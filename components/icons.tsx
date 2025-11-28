@@ -42,6 +42,7 @@ import {
   Play,
   Pause,
   RefreshCw,
+  AlertCircle,
   type LucideIcon,
 } from "lucide-react"
 
@@ -89,6 +90,7 @@ export {
   Play,
   Pause,
   RefreshCw,
+  AlertCircle,
 }
 
 export type { LucideIcon }
