@@ -244,3 +244,5 @@ export const MEMBERSHIP_BENEFITS = {
     benefits: ["24/7 VIP support", "Instant processing", "15% discount", "Custom reporting", "Area rental priority"],
   },
 }
+
+export const WAREHOUSE_LAYOUT = WAREHOUSE_CONFIG

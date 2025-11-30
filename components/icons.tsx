@@ -146,6 +146,9 @@ import {
   Droplet,
   Wind,
   Umbrella,
+  Crown,
+  Square,
+  Gift,
   type LucideIcon,
 } from "lucide-react"
 
@@ -297,6 +300,9 @@ export {
   Droplet,
   Wind,
   Umbrella,
+  Crown,
+  Square,
+  Gift,
   type LucideIcon,
 }
 
@@ -381,4 +387,7 @@ export const iconMap: Record<string, LucideIcon> = {
   server: Server,
   cloud: Cloud,
   image: ImageIcon,
+  crown: Crown,
+  square: Square,
+  gift: Gift,
 }
