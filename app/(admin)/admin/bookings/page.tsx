@@ -1,150 +1,112 @@
-"use client"
-import type { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, ArrowUpDown, Plus, Eye, Edit, Trash2 } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { DataTable } from "@/components/ui/data-table"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { mockBookings, mockCustomers, mockWarehouses } from "@/lib/mock-data"
-import { formatCurrency, formatDate } from "@/lib/utils/format"
-import type { Booking } from "@/types"
-import Link from "next/link"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Plus, Package, Building2, Eye } from "@/components/icons"
+import { mockBookings } from "@/lib/mock-data"
+import { formatCurrency, formatDate, formatNumber, getBookingTypeLabel } from "@/lib/utils/format"
 
-const columns: ColumnDef<Booking>[] = [
-  {
-    accessorKey: "booking_number",
-    header: ({ column }) => {
-      return (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Booking #
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => (
-      <Link href={`/admin/bookings/${row.original.id}`} className="font-medium text-primary hover:underline">
-        {row.getValue("booking_number")}
-      </Link>
-    ),
-  },
-  {
-    accessorKey: "customer_id",
-    header: "Customer",
-    cell: ({ row }) => {
-      const customer = mockCustomers.find((c) => c.id === row.getValue("customer_id"))
-      return (
-        <div>
-          <p className="font-medium">{customer?.full_name}</p>
-          <p className="text-xs text-muted-foreground">{customer?.company_name}</p>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "warehouse_id",
-    header: "Warehouse",
-    cell: ({ row }) => {
-      const warehouse = mockWarehouses.find((w) => w.id === row.getValue("warehouse_id"))
-      return warehouse?.name || "N/A"
-    },
-  },
-  {
-    accessorKey: "service_type",
-    header: "Service",
-    cell: ({ row }) => {
-      const type = row.getValue("service_type") as string
-      return <span className="capitalize">{type.replace("_", " ")}</span>
-    },
-  },
-  {
-    accessorKey: "start_date",
-    header: "Start Date",
-    cell: ({ row }) => formatDate(row.getValue("start_date")),
-  },
-  {
-    accessorKey: "total_amount",
-    header: ({ column }) => {
-      return (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Amount
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => formatCurrency(row.getValue("total_amount")),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => <StatusBadge type="booking" status={row.getValue("status")} />,
-  },
-  {
-    accessorKey: "payment_status",
-    header: "Payment",
-    cell: ({ row }) => <StatusBadge type="payment" status={row.getValue("payment_status")} />,
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const booking = row.original
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href={`/admin/bookings/${booking.id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Booking
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Cancel Booking
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
-  },
-]
-
-export default function BookingsPage() {
+export default function AdminBookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Bookings" description="Manage all warehouse bookings">
-        <Button asChild>
-          <Link href="/admin/bookings/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Booking
-          </Link>
+        <Button className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Booking
         </Button>
       </PageHeader>
 
-      <DataTable
-        columns={columns}
-        data={mockBookings}
-        searchKey="booking_number"
-        searchPlaceholder="Search bookings..."
-      />
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{mockBookings.length}</div>
+            <p className="text-xs text-muted-foreground">Total Bookings</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{mockBookings.filter((b) => b.status === "active").length}</div>
+            <p className="text-xs text-muted-foreground">Active</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{mockBookings.filter((b) => b.status === "pending").length}</div>
+            <p className="text-xs text-muted-foreground">Pending</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">
+              {formatCurrency(mockBookings.reduce((sum, b) => sum + b.totalAmount, 0))}
+            </div>
+            <p className="text-xs text-muted-foreground">Total Value</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All Bookings</CardTitle>
+          <CardDescription>View and manage customer bookings</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mockBookings.map((booking) => (
+                <TableRow key={booking.id}>
+                  <TableCell className="font-medium">{booking.id}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{booking.customerName}</p>
+                      <p className="text-xs text-muted-foreground">{booking.customerEmail}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {booking.type === "pallet" ? (
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      {getBookingTypeLabel(booking.type)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {booking.type === "pallet"
+                      ? `${booking.palletCount} pallets`
+                      : `${formatNumber(booking.areaSqFt || 0)} sq ft (L3)`}
+                  </TableCell>
+                  <TableCell>{formatDate(booking.startDate)}</TableCell>
+                  <TableCell>{formatCurrency(booking.totalAmount)}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={booking.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

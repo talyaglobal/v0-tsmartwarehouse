@@ -1,100 +1,77 @@
-import type { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "Terms of Service | TSmart Warehouse",
-  description: "Terms of Service for TSmart Warehouse platform",
-}
-
 export default function TermsPage() {
   return (
-    <main id="main-content" className="container mx-auto max-w-4xl px-4 py-12">
-      <h1 className="mb-8 text-3xl font-bold">Terms of Service</h1>
-      <p className="mb-4 text-sm text-muted-foreground">Last updated: January 1, 2025</p>
+    <div className="prose prose-gray dark:prose-invert max-w-4xl mx-auto">
+      <h1>Terms of Service</h1>
+      <p className="lead">Last updated: January 1, 2024</p>
 
-      <div className="prose prose-slate dark:prose-invert max-w-none">
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">1. Acceptance of Terms</h2>
-          <p className="text-muted-foreground">
-            By accessing or using TSmart Warehouse services, you agree to be bound by these Terms of Service and all
-            applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using
-            or accessing this service.
-          </p>
-        </section>
+      <h2>1. Acceptance of Terms</h2>
+      <p>
+        By accessing or using TSmart Warehouse services, you agree to be bound by these Terms of Service. If you do not
+        agree to these terms, please do not use our services.
+      </p>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">2. Service Description</h2>
-          <p className="text-muted-foreground">
-            TSmart Warehouse provides warehouse management services including but not limited to storage, inventory
-            management, fulfillment, and logistics coordination. We reserve the right to modify, suspend, or discontinue
-            any aspect of our services at any time.
-          </p>
-        </section>
+      <h2>2. Services</h2>
+      <p>TSmart Warehouse provides the following services:</p>
+      <ul>
+        <li>
+          <strong>Pallet Storage:</strong> Short and long-term storage at $17.50 per pallet per month
+        </li>
+        <li>
+          <strong>Pallet Handling:</strong> $5.00 per pallet for both inbound and outbound
+        </li>
+        <li>
+          <strong>Area Rental:</strong> $12.00 per square foot per year (minimum 40,000 sq ft, Level 3 only)
+        </li>
+        <li>
+          <strong>Value-Added Services:</strong> Including pick-and-pack, labeling, and inventory management
+        </li>
+      </ul>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">3. User Accounts</h2>
-          <p className="text-muted-foreground">
-            You are responsible for maintaining the confidentiality of your account credentials and for all activities
-            that occur under your account. You must notify us immediately of any unauthorized use of your account.
-          </p>
-        </section>
+      <h2>3. Storage Terms</h2>
+      <h3>3.1 Pallet Storage</h3>
+      <p>
+        Customers agree to store only legal goods that comply with all applicable laws and regulations. Prohibited items
+        include hazardous materials, perishables without proper cold storage arrangement, and illegal substances.
+      </p>
+      <h3>3.2 Area Rental</h3>
+      <p>
+        Area rentals are available exclusively on Level 3 of our facility with a minimum commitment of 40,000 square
+        feet. Lease terms are typically annual with renewal options.
+      </p>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">4. Acceptable Use</h2>
-          <p className="text-muted-foreground">You agree not to:</p>
-          <ul className="mt-2 list-disc space-y-2 pl-6 text-muted-foreground">
-            <li>Use the service for any unlawful purpose</li>
-            <li>Store prohibited, hazardous, or illegal items</li>
-            <li>Attempt to gain unauthorized access to our systems</li>
-            <li>Interfere with or disrupt the service</li>
-            <li>Violate any applicable laws or regulations</li>
-          </ul>
-        </section>
+      <h2>4. Pricing and Payment</h2>
+      <p>
+        Pricing is subject to change with 30 days notice. Payment is due within 30 days of invoice date. Late payments
+        may incur a 1.5% monthly interest charge.
+      </p>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">5. Liability and Insurance</h2>
-          <p className="text-muted-foreground">
-            TSmart Warehouse maintains comprehensive insurance coverage for stored items. Liability is limited to the
-            declared value of items at the time of booking. Customers are encouraged to maintain additional insurance
-            for high-value items.
-          </p>
-        </section>
+      <h2>5. Liability and Insurance</h2>
+      <p>
+        TSmart Warehouse maintains comprehensive insurance coverage. Customer goods are covered up to $10,000 per
+        occurrence unless additional coverage is arranged. Customers are encouraged to maintain their own insurance for
+        full replacement value.
+      </p>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">6. Payment Terms</h2>
-          <p className="text-muted-foreground">
-            Payment is due according to the terms specified in your service agreement. Late payments may result in
-            service suspension and additional fees. We reserve the right to exercise a lien on stored items for unpaid
-            charges.
-          </p>
-        </section>
+      <h2>6. Claims Process</h2>
+      <p>
+        Claims for damage or loss must be filed within 7 days of discovery. All claims require documentation including
+        photographs, inventory records, and value assessments.
+      </p>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">7. Termination</h2>
-          <p className="text-muted-foreground">
-            Either party may terminate services with 30 days written notice. Upon termination, you must remove all
-            stored items and settle any outstanding balances.
-          </p>
-        </section>
+      <h2>7. Termination</h2>
+      <p>
+        Either party may terminate services with 30 days written notice. All outstanding fees must be settled before
+        goods can be released.
+      </p>
 
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">8. Dispute Resolution</h2>
-          <p className="text-muted-foreground">
-            Any disputes arising from these terms shall be resolved through binding arbitration in accordance with the
-            rules of the American Arbitration Association. The arbitration shall take place in New Jersey, USA.
-          </p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">9. Contact Information</h2>
-          <p className="text-muted-foreground">
-            For questions about these Terms of Service, please contact us at:
-            <br />
-            Email: legal@tsmartwarehouse.com
-            <br />
-            Address: Elizabeth, NJ 07201
-          </p>
-        </section>
-      </div>
-    </main>
+      <h2>8. Contact</h2>
+      <p>
+        For questions about these terms, contact us at:
+        <br />
+        Email: legal@tsmart.com
+        <br />
+        Phone: +1 (555) 123-4567
+      </p>
+    </div>
   )
 }

@@ -1,47 +1,35 @@
 "use client"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Bell } from "@/components/icons"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Bell, Settings } from "lucide-react"
 
 interface WorkerHeaderProps {
   title?: string
-  showGreeting?: boolean
-  workerName?: string
 }
 
-export function WorkerHeader({ title, showGreeting = false, workerName = "David" }: WorkerHeaderProps) {
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
-
+export function WorkerHeader({ title = "TSmart Worker" }: WorkerHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b bg-background px-4 py-3">
-      <div className="flex items-center justify-between">
-        {showGreeting ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src="/worker-avatar.jpg" />
-              <AvatarFallback>DW</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="text-sm text-muted-foreground">{greeting}</p>
-              <p className="font-semibold">{workerName}</p>
-            </div>
-          </div>
-        ) : (
-          <h1 className="text-lg font-semibold">{title}</h1>
-        )}
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full bg-red-500 text-[10px] font-medium text-white flex items-center justify-center">
-              2
-            </span>
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background px-4 safe-area-top">
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+          <span className="text-sm font-bold text-primary-foreground">MW</span>
         </div>
+        <div>
+          <p className="text-sm font-medium">{title}</p>
+          <div className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-green-500"></span>
+            <span className="text-xs text-muted-foreground">Online</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center text-[10px]">
+            3
+          </Badge>
+        </Button>
       </div>
     </header>
   )

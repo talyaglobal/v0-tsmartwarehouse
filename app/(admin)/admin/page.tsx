@@ -1,127 +1,134 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatCard } from "@/components/ui/stat-card"
-import { PageHeader } from "@/components/ui/page-header"
-import { StatusBadge } from "@/components/ui/status-badge"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Package, Users, DollarSign, Warehouse, AlertTriangle, ClipboardList, Calendar } from "lucide-react"
-import { mockDashboardStats, mockBookings, mockIncidents, mockTasks, mockCustomers } from "@/lib/mock-data"
-import { formatCurrency, formatDate, formatRelativeTime } from "@/lib/utils/format"
 import Link from "next/link"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatusBadge, SeverityBadge } from "@/components/ui/status-badge"
+import { Package, DollarSign, Users, Building2, AlertCircle, ClipboardList } from "@/components/icons"
+import { mockBookings, mockIncidents, mockTasks, mockDashboardStats } from "@/lib/mock-data"
+import { WAREHOUSE_CONFIG } from "@/lib/constants"
+import { formatCurrency, formatNumber } from "@/lib/utils/format"
 
-export default function AdminDashboard() {
+export default function AdminDashboardPage() {
   const stats = mockDashboardStats
   const recentBookings = mockBookings.slice(0, 5)
   const openIncidents = mockIncidents.filter((i) => i.status !== "closed")
-  const pendingTasks = mockTasks.filter((t) => t.status === "pending" || t.status === "in_progress")
+  const pendingTasks = mockTasks.filter((t) => t.status === "pending" || t.status === "assigned")
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" description="Overview of your warehouse operations">
-        <Button asChild>
-          <Link href="/admin/bookings/new">
-            <Calendar className="mr-2 h-4 w-4" />
-            New Booking
-          </Link>
-        </Button>
-      </PageHeader>
+      <PageHeader title="Admin Dashboard" description="Overview of warehouse operations" />
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Revenue"
-          value={formatCurrency(stats.total_revenue)}
+          value={formatCurrency(stats.totalRevenue)}
           icon={DollarSign}
-          trend={{ value: 12.5, isPositive: true }}
-          description="from last month"
+          trend={{ value: 12, isPositive: true }}
+          subtitle="from last month"
         />
         <StatCard
           title="Active Bookings"
-          value={stats.active_bookings}
+          value={stats.activeBookings}
           icon={Package}
           trend={{ value: 8, isPositive: true }}
-          description="from last month"
-        />
-        <StatCard
-          title="Total Customers"
-          value={stats.total_customers}
-          icon={Users}
-          trend={{ value: 4, isPositive: true }}
-          description={`${stats.new_customers_this_month} new this month`}
+          subtitle="across all floors"
         />
         <StatCard
           title="Warehouse Utilization"
-          value={`${stats.warehouse_utilization}%`}
-          icon={Warehouse}
-          description="across all facilities"
+          value={`${stats.warehouseUtilization}%`}
+          icon={Building2}
+          subtitle={`${formatNumber(WAREHOUSE_CONFIG.totalSqFt)} sq ft total`}
+        />
+        <StatCard
+          title="Total Customers"
+          value={stats.totalCustomers}
+          icon={Users}
+          trend={{ value: 5, isPositive: true }}
+          subtitle="active accounts"
         />
       </div>
 
-      {/* Secondary Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          title="Pending Bookings"
-          value={stats.pending_bookings}
-          icon={Calendar}
-          className="border-l-4 border-l-amber-500"
-        />
-        <StatCard
-          title="Open Incidents"
-          value={stats.open_incidents}
-          icon={AlertTriangle}
-          className="border-l-4 border-l-red-500"
-        />
-        <StatCard
-          title="Pending Tasks"
-          value={stats.pending_tasks}
-          icon={ClipboardList}
-          className="border-l-4 border-l-blue-500"
-        />
-      </div>
+      {/* Warehouse Layout Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Warehouse Layout - 3 Floors</CardTitle>
+          <CardDescription>
+            {formatNumber(WAREHOUSE_CONFIG.totalSqFt)} sq ft total capacity across 3 floors
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            {WAREHOUSE_CONFIG.floors.map((floor) => {
+              const totalOccupied = floor.halls.reduce((sum, h) => sum + h.occupiedSqFt, 0)
+              const utilization = Math.round((totalOccupied / floor.totalSqFt) * 100)
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
+              return (
+                <div key={floor.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold">{floor.name}</h4>
+                    {floor.floorNumber === 3 && <Badge variant="secondary">Area Rental</Badge>}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total</span>
+                      <span>{formatNumber(floor.totalSqFt)} sq ft</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Utilization</span>
+                      <span className={utilization > 80 ? "text-amber-600" : "text-green-600"}>{utilization}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${utilization > 80 ? "bg-amber-500" : "bg-green-500"}`}
+                        style={{ width: `${utilization}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      {floor.halls.map((hall) => (
+                        <div key={hall.id} className="text-xs p-2 bg-muted rounded">
+                          <div className="font-medium">Hall {hall.hallName}</div>
+                          <div className="text-muted-foreground">{formatNumber(hall.availableSqFt)} available</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity */}
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Bookings */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Bookings</CardTitle>
-              <CardDescription>Latest booking requests</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/bookings">View All</Link>
-            </Button>
+            <CardTitle className="text-base">Recent Bookings</CardTitle>
+            <Link href="/admin/bookings">
+              <Button variant="ghost" size="sm">
+                View All
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentBookings.map((booking) => {
-                const customer = mockCustomers.find((c) => c.id === booking.customer_id)
-                return (
-                  <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback>
-                          {customer?.full_name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{booking.booking_number}</p>
-                        <p className="text-xs text-muted-foreground">{customer?.company_name || customer?.full_name}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{formatCurrency(booking.total_amount)}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(booking.start_date)}</p>
-                      </div>
-                      <StatusBadge type="booking" status={booking.status} />
-                    </div>
+            <div className="space-y-3">
+              {recentBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium">{booking.customerName}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {booking.type === "pallet"
+                        ? `${booking.palletCount} pallets`
+                        : `${formatNumber(booking.areaSqFt || 0)} sq ft`}
+                    </p>
                   </div>
-                )
-              })}
+                  <StatusBadge status={booking.status} />
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -129,44 +136,28 @@ export default function AdminDashboard() {
         {/* Open Incidents */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Open Incidents</CardTitle>
-              <CardDescription>Requires attention</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/incidents">View All</Link>
-            </Button>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              Open Incidents
+            </CardTitle>
+            <Link href="/admin/incidents">
+              <Button variant="ghost" size="sm">
+                View All
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {openIncidents.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <AlertTriangle className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                  <p>No open incidents</p>
-                </div>
+                <p className="text-sm text-muted-foreground text-center py-4">No open incidents</p>
               ) : (
                 openIncidents.map((incident) => (
-                  <div key={incident.id} className="flex items-start gap-3 p-3 rounded-lg border">
-                    <div
-                      className={`mt-0.5 h-2 w-2 rounded-full ${
-                        incident.severity === "critical"
-                          ? "bg-red-500"
-                          : incident.severity === "high"
-                            ? "bg-orange-500"
-                            : incident.severity === "medium"
-                              ? "bg-amber-500"
-                              : "bg-gray-400"
-                      }`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{incident.title}</p>
-                        <StatusBadge type="severity" status={incident.severity} />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {incident.incident_number} • {formatRelativeTime(incident.reported_at)}
-                      </p>
+                  <div key={incident.id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="font-medium">{incident.title}</p>
+                      <p className="text-muted-foreground text-xs">{incident.location}</p>
                     </div>
+                    <SeverityBadge severity={incident.severity} />
                   </div>
                 ))
               )}
@@ -175,27 +166,27 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Pending Tasks */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Pending Tasks</CardTitle>
-              <CardDescription>Tasks requiring attention</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/tasks">View All</Link>
-            </Button>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Pending Tasks
+            </CardTitle>
+            <Link href="/admin/tasks">
+              <Button variant="ghost" size="sm">
+                View All
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-3">
               {pendingTasks.map((task) => (
-                <div key={task.id} className="p-4 rounded-lg border space-y-2">
-                  <div className="flex items-center justify-between">
-                    <StatusBadge type="priority" status={task.priority} />
-                    <StatusBadge type="task" status={task.status} />
+                <div key={task.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium">{task.title}</p>
+                    <p className="text-muted-foreground text-xs">{task.assignedToName}</p>
                   </div>
-                  <h4 className="font-medium text-sm">{task.title}</h4>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
-                  {task.due_date && <p className="text-xs text-muted-foreground">Due: {formatDate(task.due_date)}</p>}
+                  <StatusBadge status={task.status} />
                 </div>
               ))}
             </div>

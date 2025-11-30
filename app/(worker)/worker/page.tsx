@@ -1,121 +1,139 @@
-"use client"
-import { WorkerHeader } from "@/components/worker/worker-header"
-import { TaskCard } from "@/components/worker/task-card"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { mockTasks, mockWorkers } from "@/lib/mock-data"
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle, ChevronRight, QrCode } from "lucide-react"
-import Link from "next/link"
+import { PriorityBadge } from "@/components/ui/status-badge"
+import { ClipboardList, ArrowRight, Timer, Package, Truck } from "@/components/icons"
+import { mockTasks, mockShifts } from "@/lib/mock-data"
 
 export default function WorkerHomePage() {
-  const worker = mockWorkers[0]
-  const myTasks = mockTasks.filter((t) => t.assigned_to === worker.id)
-  const pendingTasks = myTasks.filter((t) => t.status === "pending")
-  const inProgressTasks = myTasks.filter((t) => t.status === "in_progress")
-  const completedToday = 3 // Mock value
-  const totalAssigned = myTasks.length
-
-  const urgentTasks = myTasks.filter(
-    (t) => (t.priority === "urgent" || t.priority === "high") && t.status !== "completed",
-  )
+  const todayTasks = mockTasks
+  const completedToday = todayTasks.filter((t) => t.status === "completed").length
+  const pendingTasks = todayTasks.filter((t) => t.status === "pending" || t.status === "assigned")
+  const currentShift = mockShifts[0]
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <WorkerHeader showGreeting workerName={worker.full_name.split(" ")[0]} />
-
-      <main className="flex-1 p-4 space-y-4">
-        {/* Today's Progress */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Today's Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Tasks Completed</span>
-                <span className="font-medium">
-                  {completedToday} / {totalAssigned}
-                </span>
-              </div>
-              <Progress value={(completedToday / totalAssigned) * 100} className="h-2" />
+    <div className="p-4 space-y-4">
+      {/* Shift Status */}
+      <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm opacity-80">Current Shift</p>
+              <p className="text-2xl font-bold">8h 30m</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+              <Timer className="h-6 w-6" />
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <div>
+              <span className="opacity-80">Check-in:</span> 6:00 AM
+            </div>
+            <div>
+              <span className="opacity-80">Tasks:</span> {completedToday}/{todayTasks.length}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-3 text-center">
-              <ClipboardList className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-              <p className="text-xl font-bold">{pendingTasks.length}</p>
+      {/* Task Progress */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>Today's Progress</span>
+            <Badge variant="secondary">{Math.round((completedToday / todayTasks.length) * 100)}%</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Progress value={(completedToday / todayTasks.length) * 100} className="h-2 mb-4" />
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-lg font-bold">{pendingTasks.length}</p>
               <p className="text-xs text-muted-foreground">Pending</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <Clock className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-              <p className="text-xl font-bold">{inProgressTasks.length}</p>
-              <p className="text-xs text-muted-foreground">In Progress</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-              <p className="text-xl font-bold">{completedToday}</p>
-              <p className="text-xs text-muted-foreground">Done Today</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Scan Button */}
-        <Link href="/worker/scan">
-          <Button className="w-full h-14 text-base" size="lg">
-            <QrCode className="mr-2 h-5 w-5" />
-            Quick Scan
-          </Button>
-        </Link>
-
-        {/* Urgent Tasks */}
-        {urgentTasks.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-4 w-4" />
-              <h2 className="font-semibold">Urgent Tasks</h2>
             </div>
-            {urgentTasks.slice(0, 2).map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-lg font-bold">{todayTasks.filter((t) => t.status === "in-progress").length}</p>
+              <p className="text-xs text-muted-foreground">In Progress</p>
+            </div>
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-lg font-bold text-green-600">{completedToday}</p>
+              <p className="text-xs text-muted-foreground">Completed</p>
+            </div>
           </div>
-        )}
+        </CardContent>
+      </Card>
 
-        {/* Current Tasks */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">My Tasks</h2>
-            <Link href="/worker/tasks">
-              <Button variant="ghost" size="sm">
-                View All
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/worker/scan">
+          <Card className="hover:border-primary transition-colors cursor-pointer">
+            <CardContent className="pt-6 text-center">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                <Package className="h-6 w-6 text-primary" />
+              </div>
+              <p className="font-medium">Scan Pallet</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/worker/tasks">
+          <Card className="hover:border-primary transition-colors cursor-pointer">
+            <CardContent className="pt-6 text-center">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                <ClipboardList className="h-6 w-6 text-primary" />
+              </div>
+              <p className="font-medium">View Tasks</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Pending Tasks */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Pending Tasks</CardTitle>
+          <Link href="/worker/tasks">
+            <Button variant="ghost" size="sm" className="gap-1 text-xs">
+              See All <ArrowRight className="h-3 w-3" />
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {pendingTasks.slice(0, 3).map((task) => (
+            <Link key={task.id} href={`/worker/tasks/${task.id}`}>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      task.type === "receiving"
+                        ? "bg-blue-100 text-blue-600"
+                        : task.type === "putaway"
+                          ? "bg-green-100 text-green-600"
+                          : task.type === "picking"
+                            ? "bg-amber-100 text-amber-600"
+                            : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {task.type === "receiving" ? (
+                      <Truck className="h-5 w-5" />
+                    ) : task.type === "putaway" ? (
+                      <Package className="h-5 w-5" />
+                    ) : (
+                      <ClipboardList className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{task.title}</p>
+                    <p className="text-xs text-muted-foreground">{task.zone}</p>
+                  </div>
+                </div>
+                <PriorityBadge priority={task.priority} />
+              </div>
             </Link>
-          </div>
-          {myTasks
-            .filter((t) => t.status !== "completed")
-            .slice(0, 3)
-            .map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          {myTasks.filter((t) => t.status !== "completed").length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-emerald-500 opacity-50" />
-                <p className="text-muted-foreground">All tasks completed!</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </main>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   )
 }

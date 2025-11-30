@@ -9,47 +9,44 @@ export default function AuthLayout({
 }) {
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 flex-col justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-foreground rounded-lg flex items-center justify-center">
-            <Warehouse className="w-6 h-6 text-primary" />
-          </div>
-          <span className="text-xl font-semibold text-primary-foreground">T Smart Warehouse</span>
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 flex-col justify-between text-primary-foreground">
+        <Link href="/" className="flex items-center gap-2">
+          <Warehouse className="h-8 w-8" />
+          <span className="text-xl font-bold">TSmart Warehouse</span>
         </Link>
-
-        <div className="space-y-6">
-          <h1 className="text-4xl font-bold text-primary-foreground leading-tight">
-            Professional warehouse management made simple
-          </h1>
-          <p className="text-primary-foreground/80 text-lg">
-            Self-service booking, real-time tracking, and enterprise-grade tools for your storage needs.
+        <div className="space-y-4">
+          <h1 className="text-4xl font-bold">Professional Warehouse Storage Solutions</h1>
+          <p className="text-lg opacity-90">
+            240,000 sq ft of secure, climate-controlled storage space. Flexible pallet storage and dedicated area
+            rentals.
           </p>
-          <div className="grid grid-cols-2 gap-6 pt-4">
+          <div className="grid grid-cols-3 gap-4 pt-8">
             <div>
-              <div className="text-3xl font-bold text-primary-foreground">1.2M</div>
-              <div className="text-sm text-primary-foreground/70">Sq Ft Facility</div>
+              <div className="text-3xl font-bold">$5</div>
+              <div className="text-sm opacity-80">Pallet In</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-primary-foreground">1,000</div>
-              <div className="text-sm text-primary-foreground/70">Pallet Capacity</div>
+              <div className="text-3xl font-bold">$17.50</div>
+              <div className="text-sm opacity-80">Per Pallet/Mo</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">$12</div>
+              <div className="text-sm opacity-80">Sq Ft/Year</div>
             </div>
           </div>
         </div>
-
-        <p className="text-sm text-primary-foreground/60">Elizabeth, NJ • 5 miles from NJ Port</p>
+        <p className="text-sm opacity-70">&copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.</p>
       </div>
 
-      {/* Right Side - Auth Forms */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
+      {/* Right Panel - Auth Form */}
+      <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
-          <div className="lg:hidden mb-8">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
-                <Warehouse className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="font-semibold text-lg">T Smart Warehouse</span>
+          <div className="lg:hidden mb-8 text-center">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <Warehouse className="h-8 w-8 text-primary" />
+              <span className="text-xl font-bold">TSmart Warehouse</span>
             </Link>
           </div>
           {children}

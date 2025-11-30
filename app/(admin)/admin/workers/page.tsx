@@ -1,149 +1,127 @@
 "use client"
-import type { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, ArrowUpDown, Plus, Eye, Edit, Calendar } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DataTable } from "@/components/ui/data-table"
-import { PageHeader } from "@/components/ui/page-header"
-import { mockWorkers, mockWarehouses } from "@/lib/mock-data"
-import { formatCurrency, getInitials } from "@/lib/utils/format"
-import type { Worker } from "@/types"
-import Link from "next/link"
 
-const columns: ColumnDef<Worker>[] = [
-  {
-    accessorKey: "full_name",
-    header: ({ column }) => {
-      return (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Worker
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => {
-      const worker = row.original
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={worker.avatar_url || "/placeholder.svg"} />
-            <AvatarFallback>{getInitials(worker.full_name)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{worker.full_name}</p>
-            <p className="text-xs text-muted-foreground">{worker.employee_id}</p>
-          </div>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "department",
-    header: "Department",
-  },
-  {
-    accessorKey: "warehouse_id",
-    header: "Warehouse",
-    cell: ({ row }) => {
-      const warehouse = mockWarehouses.find((w) => w.id === row.getValue("warehouse_id"))
-      return warehouse?.name || "N/A"
-    },
-  },
-  {
-    accessorKey: "shift",
-    header: "Shift",
-    cell: ({ row }) => <span className="capitalize">{row.getValue("shift")}</span>,
-  },
-  {
-    accessorKey: "hourly_rate",
-    header: "Rate",
-    cell: ({ row }) => `${formatCurrency(row.getValue("hourly_rate"))}/hr`,
-  },
-  {
-    accessorKey: "is_available",
-    header: "Status",
-    cell: ({ row }) => (
-      <span
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          row.getValue("is_available") ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700"
-        }`}
-      >
-        {row.getValue("is_available") ? "Available" : "Busy"}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "skills",
-    header: "Skills",
-    cell: ({ row }) => {
-      const skills = row.getValue("skills") as string[]
-      return (
-        <div className="flex gap-1 flex-wrap max-w-[200px]">
-          {skills.slice(0, 2).map((skill) => (
-            <span key={skill} className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs">
-              {skill}
-            </span>
-          ))}
-          {skills.length > 2 && <span className="text-xs text-muted-foreground">+{skills.length - 2}</span>}
-        </div>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const worker = row.original
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href={`/admin/workers/${worker.id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Worker
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Calendar className="mr-2 h-4 w-4" />
-              View Schedule
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
-  },
-]
+import { useState } from "react"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatCard } from "@/components/ui/stat-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Users, Search, MoreHorizontal, Clock, CheckCircle, Plus, UserCheck } from "@/components/icons"
+import { mockUsers, mockShifts, mockTasks } from "@/lib/mock-data"
 
 export default function WorkersPage() {
+  const [search, setSearch] = useState("")
+  const workers = mockUsers.filter((u) => u.role === "worker")
+
+  const getWorkerStats = (workerId: string) => {
+    const shifts = mockShifts.filter((s) => s.workerId === workerId)
+    const tasks = mockTasks.filter((t) => t.assignedTo === workerId)
+    const completedTasks = tasks.filter((t) => t.status === "completed").length
+    const totalHours = shifts.reduce((sum, s) => sum + (s.hoursWorked || 0), 0)
+    return { shifts: shifts.length, completedTasks, totalHours }
+  }
+
+  const isOnShift = (workerId: string) => {
+    return mockShifts.some((s) => s.workerId === workerId && !s.checkOutTime)
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Workers" description="Manage warehouse staff">
-        <Button asChild>
-          <Link href="/admin/workers/new">
+      <PageHeader
+        title="Workers"
+        description="Manage warehouse staff and schedules"
+        action={
+          <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add Worker
-          </Link>
-        </Button>
-      </PageHeader>
+          </Button>
+        }
+      />
 
-      <DataTable columns={columns} data={mockWorkers} searchKey="full_name" searchPlaceholder="Search workers..." />
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard title="Total Workers" value="12" icon={Users} />
+        <StatCard title="On Shift Now" value="8" icon={UserCheck} description="Currently working" />
+        <StatCard title="Tasks Today" value="24" icon={CheckCircle} />
+        <StatCard title="Avg Hours/Week" value="38.5" icon={Clock} />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Worker Directory</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search workers..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Worker</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Tasks Completed</TableHead>
+                <TableHead>Hours This Week</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {workers.map((worker) => {
+                const stats = getWorkerStats(worker.id)
+                const onShift = isOnShift(worker.id)
+                return (
+                  <TableRow key={worker.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-medium">
+                          {worker.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium">{worker.name}</p>
+                          <p className="text-sm text-muted-foreground">{worker.email}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={onShift ? "default" : "secondary"}>{onShift ? "On Shift" : "Off Duty"}</Badge>
+                    </TableCell>
+                    <TableCell>{stats.completedTasks} tasks</TableCell>
+                    <TableCell>{stats.totalHours.toFixed(1)} hrs</TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">{worker.phone}</span>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>View Profile</DropdownMenuItem>
+                          <DropdownMenuItem>View Schedule</DropdownMenuItem>
+                          <DropdownMenuItem>Assign Task</DropdownMenuItem>
+                          <DropdownMenuItem>View Performance</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

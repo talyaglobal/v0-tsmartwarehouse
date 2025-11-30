@@ -1,136 +1,98 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { signOut } from "@/lib/supabase/auth"
 import {
   Warehouse,
-  BarChart3,
-  Calendar,
+  LayoutDashboard,
+  Package,
   FileText,
-  Building2,
+  Bell,
   Settings,
   LogOut,
-  Menu,
-  X,
+  User,
+  CreditCard,
+  AlertCircle,
   Plus,
 } from "@/components/icons"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
-  { href: "/dashboard/bookings", label: "Bookings", icon: Calendar },
-  { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
-  { href: "/dashboard/membership", label: "Membership", icon: Building2 },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+const navigation = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Bookings", href: "/dashboard/bookings", icon: Package, badge: 3 },
+  { name: "Invoices", href: "/dashboard/invoices", icon: FileText },
+  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2 },
+  { name: "Membership", href: "/dashboard/membership", icon: CreditCard },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
-interface SidebarProps {
-  userName?: string
-  companyName?: string
-}
-
-export function Sidebar({ userName, companyName }: SidebarProps) {
+export function DashboardSidebar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
-
-  async function handleSignOut() {
-    await signOut()
-    router.push("/login")
-    router.refresh()
-  }
 
   return (
-    <>
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-40 flex items-center justify-between px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Warehouse className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold">T Smart</span>
-        </Link>
-        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2" aria-label="Toggle menu">
-          {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+    <div className="flex h-full w-64 flex-col border-r bg-card">
+      {/* Logo */}
+      <div className="flex h-16 items-center gap-2 border-b px-6">
+        <Warehouse className="h-6 w-6 text-primary" />
+        <span className="font-bold">TSmart</span>
       </div>
 
-      {/* Mobile Overlay */}
-      {isMobileOpen && (
-        <div className="lg:hidden fixed inset-0 bg-foreground/20 z-40" onClick={() => setIsMobileOpen(false)} />
-      )}
+      {/* New Booking Button */}
+      <div className="p-4">
+        <Link href="/dashboard/bookings/new">
+          <Button className="w-full gap-2">
+            <Plus className="h-4 w-4" />
+            New Booking
+          </Button>
+        </Link>
+      </div>
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed top-0 left-0 h-full w-64 bg-sidebar border-r border-sidebar-border z-50 transition-transform duration-300 lg:translate-x-0",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Warehouse className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="font-semibold">T Smart Warehouse</span>
-            </Link>
-          </div>
-
-          {/* New Booking Button */}
-          <div className="p-4">
-            <Button asChild className="w-full">
-              <Link href="/dashboard/bookings/new">
-                <Plus className="w-4 h-4 mr-2" />
-                New Booking
-              </Link>
-            </Button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </nav>
-
-          {/* User Info & Logout */}
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="mb-3 px-2">
-              <p className="font-medium text-sm truncate">{userName || "User"}</p>
-              <p className="text-xs text-muted-foreground truncate">{companyName || "No company"}</p>
-            </div>
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-muted-foreground hover:text-foreground"
-              onClick={handleSignOut}
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1 px-3">
+        {navigation.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
             >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign out
-            </Button>
+              <item.icon className="h-4 w-4" />
+              {item.name}
+              {item.badge && (
+                <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                  {item.badge}
+                </Badge>
+              )}
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* User Section */}
+      <div className="border-t p-4">
+        <div className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <User className="h-4 w-4" />
+          </div>
+          <div className="flex-1 truncate">
+            <p className="text-sm font-medium">Sarah Johnson</p>
+            <p className="text-xs text-muted-foreground">Gold Member</p>
           </div>
         </div>
-      </aside>
-    </>
+        <Button variant="ghost" className="w-full justify-start gap-2 mt-2 text-muted-foreground">
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
+      </div>
+    </div>
   )
 }

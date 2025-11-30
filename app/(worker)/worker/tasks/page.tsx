@@ -1,79 +1,100 @@
 "use client"
 
-import * as React from "react"
-import { WorkerHeader } from "@/components/worker/worker-header"
-import { TaskCard } from "@/components/worker/task-card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
-import { mockTasks, mockWorkers } from "@/lib/mock-data"
-import { Search } from "lucide-react"
+import { useState } from "react"
+import Link from "next/link"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PriorityBadge, StatusBadge } from "@/components/ui/status-badge"
+import { ClipboardList, Truck, Package, Clock, MapPin } from "@/components/icons"
+import { mockTasks } from "@/lib/mock-data"
+import { formatDateTime } from "@/lib/utils/format"
+import type { TaskStatus } from "@/types"
 
 export default function WorkerTasksPage() {
-  const [search, setSearch] = React.useState("")
-  const worker = mockWorkers[0]
-  const myTasks = mockTasks.filter((t) => t.assigned_to === worker.id)
+  const [filter, setFilter] = useState<"all" | TaskStatus>("all")
 
-  const filteredTasks = myTasks.filter((task) => task.title.toLowerCase().includes(search.toLowerCase()))
-
-  const pendingTasks = filteredTasks.filter((t) => t.status === "pending")
-  const inProgressTasks = filteredTasks.filter((t) => t.status === "in_progress")
-  const completedTasks = filteredTasks.filter((t) => t.status === "completed")
+  const filteredTasks = filter === "all" ? mockTasks : mockTasks.filter((t) => t.status === filter)
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <WorkerHeader title="My Tasks" />
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">My Tasks</h1>
+        <Badge variant="secondary">{mockTasks.length} Total</Badge>
+      </div>
 
-      <main className="flex-1 p-4 space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search tasks..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+        <TabsList className="grid grid-cols-4 w-full">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="in-progress">Active</TabsTrigger>
+          <TabsTrigger value="completed">Done</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        {/* Tabs */}
-        <Tabs defaultValue="pending" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending" className="text-xs">
-              Pending ({pendingTasks.length})
-            </TabsTrigger>
-            <TabsTrigger value="in_progress" className="text-xs">
-              In Progress ({inProgressTasks.length})
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="text-xs">
-              Done ({completedTasks.length})
-            </TabsTrigger>
-          </TabsList>
+      <div className="space-y-3">
+        {filteredTasks.map((task) => (
+          <Link key={task.id} href={`/worker/tasks/${task.id}`}>
+            <Card className="hover:border-primary transition-colors">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                        task.type === "receiving"
+                          ? "bg-blue-100 text-blue-600"
+                          : task.type === "putaway"
+                            ? "bg-green-100 text-green-600"
+                            : task.type === "picking"
+                              ? "bg-amber-100 text-amber-600"
+                              : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {task.type === "receiving" ? (
+                        <Truck className="h-4 w-4" />
+                      ) : task.type === "putaway" ? (
+                        <Package className="h-4 w-4" />
+                      ) : (
+                        <ClipboardList className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{task.title}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{task.type}</p>
+                    </div>
+                  </div>
+                  <PriorityBadge priority={task.priority} />
+                </div>
 
-          <TabsContent value="pending" className="mt-4 space-y-3">
-            {pendingTasks.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No pending tasks</p>
-            ) : (
-              pendingTasks.map((task) => <TaskCard key={task.id} task={task} />)
-            )}
-          </TabsContent>
+                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{task.description}</p>
 
-          <TabsContent value="in_progress" className="mt-4 space-y-3">
-            {inProgressTasks.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No tasks in progress</p>
-            ) : (
-              inProgressTasks.map((task) => <TaskCard key={task.id} task={task} />)
-            )}
-          </TabsContent>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {task.zone}
+                    </span>
+                    {task.dueDate && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDateTime(task.dueDate)}
+                      </span>
+                    )}
+                  </div>
+                  <StatusBadge status={task.status} />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
 
-          <TabsContent value="completed" className="mt-4 space-y-3">
-            {completedTasks.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No completed tasks</p>
-            ) : (
-              completedTasks.map((task) => <TaskCard key={task.id} task={task} />)
-            )}
-          </TabsContent>
-        </Tabs>
-      </main>
+        {filteredTasks.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <ClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No tasks found</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,233 +1,243 @@
 "use client"
 
-import * as React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BarChart3, TrendingUp, DollarSign, Users, Download } from "@/components/icons"
+import { formatCurrency } from "@/lib/utils/format"
+import { mockDashboardStats } from "@/lib/mock-data"
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts"
-import { DollarSign, Package, Users, TrendingUp, Download } from "lucide-react"
-import { mockDashboardStats, mockRevenueData, mockWarehouses } from "@/lib/mock-data"
-import { formatCurrency } from "@/lib/utils/format"
 
-const serviceDistribution = [
-  { name: "Storage", value: 45, color: "#3b82f6" },
-  { name: "Fulfillment", value: 30, color: "#10b981" },
-  { name: "Cross-Dock", value: 15, color: "#f59e0b" },
-  { name: "Value-Added", value: 10, color: "#8b5cf6" },
+const revenueData = [
+  { month: "Jan", pallet: 85000, areaRental: 40000 },
+  { month: "Feb", pallet: 92000, areaRental: 40000 },
+  { month: "Mar", pallet: 88000, areaRental: 40000 },
+  { month: "Apr", pallet: 95000, areaRental: 40000 },
+  { month: "May", pallet: 102000, areaRental: 80000 },
+  { month: "Jun", pallet: 125000, areaRental: 80000 },
 ]
 
-const warehouseUtilization = mockWarehouses.map((w) => ({
-  name: w.code,
-  utilization: Math.round((w.used_sqft / w.capacity_sqft) * 100),
-  capacity: w.capacity_sqft,
-}))
+const utilizationData = [
+  { month: "Jan", floor1: 65, floor2: 58, floor3: 25 },
+  { month: "Feb", floor1: 68, floor2: 62, floor3: 25 },
+  { month: "Mar", floor1: 70, floor2: 65, floor3: 50 },
+  { month: "Apr", floor1: 72, floor2: 68, floor3: 50 },
+  { month: "May", floor1: 75, floor2: 70, floor3: 50 },
+  { month: "Jun", floor1: 78, floor2: 72, floor3: 50 },
+]
+
+const serviceBreakdown = [
+  { name: "Pallet Storage", value: 65, color: "#3b82f6" },
+  { name: "Area Rental", value: 25, color: "#10b981" },
+  { name: "Handling Fees", value: 10, color: "#f59e0b" },
+]
 
 export default function AnalyticsPage() {
-  const [period, setPeriod] = React.useState("6m")
-  const stats = mockDashboardStats
-
   return (
     <div className="space-y-6">
-      <PageHeader title="Analytics" description="Insights and performance metrics">
-        <div className="flex items-center gap-2">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="3m">Last 3 months</SelectItem>
-              <SelectItem value="6m">Last 6 months</SelectItem>
-              <SelectItem value="1y">Last year</SelectItem>
-            </SelectContent>
-          </Select>
+      <PageHeader
+        title="Analytics"
+        description="Revenue, utilization, and performance metrics"
+        action={
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
-            Export
+            Export Report
           </Button>
-        </div>
-      </PageHeader>
+        }
+      />
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           title="Total Revenue"
-          value={formatCurrency(stats.total_revenue)}
+          value={formatCurrency(mockDashboardStats.totalRevenue)}
           icon={DollarSign}
-          trend={{ value: 12.5, isPositive: true }}
-          description="vs last period"
+          trend={{ value: 15, isPositive: true }}
         />
         <StatCard
-          title="Total Bookings"
-          value={stats.total_bookings}
-          icon={Package}
-          trend={{ value: 8.2, isPositive: true }}
-          description="vs last period"
-        />
-        <StatCard
-          title="Total Customers"
-          value={stats.total_customers}
-          icon={Users}
-          trend={{ value: 5.1, isPositive: true }}
-          description="vs last period"
-        />
-        <StatCard
-          title="Avg. Utilization"
-          value={`${stats.warehouse_utilization}%`}
+          title="Monthly Revenue"
+          value={formatCurrency(mockDashboardStats.monthlyRevenue)}
           icon={TrendingUp}
-          trend={{ value: 2.3, isPositive: true }}
-          description="across warehouses"
+          trend={{ value: 8, isPositive: true }}
+        />
+        <StatCard
+          title="Utilization"
+          value={mockDashboardStats.warehouseUtilization + "%"}
+          icon={BarChart3}
+          description="Across all floors"
+        />
+        <StatCard
+          title="Active Customers"
+          value={mockDashboardStats.totalCustomers.toString()}
+          icon={Users}
+          trend={{ value: 5, isPositive: true }}
         />
       </div>
 
-      {/* Revenue Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue Overview</CardTitle>
-          <CardDescription>Monthly revenue and booking trends</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockRevenueData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} className="text-xs" />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  className="text-xs"
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="rounded-lg border bg-background p-2 shadow-sm">
-                          <p className="text-sm font-medium">{label}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Revenue: {formatCurrency(payload[0].value as number)}
-                          </p>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorRevenue)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+      <Tabs defaultValue="revenue" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="utilization">Utilization</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="revenue">
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue by Service Type</CardTitle>
+              <CardDescription>Monthly breakdown of pallet storage vs area rental revenue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(value) => `$${value / 1000}k`} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Bar dataKey="pallet" name="Pallet Services" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="areaRental" name="Area Rental" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="utilization">
+          <Card>
+            <CardHeader>
+              <CardTitle>Floor Utilization Trends</CardTitle>
+              <CardDescription>Occupancy percentage by floor over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={utilizationData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(value) => `${value}%`} />
+                    <Tooltip
+                      formatter={(value: number) => `${value}%`}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Line type="monotone" dataKey="floor1" name="Floor 1" stroke="#3b82f6" strokeWidth={2} />
+                    <Line type="monotone" dataKey="floor2" name="Floor 2" stroke="#10b981" strokeWidth={2} />
+                    <Line type="monotone" dataKey="floor3" name="Floor 3" stroke="#f59e0b" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="services">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue by Service</CardTitle>
+                <CardDescription>Distribution of revenue sources</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={serviceBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {serviceBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => `${value}%`}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {serviceBreakdown.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-sm">{item.name}</span>
+                      </div>
+                      <span className="text-sm font-medium">{item.value}%</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Key Metrics</CardTitle>
+                <CardDescription>Performance indicators</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Avg. Revenue per Customer</span>
+                    <span className="font-medium">{formatCurrency(14367)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Customer Retention Rate</span>
+                    <span className="font-medium">94%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Avg. Booking Duration</span>
+                    <span className="font-medium">4.2 months</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Storage Efficiency</span>
+                    <span className="font-medium">87%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Area Rental Rate</span>
+                    <span className="font-medium">$12/sq ft/year</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Bottom Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Warehouse Utilization */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Warehouse Utilization</CardTitle>
-            <CardDescription>Capacity usage by facility</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={warehouseUtilization} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                  <YAxis dataKey="name" type="category" width={80} />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="rounded-lg border bg-background p-2 shadow-sm">
-                            <p className="text-sm font-medium">{payload[0].payload.name}</p>
-                            <p className="text-sm text-muted-foreground">Utilization: {payload[0].value}%</p>
-                          </div>
-                        )
-                      }
-                      return null
-                    }}
-                  />
-                  <Bar dataKey="utilization" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Service Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Service Distribution</CardTitle>
-            <CardDescription>Revenue by service type</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={serviceDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {serviceDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="rounded-lg border bg-background p-2 shadow-sm">
-                            <p className="text-sm font-medium">{payload[0].name}</p>
-                            <p className="text-sm text-muted-foreground">{payload[0].value}% of revenue</p>
-                          </div>
-                        )
-                      }
-                      return null
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -1,143 +1,145 @@
 "use client"
-import type { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, ArrowUpDown, Plus, Eye, Edit, CheckCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { DataTable } from "@/components/ui/data-table"
-import { PageHeader } from "@/components/ui/page-header"
-import { StatusBadge } from "@/components/ui/status-badge"
-import { mockIncidents, mockBookings } from "@/lib/mock-data"
-import { formatRelativeTime } from "@/lib/utils/format"
-import type { Incident } from "@/types"
-import Link from "next/link"
 
-const columns: ColumnDef<Incident>[] = [
-  {
-    accessorKey: "incident_number",
-    header: "Incident #",
-    cell: ({ row }) => (
-      <Link href={`/admin/incidents/${row.original.id}`} className="font-medium text-primary hover:underline">
-        {row.getValue("incident_number")}
-      </Link>
-    ),
-  },
-  {
-    accessorKey: "title",
-    header: "Title",
-    cell: ({ row }) => <p className="max-w-[200px] truncate">{row.getValue("title")}</p>,
-  },
-  {
-    accessorKey: "type",
-    header: "Type",
-    cell: ({ row }) => <span className="capitalize">{row.getValue("type")}</span>,
-  },
-  {
-    accessorKey: "severity",
-    header: "Severity",
-    cell: ({ row }) => <StatusBadge type="severity" status={row.getValue("severity")} />,
-  },
-  {
-    accessorKey: "booking_id",
-    header: "Booking",
-    cell: ({ row }) => {
-      const booking = mockBookings.find((b) => b.id === row.getValue("booking_id"))
-      return booking?.booking_number || "N/A"
-    },
-  },
-  {
-    accessorKey: "reported_at",
-    header: ({ column }) => {
-      return (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Reported
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => formatRelativeTime(row.getValue("reported_at")),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.getValue("status") as string
-      const config: Record<string, { label: string; color: string; bgColor: string }> = {
-        open: { label: "Open", color: "text-red-700", bgColor: "bg-red-100" },
-        investigating: { label: "Investigating", color: "text-amber-700", bgColor: "bg-amber-100" },
-        resolved: { label: "Resolved", color: "text-emerald-700", bgColor: "bg-emerald-100" },
-        closed: { label: "Closed", color: "text-gray-700", bgColor: "bg-gray-100" },
-      }
-      const statusConfig = config[status]
-      return (
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
-        >
-          {statusConfig.label}
-        </span>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const incident = row.original
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href={`/admin/incidents/${incident.id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Edit className="mr-2 h-4 w-4" />
-              Update Status
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Mark Resolved
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
-  },
-]
+import { useState } from "react"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatCard } from "@/components/ui/stat-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AlertCircle, Search, MoreHorizontal, AlertTriangle, CheckCircle, Clock, Plus } from "@/components/icons"
+import { mockIncidents } from "@/lib/mock-data"
+import { formatDate } from "@/lib/utils/format"
+import type { IncidentSeverity, IncidentStatus } from "@/types"
+
+const severityColors: Record<IncidentSeverity, string> = {
+  low: "bg-blue-100 text-blue-800",
+  medium: "bg-yellow-100 text-yellow-800",
+  high: "bg-orange-100 text-orange-800",
+  critical: "bg-red-100 text-red-800",
+}
+
+const statusConfig: Record<IncidentStatus, { color: string; icon: typeof CheckCircle }> = {
+  open: { color: "destructive", icon: AlertCircle },
+  investigating: { color: "warning", icon: Clock },
+  resolved: { color: "success", icon: CheckCircle },
+  closed: { color: "secondary", icon: CheckCircle },
+}
 
 export default function IncidentsPage() {
+  const [search, setSearch] = useState("")
+
+  const openCount = mockIncidents.filter((i) => i.status === "open").length
+  const investigatingCount = mockIncidents.filter((i) => i.status === "investigating").length
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Incidents" description="Track and manage warehouse incidents">
-        <Button asChild>
-          <Link href="/admin/incidents/new">
+      <PageHeader
+        title="Incidents"
+        description="Track and manage warehouse incidents"
+        action={
+          <Button>
             <Plus className="mr-2 h-4 w-4" />
             Report Incident
-          </Link>
-        </Button>
-      </PageHeader>
-
-      <DataTable
-        columns={columns}
-        data={mockIncidents}
-        searchKey="incident_number"
-        searchPlaceholder="Search incidents..."
+          </Button>
+        }
       />
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard
+          title="Open Incidents"
+          value={openCount.toString()}
+          icon={AlertCircle}
+          description="Requires attention"
+        />
+        <StatCard title="Investigating" value={investigatingCount.toString()} icon={Clock} description="In progress" />
+        <StatCard title="Resolved (30d)" value="8" icon={CheckCircle} description="This month" />
+        <StatCard title="Avg Resolution" value="4.2 hrs" icon={AlertTriangle} description="Response time" />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Incidents</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search incidents..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Incident</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Severity</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Reported</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mockIncidents.map((incident) => {
+                const StatusIcon = statusConfig[incident.status].icon
+                return (
+                  <TableRow key={incident.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{incident.title}</p>
+                        <p className="text-sm text-muted-foreground truncate max-w-[200px]">{incident.description}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {incident.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${severityColors[incident.severity]}`}
+                      >
+                        {incident.severity}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <StatusIcon className="h-4 w-4" />
+                        <span className="capitalize">{incident.status}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{incident.location || "-"}</TableCell>
+                    <TableCell>{formatDate(incident.createdAt)}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>View Details</DropdownMenuItem>
+                          <DropdownMenuItem>Update Status</DropdownMenuItem>
+                          <DropdownMenuItem>Assign Investigator</DropdownMenuItem>
+                          <DropdownMenuItem>Create Claim</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

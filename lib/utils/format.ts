@@ -1,73 +1,118 @@
-import { format, formatDistanceToNow, parseISO } from "date-fns"
+import { PRICING } from "@/lib/constants"
+import type { MembershipTier, BookingType } from "@/types"
 
-export function formatCurrency(amount: number, currency = "USD"): string {
+export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency,
+    currency: "USD",
   }).format(amount)
+}
+
+export function formatDate(date: string | Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(date))
+}
+
+export function formatDateTime(date: string | Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date))
 }
 
 export function formatNumber(num: number): string {
   return new Intl.NumberFormat("en-US").format(num)
 }
 
-export function formatDate(date: string | Date, pattern = "MMM d, yyyy"): string {
-  const d = typeof date === "string" ? parseISO(date) : date
-  return format(d, pattern)
+export function formatSqFt(sqFt: number): string {
+  return `${formatNumber(sqFt)} sq ft`
 }
 
-export function formatDateTime(date: string | Date): string {
-  const d = typeof date === "string" ? parseISO(date) : date
-  return format(d, "MMM d, yyyy h:mm a")
-}
+// Calculate pallet storage cost
+export function calculatePalletCost(
+  palletCount: number,
+  months = 1,
+  membershipTier: MembershipTier = "bronze",
+): {
+  palletIn: number
+  storage: number
+  palletOut: number
+  subtotal: number
+  discount: number
+  total: number
+} {
+  const palletIn = palletCount * PRICING.palletIn
+  const storage = palletCount * PRICING.storagePerPalletPerMonth * months
+  const palletOut = palletCount * PRICING.palletOut
+  const subtotal = palletIn + storage + palletOut
 
-export function formatRelativeTime(date: string | Date): string {
-  const d = typeof date === "string" ? parseISO(date) : date
-  return formatDistanceToNow(d, { addSuffix: true })
-}
+  // Apply membership discount
+  const membershipDiscount = PRICING.membershipDiscounts.find((d) => d.tier === membershipTier)?.discountPercent || 0
 
-export function formatPhoneNumber(phone: string): string {
-  const cleaned = phone.replace(/\D/g, "")
-  const match = cleaned.match(/^(\d{1})(\d{3})(\d{3})(\d{4})$/)
-  if (match) {
-    return `+${match[1]} (${match[2]}) ${match[3]}-${match[4]}`
+  // Apply volume discount
+  let volumeDiscount = 0
+  for (const vd of PRICING.volumeDiscounts) {
+    if (palletCount >= vd.palletThreshold) {
+      volumeDiscount = vd.discountPercent
+    }
   }
-  return phone
+
+  const totalDiscount = Math.max(membershipDiscount, volumeDiscount)
+  const discount = subtotal * (totalDiscount / 100)
+  const total = subtotal - discount
+
+  return { palletIn, storage, palletOut, subtotal, discount, total }
 }
 
-export function formatPercentage(value: number, decimals = 1): string {
-  return `${value.toFixed(decimals)}%`
+// Calculate area rental cost
+export function calculateAreaRentalCost(
+  sqFt: number,
+  membershipTier: MembershipTier = "bronze",
+): {
+  annualCost: number
+  monthlyCost: number
+  discount: number
+  total: number
+  isValid: boolean
+  error?: string
+} {
+  // Validate minimum sq ft requirement
+  if (sqFt < PRICING.areaRentalMinSqFt) {
+    return {
+      annualCost: 0,
+      monthlyCost: 0,
+      discount: 0,
+      total: 0,
+      isValid: false,
+      error: `Minimum area rental is ${formatNumber(PRICING.areaRentalMinSqFt)} sq ft`,
+    }
+  }
+
+  const annualCost = sqFt * PRICING.areaRentalPerSqFtPerYear
+  const monthlyCost = annualCost / 12
+
+  // Apply membership discount
+  const membershipDiscount = PRICING.membershipDiscounts.find((d) => d.tier === membershipTier)?.discountPercent || 0
+  const discount = annualCost * (membershipDiscount / 100)
+  const total = annualCost - discount
+
+  return { annualCost, monthlyCost, discount, total, isValid: true }
 }
 
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes"
-  const k = 1024
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-}
-
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength) + "..."
-}
-
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w ]+/g, "")
-    .replace(/ +/g, "-")
-}
-
-export function capitalizeFirst(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
-}
-
-export function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
+// Get booking type label
+export function getBookingTypeLabel(type: BookingType): string {
+  switch (type) {
+    case "pallet":
+      return "Pallet Storage"
+    case "area-rental":
+      return "Area Rental"
+    default:
+      return type
+  }
 }

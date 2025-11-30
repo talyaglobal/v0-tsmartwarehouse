@@ -1,143 +1,139 @@
 "use client"
-import type { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, ArrowUpDown, Plus, Eye, Edit, Mail } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DataTable } from "@/components/ui/data-table"
-import { PageHeader } from "@/components/ui/page-header"
-import { StatusBadge } from "@/components/ui/status-badge"
-import { mockCustomers } from "@/lib/mock-data"
-import { formatCurrency, formatDate, getInitials } from "@/lib/utils/format"
-import type { Customer } from "@/types"
-import Link from "next/link"
 
-const columns: ColumnDef<Customer>[] = [
-  {
-    accessorKey: "full_name",
-    header: ({ column }) => {
-      return (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Customer
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => {
-      const customer = row.original
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={customer.avatar_url || "/placeholder.svg"} />
-            <AvatarFallback>{getInitials(customer.full_name)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{customer.full_name}</p>
-            <p className="text-xs text-muted-foreground">{customer.email}</p>
-          </div>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "company_name",
-    header: "Company",
-    cell: ({ row }) => row.getValue("company_name") || "—",
-  },
-  {
-    accessorKey: "membership_tier",
-    header: "Tier",
-    cell: ({ row }) => <StatusBadge type="membership" status={row.getValue("membership_tier")} />,
-  },
-  {
-    accessorKey: "total_spent",
-    header: ({ column }) => {
-      return (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Total Spent
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => formatCurrency(row.getValue("total_spent")),
-  },
-  {
-    accessorKey: "loyalty_points",
-    header: "Points",
-    cell: ({ row }) => row.getValue("loyalty_points")?.toLocaleString() || "0",
-  },
-  {
-    accessorKey: "created_at",
-    header: "Joined",
-    cell: ({ row }) => formatDate(row.getValue("created_at")),
-  },
-  {
-    accessorKey: "is_active",
-    header: "Status",
-    cell: ({ row }) => (
-      <span
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          row.getValue("is_active") ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700"
-        }`}
-      >
-        {row.getValue("is_active") ? "Active" : "Inactive"}
-      </span>
-    ),
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const customer = row.original
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href={`/admin/customers/${customer.id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Customer
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Mail className="mr-2 h-4 w-4" />
-              Send Email
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
-  },
-]
+import { useState } from "react"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatCard } from "@/components/ui/stat-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Users, Search, MoreHorizontal, Mail, Phone, Building2, Crown, Plus } from "@/components/icons"
+import { mockUsers } from "@/lib/mock-data"
+import { formatCurrency } from "@/lib/utils/format"
+import type { MembershipTier } from "@/types"
+
+const tierColors: Record<MembershipTier, string> = {
+  bronze: "bg-orange-100 text-orange-800",
+  silver: "bg-gray-100 text-gray-800",
+  gold: "bg-yellow-100 text-yellow-800",
+  platinum: "bg-purple-100 text-purple-800",
+}
 
 export default function CustomersPage() {
+  const [search, setSearch] = useState("")
+  const customers = mockUsers.filter((u) => u.role === "customer")
+
+  const filteredCustomers = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.email.toLowerCase().includes(search.toLowerCase()) ||
+      c.company?.toLowerCase().includes(search.toLowerCase()),
+  )
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Customers" description="Manage customer accounts and relationships">
-        <Button asChild>
-          <Link href="/admin/customers/new">
+      <PageHeader
+        title="Customers"
+        description="Manage customer accounts and memberships"
+        action={
+          <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add Customer
-          </Link>
-        </Button>
-      </PageHeader>
+          </Button>
+        }
+      />
 
-      <DataTable columns={columns} data={mockCustomers} searchKey="full_name" searchPlaceholder="Search customers..." />
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard title="Total Customers" value="87" icon={Users} trend={{ value: 12, isPositive: true }} />
+        <StatCard title="Gold Members" value="24" icon={Crown} description="Premium tier" />
+        <StatCard title="Active Bookings" value="42" icon={Building2} />
+        <StatCard title="Total Revenue" value={formatCurrency(1250000)} icon={Users} />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Customer Directory</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search customers..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Membership</TableHead>
+                <TableHead>Credit Balance</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCustomers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-medium">
+                        {customer.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium">{customer.name}</p>
+                        <p className="text-sm text-muted-foreground">{customer.email}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{customer.company || "-"}</TableCell>
+                  <TableCell>
+                    {customer.membershipTier && (
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${tierColors[customer.membershipTier]}`}
+                      >
+                        {customer.membershipTier}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>{customer.creditBalance ? formatCurrency(customer.creditBalance) : "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Phone className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem>Edit Customer</DropdownMenuItem>
+                        <DropdownMenuItem>View Bookings</DropdownMenuItem>
+                        <DropdownMenuItem>Adjust Credits</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

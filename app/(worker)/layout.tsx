@@ -1,19 +1,6 @@
 import type React from "react"
-import { ThemeProvider } from "@/components/theme-provider"
-import { WorkerBottomNav } from "@/components/worker/bottom-nav"
-
-export const metadata = {
-  title: "TSmart Worker",
-  description: "TSmart Warehouse Worker App",
-  manifest: "/manifest.json",
-  themeColor: "#0f172a",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
-}
+import { BottomNav } from "@/components/worker/bottom-nav"
+import { WorkerHeader } from "@/components/worker/worker-header"
 
 export default function WorkerLayout({
   children,
@@ -21,11 +8,10 @@ export default function WorkerLayout({
   children: React.ReactNode
 }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-      <div className="flex min-h-screen flex-col bg-background pb-16">
-        {children}
-        <WorkerBottomNav />
-      </div>
-    </ThemeProvider>
+    <div className="flex flex-col min-h-screen bg-background">
+      <WorkerHeader />
+      <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
+      <BottomNav />
+    </div>
   )
 }

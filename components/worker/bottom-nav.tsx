@@ -3,35 +3,35 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, ClipboardList, Package, QrCode, User } from "lucide-react"
+import { Home, ClipboardList, ScanLine, Package, User } from "@/components/icons"
 
 const navItems = [
-  { href: "/worker", icon: Home, label: "Home" },
-  { href: "/worker/tasks", icon: ClipboardList, label: "Tasks" },
-  { href: "/worker/scan", icon: QrCode, label: "Scan" },
-  { href: "/worker/inventory", icon: Package, label: "Inventory" },
-  { href: "/worker/profile", icon: User, label: "Profile" },
+  { name: "Home", href: "/worker", icon: Home },
+  { name: "Tasks", href: "/worker/tasks", icon: ClipboardList },
+  { name: "Scan", href: "/worker/scan", icon: ScanLine },
+  { name: "Inventory", href: "/worker/inventory", icon: Package },
+  { name: "Profile", href: "/worker/profile", icon: User },
 ]
 
-export function WorkerBottomNav() {
+export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background">
-      <div className="flex h-16 items-center justify-around">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background safe-area-bottom">
+      <div className="flex items-center justify-around h-16">
         {navItems.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || (item.href !== "/worker" && pathname.startsWith(item.href))
           return (
             <Link
-              key={item.href}
+              key={item.name}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 px-3 py-2 text-xs transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                "flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground",
               )}
             >
               <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
-              <span className={cn(isActive && "font-medium")}>{item.label}</span>
+              <span className="text-xs font-medium">{item.name}</span>
             </Link>
           )
         })}
