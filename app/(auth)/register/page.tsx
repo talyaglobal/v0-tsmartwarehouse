@@ -115,6 +115,11 @@ export default function RegisterPage() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
+              {error}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>

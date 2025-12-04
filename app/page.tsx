@@ -403,7 +403,7 @@ export default function HomePage() {
                 <CardContent className="pt-6">
                   <Phone className="h-8 w-8 text-primary mx-auto mb-4" />
                   <h3 className="font-semibold">Phone</h3>
-                  <p className="text-sm text-muted-foreground mt-2">+1 (555) 123-4567</p>
+                  <p className="text-sm text-muted-foreground mt-2">+1 (646) 207-7483</p>
                 </CardContent>
               </Card>
               <Card className="text-center">
