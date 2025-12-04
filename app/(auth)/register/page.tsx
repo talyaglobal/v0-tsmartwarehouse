@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +16,9 @@ import { Loader2 } from "@/components/icons"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -30,11 +33,78 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
-    // Simulate registration
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    // Validate passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match")
+      setIsLoading(false)
+      return
+    }
 
-    router.push("/dashboard")
+    // Validate password strength
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters long")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      // Sign up user
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.name,
+            company: formData.company,
+            phone: formData.phone,
+            storageType: formData.storageType,
+            role: 'customer', // Default role
+          },
+        },
+      })
+
+      if (signUpError) {
+        setError(signUpError.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (authData.user) {
+        // Create profile in profiles table
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: formData.email,
+            name: formData.name,
+            company: formData.company,
+            phone: formData.phone,
+            role: 'customer',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError)
+          // Continue anyway - profile can be created later
+        }
+
+        // Check if email confirmation is required
+        if (authData.session) {
+          // User is automatically signed in
+          router.push("/dashboard")
+          router.refresh()
+        } else {
+          // Email confirmation required
+          router.push("/login?message=Check your email to confirm your account")
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during registration')
+      setIsLoading(false)
+    }
   }
 
   return (

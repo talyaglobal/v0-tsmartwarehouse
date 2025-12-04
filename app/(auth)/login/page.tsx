@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,24 +14,52 @@ import { Loader2 } from "@/components/icons"
 
 export default function LoginPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
-    // Simulate login - in production, this would call Supabase auth
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    // Route based on email domain (demo purposes)
-    if (email.includes("admin")) {
-      router.push("/admin")
-    } else if (email.includes("worker")) {
-      router.push("/worker")
-    } else {
-      router.push("/dashboard")
+      if (signInError) {
+        setError(signInError.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (data.user) {
+        // Get user role from profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single()
+
+        const role = profile?.role || data.user.user_metadata?.role || 'customer'
+
+        // Route based on role
+        if (role === 'admin') {
+          router.push("/admin")
+        } else if (role === 'worker') {
+          router.push("/worker")
+        } else {
+          router.push("/dashboard")
+        }
+        router.refresh()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during login')
+      setIsLoading(false)
     }
   }
 
@@ -42,6 +71,11 @@ export default function LoginPage() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -51,6 +85,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -67,6 +102,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
         </CardContent>

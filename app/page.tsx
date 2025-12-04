@@ -55,10 +55,10 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative py-20 md:py-32 overflow-hidden">
+        <section className="relative py-20 md:py-32 overflow-hidden min-h-[calc(100vh-4rem)] flex items-center">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-          <div className="container relative">
-            <div className="mx-auto max-w-3xl text-center">
+          <div className="container relative w-full">
+            <div className="mx-auto max-w-4xl text-center">
               <Badge variant="outline" className="mb-4">
                 240,000 sq ft of Premium Storage Space
               </Badge>
@@ -112,11 +112,11 @@ export default function HomePage() {
         {/* Services Section */}
         <section id="services" className="py-20 bg-muted/50">
           <div className="container">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold">Our Services</h2>
-              <p className="mt-2 text-muted-foreground">Comprehensive warehouse solutions for your business</p>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold mb-4">Our Services</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Comprehensive warehouse solutions for your business</p>
             </div>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
               <Card>
                 <CardHeader>
                   <Package className="h-10 w-10 text-primary mb-2" />
@@ -198,14 +198,14 @@ export default function HomePage() {
         {/* Facility Section */}
         <section id="facility" className="py-20">
           <div className="container">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold">Our Facility</h2>
-              <p className="mt-2 text-muted-foreground">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold mb-4">Our Facility</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 {formatNumber(WAREHOUSE_CONFIG.totalSqFt)} sq ft of modern warehouse space
               </p>
             </div>
 
-            <div className="mb-12">
+            <div className="mb-16 max-w-6xl mx-auto">
               <Card className="overflow-hidden">
                 <div className="relative aspect-[16/9] md:aspect-[21/9]">
                   <Image
@@ -230,7 +230,7 @@ export default function HomePage() {
             </div>
 
             {/* Floor Layout */}
-            <div className="grid gap-6 md:grid-cols-3 mb-12">
+            <div className="grid gap-8 md:grid-cols-3 mb-16 max-w-6xl mx-auto">
               {WAREHOUSE_CONFIG.floors.map((floor) => (
                 <Card key={floor.id} className={floor.floorNumber === 3 ? "border-primary" : ""}>
                   <CardHeader>
@@ -263,12 +263,13 @@ export default function HomePage() {
             </div>
 
             {/* Amenities */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Facility Amenities</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="max-w-4xl mx-auto">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-center">Facility Amenities</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {WAREHOUSE_CONFIG.amenities.map((amenity) => (
                     <div key={amenity} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -284,9 +285,9 @@ export default function HomePage() {
         {/* Pricing Section */}
         <section id="pricing" className="py-20 bg-muted/50">
           <div className="container">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold">Simple, Transparent Pricing</h2>
-              <p className="mt-2 text-muted-foreground">No hidden fees. Pay only for what you use.</p>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold mb-4">Simple, Transparent Pricing</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">No hidden fees. Pay only for what you use.</p>
             </div>
 
             <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
@@ -382,11 +383,11 @@ export default function HomePage() {
         {/* Contact Section */}
         <section id="contact" className="py-20">
           <div className="container">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold">Contact Us</h2>
-              <p className="mt-2 text-muted-foreground">Get in touch with our team</p>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold mb-4">Contact Us</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Get in touch with our team</p>
             </div>
-            <div className="grid gap-8 md:grid-cols-3 max-w-3xl mx-auto">
+            <div className="grid gap-8 md:grid-cols-3 max-w-4xl mx-auto">
               <Card className="text-center">
                 <CardContent className="pt-6">
                   <MapPin className="h-8 w-8 text-primary mx-auto mb-4" />
