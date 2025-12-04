@@ -120,6 +120,19 @@ export async function updateTask(
   return transformTaskRow(data)
 }
 
+export async function deleteTask(id: string): Promise<void> {
+  const supabase = createServerSupabaseClient()
+  
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    throw new Error(`Failed to delete task: ${error.message}`)
+  }
+}
+
 /**
  * Transform database row to Task type
  */

@@ -3,6 +3,7 @@ import { getIncidents, createIncident } from "@/lib/db/incidents"
 import { handleApiError } from "@/lib/utils/logger"
 import { getNotificationService } from "@/lib/notifications/service"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createIncidentSchema } from "@/lib/validation/schemas"
 import type { IncidentStatus, IncidentSeverity } from "@/types"
 
 export async function GET(request: NextRequest) {
@@ -46,18 +47,29 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Validate required fields
-    if (!body.type || !body.title || !body.warehouseId) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields: type, title, and warehouseId" },
-        { status: 400 }
-      )
+    // Validate with Zod schema
+    let validatedData
+    try {
+      validatedData = createIncidentSchema.parse(body)
+    } catch (error) {
+      if (error && typeof error === "object" && "issues" in error) {
+        const zodError = error as { issues: Array<{ path: string[]; message: string }> }
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: "Validation error", 
+            details: zodError.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ")
+          },
+          { status: 400 }
+        )
+      }
+      throw error
     }
 
     // Create incident using database function
     const newIncident = await createIncident({
-      ...body,
-      status: body.status || "open",
+      ...validatedData,
+      status: validatedData.status || "open",
     })
 
     // Send notification to admins

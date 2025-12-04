@@ -112,6 +112,19 @@ export async function updateClaim(
   return transformClaimRow(data)
 }
 
+export async function deleteClaim(id: string): Promise<void> {
+  const supabase = createServerSupabaseClient()
+  
+  const { error } = await supabase
+    .from('claims')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    throw new Error(`Failed to delete claim: ${error.message}`)
+  }
+}
+
 /**
  * Transform database row to Claim type
  */

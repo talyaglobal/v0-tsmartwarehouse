@@ -1,47 +1,109 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Booking, BookingStatus, BookingType } from '@/types'
+import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
 /**
- * Database operations for Bookings
+ * Database operations for Bookings with caching and query optimization
  */
 
-export async function getBookings(filters?: {
+interface GetBookingsOptions {
   customerId?: string
   status?: BookingStatus
   type?: BookingType
   warehouseId?: string
-}) {
+  limit?: number
+  offset?: number
+  useCache?: boolean
+}
+
+export async function getBookings(filters?: GetBookingsOptions) {
+  const {
+    customerId,
+    status,
+    type,
+    warehouseId,
+    limit,
+    offset = 0,
+    useCache = true,
+  } = filters || {}
+
+  // Generate cache key
+  const cacheKey = generateCacheKey(
+    CACHE_PREFIXES.BOOKINGS,
+    customerId || 'all',
+    status || 'all',
+    type || 'all',
+    warehouseId || 'all',
+    limit || 'all',
+    offset
+  )
+
+  // Try cache first
+  if (useCache) {
+    const cached = await getCache<Booking[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+  }
+
   const supabase = createServerSupabaseClient()
-  let query = supabase.from('bookings').select('*')
+  
+  // Optimize: Only select needed fields instead of '*'
+  let query = supabase
+    .from('bookings')
+    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
 
-  if (filters?.customerId) {
-    query = query.eq('customer_id', filters.customerId)
+  if (customerId) {
+    query = query.eq('customer_id', customerId)
   }
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
+  if (status) {
+    query = query.eq('status', status)
   }
-  if (filters?.type) {
-    query = query.eq('type', filters.type)
+  if (type) {
+    query = query.eq('type', type)
   }
-  if (filters?.warehouseId) {
-    query = query.eq('warehouse_id', filters.warehouseId)
+  if (warehouseId) {
+    query = query.eq('warehouse_id', warehouseId)
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false })
+  // Add pagination if limit is provided
+  if (limit) {
+    query = query.range(offset, offset + limit - 1)
+  }
+
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
 
   if (error) {
     throw new Error(`Failed to fetch bookings: ${error.message}`)
   }
 
   // Transform database rows to Booking type
-  return (data || []).map(transformBookingRow)
+  const bookings = (data || []).map(transformBookingRow)
+
+  // Cache the results
+  if (useCache) {
+    await setCache(cacheKey, bookings, CACHE_TTL.MEDIUM)
+  }
+
+  return bookings
 }
 
-export async function getBookingById(id: string): Promise<Booking | null> {
+export async function getBookingById(id: string, useCache: boolean = true): Promise<Booking | null> {
+  const cacheKey = generateCacheKey(CACHE_PREFIXES.BOOKING, id)
+
+  // Try cache first
+  if (useCache) {
+    const cached = await getCache<Booking>(cacheKey)
+    if (cached) {
+      return cached
+    }
+  }
+
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('bookings')
-    .select('*')
+    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
     .eq('id', id)
     .single()
 
@@ -53,7 +115,14 @@ export async function getBookingById(id: string): Promise<Booking | null> {
     throw new Error(`Failed to fetch booking: ${error.message}`)
   }
 
-  return data ? transformBookingRow(data) : null
+  const booking = data ? transformBookingRow(data) : null
+
+  // Cache the result
+  if (booking && useCache) {
+    await setCache(cacheKey, booking, CACHE_TTL.MEDIUM)
+  }
+
+  return booking
 }
 
 export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): Promise<Booking> {
@@ -86,7 +155,12 @@ export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 
     throw new Error(`Failed to create booking: ${error.message}`)
   }
 
-  return transformBookingRow(data)
+  const newBooking = transformBookingRow(data)
+
+  // Invalidate cache
+  await invalidateCache(CACHE_PREFIXES.BOOKINGS)
+
+  return newBooking
 }
 
 export async function updateBooking(
@@ -117,7 +191,12 @@ export async function updateBooking(
     throw new Error(`Failed to update booking: ${error.message}`)
   }
 
-  return transformBookingRow(data)
+  const updatedBooking = transformBookingRow(data)
+
+  // Invalidate cache
+  await invalidateCache(CACHE_PREFIXES.BOOKINGS, id)
+
+  return updatedBooking
 }
 
 export async function deleteBooking(id: string): Promise<void> {
@@ -127,6 +206,9 @@ export async function deleteBooking(id: string): Promise<void> {
   if (error) {
     throw new Error(`Failed to delete booking: ${error.message}`)
   }
+
+  // Invalidate cache
+  await invalidateCache(CACHE_PREFIXES.BOOKINGS, id)
 }
 
 /**

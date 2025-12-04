@@ -115,6 +115,19 @@ export async function updateIncident(
   return transformIncidentRow(data)
 }
 
+export async function deleteIncident(id: string): Promise<void> {
+  const supabase = createServerSupabaseClient()
+  
+  const { error } = await supabase
+    .from('incidents')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    throw new Error(`Failed to delete incident: ${error.message}`)
+  }
+}
+
 /**
  * Transform database row to Incident type
  */

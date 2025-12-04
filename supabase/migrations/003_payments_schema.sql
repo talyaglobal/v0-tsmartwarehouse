@@ -74,6 +74,8 @@ CREATE INDEX IF NOT EXISTS idx_refunds_stripe_refund_id ON refunds(stripe_refund
 -- TRIGGERS
 -- ============================================
 -- Auto-update updated_at timestamp
+-- Note: Function may already exist from 001_initial_schema.sql
+-- Using CREATE OR REPLACE to handle both cases
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -82,6 +84,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop trigger if it exists, then create it
+DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
 CREATE TRIGGER update_payments_updated_at
   BEFORE UPDATE ON payments
   FOR EACH ROW

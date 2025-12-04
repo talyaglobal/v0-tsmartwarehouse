@@ -3,7 +3,11 @@ import { getBookings, createBooking } from "@/lib/db/bookings"
 import { PRICING } from "@/lib/constants"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
+import { setCacheHeaders, createApiCacheKey } from "@/lib/cache/api-cache"
 import type { BookingStatus, BookingType } from "@/types"
+
+// Enable caching for GET requests (5 minutes)
+export const revalidate = 300
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,25 +15,34 @@ export async function GET(request: NextRequest) {
     const customerId = searchParams.get("customerId")
     const status = searchParams.get("status") as BookingStatus | null
     const type = searchParams.get("type") as BookingType | null
+    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined
+    const offset = searchParams.get("offset") ? parseInt(searchParams.get("offset")!) : undefined
 
     const filters: {
       customerId?: string
       status?: BookingStatus
       type?: BookingType
       warehouseId?: string
+      limit?: number
+      offset?: number
     } = {}
 
     if (customerId) filters.customerId = customerId
     if (status) filters.status = status
     if (type) filters.type = type
+    if (limit) filters.limit = limit
+    if (offset) filters.offset = offset
 
     const bookings = await getBookings(filters)
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: bookings,
       total: bookings.length,
     })
+
+    // Set cache headers
+    return setCacheHeaders(response, 300, 60)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/bookings" })
     return NextResponse.json(
@@ -91,12 +104,15 @@ export async function POST(request: NextRequest) {
       totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
     }
 
+    // Get default warehouse ID from environment or use first available
+    const defaultWarehouseId = process.env.DEFAULT_WAREHOUSE_ID || body.warehouseId || "wh-001"
+
     // Create booking using database function
     const newBooking = await createBooking({
       customerId: user.id,
       customerName: profile.name || user.email,
       customerEmail: profile.email || user.email,
-      warehouseId: "wh-001",
+      warehouseId: defaultWarehouseId,
       type,
       status: "pending",
       palletCount: type === "pallet" ? palletCount : undefined,

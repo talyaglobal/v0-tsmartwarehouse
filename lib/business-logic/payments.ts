@@ -81,16 +81,6 @@ export async function processInvoicePayment(
       
       // Deduct from credit balance
       await updateCustomerCreditBalance(input.customerId, -creditBalanceUsed)
-      
-      // Create transaction record
-      await createPaymentTransaction({
-        paymentId: "", // Will be set after payment creation
-        type: "credit_adjustment",
-        amount: -creditBalanceUsed,
-        currency: "USD",
-        status: "succeeded",
-        description: `Credit balance used for invoice ${invoice.id}`,
-      })
     }
   }
 
@@ -169,7 +159,17 @@ export async function processInvoicePayment(
       paidDate: new Date().toISOString().split("T")[0],
     })
 
-    // Create transaction record
+    // Create transaction records
+    if (creditBalanceUsed > 0) {
+      await createPaymentTransaction({
+        paymentId: payment.id,
+        type: "credit_adjustment",
+        amount: -creditBalanceUsed,
+        currency: "USD",
+        status: "succeeded",
+        description: `Credit balance used for invoice ${invoice.id}`,
+      })
+    }
     await createPaymentTransaction({
       paymentId: payment.id,
       type: "payment",

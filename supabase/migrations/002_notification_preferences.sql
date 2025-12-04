@@ -10,13 +10,7 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
   push_enabled BOOLEAN DEFAULT TRUE,
   whatsapp_enabled BOOLEAN DEFAULT FALSE,
   -- Type-specific preferences (JSONB for flexibility)
-  type_preferences JSONB DEFAULT '{
-    "booking": {"email": true, "sms": false, "push": true, "whatsapp": false},
-    "invoice": {"email": true, "sms": false, "push": true, "whatsapp": false},
-    "task": {"email": false, "sms": false, "push": true, "whatsapp": false},
-    "incident": {"email": true, "sms": true, "push": true, "whatsapp": false},
-    "system": {"email": true, "sms": false, "push": true, "whatsapp": false}
-  }'::jsonb,
+  type_preferences JSONB DEFAULT '{"booking": {"email": true, "sms": false, "push": true, "whatsapp": false}, "invoice": {"email": true, "sms": false, "push": true, "whatsapp": false}, "task": {"email": false, "sms": false, "push": true, "whatsapp": false}, "incident": {"email": true, "sms": true, "push": true, "whatsapp": false}, "system": {"email": true, "sms": false, "push": true, "whatsapp": false}}'::jsonb,
   -- Contact information for notifications
   email_address TEXT,
   phone_number TEXT,
@@ -38,6 +32,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop trigger if it exists (for idempotent migrations)
+DROP TRIGGER IF EXISTS trigger_update_notification_preferences_updated_at ON notification_preferences;
+
 CREATE TRIGGER trigger_update_notification_preferences_updated_at
   BEFORE UPDATE ON notification_preferences
   FOR EACH ROW
@@ -58,6 +55,12 @@ CREATE INDEX IF NOT EXISTS idx_notifications_delivered_at ON notifications(deliv
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for notification_preferences
+-- Drop existing policies if they exist (for idempotent migrations)
+DROP POLICY IF EXISTS "Users can view their own notification preferences" ON notification_preferences;
+DROP POLICY IF EXISTS "Users can update their own notification preferences" ON notification_preferences;
+DROP POLICY IF EXISTS "Users can insert their own notification preferences" ON notification_preferences;
+DROP POLICY IF EXISTS "Admins can view all notification preferences" ON notification_preferences;
+
 -- Users can view and update their own preferences
 CREATE POLICY "Users can view their own notification preferences"
   ON notification_preferences

@@ -1,26 +1,68 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Invoice, InvoiceStatus } from '@/types'
+import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
 /**
- * Database operations for Invoices
+ * Database operations for Invoices with caching and query optimization
  */
 
-export async function getInvoices(filters?: {
+interface GetInvoicesOptions {
   customerId?: string
   status?: InvoiceStatus
   bookingId?: string
-}) {
-  const supabase = createServerSupabaseClient()
-  let query = supabase.from('invoices').select('*')
+  limit?: number
+  offset?: number
+  useCache?: boolean
+}
 
-  if (filters?.customerId) {
-    query = query.eq('customer_id', filters.customerId)
+export async function getInvoices(filters?: GetInvoicesOptions) {
+  const {
+    customerId,
+    status,
+    bookingId,
+    limit,
+    offset = 0,
+    useCache = true,
+  } = filters || {}
+
+  // Generate cache key
+  const cacheKey = generateCacheKey(
+    CACHE_PREFIXES.INVOICES,
+    customerId || 'all',
+    status || 'all',
+    bookingId || 'all',
+    limit || 'all',
+    offset
+  )
+
+  // Try cache first
+  if (useCache) {
+    const cached = await getCache<Invoice[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
   }
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
+
+  const supabase = createServerSupabaseClient()
+  
+  // Optimize: Only select needed fields instead of '*'
+  let query = supabase
+    .from('invoices')
+    .select('id, booking_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+
+  if (customerId) {
+    query = query.eq('customer_id', customerId)
   }
-  if (filters?.bookingId) {
-    query = query.eq('booking_id', filters.bookingId)
+  if (status) {
+    query = query.eq('status', status)
+  }
+  if (bookingId) {
+    query = query.eq('booking_id', bookingId)
+  }
+
+  // Add pagination if limit is provided
+  if (limit) {
+    query = query.range(offset, offset + limit - 1)
   }
 
   const { data, error } = await query.order('created_at', { ascending: false })
@@ -29,14 +71,31 @@ export async function getInvoices(filters?: {
     throw new Error(`Failed to fetch invoices: ${error.message}`)
   }
 
-  return (data || []).map(transformInvoiceRow)
+  const invoices = (data || []).map(transformInvoiceRow)
+
+  // Cache the results
+  if (useCache) {
+    await setCache(cacheKey, invoices, CACHE_TTL.MEDIUM)
+  }
+
+  return invoices
 }
 
-export async function getInvoiceById(id: string): Promise<Invoice | null> {
+export async function getInvoiceById(id: string, useCache: boolean = true): Promise<Invoice | null> {
+  const cacheKey = generateCacheKey(CACHE_PREFIXES.INVOICE, id)
+
+  // Try cache first
+  if (useCache) {
+    const cached = await getCache<Invoice>(cacheKey)
+    if (cached) {
+      return cached
+    }
+  }
+
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('invoices')
-    .select('*')
+    .select('id, booking_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
     .eq('id', id)
     .single()
 
@@ -47,7 +106,14 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
     throw new Error(`Failed to fetch invoice: ${error.message}`)
   }
 
-  return data ? transformInvoiceRow(data) : null
+  const invoice = data ? transformInvoiceRow(data) : null
+
+  // Cache the result
+  if (invoice && useCache) {
+    await setCache(cacheKey, invoice, CACHE_TTL.MEDIUM)
+  }
+
+  return invoice
 }
 
 export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>): Promise<Invoice> {
@@ -76,7 +142,12 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>):
     throw new Error(`Failed to create invoice: ${error.message}`)
   }
 
-  return transformInvoiceRow(data)
+  const newInvoice = transformInvoiceRow(data)
+
+  // Invalidate cache
+  await invalidateCache(CACHE_PREFIXES.INVOICES)
+
+  return newInvoice
 }
 
 export async function updateInvoice(
@@ -100,7 +171,12 @@ export async function updateInvoice(
     throw new Error(`Failed to update invoice: ${error.message}`)
   }
 
-  return transformInvoiceRow(data)
+  const updatedInvoice = transformInvoiceRow(data)
+
+  // Invalidate cache
+  await invalidateCache(CACHE_PREFIXES.INVOICES, id)
+
+  return updatedInvoice
 }
 
 /**

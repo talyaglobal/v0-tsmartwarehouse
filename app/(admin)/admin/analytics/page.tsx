@@ -8,20 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart3, TrendingUp, DollarSign, Users, Download } from "@/components/icons"
 import { formatCurrency } from "@/lib/utils/format"
 import { mockDashboardStats } from "@/lib/mock-data"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts"
+import { RevenueChart } from "@/components/charts/revenue-chart"
+import { UtilizationChart } from "@/components/charts/utilization-chart"
+import { ServiceBreakdownChart } from "@/components/charts/service-breakdown-chart"
 
 const revenueData = [
   { month: "Jan", pallet: 85000, areaRental: 40000 },
@@ -96,114 +85,16 @@ export default function AnalyticsPage() {
         </TabsList>
 
         <TabsContent value="revenue">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue by Service Type</CardTitle>
-              <CardDescription>Monthly breakdown of pallet storage vs area rental revenue</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(value) => `$${value / 1000}k`} />
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar dataKey="pallet" name="Pallet Services" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="areaRental" name="Area Rental" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          <RevenueChart data={revenueData} />
         </TabsContent>
 
         <TabsContent value="utilization">
-          <Card>
-            <CardHeader>
-              <CardTitle>Floor Utilization Trends</CardTitle>
-              <CardDescription>Occupancy percentage by floor over time</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={utilizationData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(value) => `${value}%`} />
-                    <Tooltip
-                      formatter={(value: number) => `${value}%`}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Line type="monotone" dataKey="floor1" name="Floor 1" stroke="#3b82f6" strokeWidth={2} />
-                    <Line type="monotone" dataKey="floor2" name="Floor 2" stroke="#10b981" strokeWidth={2} />
-                    <Line type="monotone" dataKey="floor3" name="Floor 3" stroke="#f59e0b" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          <UtilizationChart data={utilizationData} />
         </TabsContent>
 
         <TabsContent value="services">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue by Service</CardTitle>
-                <CardDescription>Distribution of revenue sources</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={serviceBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {serviceBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number) => `${value}%`}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {serviceBreakdown.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="text-sm">{item.name}</span>
-                      </div>
-                      <span className="text-sm font-medium">{item.value}%</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <ServiceBreakdownChart data={serviceBreakdown} />
 
             <Card>
               <CardHeader>

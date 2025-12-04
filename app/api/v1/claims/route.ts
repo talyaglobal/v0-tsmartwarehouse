@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getClaims, createClaim } from "@/lib/db/claims"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
+import { createClaimSchema } from "@/lib/validation/schemas"
 import type { ClaimStatus } from "@/types"
 
 export async function GET(request: NextRequest) {
@@ -47,12 +48,23 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    // Validate required fields
-    if (!body.type || !body.description || !body.bookingId || !body.amount) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields: type, description, bookingId, and amount" },
-        { status: 400 }
-      )
+    // Validate with Zod schema
+    let validatedData
+    try {
+      validatedData = createClaimSchema.parse(body)
+    } catch (error) {
+      if (error && typeof error === "object" && "issues" in error) {
+        const zodError = error as { issues: Array<{ path: string[]; message: string }> }
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: "Validation error", 
+            details: zodError.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ")
+          },
+          { status: 400 }
+        )
+      }
+      throw error
     }
 
     // Get customer profile information
@@ -75,8 +87,8 @@ export async function POST(request: NextRequest) {
     const newClaim = await createClaim({
       customerId: user.id,
       customerName: profile.name || user.email,
-      ...body,
-      status: body.status || "submitted",
+      ...validatedData,
+      status: validatedData.status || "submitted",
     })
 
     return NextResponse.json({
