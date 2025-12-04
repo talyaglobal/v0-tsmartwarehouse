@@ -11,7 +11,8 @@ import { logger } from "@/lib/utils/logger"
 
 // Example GET handler with middleware
 export const GET = withApiMiddleware(
-  async (request: NextRequest, { user }) => {
+  async (request: NextRequest, context) => {
+    const { user } = context || {}
     const { searchParams } = new URL(request.url)
     const customerId = searchParams.get("customerId")
     const status = searchParams.get("status")
@@ -64,7 +65,8 @@ export const GET = withApiMiddleware(
 
 // Example POST handler with middleware
 export const POST = withApiMiddleware(
-  async (request: NextRequest, { user }) => {
+  async (request: NextRequest, context) => {
+    const { user } = context || {}
     try {
       const body = await request.json()
       const { type, palletCount, areaSqFt, floorNumber, startDate, endDate, notes } = body

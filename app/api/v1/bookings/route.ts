@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       status: "pending",
       palletCount: type === "pallet" ? palletCount : undefined,
       areaSqFt: type === "area-rental" ? areaSqFt : undefined,
-      floorNumber: type === "area-rental" ? floorNumber : undefined,
+      floorNumber: type === "area-rental" ? 3 : undefined,
       hallId: type === "area-rental" ? hallId : undefined,
       startDate,
       endDate: endDate || undefined,

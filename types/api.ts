@@ -73,5 +73,6 @@ export interface ErrorResponse extends ApiResponse {
   error: string
   code?: string
   statusCode: number
+  details?: string
 }
 
