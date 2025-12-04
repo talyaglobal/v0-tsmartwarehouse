@@ -49,6 +49,18 @@ const requiredEnvVars = {
     example: 'http://localhost:3000',
     note: 'Optional, defaults to http://localhost:3000',
   },
+  STRIPE_SECRET_KEY: {
+    required: false,
+    description: 'Stripe secret API key (for payment processing)',
+    example: 'sk_test_...',
+    note: 'Required for payment features. Get from: https://dashboard.stripe.com/apikeys',
+  },
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: {
+    required: false,
+    description: 'Stripe publishable API key (for frontend)',
+    example: 'pk_test_...',
+    note: 'Required for payment UI. Get from: https://dashboard.stripe.com/apikeys',
+  },
 }
 
 function checkEnvVars() {
@@ -124,6 +136,29 @@ function checkEnvVars() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (serviceKey && !serviceKey.startsWith('eyJ')) {
     console.log('⚠️  Warning: SUPABASE_SERVICE_ROLE_KEY should start with "eyJ" (JWT format)')
+  }
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+  if (stripeSecretKey && !stripeSecretKey.startsWith('sk_test_') && !stripeSecretKey.startsWith('sk_live_')) {
+    console.log('⚠️  Warning: STRIPE_SECRET_KEY should start with "sk_test_" (test) or "sk_live_" (production)')
+  }
+
+  const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  if (stripePublishableKey && !stripePublishableKey.startsWith('pk_test_') && !stripePublishableKey.startsWith('pk_live_')) {
+    console.log('⚠️  Warning: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY should start with "pk_test_" (test) or "pk_live_" (production)')
+  }
+
+  // Check if Stripe keys are missing but payment features might be needed
+  if (!stripeSecretKey || !stripePublishableKey) {
+    console.log('\n💡 Payment Processing:')
+    if (!stripeSecretKey) {
+      console.log('   ⚠️  STRIPE_SECRET_KEY is not set (required for payment processing)')
+    }
+    if (!stripePublishableKey) {
+      console.log('   ⚠️  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set (required for payment UI)')
+    }
+    console.log('   Get your Stripe keys from: https://dashboard.stripe.com/apikeys')
+    console.log('   See PAYMENT_SETUP.md for detailed setup instructions\n')
   }
 
   console.log('\n✅ All required environment variables are set!')

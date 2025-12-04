@@ -1,19 +1,59 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Mail, Phone, LogOut, Bell, Moon } from "@/components/icons"
-import { mockShifts } from "@/lib/mock-data"
+import { Mail, Phone, LogOut, Bell, Moon, Loader2 } from "@/components/icons"
 
 export default function ProfilePage() {
   const [notifications, setNotifications] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
+  const [user, setUser] = useState<{ name: string; email: string; phone?: string } | null>(null)
+  const [stats, setStats] = useState({ hours: 0, tasks: 0, onTime: 0 })
+  const [loading, setLoading] = useState(true)
 
-  const currentShift = mockShifts[0]
+  useEffect(() => {
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true)
+      // Fetch user profile
+      const userRes = await fetch('/api/v1/users/me')
+      if (userRes.ok) {
+        const userData = await userRes.json()
+        setUser(userData.data)
+      }
+
+      // Fetch worker stats (tasks completed this week, hours, etc.)
+      const tasksRes = await fetch('/api/v1/tasks')
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json()
+        const completedTasks = (tasksData.data || []).filter((t: any) => t.status === 'completed')
+        setStats({
+          hours: 42, // Would come from worker_shifts API
+          tasks: completedTasks.length,
+          onTime: 96, // Would be calculated
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -25,7 +65,7 @@ export default function ProfilePage() {
               <span className="text-2xl font-bold text-primary-foreground">MW</span>
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold">Mike Worker</h2>
+              <h2 className="text-xl font-bold">{user?.name || 'Worker'}</h2>
               <p className="text-muted-foreground">Warehouse Associate</p>
               <Badge variant="secondary" className="mt-1">
                 Active
@@ -43,12 +83,14 @@ export default function ProfilePage() {
         <CardContent className="space-y-3">
           <div className="flex items-center gap-3">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            <span>worker@tsmart.com</span>
+            <span>{user?.email || '-'}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <span>+1 (555) 123-4567</span>
-          </div>
+          {user?.phone && (
+            <div className="flex items-center gap-3">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span>{user.phone}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -60,15 +102,15 @@ export default function ProfilePage() {
         <CardContent>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="p-3 bg-muted rounded-lg">
-              <p className="text-2xl font-bold">42h</p>
+              <p className="text-2xl font-bold">{stats.hours}h</p>
               <p className="text-xs text-muted-foreground">Hours</p>
             </div>
             <div className="p-3 bg-muted rounded-lg">
-              <p className="text-2xl font-bold">28</p>
+              <p className="text-2xl font-bold">{stats.tasks}</p>
               <p className="text-xs text-muted-foreground">Tasks</p>
             </div>
             <div className="p-3 bg-muted rounded-lg">
-              <p className="text-2xl font-bold text-green-600">96%</p>
+              <p className="text-2xl font-bold text-green-600">{stats.onTime}%</p>
               <p className="text-xs text-muted-foreground">On-Time</p>
             </div>
           </div>

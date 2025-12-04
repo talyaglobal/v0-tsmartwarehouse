@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest } from "@/lib/auth/api-middleware"
 import { confirmPayment } from "@/lib/business-logic/payments"
+import type { PaymentResponse, ErrorResponse } from "@/types/api"
 
 /**
  * POST /api/v1/payments/[id]/confirm
@@ -13,7 +14,12 @@ export async function POST(
   try {
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      return NextResponse.json({ success: false, error: authResult.error }, { status: 401 })
+      const errorData: ErrorResponse = {
+        success: false,
+        error: authResult.error || "Unauthorized",
+        statusCode: 401,
+      }
+      return NextResponse.json(errorData, { status: 401 })
     }
 
     const { user } = authResult
@@ -26,26 +32,28 @@ export async function POST(
 
     // Verify user owns this payment
     if (user.role === "customer" && payment.customerId !== user.id) {
-      return NextResponse.json(
-        { success: false, error: "Payment not found" },
-        { status: 404 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Payment not found",
+        statusCode: 404,
+      }
+      return NextResponse.json(errorData, { status: 404 })
     }
 
-    return NextResponse.json({
+    const responseData: PaymentResponse = {
       success: true,
       data: payment,
       message: "Payment confirmed successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error confirming payment:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to confirm payment",
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to confirm payment",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 

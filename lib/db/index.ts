@@ -12,4 +12,7 @@ export * from './incidents'
 export * from './claims'
 export * from './notifications'
 export * from './payments'
+export * from './inventory'
+export * from './analytics'
+export * from './audit'
 

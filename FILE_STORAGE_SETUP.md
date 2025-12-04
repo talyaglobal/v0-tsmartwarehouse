@@ -22,6 +22,15 @@ The file management system uses **Supabase Storage** for:
 
 ## Setup Instructions
 
+### Quick Setup (Recommended)
+
+1. **Create the storage bucket** manually in Supabase Dashboard (see Step 1 below)
+2. **Run the migration** to set up RLS policies:
+   - Open `supabase/migrations/005_storage_bucket_setup.sql` in Supabase SQL Editor
+   - Run the migration to automatically configure all storage policies
+
+### Detailed Setup
+
 ### 1. Create Storage Bucket in Supabase
 
 1. Go to your [Supabase Dashboard](https://app.supabase.com)
@@ -36,65 +45,32 @@ The file management system uses **Supabase Storage** for:
 
 ### 2. Configure Storage Policies (Row Level Security)
 
-For secure file access, set up RLS policies:
+For secure file access, set up RLS policies using the provided migration:
 
-#### Option A: Public Bucket (Simpler)
+#### Option A: Use Migration File (Recommended)
 
-If you made the bucket public, files are accessible via public URLs. This is fine for claim evidence as long as file paths are secure.
+After creating the bucket, run the storage migration:
 
-#### Option B: Private Bucket with RLS (More Secure)
+1. In the Supabase Dashboard, go to **SQL Editor**
+2. Open `supabase/migrations/005_storage_bucket_setup.sql`
+3. Copy the entire contents
+4. Paste into SQL Editor
+5. Click **Run**
+
+This migration sets up comprehensive RLS policies that:
+- Allow users to upload/view/delete their own files
+- Allow admins to access all files
+- Enforce proper file organization by user ID
+
+#### Option B: Manual Policy Setup (Alternative)
+
+If you prefer to set up policies manually:
 
 1. In the Supabase Dashboard, go to **Storage** → **Policies**
 2. Click on your `claim-evidence` bucket
-3. Create policies:
+3. Create the policies manually (see migration file for SQL)
 
-**Policy 1: Users can upload their own files**
-```sql
-CREATE POLICY "Users can upload own files"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'claim-evidence' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-```
-
-**Policy 2: Users can view their own files**
-```sql
-CREATE POLICY "Users can view own files"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'claim-evidence' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-```
-
-**Policy 3: Users can delete their own files**
-```sql
-CREATE POLICY "Users can delete own files"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'claim-evidence' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-```
-
-**Policy 4: Admins can view all files**
-```sql
-CREATE POLICY "Admins can view all files"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'claim-evidence' AND
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE profiles.id = auth.uid()
-    AND profiles.role = 'admin'
-  )
-);
-```
+**Note**: The migration file (`005_storage_bucket_setup.sql`) contains all the necessary policies and is the recommended approach.
 
 ### 3. File Organization Structure
 
@@ -292,5 +268,20 @@ $$ LANGUAGE plpgsql;
 
 ---
 
-**Status**: ✅ Implementation complete, ready for Supabase Storage setup
+## Migration File
+
+A complete migration file is available at `supabase/migrations/005_storage_bucket_setup.sql` that:
+- ✅ Sets up all required RLS policies automatically
+- ✅ Configures user isolation (users can only access their own files)
+- ✅ Grants admin access to all files
+- ✅ Enforces proper file organization structure
+
+**To use the migration:**
+1. Create the storage bucket first (Step 1 above)
+2. Run the migration file in Supabase SQL Editor
+3. Verify policies are created in Storage → Policies
+
+---
+
+**Status**: ✅ Implementation complete, migration file ready for Supabase Storage setup
 

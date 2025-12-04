@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest } from "@/lib/auth/api-middleware"
 import { processInvoicePayment, getPaymentHistory } from "@/lib/business-logic/payments"
 import { getPayments } from "@/lib/db/payments"
+import type { PaymentsListResponse, PaymentResponse, ErrorResponse } from "@/types/api"
 
 /**
  * GET /api/v1/payments
@@ -11,7 +12,12 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      return NextResponse.json({ success: false, error: authResult.error }, { status: 401 })
+      const errorData: ErrorResponse = {
+        success: false,
+        error: authResult.error || "Unauthorized",
+        statusCode: 401,
+      }
+      return NextResponse.json(errorData, { status: 401 })
     }
 
     const { user } = authResult
@@ -33,20 +39,20 @@ export async function GET(request: NextRequest) {
 
     const payments = await getPayments(filters)
 
-    return NextResponse.json({
+    const responseData: PaymentsListResponse = {
       success: true,
       data: payments,
       total: payments.length,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error fetching payments:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch payments",
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch payments",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 
@@ -58,34 +64,45 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      return NextResponse.json({ success: false, error: authResult.error }, { status: 401 })
+      const errorData: ErrorResponse = {
+        success: false,
+        error: authResult.error || "Unauthorized",
+        statusCode: 401,
+      }
+      return NextResponse.json(errorData, { status: 401 })
     }
 
     const { user } = authResult
 
     // Only customers can create payments for their own invoices
     if (user.role !== "customer") {
-      return NextResponse.json(
-        { success: false, error: "Only customers can create payments" },
-        { status: 403 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Only customers can create payments",
+        statusCode: 403,
+      }
+      return NextResponse.json(errorData, { status: 403 })
     }
 
     const body = await request.json()
     const { invoiceId, paymentMethod, amount, useCreditBalance, creditBalanceAmount, paymentMethodId } = body
 
     if (!invoiceId) {
-      return NextResponse.json(
-        { success: false, error: "invoiceId is required" },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "invoiceId is required",
+        statusCode: 400,
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     if (!paymentMethod || !["card", "credit_balance", "both"].includes(paymentMethod)) {
-      return NextResponse.json(
-        { success: false, error: "paymentMethod must be 'card', 'credit_balance', or 'both'" },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "paymentMethod must be 'card', 'credit_balance', or 'both'",
+        statusCode: 400,
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     const result = await processInvoicePayment({
@@ -98,21 +115,21 @@ export async function POST(request: NextRequest) {
       paymentMethodId,
     })
 
-    return NextResponse.json({
+    const responseData: PaymentResponse & { clientSecret?: string } = {
       success: true,
       data: result.payment,
       clientSecret: result.clientSecret,
       message: result.message,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error processing payment:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to process payment",
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to process payment",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 

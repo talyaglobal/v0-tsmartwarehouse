@@ -1,13 +1,45 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Download, Eye } from "@/components/icons"
-import { mockInvoices } from "@/lib/mock-data"
+import { Download, Eye, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
+import type { Invoice } from "@/types"
 
 export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
+
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/invoices')
+      if (response.ok) {
+        const data = await response.json()
+        setInvoices(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch invoices:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
   return (
     <div className="space-y-6">
       <PageHeader title="Invoices" description="View and manage your billing history" />
@@ -30,7 +62,14 @@ export default function InvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockInvoices.map((invoice) => (
+              {invoices.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No invoices found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                invoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.id}</TableCell>
                   <TableCell>{invoice.bookingId}</TableCell>
@@ -50,7 +89,8 @@ export default function InvoicesPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

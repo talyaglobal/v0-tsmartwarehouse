@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { requireRole } from "@/lib/auth/utils"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 export default async function AdminLayout({
   children,
@@ -17,17 +18,19 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <aside className="hidden lg:block">
-        <AdminSidebar />
-      </aside>
+    <ErrorBoundary>
+      <div className="flex h-screen">
+        {/* Sidebar */}
+        <aside className="hidden lg:block">
+          <AdminSidebar />
+        </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader />
-        <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <AdminHeader />
+          <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   )
 }

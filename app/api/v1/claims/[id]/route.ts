@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getClaimById, updateClaim, deleteClaim } from "@/lib/db/claims"
 import { handleApiError } from "@/lib/utils/logger"
 import { updateClaimSchema } from "@/lib/validation/schemas"
+import type { ClaimResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
 export async function GET(
   request: NextRequest,
@@ -12,22 +13,27 @@ export async function GET(
     const claim = await getClaimById(id)
 
     if (!claim) {
-      return NextResponse.json(
-        { success: false, error: "Claim not found" },
-        { status: 404 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Claim not found",
+        statusCode: 404,
+      }
+      return NextResponse.json(errorData, { status: 404 })
     }
 
-    return NextResponse.json({
+    const responseData: ClaimResponse = {
       success: true,
       data: claim,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/claims/[id]" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }
 
@@ -44,23 +50,23 @@ export async function PATCH(
 
     const updatedClaim = await updateClaim(id, validatedData)
 
-    return NextResponse.json({
+    const responseData: ClaimResponse = {
       success: true,
       data: updatedClaim,
       message: "Claim updated successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     // Handle Zod validation errors
     if (error && typeof error === "object" && "issues" in error) {
       const zodError = error as { issues: Array<{ path: string[]; message: string }> }
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: "Validation error", 
-          details: zodError.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ")
-        },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Validation error",
+        statusCode: 400,
+        code: "VALIDATION_ERROR",
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     const errorResponse = handleApiError(error, { path: "/api/v1/claims/[id]", method: "PATCH" })
@@ -79,10 +85,11 @@ export async function DELETE(
     const { id } = await params
     await deleteClaim(id)
 
-    return NextResponse.json({
+    const responseData: ApiResponse = {
       success: true,
       message: "Claim deleted successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/claims/[id]", method: "DELETE" })
     return NextResponse.json(

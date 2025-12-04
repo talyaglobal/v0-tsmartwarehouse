@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { Button } from "@/components/ui/button"
@@ -8,10 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Users, Search, MoreHorizontal, Mail, Phone, Building2, Crown, Plus } from "@/components/icons"
-import { mockUsers } from "@/lib/mock-data"
+import { Users, Search, MoreHorizontal, Mail, Phone, Building2, Crown, Plus, Loader2 } from "@/components/icons"
 import { formatCurrency } from "@/lib/utils/format"
-import type { MembershipTier } from "@/types"
+import type { MembershipTier, User } from "@/types"
 
 const tierColors: Record<MembershipTier, string> = {
   bronze: "bg-orange-100 text-orange-800",
@@ -22,7 +21,43 @@ const tierColors: Record<MembershipTier, string> = {
 
 export default function CustomersPage() {
   const [search, setSearch] = useState("")
-  const customers = mockUsers.filter((u) => u.role === "customer")
+  const [customers, setCustomers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    total: 0,
+    goldMembers: 0,
+    activeBookings: 0,
+    totalRevenue: 0,
+  })
+
+  useEffect(() => {
+    fetchCustomers()
+  }, [])
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true)
+      // Note: This assumes a users API endpoint exists. If not, you'll need to create one.
+      // For now, we'll fetch from Supabase directly or use a placeholder
+      const response = await fetch('/api/v1/users?role=customer')
+      if (response.ok) {
+        const data = await response.json()
+        setCustomers(data.data || [])
+        setStats({
+          total: data.data?.length || 0,
+          goldMembers: data.data?.filter((u: User) => u.membershipTier === 'gold' || u.membershipTier === 'platinum').length || 0,
+          activeBookings: 0, // Would need to calculate from bookings
+          totalRevenue: 0, // Would need to calculate from invoices
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch customers:', error)
+      // Fallback: empty array
+      setCustomers([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -30,6 +65,14 @@ export default function CustomersPage() {
       c.email.toLowerCase().includes(search.toLowerCase()) ||
       c.company?.toLowerCase().includes(search.toLowerCase()),
   )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -45,10 +88,10 @@ export default function CustomersPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard title="Total Customers" value="87" icon={Users} trend={{ value: 12, isPositive: true }} />
-        <StatCard title="Gold Members" value="24" icon={Crown} description="Premium tier" />
-        <StatCard title="Active Bookings" value="42" icon={Building2} />
-        <StatCard title="Total Revenue" value={formatCurrency(1250000)} icon={Users} />
+        <StatCard title="Total Customers" value={stats.total.toString()} icon={Users} trend={{ value: 12, isPositive: true }} />
+        <StatCard title="Gold Members" value={stats.goldMembers.toString()} icon={Crown} description="Premium tier" />
+        <StatCard title="Active Bookings" value={stats.activeBookings.toString()} icon={Building2} />
+        <StatCard title="Total Revenue" value={formatCurrency(stats.totalRevenue)} icon={Users} />
       </div>
 
       <Card>
@@ -79,7 +122,14 @@ export default function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCustomers.map((customer) => (
+              {filteredCustomers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No customers found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -129,7 +179,8 @@ export default function CustomersPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

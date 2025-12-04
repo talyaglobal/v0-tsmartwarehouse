@@ -5,6 +5,7 @@ import { getNotificationService } from "@/lib/notifications/service"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createIncidentSchema } from "@/lib/validation/schemas"
 import type { IncidentStatus, IncidentSeverity } from "@/types"
+import type { IncidentsListResponse, IncidentResponse, ErrorResponse } from "@/types/api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,17 +30,20 @@ export async function GET(request: NextRequest) {
 
     const incidents = await getIncidents(filters)
 
-    return NextResponse.json({
+    const responseData: IncidentsListResponse = {
       success: true,
       data: incidents,
       total: incidents.length,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/incidents" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }
 
@@ -54,14 +58,13 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       if (error && typeof error === "object" && "issues" in error) {
         const zodError = error as { issues: Array<{ path: string[]; message: string }> }
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: "Validation error", 
-            details: zodError.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ")
-          },
-          { status: 400 }
-        )
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "Validation error",
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+        }
+        return NextResponse.json(errorData, { status: 400 })
       }
       throw error
     }
@@ -114,16 +117,19 @@ export async function POST(request: NextRequest) {
       console.error("Failed to send incident notification:", error)
     }
 
-    return NextResponse.json({
+    const responseData: IncidentResponse = {
       success: true,
       data: newIncident,
       message: "Incident reported successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/incidents", method: "POST" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }

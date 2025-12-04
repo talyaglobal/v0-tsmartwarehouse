@@ -60,10 +60,21 @@ The initial schema includes:
 
 RLS is enabled on all tables. You'll need to create policies based on your authentication setup. Example policies are commented in the migration file.
 
+## Realtime Setup
+
+After running `003_enable_realtime.sql`, you must also enable Realtime in your Supabase project settings:
+
+1. Go to **Database** → **Replication** in Supabase dashboard
+2. Toggle **Enable Realtime** to **ON**
+3. Verify that `tasks`, `notifications`, `warehouse_halls`, and `bookings` tables are in the Realtime publication
+
+See `DATABASE_COMPLETE_SETUP.md` Step 4.1 for detailed instructions.
+
 ## Next Steps
 
-1. Run the migration
-2. Configure RLS policies
-3. Seed initial data (optional)
-4. Update API routes to use database functions from `lib/db/`
+1. Run the migrations in order
+2. **Enable Realtime in project settings** (see above)
+3. Configure RLS policies
+4. Seed initial data (optional)
+5. Update API routes to use database functions from `lib/db/`
 

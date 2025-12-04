@@ -1,42 +1,86 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, TrendingUp, DollarSign, Users, Download } from "@/components/icons"
+import { BarChart3, TrendingUp, DollarSign, Users, Download, Loader2 } from "@/components/icons"
 import { formatCurrency } from "@/lib/utils/format"
-import { mockDashboardStats } from "@/lib/mock-data"
 import { RevenueChart } from "@/components/charts/revenue-chart"
 import { UtilizationChart } from "@/components/charts/utilization-chart"
 import { ServiceBreakdownChart } from "@/components/charts/service-breakdown-chart"
 
-const revenueData = [
-  { month: "Jan", pallet: 85000, areaRental: 40000 },
-  { month: "Feb", pallet: 92000, areaRental: 40000 },
-  { month: "Mar", pallet: 88000, areaRental: 40000 },
-  { month: "Apr", pallet: 95000, areaRental: 40000 },
-  { month: "May", pallet: 102000, areaRental: 80000 },
-  { month: "Jun", pallet: 125000, areaRental: 80000 },
-]
+interface RevenueData {
+  month: string
+  pallet: number
+  areaRental: number
+}
 
-const utilizationData = [
-  { month: "Jan", floor1: 65, floor2: 58, floor3: 25 },
-  { month: "Feb", floor1: 68, floor2: 62, floor3: 25 },
-  { month: "Mar", floor1: 70, floor2: 65, floor3: 50 },
-  { month: "Apr", floor1: 72, floor2: 68, floor3: 50 },
-  { month: "May", floor1: 75, floor2: 70, floor3: 50 },
-  { month: "Jun", floor1: 78, floor2: 72, floor3: 50 },
-]
+interface UtilizationData {
+  month: string
+  floor1: number
+  floor2: number
+  floor3: number
+}
 
-const serviceBreakdown = [
-  { name: "Pallet Storage", value: 65, color: "#3b82f6" },
-  { name: "Area Rental", value: 25, color: "#10b981" },
-  { name: "Handling Fees", value: 10, color: "#f59e0b" },
-]
+interface ServiceBreakdown {
+  name: string
+  value: number
+  color: string
+}
+
+interface AnalyticsStats {
+  totalRevenue: number
+  monthlyRevenue: number
+  warehouseUtilization: number
+  totalCustomers: number
+  avgRevenuePerCustomer: number
+  customerRetentionRate: number
+  avgBookingDuration: number
+  storageEfficiency: number
+  areaRentalRate: number
+}
 
 export default function AnalyticsPage() {
+  const [loading, setLoading] = useState(true)
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([])
+  const [utilizationData, setUtilizationData] = useState<UtilizationData[]>([])
+  const [serviceBreakdown, setServiceBreakdown] = useState<ServiceBreakdown[]>([])
+  const [stats, setStats] = useState<AnalyticsStats | null>(null)
+
+  useEffect(() => {
+    fetchAnalyticsData()
+  }, [])
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/analytics?type=all&months=6')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data')
+      }
+
+      const result = await response.json()
+      
+      if (result.success) {
+        setRevenueData(result.data.revenue || [])
+        setUtilizationData(result.data.utilization || [])
+        setServiceBreakdown(result.data.serviceBreakdown || [])
+        setStats(result.data.stats)
+      }
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error)
+      // Fallback to empty data
+      setRevenueData([])
+      setUtilizationData([])
+      setServiceBreakdown([])
+    } finally {
+      setLoading(false)
+    }
+  }
   return (
     <div className="space-y-6">
       <PageHeader
@@ -50,32 +94,38 @@ export default function AnalyticsPage() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard
-          title="Total Revenue"
-          value={formatCurrency(mockDashboardStats.totalRevenue)}
-          icon={DollarSign}
-          trend={{ value: 15, isPositive: true }}
-        />
-        <StatCard
-          title="Monthly Revenue"
-          value={formatCurrency(mockDashboardStats.monthlyRevenue)}
-          icon={TrendingUp}
-          trend={{ value: 8, isPositive: true }}
-        />
-        <StatCard
-          title="Utilization"
-          value={mockDashboardStats.warehouseUtilization + "%"}
-          icon={BarChart3}
-          description="Across all floors"
-        />
-        <StatCard
-          title="Active Customers"
-          value={mockDashboardStats.totalCustomers.toString()}
-          icon={Users}
-          trend={{ value: 5, isPositive: true }}
-        />
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
+            <StatCard
+              title="Total Revenue"
+              value={formatCurrency(stats?.totalRevenue || 0)}
+              icon={DollarSign}
+              trend={{ value: 15, isPositive: true }}
+            />
+            <StatCard
+              title="Monthly Revenue"
+              value={formatCurrency(stats?.monthlyRevenue || 0)}
+              icon={TrendingUp}
+              trend={{ value: 8, isPositive: true }}
+            />
+            <StatCard
+              title="Utilization"
+              value={(stats?.warehouseUtilization || 0) + "%"}
+              icon={BarChart3}
+              description="Across all floors"
+            />
+            <StatCard
+              title="Active Customers"
+              value={(stats?.totalCustomers || 0).toString()}
+              icon={Users}
+              trend={{ value: 5, isPositive: true }}
+            />
+          </div>
 
       <Tabs defaultValue="revenue" className="space-y-4">
         <TabsList>
@@ -105,23 +155,23 @@ export default function AnalyticsPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Avg. Revenue per Customer</span>
-                    <span className="font-medium">{formatCurrency(14367)}</span>
+                    <span className="font-medium">{formatCurrency(stats?.avgRevenuePerCustomer || 0)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Customer Retention Rate</span>
-                    <span className="font-medium">94%</span>
+                    <span className="font-medium">{stats?.customerRetentionRate || 0}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Avg. Booking Duration</span>
-                    <span className="font-medium">4.2 months</span>
+                    <span className="font-medium">{stats?.avgBookingDuration || 0} months</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Storage Efficiency</span>
-                    <span className="font-medium">87%</span>
+                    <span className="font-medium">{stats?.storageEfficiency || 0}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Area Rental Rate</span>
-                    <span className="font-medium">$12/sq ft/year</span>
+                    <span className="font-medium">${stats?.areaRentalRate || 0}/sq ft/year</span>
                   </div>
                 </div>
               </CardContent>
@@ -129,6 +179,8 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
       </Tabs>
+        </>
+      )}
     </div>
   )
 }

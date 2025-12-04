@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -7,19 +8,84 @@ import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge, SeverityBadge } from "@/components/ui/status-badge"
-import { Package, DollarSign, Users, Building2, AlertCircle, ClipboardList, Wifi, WifiOff } from "@/components/icons"
-import { mockBookings, mockIncidents, mockTasks, mockDashboardStats } from "@/lib/mock-data"
+import { Package, DollarSign, Users, Building2, AlertCircle, ClipboardList, Wifi, WifiOff, Loader2 } from "@/components/icons"
 import { useRealtimeWarehouseUtilization } from "@/lib/realtime"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
+import type { Booking, Incident, Task } from "@/types"
 
 export default function AdminDashboardPage() {
-  const stats = mockDashboardStats
-  const recentBookings = mockBookings.slice(0, 5)
-  const openIncidents = mockIncidents.filter((i) => i.status !== "closed")
-  const pendingTasks = mockTasks.filter((t) => t.status === "pending" || t.status === "assigned")
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    activeBookings: 0,
+    totalCustomers: 0,
+  })
+  const [recentBookings, setRecentBookings] = useState<Booking[]>([])
+  const [openIncidents, setOpenIncidents] = useState<Incident[]>([])
+  const [pendingTasks, setPendingTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   
   // Real-time warehouse utilization
   const { utilization, isConnected } = useRealtimeWarehouseUtilization()
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch analytics stats
+      const statsRes = await fetch('/api/v1/analytics?type=stats')
+      if (statsRes.ok) {
+        const statsData = await statsRes.json()
+        setStats({
+          totalRevenue: statsData.data?.totalRevenue || 0,
+          activeBookings: 0, // Will be calculated from bookings
+          totalCustomers: statsData.data?.totalCustomers || 0,
+        })
+      }
+
+      // Fetch recent bookings
+      const bookingsRes = await fetch('/api/v1/bookings?limit=5')
+      if (bookingsRes.ok) {
+        const bookingsData = await bookingsRes.json()
+        setRecentBookings(bookingsData.data || [])
+        setStats(prev => ({
+          ...prev,
+          activeBookings: (bookingsData.data || []).filter((b: Booking) => 
+            b.status === 'active' || b.status === 'confirmed'
+          ).length,
+        }))
+      }
+
+      // Fetch open incidents
+      const incidentsRes = await fetch('/api/v1/incidents?status=open,investigating')
+      if (incidentsRes.ok) {
+        const incidentsData = await incidentsRes.json()
+        setOpenIncidents(incidentsData.data || [])
+      }
+
+      // Fetch pending tasks
+      const tasksRes = await fetch('/api/v1/tasks?status=pending,assigned')
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json()
+        setPendingTasks(tasksData.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

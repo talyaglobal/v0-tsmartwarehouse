@@ -9,10 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { AlertCircle, Search, MoreHorizontal, AlertTriangle, CheckCircle, Clock, Plus } from "@/components/icons"
-import { mockIncidents } from "@/lib/mock-data"
+import { AlertCircle, Search, MoreHorizontal, AlertTriangle, CheckCircle, Clock, Plus, Loader2 } from "@/components/icons"
 import { formatDate } from "@/lib/utils/format"
-import type { IncidentSeverity, IncidentStatus } from "@/types"
+import type { IncidentSeverity, IncidentStatus, Incident } from "@/types"
 
 const severityColors: Record<IncidentSeverity, string> = {
   low: "bg-blue-100 text-blue-800",
@@ -30,9 +29,48 @@ const statusConfig: Record<IncidentStatus, { color: string; icon: typeof CheckCi
 
 export default function IncidentsPage() {
   const [search, setSearch] = useState("")
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const openCount = mockIncidents.filter((i) => i.status === "open").length
-  const investigatingCount = mockIncidents.filter((i) => i.status === "investigating").length
+  useEffect(() => {
+    fetchIncidents()
+  }, [])
+
+  const fetchIncidents = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/incidents')
+      if (response.ok) {
+        const data = await response.json()
+        setIncidents(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch incidents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredIncidents = incidents.filter((incident) => {
+    if (!search) return true
+    const searchLower = search.toLowerCase()
+    return (
+      incident.title.toLowerCase().includes(searchLower) ||
+      incident.description.toLowerCase().includes(searchLower) ||
+      incident.location?.toLowerCase().includes(searchLower)
+    )
+  })
+
+  const openCount = incidents.filter((i) => i.status === "open").length
+  const investigatingCount = incidents.filter((i) => i.status === "investigating").length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -88,7 +126,14 @@ export default function IncidentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockIncidents.map((incident) => {
+              {filteredIncidents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No incidents found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredIncidents.map((incident) => {
                 const StatusIcon = statusConfig[incident.status].icon
                 return (
                   <TableRow key={incident.id}>
@@ -135,7 +180,8 @@ export default function IncidentsPage() {
                     </TableCell>
                   </TableRow>
                 )
-              })}
+              })
+              )}
             </TableBody>
           </Table>
         </CardContent>

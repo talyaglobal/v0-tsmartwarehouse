@@ -1,16 +1,50 @@
 "use client"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertCircle, Plus, Clock, CheckCircle, FileText } from "@/components/icons"
-import { mockClaims } from "@/lib/mock-data"
+import { AlertCircle, Plus, Clock, CheckCircle, FileText, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
+import type { Claim } from "@/types"
 
 export default function ClaimsPage() {
-  const customerClaims = mockClaims.filter((c) => c.customerId === "user-2")
+  const [claims, setClaims] = useState<Claim[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchClaims()
+  }, [])
+
+  const fetchClaims = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/claims')
+      if (response.ok) {
+        const data = await response.json()
+        setClaims(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch claims:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const customerClaims = claims
+  const openClaims = customerClaims.filter((c) => c.status === 'submitted' || c.status === 'under-review')
+  const approvedClaims = customerClaims.filter((c) => c.status === 'approved')
+  const approvedTotal = approvedClaims.reduce((sum, c) => sum + c.amount, 0)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -34,7 +68,7 @@ export default function ClaimsPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{openClaims.length}</div>
             <p className="text-xs text-muted-foreground">Awaiting review</p>
           </CardContent>
         </Card>
@@ -44,8 +78,8 @@ export default function ClaimsPage() {
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1</div>
-            <p className="text-xs text-muted-foreground">{formatCurrency(150)} total</p>
+            <div className="text-2xl font-bold">{approvedClaims.length}</div>
+            <p className="text-xs text-muted-foreground">{formatCurrency(approvedTotal)} total</p>
           </CardContent>
         </Card>
         <Card>

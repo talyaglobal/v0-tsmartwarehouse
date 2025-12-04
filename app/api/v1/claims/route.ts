@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { createClaimSchema } from "@/lib/validation/schemas"
 import type { ClaimStatus } from "@/types"
+import type { ClaimsListResponse, ClaimResponse, ErrorResponse } from "@/types/api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,17 +24,20 @@ export async function GET(request: NextRequest) {
 
     const claims = await getClaims(filters)
 
-    return NextResponse.json({
+    const responseData: ClaimsListResponse = {
       success: true,
       data: claims,
       total: claims.length,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/claims" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }
 
@@ -55,14 +59,13 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       if (error && typeof error === "object" && "issues" in error) {
         const zodError = error as { issues: Array<{ path: string[]; message: string }> }
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: "Validation error", 
-            details: zodError.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ")
-          },
-          { status: 400 }
-        )
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "Validation error",
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+        }
+        return NextResponse.json(errorData, { status: 400 })
       }
       throw error
     }
@@ -77,10 +80,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json(
-        { success: false, error: "User profile not found" },
-        { status: 404 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "User profile not found",
+        statusCode: 404,
+      }
+      return NextResponse.json(errorData, { status: 404 })
     }
 
     // Create claim using database function
@@ -91,16 +96,19 @@ export async function POST(request: NextRequest) {
       status: validatedData.status || "submitted",
     })
 
-    return NextResponse.json({
+    const responseData: ClaimResponse = {
       success: true,
       data: newClaim,
       message: "Claim submitted successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/claims", method: "POST" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }

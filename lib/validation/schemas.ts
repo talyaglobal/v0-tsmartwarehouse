@@ -63,6 +63,22 @@ export const updateInvoiceSchema = z.object({
   notes: z.string().max(1000).optional(),
 })
 
+// Query parameter schemas for GET requests
+export const bookingsQuerySchema = z.object({
+  customerId: z.string().uuid().optional(),
+  status: z.enum(["pending", "confirmed", "active", "completed", "cancelled"]).optional(),
+  type: z.enum(["pallet", "area-rental"]).optional(),
+  warehouseId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().nonnegative().optional(),
+})
+
+export const invoicesQuerySchema = z.object({
+  customerId: z.string().uuid().optional(),
+  status: z.enum(["draft", "pending", "paid", "overdue", "cancelled"]).optional(),
+  bookingId: z.string().uuid().optional(),
+})
+
 // Incident schemas
 export const createIncidentSchema = z.object({
   type: z.string().min(1).max(50),

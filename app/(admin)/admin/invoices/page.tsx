@@ -9,10 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { FileText, Search, MoreHorizontal, DollarSign, Clock, CheckCircle, Plus, Download } from "@/components/icons"
-import { mockInvoices } from "@/lib/mock-data"
+import { FileText, Search, MoreHorizontal, DollarSign, Clock, CheckCircle, Plus, Download, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
-import type { InvoiceStatus } from "@/types"
+import type { InvoiceStatus, Invoice } from "@/types"
 
 const statusColors: Record<InvoiceStatus, "default" | "secondary" | "destructive" | "outline"> = {
   draft: "secondary",
@@ -24,10 +23,48 @@ const statusColors: Record<InvoiceStatus, "default" | "secondary" | "destructive
 
 export default function InvoicesPage() {
   const [search, setSearch] = useState("")
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const totalPending = mockInvoices.filter((i) => i.status === "pending").reduce((sum, i) => sum + i.total, 0)
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
 
-  const totalPaid = mockInvoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.total, 0)
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/invoices')
+      if (response.ok) {
+        const data = await response.json()
+        setInvoices(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch invoices:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredInvoices = invoices.filter((invoice) => {
+    if (!search) return true
+    const searchLower = search.toLowerCase()
+    return (
+      invoice.id.toLowerCase().includes(searchLower) ||
+      invoice.customerName.toLowerCase().includes(searchLower)
+    )
+  })
+
+  const totalPending = invoices.filter((i) => i.status === "pending").reduce((sum, i) => sum + i.total, 0)
+  const totalPaid = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.total, 0)
+  const avgInvoice = invoices.length > 0 ? invoices.reduce((sum, i) => sum + i.total, 0) / invoices.length : 0
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -50,8 +87,8 @@ export default function InvoicesPage() {
           description="Awaiting payment"
         />
         <StatCard title="Paid (30d)" value={formatCurrency(totalPaid)} icon={CheckCircle} description="This month" />
-        <StatCard title="Total Invoices" value={mockInvoices.length.toString()} icon={FileText} />
-        <StatCard title="Avg. Invoice" value={formatCurrency(260111)} icon={DollarSign} />
+        <StatCard title="Total Invoices" value={invoices.length.toString()} icon={FileText} />
+        <StatCard title="Avg. Invoice" value={formatCurrency(avgInvoice)} icon={DollarSign} />
       </div>
 
       <Card>
@@ -83,7 +120,14 @@ export default function InvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockInvoices.map((invoice) => (
+              {filteredInvoices.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No invoices found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell>
                     <span className="font-medium">#{invoice.id}</span>
@@ -114,7 +158,8 @@ export default function InvoicesPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

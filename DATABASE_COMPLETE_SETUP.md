@@ -163,12 +163,63 @@ ls -la .env.local
    - Paste into SQL Editor
    - Click **Run**
    - ✅ Verify: Should see "Success. No rows returned"
+   - ⚠️ **IMPORTANT**: After running this migration, you must also enable Realtime in Supabase project settings (see Step 4.1 below)
 
    **Migration 5: Payments Schema** (Optional - if using payments)
    - Open `supabase/migrations/003_payments_schema.sql`
    - Copy entire contents
    - Paste into SQL Editor
    - Click **Run**
+
+   **Migration 6: RLS Policies**
+   - Open `supabase/migrations/004_rls_policies.sql`
+   - Copy entire contents
+   - Paste into SQL Editor
+   - Click **Run**
+   - ✅ Verify: Should see "Success. No rows returned"
+
+   **Migration 7: Storage Bucket Setup** (Required if using file uploads)
+   - ⚠️ **IMPORTANT**: First create the storage bucket manually (see Step 7 below)
+   - Open `supabase/migrations/005_storage_bucket_setup.sql`
+   - Copy entire contents
+   - Paste into SQL Editor
+   - Click **Run**
+   - ✅ Verify: Should see "Success. No rows returned"
+
+### 4.1 Enable Supabase Realtime in Project Settings
+
+⚠️ **CRITICAL STEP**: After running the Realtime migration, you must enable Realtime in your Supabase project settings. The migration only adds tables to the Realtime publication, but Realtime itself must be enabled at the project level.
+
+1. **Open Supabase Dashboard**
+   - Go to https://app.supabase.com
+   - Select your project
+
+2. **Navigate to Database Settings**
+   - Click **Database** in the left sidebar
+   - Click **Replication** (or go to **Settings** → **Database** → **Replication**)
+
+3. **Enable Realtime**
+   - Find the **Realtime** section
+   - Toggle **Enable Realtime** to **ON** (if not already enabled)
+   - This enables the Realtime server for your project
+
+4. **Verify Realtime is Enabled**
+   - You should see a green indicator or checkmark
+   - The Realtime server URL should be visible (usually `wss://your-project.supabase.co/realtime/v1`)
+
+5. **Verify Tables are in Publication**
+   - In the same Replication settings page, you should see tables listed under the Realtime publication
+   - The following tables should be included:
+     - ✅ `tasks`
+     - ✅ `notifications`
+     - ✅ `warehouse_halls`
+     - ✅ `bookings`
+   - If tables are missing, re-run the `003_enable_realtime.sql` migration
+
+**Note**: 
+- Realtime is enabled by default on new Supabase projects, but it's good to verify
+- If Realtime is disabled, real-time features in the application (live task updates, notifications, warehouse utilization) will not work
+- You may need to wait a few minutes after enabling for changes to take effect
 
 ### Option B: Using Supabase CLI (For Advanced Users)
 
@@ -288,15 +339,25 @@ SELECT * FROM bookings;
 
 If you're using file uploads (claim evidence, etc.):
 
+⚠️ **IMPORTANT**: You must create the storage bucket BEFORE running the storage migration (`005_storage_bucket_setup.sql`).
+
 1. Go to **Storage** in Supabase dashboard
 2. Click **Create a new bucket**
 3. Configure:
    - **Name**: `claim-evidence`
-   - **Public bucket**: ✅ Enable (or configure RLS if private)
-   - **File size limit**: 10MB
+   - **Public bucket**: ✅ Enable (for public access) OR ❌ Disable (for private access with signed URLs)
+   - **File size limit**: 10MB (recommended)
+   - **Allowed MIME types**: Leave empty to allow all configured types
 4. Click **Create bucket**
 
-See `FILE_STORAGE_SETUP.md` for detailed storage configuration.
+5. **After creating the bucket**, run the storage migration:
+   - Open `supabase/migrations/005_storage_bucket_setup.sql`
+   - Copy entire contents
+   - Paste into SQL Editor
+   - Click **Run**
+   - This will set up RLS policies for the storage bucket
+
+See `FILE_STORAGE_SETUP.md` for detailed storage configuration and policy options.
 
 ---
 
@@ -389,6 +450,26 @@ Check browser console for any "Missing environment variable" errors.
   ```
 - Or modify migration to use `CREATE POLICY IF NOT EXISTS` (PostgreSQL 9.5+)
 
+### Realtime Features Not Working
+
+**Symptoms:**
+- Real-time updates not appearing in the UI
+- Connection status shows as disconnected
+- No live updates for tasks, notifications, or warehouse utilization
+
+**Solution:**
+1. Verify Realtime is enabled in Supabase project settings:
+   - Go to **Database** → **Replication** (or **Settings** → **Database** → **Replication**)
+   - Ensure **Enable Realtime** toggle is **ON**
+2. Verify tables are in the Realtime publication:
+   - Check that `tasks`, `notifications`, `warehouse_halls`, and `bookings` are listed
+   - If missing, re-run `supabase/migrations/003_enable_realtime.sql`
+3. Check browser console for WebSocket connection errors
+4. Verify environment variables are set correctly:
+   - `NEXT_PUBLIC_SUPABASE_URL` must be correct
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` must be valid
+5. Wait a few minutes after enabling Realtime for changes to propagate
+
 ---
 
 ## ✅ Completion Checklist
@@ -398,12 +479,15 @@ After completing all steps, verify:
 - [ ] `.env.local` file exists with all required variables
 - [ ] All migration files have been run successfully
 - [ ] All tables appear in Table Editor
+- [ ] **Realtime is enabled in project settings** (Database → Replication)
+- [ ] **Realtime tables are in publication** (`tasks`, `notifications`, `warehouse_halls`, `bookings`)
 - [ ] RLS policies are visible in Authentication → Policies
 - [ ] Can register a new user successfully
 - [ ] User profile is automatically created in `profiles` table
 - [ ] Email verification works
 - [ ] Database queries work in API routes
 - [ ] Storage bucket created (if using file uploads)
+- [ ] Real-time features work (test task updates, notifications)
 
 ---
 

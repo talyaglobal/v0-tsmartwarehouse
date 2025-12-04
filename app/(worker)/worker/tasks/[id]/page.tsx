@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,26 +8,86 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { PriorityBadge, StatusBadge } from "@/components/ui/status-badge"
 import { ArrowLeft, MapPin, Clock, Package, CheckCircle, Play, Loader2 } from "@/components/icons"
-import { mockTasks } from "@/lib/mock-data"
 import { formatDateTime } from "@/lib/utils/format"
+import type { Task } from "@/types"
 
 export default function TaskDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState("")
+  const [task, setTask] = useState<Task | null>(null)
 
-  const task = mockTasks.find((t) => t.id === params.id) || mockTasks[0]
+  useEffect(() => {
+    fetchTask()
+  }, [params.id])
+
+  const fetchTask = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/v1/tasks/${params.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setTask(data.data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch task:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleStartTask = async () => {
+    if (!task) return
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
+    try {
+      const response = await fetch(`/api/v1/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in-progress' }),
+      })
+      if (response.ok) {
+        await fetchTask()
+      }
+    } catch (error) {
+      console.error('Failed to start task:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCompleteTask = async () => {
+    if (!task) return
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    router.push("/worker/tasks")
+    try {
+      const response = await fetch(`/api/v1/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      })
+      if (response.ok) {
+        router.push("/worker/tasks")
+      }
+    } catch (error) {
+      console.error('Failed to complete task:', error)
+      setIsLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!task) {
+    return (
+      <div className="p-4">
+        <p className="text-muted-foreground">Task not found</p>
+      </div>
+    )
   }
 
   return (

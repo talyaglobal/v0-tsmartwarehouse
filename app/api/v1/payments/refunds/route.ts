@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest } from "@/lib/auth/api-middleware"
 import { processRefund } from "@/lib/business-logic/payments"
 import { getRefunds } from "@/lib/db/payments"
+import type { RefundsListResponse, RefundResponse, ErrorResponse } from "@/types/api"
 
 /**
  * GET /api/v1/payments/refunds
@@ -11,7 +12,12 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      return NextResponse.json({ success: false, error: authResult.error }, { status: 401 })
+      const errorData: ErrorResponse = {
+        success: false,
+        error: authResult.error || "Unauthorized",
+        statusCode: 401,
+      }
+      return NextResponse.json(errorData, { status: 401 })
     }
 
     const { user } = authResult
@@ -37,20 +43,20 @@ export async function GET(request: NextRequest) {
 
     const refunds = await getRefunds(filters)
 
-    return NextResponse.json({
+    const responseData: RefundsListResponse = {
       success: true,
       data: refunds,
       total: refunds.length,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error fetching refunds:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch refunds",
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch refunds",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 
@@ -62,27 +68,36 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      return NextResponse.json({ success: false, error: authResult.error }, { status: 401 })
+      const errorData: ErrorResponse = {
+        success: false,
+        error: authResult.error || "Unauthorized",
+        statusCode: 401,
+      }
+      return NextResponse.json(errorData, { status: 401 })
     }
 
     const { user } = authResult
 
     // Only admins can create refunds
     if (user.role !== "admin") {
-      return NextResponse.json(
-        { success: false, error: "Only admins can create refunds" },
-        { status: 403 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Only admins can create refunds",
+        statusCode: 403,
+      }
+      return NextResponse.json(errorData, { status: 403 })
     }
 
     const body = await request.json()
     const { paymentId, amount, reason, refundToCredit } = body
 
     if (!paymentId) {
-      return NextResponse.json(
-        { success: false, error: "paymentId is required" },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "paymentId is required",
+        statusCode: 400,
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     const refund = await processRefund({
@@ -92,20 +107,20 @@ export async function POST(request: NextRequest) {
       refundToCredit,
     })
 
-    return NextResponse.json({
+    const responseData: RefundResponse = {
       success: true,
       data: refund,
       message: "Refund processed successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error processing refund:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to process refund",
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to process refund",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 

@@ -7,6 +7,7 @@ import {
   FILE_SIZE_LIMITS,
   ALLOWED_MIME_TYPES,
 } from '@/lib/storage/utils'
+import type { ApiResponse, ErrorResponse } from '@/types/api'
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,10 +26,12 @@ export async function POST(request: NextRequest) {
     const folder = (formData.get('folder') as string) || 'claims'
 
     if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided' },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: 'No file provided',
+        statusCode: 400,
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     // Validate file
@@ -38,10 +41,12 @@ export async function POST(request: NextRequest) {
     })
 
     if (validationError) {
-      return NextResponse.json(
-        { success: false, error: validationError.message },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: validationError.message,
+        statusCode: 400,
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     // Create Supabase client
@@ -62,10 +67,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('File upload error:', error)
-      return NextResponse.json(
-        { success: false, error: error.message || 'Failed to upload file' },
-        { status: 500 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: error.message || 'Failed to upload file',
+        statusCode: 500,
+      }
+      return NextResponse.json(errorData, { status: 500 })
     }
 
     // Get public URL
@@ -73,7 +80,7 @@ export async function POST(request: NextRequest) {
       data: { publicUrl },
     } = supabase.storage.from(bucket).getPublicUrl(filePath)
 
-    return NextResponse.json({
+    const responseData: ApiResponse = {
       success: true,
       data: {
         url: publicUrl,
@@ -81,17 +88,17 @@ export async function POST(request: NextRequest) {
         name: file.name,
         size: file.size,
         mimeType: file.type,
-      },
-    })
+      } as any,
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Upload error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to upload file',
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to upload file',
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 
@@ -107,31 +114,37 @@ export async function DELETE(request: NextRequest) {
     const { path, bucket = 'claim-evidence' } = body
 
     if (!path) {
-      return NextResponse.json(
-        { success: false, error: 'File path is required' },
-        { status: 400 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: 'File path is required',
+        statusCode: 400,
+      }
+      return NextResponse.json(errorData, { status: 400 })
     }
 
     const supabase = await createClient()
     const { error } = await supabase.storage.from(bucket).remove([path])
 
     if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      )
+      const errorData: ErrorResponse = {
+        success: false,
+        error: error.message,
+        statusCode: 500,
+      }
+      return NextResponse.json(errorData, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    const responseData: ApiResponse = {
+      success: true,
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete file',
-      },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete file',
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 }
 

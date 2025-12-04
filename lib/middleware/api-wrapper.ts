@@ -3,6 +3,8 @@ import { rateLimit, getClientIdentifier, RATE_LIMIT_PRESETS } from './rate-limit
 import { applyCorsHeaders, handleCorsPreflight } from './cors'
 import { logger, handleApiError, AppError } from '@/lib/utils/logger'
 import { requireAuth, requireRole } from '@/lib/auth/api-middleware'
+import { validateCsrfToken } from '@/lib/security/csrf'
+import { applySecurityHeaders } from '@/lib/security/headers'
 import type { UserRole } from '@/types'
 
 /**
@@ -30,6 +32,10 @@ export interface ApiHandlerOptions {
    * Allowed HTTP methods
    */
   methods?: string[]
+  /**
+   * Require CSRF token validation (default: true for state-changing methods)
+   */
+  requireCsrf?: boolean
 }
 
 /**
@@ -57,27 +63,38 @@ export function withApiMiddleware<T = any>(
         )
       }
 
-      // Rate limiting
-      if (options.rateLimit) {
-        const identifier = getClientIdentifier(request)
-        const rateLimitResult = await rateLimit(identifier, options.rateLimit)
-
-        if (!rateLimitResult.success) {
-          const response = NextResponse.json(
-            {
-              error: 'Too many requests',
-              message: 'Rate limit exceeded. Please try again later.',
-            },
-            { status: 429 }
+      // CSRF protection (for state-changing methods)
+      if (options.requireCsrf !== false) {
+        const csrfResponse = await validateCsrfToken(request)
+        if (csrfResponse) {
+          return applySecurityHeaders(
+            applyCorsHeaders(request, csrfResponse, options.cors !== false ? {} : undefined)
           )
-
-          // Add rate limit headers
-          response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString())
-          response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString())
-          response.headers.set('X-RateLimit-Reset', rateLimitResult.reset.toString())
-
-          return applyCorsHeaders(request, response, options.cors !== false ? {} : undefined)
         }
+      }
+
+      // Rate limiting (apply to all requests by default)
+      const rateLimitPreset = options.rateLimit || 'api'
+      const identifier = getClientIdentifier(request)
+      const rateLimitResult = await rateLimit(identifier, rateLimitPreset)
+
+      if (!rateLimitResult.success) {
+        const response = NextResponse.json(
+          {
+            error: 'Too many requests',
+            message: 'Rate limit exceeded. Please try again later.',
+          },
+          { status: 429 }
+        )
+
+        // Add rate limit headers
+        response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString())
+        response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString())
+        response.headers.set('X-RateLimit-Reset', rateLimitResult.reset.toString())
+
+        return applySecurityHeaders(
+          applyCorsHeaders(request, response, options.cors !== false ? {} : undefined)
+        )
       }
 
       // Authentication
@@ -100,12 +117,20 @@ export function withApiMiddleware<T = any>(
       }
 
       // Execute handler
-      const response = await handler(request, { user })
+      let response = await handler(request, { user })
 
       // Apply CORS headers
       if (options.cors !== false) {
-        return applyCorsHeaders(request, response, {})
+        response = applyCorsHeaders(request, response, {})
       }
+
+      // Apply security headers
+      response = applySecurityHeaders(response)
+
+      // Add rate limit headers to successful responses
+      response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString())
+      response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString())
+      response.headers.set('X-RateLimit-Reset', rateLimitResult.reset.toString())
 
       return response
     } catch (error) {
@@ -125,8 +150,11 @@ export function withApiMiddleware<T = any>(
 
       // Apply CORS headers even on error
       if (options.cors !== false) {
-        return applyCorsHeaders(request, response)
+        response = applyCorsHeaders(request, response)
       }
+
+      // Apply security headers even on error
+      response = applySecurityHeaders(response)
 
       return response
     }

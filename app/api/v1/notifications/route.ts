@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server"
 import { getNotifications, getUnreadCount, markAllNotificationsAsRead } from "@/lib/db/notifications"
 import { getCurrentUser } from "@/lib/auth/utils"
 import { apiWrapper } from "@/lib/middleware/api-wrapper"
+import type { NotificationsListResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
 export const GET = apiWrapper(async (req: NextRequest) => {
   const user = await getCurrentUser()
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const errorData: ErrorResponse = {
+      success: false,
+      error: "Unauthorized",
+      statusCode: 401,
+    }
+    return NextResponse.json(errorData, { status: 401 })
   }
 
   const searchParams = req.nextUrl.searchParams
@@ -26,17 +32,21 @@ export const GET = apiWrapper(async (req: NextRequest) => {
 
     const unreadCount = await getUnreadCount(user.id)
 
-    return NextResponse.json({
-      notifications,
-      unreadCount,
+    const responseData: NotificationsListResponse = {
+      success: true,
+      data: notifications,
       total: notifications.length,
-    })
+      unreadCount,
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error fetching notifications:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch notifications" },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch notifications",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 })
 
@@ -44,7 +54,12 @@ export const PATCH = apiWrapper(async (req: NextRequest) => {
   const user = await getCurrentUser()
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const errorData: ErrorResponse = {
+      success: false,
+      error: "Unauthorized",
+      statusCode: 401,
+    }
+    return NextResponse.json(errorData, { status: 401 })
   }
 
   try {
@@ -52,16 +67,27 @@ export const PATCH = apiWrapper(async (req: NextRequest) => {
 
     if (action === "mark_all_read") {
       await markAllNotificationsAsRead(user.id)
-      return NextResponse.json({ success: true, message: "All notifications marked as read" })
+      const responseData: ApiResponse = {
+        success: true,
+        message: "All notifications marked as read",
+      }
+      return NextResponse.json(responseData)
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    const errorData: ErrorResponse = {
+      success: false,
+      error: "Invalid action",
+      statusCode: 400,
+    }
+    return NextResponse.json(errorData, { status: 400 })
   } catch (error) {
     console.error("Error updating notifications:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update notifications" },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update notifications",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 })
 

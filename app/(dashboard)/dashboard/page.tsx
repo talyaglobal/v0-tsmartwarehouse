@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -5,15 +8,69 @@ import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { Package, DollarSign, FileText, ArrowRight, Building2 } from "@/components/icons"
-import { mockBookings, mockInvoices } from "@/lib/mock-data"
+import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
+import type { Booking, Invoice } from "@/types"
 
 export default function CustomerDashboardPage() {
-  const activeBookings = mockBookings.filter((b) => b.status === "active" || b.status === "confirmed")
-  const pendingInvoices = mockInvoices.filter((i) => i.status === "pending")
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [user, setUser] = useState<{ membershipTier?: string; creditBalance?: number } | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const [bookingsRes, invoicesRes] = await Promise.all([
+        fetch('/api/v1/bookings'),
+        fetch('/api/v1/invoices'),
+      ])
+
+      if (bookingsRes.ok) {
+        const bookingsData = await bookingsRes.json()
+        setBookings(bookingsData.data || [])
+      }
+
+      if (invoicesRes.ok) {
+        const invoicesData = await invoicesRes.json()
+        setInvoices(invoicesData.data || [])
+      }
+
+      // Fetch user info for membership tier and credit balance
+      try {
+        const userRes = await fetch('/api/v1/users/me')
+        if (userRes.ok) {
+          const userData = await userRes.json()
+          setUser(userData.data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch user data:', err)
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const activeBookings = bookings.filter((b) => b.status === "active" || b.status === "confirmed")
+  const pendingInvoices = invoices.filter((i) => i.status === "pending")
   const totalPallets = activeBookings.reduce((sum, b) => sum + (b.palletCount || 0), 0)
   const totalAreaRented = activeBookings.reduce((sum, b) => sum + (b.areaSqFt || 0), 0)
+  const membershipTier = user?.membershipTier || "bronze"
+  const creditBalance = user?.creditBalance || 0
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -41,10 +98,10 @@ export default function CustomerDashboardPage() {
         />
         <StatCard
           title="Membership Credits"
-          value={formatCurrency(2500)}
+          value={formatCurrency(creditBalance)}
           icon={DollarSign}
           trend={{ value: 5, isPositive: true }}
-          subtitle="Gold tier benefits"
+          subtitle={`${membershipTier.charAt(0).toUpperCase() + membershipTier.slice(1)} tier benefits`}
         />
       </div>
 
@@ -65,7 +122,7 @@ export default function CustomerDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockBookings.slice(0, 3).map((booking) => (
+              {bookings.slice(0, 3).map((booking) => (
                 <div key={booking.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -106,7 +163,7 @@ export default function CustomerDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockInvoices.slice(0, 3).map((invoice) => (
+              {invoices.slice(0, 3).map((invoice) => (
                 <div key={invoice.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -133,10 +190,12 @@ export default function CustomerDashboardPage() {
         <CardContent className="flex items-center justify-between p-6">
           <div>
             <Badge variant="secondary" className="mb-2">
-              Gold Member
+              {membershipTier.charAt(0).toUpperCase() + membershipTier.slice(1)} Member
             </Badge>
-            <h3 className="text-xl font-bold">10% Discount on All Services</h3>
-            <p className="text-amber-100 mt-1">You have {formatCurrency(2500)} in loyalty credits available</p>
+            <h3 className="text-xl font-bold">
+              {membershipTier === 'platinum' ? '15%' : membershipTier === 'gold' ? '10%' : membershipTier === 'silver' ? '5%' : '0%'} Discount on All Services
+            </h3>
+            <p className="text-amber-100 mt-1">You have {formatCurrency(creditBalance)} in loyalty credits available</p>
           </div>
           <Link href="/dashboard/membership">
             <Button variant="secondary">View Benefits</Button>

@@ -3,6 +3,7 @@ import { getTasks, createTask } from "@/lib/db/tasks"
 import { handleApiError } from "@/lib/utils/logger"
 import { createTaskSchema } from "@/lib/validation/schemas"
 import type { TaskStatus, TaskPriority } from "@/types"
+import type { TasksListResponse, TaskResponse, ErrorResponse } from "@/types/api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,17 +26,20 @@ export async function GET(request: NextRequest) {
 
     const tasks = await getTasks(filters)
 
-    return NextResponse.json({
+    const responseData: TasksListResponse = {
       success: true,
       data: tasks,
       total: tasks.length,
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/tasks" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }
 
@@ -51,14 +55,13 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       if (error && typeof error === "object" && "issues" in error) {
         const zodError = error as { issues: Array<{ path: string[]; message: string }> }
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: "Validation error", 
-            details: zodError.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join(", ")
-          },
-          { status: 400 }
-        )
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "Validation error",
+          statusCode: 400,
+          code: "VALIDATION_ERROR",
+        }
+        return NextResponse.json(errorData, { status: 400 })
       }
       throw error
     }
@@ -69,16 +72,19 @@ export async function POST(request: NextRequest) {
       status: validatedData.status || "pending",
     })
 
-    return NextResponse.json({
+    const responseData: TaskResponse = {
       success: true,
       data: newTask,
       message: "Task created successfully",
-    })
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     const errorResponse = handleApiError(error, { path: "/api/v1/tasks", method: "POST" })
-    return NextResponse.json(
-      { success: false, error: errorResponse.message },
-      { status: errorResponse.statusCode }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: errorResponse.message,
+      statusCode: errorResponse.statusCode,
+    }
+    return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }

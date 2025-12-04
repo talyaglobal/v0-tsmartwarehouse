@@ -29,10 +29,10 @@ export const PRICING: PricingConfig = {
 export const WAREHOUSE_CONFIG: Warehouse = {
   id: "wh-001",
   name: "TSmart Warehouse - Main Facility",
-  address: "1234 Industrial Blvd",
-  city: "Los Angeles",
-  state: "CA",
-  zipCode: "90001",
+  address: "735 S Front St",
+  city: "Elizabeth",
+  state: "NJ",
+  zipCode: "07202",
   totalSqFt: 240000,
   floors: [
     {

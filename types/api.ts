@@ -2,7 +2,7 @@
  * Typed API Response interfaces
  */
 
-import type { Booking, Task, Invoice, Incident, Claim, Notification } from "./index"
+import type { Booking, Task, Invoice, Incident, Claim, Notification, Payment, PaymentTransaction, Refund } from "./index"
 
 // Base API Response
 export interface ApiResponse<T = unknown> {
@@ -48,6 +48,24 @@ export type NotificationResponse = ApiResponse<Notification>
 export type NotificationsListResponse = ListResponse<Notification> & {
   unreadCount: number
 }
+
+// Payment API Responses
+export type PaymentResponse = ApiResponse<Payment>
+export type PaymentsListResponse = ListResponse<Payment>
+export type PaymentHistoryResponse = ListResponse<PaymentTransaction>
+export type RefundResponse = ApiResponse<Refund>
+export type RefundsListResponse = ListResponse<Refund>
+
+// Generic/Other API Responses
+export type HealthResponse = ApiResponse<{
+  status: string
+  timestamp: string
+  version: string
+  services: {
+    database: string
+    storage: string
+  }
+}>
 
 // Error Response
 export interface ErrorResponse extends ApiResponse {

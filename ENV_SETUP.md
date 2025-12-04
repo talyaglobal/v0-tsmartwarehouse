@@ -23,7 +23,16 @@
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
    ```
 
-4. **Verify setup:**
+4. **Add Stripe keys (for payment processing):**
+   - Go to Stripe Dashboard: https://dashboard.stripe.com/apikeys
+   - Copy your test API keys (Secret key and Publishable key)
+   - Add to `.env.local`:
+     ```env
+     STRIPE_SECRET_KEY=sk_test_...
+     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+     ```
+
+5. **Verify setup:**
    ```bash
    npm run check-env
    ```
@@ -93,6 +102,28 @@
 - **`VAPID_PRIVATE_KEY`** - VAPID private key (keep secret!)
 - **`VAPID_SUBJECT`** - VAPID subject (email or URL, default: `mailto:notifications@tsmart.com`)
 
+## Payment Processing Variables (Stripe)
+
+### Stripe Configuration
+- **`STRIPE_SECRET_KEY`** - Stripe secret API key (server-side only)
+  - **Where to find:** Stripe Dashboard → Developers → API keys → Secret key
+  - **Format:** `sk_test_...` (test mode) or `sk_live_...` (production)
+  - **Required:** Yes (for payment processing features)
+  - **Security:** ⚠️ **NEVER expose this in client-side code!** Keep it secret.
+  - **Get from:** https://dashboard.stripe.com/apikeys
+
+- **`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`** - Stripe publishable API key (for frontend)
+  - **Where to find:** Stripe Dashboard → Developers → API keys → Publishable key
+  - **Format:** `pk_test_...` (test mode) or `pk_live_...` (production)
+  - **Required:** Yes (for frontend payment UI)
+  - **Security:** Safe to expose in client-side code
+  - **Get from:** https://dashboard.stripe.com/apikeys
+
+**Note:** 
+- Use test keys (`sk_test_` / `pk_test_`) for development
+- Use live keys (`sk_live_` / `pk_live_`) for production
+- Test cards: `4242 4242 4242 4242` (any future expiry, any CVC)
+
 ### Example `.env.local` with Notifications
 
 ```env
@@ -120,6 +151,10 @@ TWILIO_WHATSAPP_NUMBER=whatsapp:+1234567890
 VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 VAPID_SUBJECT=mailto:notifications@tsmart.com
+
+# Payment Processing (Stripe) - Required for payment features
+STRIPE_SECRET_KEY=sk_test_your-secret-key-here
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your-publishable-key-here
 ```
 
 ## Verification
@@ -157,12 +192,21 @@ Expected output when correctly configured:
 - Restart the dev server: `npm run dev`
 - Clear Next.js cache: `rm -rf .next`
 
+### "STRIPE_SECRET_KEY environment variable is required" error
+- Make sure you've added `STRIPE_SECRET_KEY` to your `.env.local` file
+- Get your Stripe keys from: https://dashboard.stripe.com/apikeys
+- Use test keys (`sk_test_...`) for development
+- Restart your development server after adding the variable
+- See `PAYMENT_SETUP.md` for detailed payment setup instructions
+
 ## Security Notes
 
 1. **Never commit `.env.local`** - It's already in `.gitignore`
 2. **Use `.env.example`** for documenting required variables
 3. **Service Role Key** should only be used server-side
 4. **Anon Key** is safe for client-side (protected by RLS)
+5. **Stripe Secret Key** should only be used server-side - never expose in client code
+6. **Stripe Publishable Key** is safe for client-side use
 
 ## Next Steps
 

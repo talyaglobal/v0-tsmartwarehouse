@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -12,9 +12,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FileUpload, type UploadedFile, getUploadedFileUrls } from "@/components/ui/file-upload"
-import { ArrowLeft } from "@/components/icons"
+import { ArrowLeft, Loader2 } from "@/components/icons"
 import Link from "next/link"
-import { mockBookings } from "@/lib/mock-data"
+import type { Booking } from "@/types"
 
 export default function NewClaimPage() {
   const router = useRouter()
@@ -24,10 +24,32 @@ export default function NewClaimPage() {
   const [description, setDescription] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const customerBookings = mockBookings.filter(
-    (b) => b.customerId === "user-2" && (b.status === "active" || b.status === "completed"),
-  )
+  useEffect(() => {
+    fetchBookings()
+  }, [])
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/bookings')
+      if (response.ok) {
+        const data = await response.json()
+        const activeBookings = (data.data || []).filter(
+          (b: Booking) => b.status === "active" || b.status === "completed" || b.status === "confirmed"
+        )
+        setBookings(activeBookings)
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const customerBookings = bookings
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,12 +116,20 @@ export default function NewClaimPage() {
                   <SelectValue placeholder="Select a booking" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customerBookings.map((booking) => (
-                    <SelectItem key={booking.id} value={booking.id}>
-                      #{booking.id} -{" "}
-                      {booking.type === "pallet" ? `${booking.palletCount} pallets` : `${booking.areaSqFt} sq ft`}
-                    </SelectItem>
-                  ))}
+                  {loading ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : customerBookings.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground">No active bookings found</div>
+                  ) : (
+                    customerBookings.map((booking) => (
+                      <SelectItem key={booking.id} value={booking.id}>
+                        #{booking.id} -{" "}
+                        {booking.type === "pallet" ? `${booking.palletCount} pallets` : `${booking.areaSqFt} sq ft`}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

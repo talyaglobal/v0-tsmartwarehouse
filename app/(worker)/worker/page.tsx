@@ -1,17 +1,58 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { PriorityBadge } from "@/components/ui/status-badge"
-import { ClipboardList, ArrowRight, Timer, Package, Truck } from "@/components/icons"
-import { mockTasks, mockShifts } from "@/lib/mock-data"
+import { ClipboardList, ArrowRight, Timer, Package, Truck, Loader2 } from "@/components/icons"
+import type { Task } from "@/types"
 
 export default function WorkerHomePage() {
-  const todayTasks = mockTasks
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [shiftInfo, setShiftInfo] = useState({
+    hours: 0,
+    minutes: 0,
+    checkIn: "6:00 AM",
+  })
+
+  useEffect(() => {
+    fetchWorkerData()
+  }, [])
+
+  const fetchWorkerData = async () => {
+    try {
+      setLoading(true)
+      // Fetch tasks assigned to current worker
+      const tasksRes = await fetch('/api/v1/tasks')
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json()
+        setTasks(tasksData.data || [])
+      }
+
+      // Note: Shift information would come from worker_shifts API
+      // For now, using placeholder
+    } catch (error) {
+      console.error('Failed to fetch worker data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const todayTasks = tasks
   const completedToday = todayTasks.filter((t) => t.status === "completed").length
   const pendingTasks = todayTasks.filter((t) => t.status === "pending" || t.status === "assigned")
-  const currentShift = mockShifts[0]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -21,7 +62,7 @@ export default function WorkerHomePage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm opacity-80">Current Shift</p>
-              <p className="text-2xl font-bold">8h 30m</p>
+              <p className="text-2xl font-bold">{shiftInfo.hours}h {shiftInfo.minutes}m</p>
             </div>
             <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
               <Timer className="h-6 w-6" />
@@ -29,10 +70,10 @@ export default function WorkerHomePage() {
           </div>
           <div className="flex items-center gap-4 text-sm">
             <div>
-              <span className="opacity-80">Check-in:</span> 6:00 AM
+              <span className="opacity-80">Check-in:</span> {shiftInfo.checkIn}
             </div>
             <div>
-              <span className="opacity-80">Tasks:</span> {completedToday}/{todayTasks.length}
+              <span className="opacity-80">Tasks:</span> {completedToday}/{todayTasks.length || 0}
             </div>
           </div>
         </CardContent>
@@ -43,11 +84,13 @@ export default function WorkerHomePage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center justify-between">
             <span>Today's Progress</span>
-            <Badge variant="secondary">{Math.round((completedToday / todayTasks.length) * 100)}%</Badge>
+            <Badge variant="secondary">
+              {todayTasks.length > 0 ? Math.round((completedToday / todayTasks.length) * 100) : 0}%
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Progress value={(completedToday / todayTasks.length) * 100} className="h-2 mb-4" />
+          <Progress value={todayTasks.length > 0 ? (completedToday / todayTasks.length) * 100 : 0} className="h-2 mb-4" />
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="p-2 bg-muted rounded-lg">
               <p className="text-lg font-bold">{pendingTasks.length}</p>

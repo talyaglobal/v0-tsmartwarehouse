@@ -1,14 +1,46 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Package, Building2, Eye } from "@/components/icons"
-import { mockBookings } from "@/lib/mock-data"
+import { Plus, Package, Building2, Eye, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
+import type { Booking } from "@/types"
 
 export default function BookingsPage() {
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchBookings()
+  }, [])
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/v1/bookings')
+      if (response.ok) {
+        const data = await response.json()
+        setBookings(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
   return (
     <div className="space-y-6">
       <PageHeader title="Bookings" description="Manage your warehouse storage bookings">
@@ -39,7 +71,14 @@ export default function BookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockBookings.map((booking) => (
+              {bookings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No bookings found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                bookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell className="font-medium">{booking.id}</TableCell>
                   <TableCell>
@@ -70,7 +109,8 @@ export default function BookingsPage() {
                     </Link>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

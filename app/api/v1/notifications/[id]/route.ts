@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { markNotificationAsRead, deleteNotification } from "@/lib/db/notifications"
 import { getCurrentUser } from "@/lib/auth/utils"
 import { apiWrapper } from "@/lib/middleware/api-wrapper"
+import type { NotificationResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
 export const PATCH = apiWrapper(async (
   req: NextRequest,
@@ -10,7 +11,12 @@ export const PATCH = apiWrapper(async (
   const user = await getCurrentUser()
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const errorData: ErrorResponse = {
+      success: false,
+      error: "Unauthorized",
+      statusCode: 401,
+    }
+    return NextResponse.json(errorData, { status: 401 })
   }
 
   try {
@@ -18,16 +24,27 @@ export const PATCH = apiWrapper(async (
 
     if (action === "mark_read") {
       await markNotificationAsRead(params.id)
-      return NextResponse.json({ success: true, message: "Notification marked as read" })
+      const responseData: ApiResponse = {
+        success: true,
+        message: "Notification marked as read",
+      }
+      return NextResponse.json(responseData)
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    const errorData: ErrorResponse = {
+      success: false,
+      error: "Invalid action",
+      statusCode: 400,
+    }
+    return NextResponse.json(errorData, { status: 400 })
   } catch (error) {
     console.error("Error updating notification:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update notification" },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update notification",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 })
 
@@ -38,18 +55,29 @@ export const DELETE = apiWrapper(async (
   const user = await getCurrentUser()
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const errorData: ErrorResponse = {
+      success: false,
+      error: "Unauthorized",
+      statusCode: 401,
+    }
+    return NextResponse.json(errorData, { status: 401 })
   }
 
   try {
     await deleteNotification(params.id)
-    return NextResponse.json({ success: true, message: "Notification deleted" })
+    const responseData: ApiResponse = {
+      success: true,
+      message: "Notification deleted",
+    }
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Error deleting notification:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete notification" },
-      { status: 500 }
-    )
+    const errorData: ErrorResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete notification",
+      statusCode: 500,
+    }
+    return NextResponse.json(errorData, { status: 500 })
   }
 })
 

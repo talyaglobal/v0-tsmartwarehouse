@@ -1,11 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { applySecurityHeaders } from '@/lib/security/headers'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
+  })
+
+  // Apply security headers to all responses
+  response = applySecurityHeaders(response, {
+    strictTransportSecurity: process.env.NODE_ENV === 'production',
   })
 
   const supabase = createServerClient(

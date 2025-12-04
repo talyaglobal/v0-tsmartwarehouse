@@ -3,16 +3,23 @@
  */
 
 import type { CreateAuditLogParams, AuditLog } from './types'
+import { createAuditLog as createAuditLogDb } from '@/lib/db/audit'
 
 /**
  * Create an audit log entry
- * In production, this would write to the database
+ * Writes to the database
  */
-export function createAuditLog(params: CreateAuditLogParams): AuditLog {
-  return {
-    id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    ...params,
-    createdAt: new Date().toISOString(),
+export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog> {
+  try {
+    return await createAuditLogDb(params)
+  } catch (error) {
+    // Fallback to in-memory log if database fails
+    console.error('Failed to create audit log in database:', error)
+    return {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      ...params,
+      createdAt: new Date().toISOString(),
+    }
   }
 }
 

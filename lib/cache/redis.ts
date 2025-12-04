@@ -93,6 +93,8 @@ export const CACHE_PREFIXES = {
   INCIDENTS: 'incidents',
   USER: 'user',
   DASHBOARD_STATS: 'dashboard_stats',
+  INVENTORY: 'inventory',
+  INVENTORY_ITEM: 'inventory_item',
 } as const
 
 /**
