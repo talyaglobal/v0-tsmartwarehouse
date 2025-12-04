@@ -38,9 +38,13 @@ export default function NotificationsPage() {
           <div className="flex items-center gap-2">
             <span>Manage your alerts and preferences</span>
             {isConnected ? (
-              <Wifi className="h-4 w-4 text-green-500" title="Real-time connected" />
+              <span title="Real-time connected">
+                <Wifi className="h-4 w-4 text-green-500" />
+              </span>
             ) : (
-              <WifiOff className="h-4 w-4 text-muted-foreground" title="Real-time disconnected" />
+              <span title="Real-time disconnected">
+                <WifiOff className="h-4 w-4 text-muted-foreground" />
+              </span>
             )}
           </div>
         }

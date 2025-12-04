@@ -47,7 +47,7 @@ export default function VerifyEmailPage() {
             
             // Redirect after a short delay
             setTimeout(() => {
-              const userRole = data.user.user_metadata?.role || 'customer'
+              const userRole = data.user?.user_metadata?.role || 'customer'
               if (userRole === 'admin') {
                 router.push('/admin')
               } else if (userRole === 'worker') {
