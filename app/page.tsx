@@ -280,6 +280,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
           </div>
+          </div>
         </section>
 
         {/* Pricing Section */}

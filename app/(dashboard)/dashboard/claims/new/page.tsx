@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Upload } from "@/components/icons"
+import { FileUpload, type UploadedFile, getUploadedFileUrls } from "@/components/ui/file-upload"
+import { ArrowLeft } from "@/components/icons"
 import Link from "next/link"
 import { mockBookings } from "@/lib/mock-data"
 
@@ -21,16 +22,49 @@ export default function NewClaimPage() {
   const [bookingId, setBookingId] = useState("")
   const [amount, setAmount] = useState("")
   const [description, setDescription] = useState("")
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const customerBookings = mockBookings.filter(
     (b) => b.customerId === "user-2" && (b.status === "active" || b.status === "completed"),
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would submit to the API
-    alert("Claim submitted successfully!")
-    router.push("/dashboard/claims")
+    setIsSubmitting(true)
+
+    try {
+      // Get uploaded file URLs
+      const evidenceUrls = getUploadedFileUrls(uploadedFiles)
+
+      // Submit claim to API
+      const response = await fetch('/api/v1/claims', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId,
+          type: claimType,
+          amount: parseFloat(amount),
+          description,
+          evidence: evidenceUrls,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        router.push("/dashboard/claims")
+      } else {
+        alert(result.error || 'Failed to submit claim. Please try again.')
+        setIsSubmitting(false)
+      }
+    } catch (error) {
+      console.error('Error submitting claim:', error)
+      alert('An error occurred while submitting your claim. Please try again.')
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -114,11 +148,14 @@ export default function NewClaimPage() {
 
             <div className="space-y-2">
               <Label>Evidence (Optional)</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Drag and drop files here, or click to browse</p>
-                <p className="text-xs text-muted-foreground mt-1">Supports: Images, PDFs, Documents (Max 10MB each)</p>
-              </div>
+              <FileUpload
+                value={uploadedFiles}
+                onChange={setUploadedFiles}
+                bucket="claim-evidence"
+                folder="claims"
+                maxFiles={10}
+                disabled={isSubmitting}
+              />
             </div>
 
             <div className="flex gap-3">
@@ -127,7 +164,9 @@ export default function NewClaimPage() {
                   Cancel
                 </Button>
               </Link>
-              <Button type="submit">Submit Claim</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+              </Button>
             </div>
           </form>
         </CardContent>

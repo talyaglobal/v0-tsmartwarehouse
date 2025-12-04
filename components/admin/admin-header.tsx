@@ -1,17 +1,27 @@
 "use client"
 
-import { Bell, Search, Menu, Moon, Sun } from "@/components/icons"
+import { useRouter } from "next/navigation"
+import { Bell, Search, Menu, Moon, Sun, LogOut } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useTheme } from "next-themes"
+import { useAuth } from "@/components/auth/auth-provider"
 
 interface AdminHeaderProps {
   onMenuClick?: () => void
 }
 
 export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
+  const { signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push("/login")
+    router.refresh()
+  }
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6">
@@ -34,6 +44,9 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
           <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center">
             5
           </Badge>
+        </Button>
+        <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign out">
+          <LogOut className="h-5 w-5" />
         </Button>
       </div>
     </header>

@@ -1,96 +1,80 @@
-'use client'
+"use client"
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import type { UserRole } from '@/types'
+import type { AuthUser } from '@/lib/auth/utils'
 
 interface AuthContextType {
-  user: User | null
-  userRole: UserRole | null
+  user: AuthUser | null
   loading: boolean
-  signOut: () => Promise<void>
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  userRole: null,
   loading: true,
-  signOut: async () => {},
+  refresh: async () => {},
 })
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [userRole, setUserRole] = useState<UserRole | null>(null)
+export function useAuth() {
+  return useContext(AuthContext)
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+
   const supabase = createClient()
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchUserRole(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    })
+  const mapSupabaseUser = (supabaseUser: User | null): AuthUser | null => {
+    if (!supabaseUser) return null
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchUserRole(session.user.id)
-      } else {
-        setUserRole(null)
-        setLoading(false)
-      }
-    })
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email!,
+      name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name,
+      role: (supabaseUser.user_metadata?.role as UserRole) || 'customer',
+      phone: supabaseUser.user_metadata?.phone,
+      company: supabaseUser.user_metadata?.company,
+      avatar: supabaseUser.user_metadata?.avatar_url,
+      emailVerified: !!supabaseUser.email_confirmed_at,
+    }
+  }
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const fetchUserRole = async (userId: string) => {
+  const refresh = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single()
-
-      if (error) {
-        // If profile doesn't exist, default to customer
-        setUserRole('customer')
-      } else {
-        setUserRole((data?.role as UserRole) || 'customer')
-      }
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+      setUser(mapSupabaseUser(supabaseUser))
     } catch (error) {
-      setUserRole('customer')
+      console.error('Error refreshing auth:', error)
+      setUser(null)
     } finally {
       setLoading(false)
     }
   }
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setUserRole(null)
-  }
+  useEffect(() => {
+    // Get initial session
+    refresh()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapSupabaseUser(session?.user ?? null))
+      setLoading(false)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, refresh }}>
       {children}
     </AuthContext.Provider>
   )
 }
-
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
-}
-

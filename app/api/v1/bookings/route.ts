@@ -1,36 +1,79 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { mockBookings } from "@/lib/mock-data"
+import { getBookings, createBooking } from "@/lib/db/bookings"
 import { PRICING } from "@/lib/constants"
+import { requireAuth } from "@/lib/auth/api-middleware"
+import { handleApiError } from "@/lib/utils/logger"
+import type { BookingStatus, BookingType } from "@/types"
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const customerId = searchParams.get("customerId")
-  const status = searchParams.get("status")
-  const type = searchParams.get("type")
+  try {
+    const { searchParams } = new URL(request.url)
+    const customerId = searchParams.get("customerId")
+    const status = searchParams.get("status") as BookingStatus | null
+    const type = searchParams.get("type") as BookingType | null
 
-  let bookings = [...mockBookings]
+    const filters: {
+      customerId?: string
+      status?: BookingStatus
+      type?: BookingType
+      warehouseId?: string
+    } = {}
 
-  if (customerId) {
-    bookings = bookings.filter((b) => b.customerId === customerId)
-  }
-  if (status) {
-    bookings = bookings.filter((b) => b.status === status)
-  }
-  if (type) {
-    bookings = bookings.filter((b) => b.type === type)
-  }
+    if (customerId) filters.customerId = customerId
+    if (status) filters.status = status
+    if (type) filters.type = type
 
-  return NextResponse.json({
-    success: true,
-    data: bookings,
-    total: bookings.length,
-  })
+    const bookings = await getBookings(filters)
+
+    return NextResponse.json({
+      success: true,
+      data: bookings,
+      total: bookings.length,
+    })
+  } catch (error) {
+    const errorResponse = handleApiError(error, { path: "/api/v1/bookings" })
+    return NextResponse.json(
+      { success: false, error: errorResponse.message },
+      { status: errorResponse.statusCode }
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+    const { user } = authResult
+
     const body = await request.json()
-    const { customerId, type, palletCount, areaSqFt, floorNumber, startDate, endDate, notes } = body
+    const { type, palletCount, areaSqFt, floorNumber, hallId, startDate, endDate, notes } = body
+
+    // Validate required fields
+    if (!type || (!palletCount && !areaSqFt) || !startDate) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields: type, palletCount or areaSqFt, and startDate" },
+        { status: 400 }
+      )
+    }
+
+    // Get customer profile information
+    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
+    const supabase = createServerSupabaseClient()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, email')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json(
+        { success: false, error: "User profile not found" },
+        { status: 404 }
+      )
+    }
 
     // Calculate pricing
     let totalAmount = 0
@@ -48,24 +91,23 @@ export async function POST(request: NextRequest) {
       totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
     }
 
-    const newBooking = {
-      id: `book-${Date.now()}`,
-      customerId,
-      customerName: "Customer",
-      customerEmail: "customer@example.com",
+    // Create booking using database function
+    const newBooking = await createBooking({
+      customerId: user.id,
+      customerName: profile.name || user.email,
+      customerEmail: profile.email || user.email,
       warehouseId: "wh-001",
       type,
       status: "pending",
-      palletCount,
-      areaSqFt,
-      floorNumber,
+      palletCount: type === "pallet" ? palletCount : undefined,
+      areaSqFt: type === "area-rental" ? areaSqFt : undefined,
+      floorNumber: type === "area-rental" ? floorNumber : undefined,
+      hallId: type === "area-rental" ? hallId : undefined,
       startDate,
-      endDate,
+      endDate: endDate || undefined,
       totalAmount,
-      notes,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
+      notes: notes || undefined,
+    })
 
     return NextResponse.json({
       success: true,
@@ -73,6 +115,10 @@ export async function POST(request: NextRequest) {
       message: "Booking created successfully",
     })
   } catch (error) {
-    return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 })
+    const errorResponse = handleApiError(error, { path: "/api/v1/bookings", method: "POST" })
+    return NextResponse.json(
+      { success: false, error: errorResponse.message },
+      { status: errorResponse.statusCode }
+    )
   }
 }

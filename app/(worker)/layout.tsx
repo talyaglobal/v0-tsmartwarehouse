@@ -1,12 +1,21 @@
 import type React from "react"
+import { redirect } from "next/navigation"
 import { BottomNav } from "@/components/worker/bottom-nav"
 import { WorkerHeader } from "@/components/worker/worker-header"
+import { requireRole } from "@/lib/auth/utils"
 
-export default function WorkerLayout({
+export default async function WorkerLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Require worker role
+  try {
+    await requireRole('worker')
+  } catch (error) {
+    redirect('/dashboard')
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <WorkerHeader />

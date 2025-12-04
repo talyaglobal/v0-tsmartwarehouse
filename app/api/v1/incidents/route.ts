@@ -1,36 +1,105 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { mockIncidents } from "@/lib/mock-data"
+import { getIncidents, createIncident } from "@/lib/db/incidents"
+import { handleApiError } from "@/lib/utils/logger"
+import { getNotificationService } from "@/lib/notifications/service"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import type { IncidentStatus, IncidentSeverity } from "@/types"
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const status = searchParams.get("status")
-  const severity = searchParams.get("severity")
+  try {
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get("status") as IncidentStatus | null
+    const severity = searchParams.get("severity") as IncidentSeverity | null
+    const reportedBy = searchParams.get("reportedBy")
+    const warehouseId = searchParams.get("warehouseId")
 
-  let incidents = [...mockIncidents]
+    const filters: {
+      reportedBy?: string
+      status?: IncidentStatus
+      severity?: IncidentSeverity
+      warehouseId?: string
+      affectedBookingId?: string
+    } = {}
 
-  if (status) {
-    incidents = incidents.filter((i) => i.status === status)
+    if (status) filters.status = status
+    if (severity) filters.severity = severity
+    if (reportedBy) filters.reportedBy = reportedBy
+    if (warehouseId) filters.warehouseId = warehouseId
+
+    const incidents = await getIncidents(filters)
+
+    return NextResponse.json({
+      success: true,
+      data: incidents,
+      total: incidents.length,
+    })
+  } catch (error) {
+    const errorResponse = handleApiError(error, { path: "/api/v1/incidents" })
+    return NextResponse.json(
+      { success: false, error: errorResponse.message },
+      { status: errorResponse.statusCode }
+    )
   }
-  if (severity) {
-    incidents = incidents.filter((i) => i.severity === severity)
-  }
-
-  return NextResponse.json({
-    success: true,
-    data: incidents,
-    total: incidents.length,
-  })
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    const newIncident = {
-      id: `inc-${Date.now()}`,
+    // Validate required fields
+    if (!body.type || !body.title || !body.warehouseId) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields: type, title, and warehouseId" },
+        { status: 400 }
+      )
+    }
+
+    // Create incident using database function
+    const newIncident = await createIncident({
       ...body,
-      status: "open",
-      createdAt: new Date().toISOString(),
+      status: body.status || "open",
+    })
+
+    // Send notification to admins
+    try {
+      const supabase = createServerSupabaseClient()
+      const notificationService = getNotificationService()
+
+      // Get all admin users
+      const { data: admins } = await supabase
+        .from("users")
+        .select("id")
+        .eq("role", "admin")
+
+      if (admins && admins.length > 0) {
+        const adminIds = admins.map((a) => a.id)
+        const channels: ("email" | "sms" | "push" | "whatsapp")[] = ["email", "push"]
+        
+        // For high severity incidents, also send SMS
+        if (body.severity === "high" || body.severity === "critical") {
+          channels.push("sms")
+        }
+
+        await notificationService.sendBulkNotification(adminIds, {
+          type: "incident",
+          channels,
+          title: "New Incident Reported",
+          message: `${newIncident.severity.toUpperCase()} severity incident: ${newIncident.title}. ${newIncident.description}`,
+          template: "incident-reported",
+          templateData: {
+            incidentId: newIncident.id.slice(0, 8),
+            incidentType: newIncident.type,
+            severity: newIncident.severity,
+            description: newIncident.description,
+            location: newIncident.location,
+            reportedBy: newIncident.reportedByName,
+            recipientName: "Admin",
+          },
+        })
+      }
+    } catch (error) {
+      // Log error but don't fail the incident creation
+      console.error("Failed to send incident notification:", error)
     }
 
     return NextResponse.json({
@@ -39,6 +108,10 @@ export async function POST(request: NextRequest) {
       message: "Incident reported successfully",
     })
   } catch (error) {
-    return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 })
+    const errorResponse = handleApiError(error, { path: "/api/v1/incidents", method: "POST" })
+    return NextResponse.json(
+      { success: false, error: errorResponse.message },
+      { status: errorResponse.statusCode }
+    )
   }
 }

@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,11 +14,21 @@ import { Loader2 } from "@/components/icons"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect')
+  const message = searchParams.get('message')
   const supabase = createClient()
+  
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(message)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+
+  useEffect(() => {
+    if (message) {
+      setError(message)
+    }
+  }, [message])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,8 +57,10 @@ export default function LoginPage() {
 
         const role = profile?.role || data.user.user_metadata?.role || 'customer'
 
-        // Route based on role
-        if (role === 'admin') {
+        // Redirect to original destination or role-based dashboard
+        if (redirect) {
+          router.push(redirect)
+        } else if (role === 'admin') {
           router.push("/admin")
         } else if (role === 'worker') {
           router.push("/worker")
@@ -72,7 +84,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
+            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md border border-destructive/20">
               {error}
             </div>
           )}
@@ -85,6 +97,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               disabled={isLoading}
             />
           </div>
@@ -102,6 +115,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               disabled={isLoading}
             />
           </div>

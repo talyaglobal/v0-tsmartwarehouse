@@ -1,26 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PriorityBadge, StatusBadge } from "@/components/ui/status-badge"
-import { ClipboardList, Truck, Package, Clock, MapPin } from "@/components/icons"
-import { mockTasks } from "@/lib/mock-data"
+import { ClipboardList, Truck, Package, Clock, MapPin, Wifi, WifiOff } from "@/components/icons"
+import { useRealtimeTasks } from "@/lib/realtime"
+import { useUser } from "@/lib/hooks/use-user"
 import { formatDateTime } from "@/lib/utils/format"
 import type { TaskStatus } from "@/types"
 
 export default function WorkerTasksPage() {
   const [filter, setFilter] = useState<"all" | TaskStatus>("all")
+  const { user } = useUser()
+  const { tasks, isConnected, error } = useRealtimeTasks(user?.id)
 
-  const filteredTasks = filter === "all" ? mockTasks : mockTasks.filter((t) => t.status === filter)
+  const filteredTasks = useMemo(() => {
+    if (filter === "all") return tasks
+    return tasks.filter((t) => t.status === filter)
+  }, [tasks, filter])
 
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">My Tasks</h1>
-        <Badge variant="secondary">{mockTasks.length} Total</Badge>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold">My Tasks</h1>
+          {isConnected ? (
+            <Wifi className="h-4 w-4 text-green-500" title="Real-time connected" />
+          ) : (
+            <WifiOff className="h-4 w-4 text-muted-foreground" title="Real-time disconnected" />
+          )}
+        </div>
+        <Badge variant="secondary">{tasks.length} Total</Badge>
       </div>
 
       <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>

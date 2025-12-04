@@ -1,12 +1,21 @@
 import type React from "react"
+import { redirect } from "next/navigation"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
+import { requireRole } from "@/lib/auth/utils"
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Require customer or admin role
+  try {
+    await requireRole(['customer', 'admin'])
+  } catch (error) {
+    redirect('/login')
+  }
+
   return (
     <div className="flex h-screen">
       {/* Sidebar */}

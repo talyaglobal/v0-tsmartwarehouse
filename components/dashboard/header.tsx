@@ -1,15 +1,26 @@
 "use client"
 
-import { Bell, Search, Menu } from "@/components/icons"
+import { useRouter } from "next/navigation"
+import { Bell, Search, Menu, LogOut } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/components/auth/auth-provider"
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void
 }
 
 export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
+  const router = useRouter()
+  const { signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push("/login")
+    router.refresh()
+  }
+
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-4">
@@ -27,6 +38,9 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
           <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center">
             2
           </Badge>
+        </Button>
+        <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign out">
+          <LogOut className="h-5 w-5" />
         </Button>
       </div>
     </header>

@@ -68,11 +68,20 @@ types/
 
 #### Authentication Pages
 - ✅ **Login Page** (`app/(auth)/login/page.tsx`)
-  - Email/password form
-  - Mock authentication (routes based on email domain)
-  - Forgot password link (UI only)
+  - Email/password form with Supabase Auth
+  - Real authentication with role-based routing
+  - Error handling and loading states
+  - Redirect support for protected routes
 - ✅ **Register Page** (`app/(auth)/register/page.tsx`)
-  - User registration form (UI only)
+  - User registration with Supabase Auth
+  - Automatic profile creation
+  - Form validation
+- ✅ **Forgot Password Page** (`app/(auth)/forgot-password/page.tsx`)
+  - Password reset request form
+  - Email link generation
+- ✅ **Reset Password Page** (`app/(auth)/reset-password/page.tsx`)
+  - Password reset form
+  - Token validation
 
 #### Customer Dashboard (`app/(dashboard)/dashboard/`)
 - ✅ **Dashboard Home** - Overview with stats, recent bookings, invoices
@@ -163,36 +172,109 @@ Complete TypeScript types defined in `types/index.ts`:
 - ✅ Gold (10% discount, 100+ pallets)
 - ✅ Platinum (15% discount, 250+ pallets)
 
-### 2.5 API Routes (Mock Implementation)
-
-All API routes exist but use mock data:
+### 2.5 API Routes
 
 **Health Check:**
 - ✅ `GET /api/health` - System health status
 
 **Bookings:**
-- ✅ `GET /api/v1/bookings` - List bookings (with filters)
-- ✅ `POST /api/v1/bookings` - Create booking
-- ✅ `GET /api/v1/bookings/[id]` - Get booking details
-- ✅ `PATCH /api/v1/bookings/[id]` - Update booking
-- ✅ `DELETE /api/v1/bookings/[id]` - Delete booking
+- ✅ `GET /api/v1/bookings` - List bookings (with filters) - **Database integrated**
+- ✅ `POST /api/v1/bookings` - Create booking - **Database integrated**
+- ✅ `GET /api/v1/bookings/[id]` - Get booking details - **Database integrated**
+- ✅ `PATCH /api/v1/bookings/[id]` - Update booking - **Database integrated**
+- ✅ `DELETE /api/v1/bookings/[id]` - Delete booking - **Database integrated**
 
 **Tasks:**
-- ✅ `GET /api/v1/tasks` - List tasks (with filters)
-- ✅ `POST /api/v1/tasks` - Create task
+- ✅ `GET /api/v1/tasks` - List tasks (with filters) - **Database integrated**
+- ✅ `POST /api/v1/tasks` - Create task - **Database integrated**
 
 **Incidents:**
-- ✅ `GET /api/v1/incidents` - List incidents (with filters)
-- ✅ `POST /api/v1/incidents` - Create incident
+- ✅ `GET /api/v1/incidents` - List incidents (with filters) - **Database integrated**
+- ✅ `POST /api/v1/incidents` - Create incident - **Database integrated**
 
 **Claims:**
-- ✅ `GET /api/v1/claims` - List claims (with filters)
-- ✅ `POST /api/v1/claims` - Create claim
+- ✅ `GET /api/v1/claims` - List claims (with filters) - **Database integrated**
+- ✅ `POST /api/v1/claims` - Create claim - **Database integrated**
 
 **Invoices:**
-- ✅ `GET /api/v1/invoices` - List invoices (with filters)
+- ✅ `GET /api/v1/invoices` - List invoices (with filters) - **Database integrated**
 
-### 2.6 Mock Data
+**Notifications:**
+- ✅ `GET /api/v1/notifications` - List notifications (with filters) - **Database integrated**
+- ✅ `PATCH /api/v1/notifications` - Mark all notifications as read - **Database integrated**
+- ✅ `PATCH /api/v1/notifications/[id]` - Mark notification as read - **Database integrated**
+- ✅ `DELETE /api/v1/notifications/[id]` - Delete notification - **Database integrated**
+- ✅ `GET /api/v1/notifications/preferences` - Get user notification preferences - **Database integrated**
+- ✅ `PUT /api/v1/notifications/preferences` - Update notification preferences - **Database integrated**
+
+**Payments:**
+- ✅ `GET /api/v1/payments` - List payments (with filters) - **Database integrated**
+- ✅ `POST /api/v1/payments` - Create payment for invoice - **Stripe integrated**
+- ✅ `POST /api/v1/payments/[id]/confirm` - Confirm payment after client-side confirmation
+- ✅ `GET /api/v1/payments/history` - Get payment history for customer
+- ✅ `GET /api/v1/payments/refunds` - List refunds (with filters)
+- ✅ `POST /api/v1/payments/refunds` - Create refund for payment
+
+**Features:**
+- ✅ All API routes now use database functions from `lib/db/`
+- ✅ Proper error handling with `handleApiError` utility
+- ✅ Payment processing with Stripe integration
+- ✅ Credit balance management
+- ✅ Refund processing
+- ✅ Authentication middleware integrated where needed
+- ✅ Input validation for required fields
+
+### 2.6 Database Infrastructure
+
+**Database Setup:**
+- ✅ Server-side Supabase client (`lib/supabase/server.ts`)
+  - Supports both service role (admin) and authenticated user operations
+  - Proper error handling and environment variable validation
+- ✅ Database schema migration file (`supabase/migrations/001_initial_schema.sql`)
+  - Complete PostgreSQL schema with all tables
+  - Foreign key relationships and constraints
+  - Indexes for performance optimization
+  - Row Level Security (RLS) enabled (policies to be configured)
+  - Automatic `updated_at` triggers
+
+**Database Tables:**
+- ✅ `users` - User accounts with roles and membership tiers
+- ✅ `warehouses` - Warehouse information
+- ✅ `warehouse_floors` - Floor configuration (3 floors)
+- ✅ `warehouse_halls` - Hall configuration (2 halls per floor)
+- ✅ `warehouse_zones` - Zone definitions (pallet, area-rental, cold-storage, hazmat)
+- ✅ `bookings` - Customer bookings (pallet and area rental)
+- ✅ `invoices` - Billing and invoicing
+- ✅ `tasks` - Worker task management
+- ✅ `incidents` - Incident tracking
+- ✅ `claims` - Customer claims
+- ✅ `notifications` - User notifications
+- ✅ `notification_preferences` - User notification preferences and settings
+- ✅ `worker_shifts` - Worker shift tracking
+- ✅ `payments` - Payment records for invoices
+- ✅ `payment_transactions` - Payment transaction history
+- ✅ `refunds` - Refund records
+
+**Database Utilities:**
+- ✅ `lib/db/bookings.ts` - CRUD operations for bookings
+- ✅ `lib/db/tasks.ts` - CRUD operations for tasks
+- ✅ `lib/db/invoices.ts` - CRUD operations for invoices
+- ✅ `lib/db/incidents.ts` - CRUD operations for incidents
+- ✅ `lib/db/claims.ts` - CRUD operations for claims
+- ✅ `lib/db/notifications.ts` - CRUD operations for notifications and preferences
+- ✅ `lib/db/payments.ts` - CRUD operations for payments, transactions, refunds, and credit balance
+- ✅ `lib/db/index.ts` - Centralized exports
+
+**Documentation:**
+- ✅ Database migration setup guide (`DATABASE_SETUP.md`)
+- ✅ Environment variables example file (`.env.example`)
+
+**Next Steps:**
+- ⚠️ Run database migration in Supabase project (see `DATABASE_SETUP.md`)
+- ⚠️ Configure Row Level Security policies
+- ⚠️ Set up environment variables in `.env.local` (see `.env.example`)
+
+### 2.7 Mock Data
 
 Comprehensive mock data in `lib/mock-data.ts`:
 - ✅ 3 mock users (admin, customer, worker)
@@ -205,7 +287,7 @@ Comprehensive mock data in `lib/mock-data.ts`:
 - ✅ 1 mock worker shift
 - ✅ Dashboard stats
 
-### 2.7 Utility Functions
+### 2.8 Utility Functions
 
 - ✅ `lib/utils/format.ts` - Currency, date, number formatting
 - ✅ `lib/utils.ts` - General utilities (cn, etc.)
@@ -215,77 +297,165 @@ Comprehensive mock data in `lib/mock-data.ts`:
 ## 3. Partially Implemented Features
 
 ### 3.1 Authentication
-- ⚠️ **Status:** UI Complete, Backend Missing
-- ✅ Login/Register forms implemented
-- ❌ No real authentication system (Supabase mentioned but not integrated)
-- ❌ No session management
-- ❌ No protected routes
-- ❌ No JWT/token handling
-- ❌ No password reset functionality
+- ✅ **Status:** Fully Integrated with Supabase
+- ✅ Login/Register forms implemented with Supabase Auth
+- ✅ Real authentication system (Supabase Auth integrated)
+- ✅ Session management with automatic token refresh
+- ✅ Protected routes with Next.js middleware
+- ✅ JWT/token handling via Supabase
+- ✅ Password reset functionality (forgot password + reset password pages)
+- ✅ Email verification flow (verification page, resend functionality, login blocking for unverified users)
+  - ⚠️ Requires Supabase dashboard configuration for email delivery (SMTP/SES setup)
+- ✅ Role-based access control (RBAC) for admin, customer, worker roles
+- ✅ User profiles table with automatic creation on signup
+- ✅ Sign out functionality in headers
 
 ### 3.2 Data Persistence
-- ⚠️ **Status:** Mock Data Only
+- ✅ **Status:** Infrastructure Ready, Database Integration Complete
 - ✅ All API routes structured
-- ❌ No database connection
-- ❌ No data persistence
-- ❌ All operations are in-memory only
+- ✅ Server-side Supabase client created (`lib/supabase/server.ts`)
+- ✅ Database schema designed and migration file created (`supabase/migrations/001_initial_schema.sql`)
+- ✅ Database utility functions created for all entities (`lib/db/`)
+  - ✅ Bookings operations (`lib/db/bookings.ts`)
+  - ✅ Tasks operations (`lib/db/tasks.ts`)
+  - ✅ Invoices operations (`lib/db/invoices.ts`)
+  - ✅ Incidents operations (`lib/db/incidents.ts`)
+  - ✅ Claims operations (`lib/db/claims.ts`)
+- ✅ API routes integrated with database functions (all endpoints updated)
+- ✅ Error handling implemented across all API routes
+- ✅ Authentication middleware integrated where required
+- ✅ Environment variables template created (`.env.example`)
+- ✅ Database setup documentation created (`DATABASE_SETUP.md`)
+- ⚠️ Database migration not yet run (requires Supabase project setup - see `DATABASE_SETUP.md`)
+- ⚠️ Environment variables need to be configured in `.env.local` (see `.env.example`)
+- ⚠️ Row Level Security policies need to be configured
 
 ---
 
 ## 4. Missing Features
 
 ### 4.1 Backend Infrastructure
-- ❌ Database setup (PostgreSQL/Supabase recommended)
-- ❌ Database schema/migrations
-- ❌ ORM or database client configuration
-- ❌ Environment variable management
-- ❌ API authentication middleware
-- ❌ Rate limiting
-- ❌ CORS configuration
-- ❌ Error logging and monitoring
+- ✅ Database setup (PostgreSQL/Supabase recommended)
+- ✅ Database schema/migrations (`supabase/migrations/001_initial_schema.sql`)
+- ✅ Database client configuration (Supabase client wrapper in `lib/db/client.ts`)
+- ✅ Environment variable management (`.env.example` created, documented in `BACKEND_INFRASTRUCTURE.md`)
+- ✅ API authentication middleware (`lib/auth/api-middleware.ts`, `lib/middleware/api-wrapper.ts`)
+- ✅ Rate limiting (`lib/middleware/rate-limit.ts` with Upstash Redis support)
+- ✅ CORS configuration (`lib/middleware/cors.ts`, `next.config.mjs`)
+- ✅ Error logging and monitoring (`lib/utils/logger.ts` with Sentry support)
 
 ### 4.2 Authentication & Authorization
-- ❌ Real authentication system (Supabase Auth recommended)
-- ❌ Role-based access control (RBAC)
-- ❌ Session management
-- ❌ Protected route middleware
-- ❌ Password reset flow
-- ❌ Email verification
+- ✅ Real authentication system (Supabase Auth integrated)
+- ✅ Role-based access control (RBAC)
+- ✅ Session management
+- ✅ Protected route middleware
+- ✅ Password reset flow
+- ✅ Email verification (fully implemented in code)
+  - ✅ Verification email sending on signup (`lib/auth/actions.ts`)
+  - ✅ Email verification page (`app/(auth)/verify-email/page.tsx`)
+  - ✅ Resend verification email functionality
+  - ✅ Email verification check on login (blocks unverified users)
+  - ⚠️ **Requires Supabase dashboard configuration:** Enable email verification in Supabase Auth settings and configure SMTP/SES for email delivery
 - ❌ Two-factor authentication (optional)
+  - Not implemented - would require:
+    - TOTP (Time-based One-Time Password) integration
+    - QR code generation for authenticator apps
+    - Backup codes generation
+    - 2FA enforcement settings per user role
 
 ### 4.3 Business Logic
-- ❌ Booking creation with availability checking
-- ❌ Pricing calculation with discounts
-- ❌ Invoice generation automation
-- ❌ Membership tier calculation
-- ❌ Warehouse capacity management
-- ❌ Task assignment algorithms
-- ❌ Claim processing workflow
+- ✅ Booking creation with availability checking (`lib/business-logic/bookings.ts`)
+- ✅ Pricing calculation with discounts (`lib/business-logic/pricing.ts`)
+- ✅ Invoice generation automation (`lib/business-logic/invoices.ts`)
+- ✅ Membership tier calculation (`lib/business-logic/membership.ts`)
+- ✅ Warehouse capacity management (`lib/business-logic/capacity.ts`)
+- ✅ Task assignment algorithms (`lib/business-logic/tasks.ts`)
+- ✅ Claim processing workflow (`lib/business-logic/claims.ts`)
 
 ### 4.4 File Management
-- ❌ File upload for claim evidence
-- ❌ Image/document storage (S3/Cloudinary)
-- ❌ File validation and processing
+- ✅ File upload for claim evidence (Supabase Storage)
+- ✅ Image/document storage (Supabase Storage integrated)
+- ✅ File validation and processing
+- ✅ Reusable FileUpload component with drag-and-drop
+- ✅ File preview and management UI
+- ✅ Secure file access with authentication
+- ⚠️ Supabase Storage bucket setup required (see FILE_STORAGE_SETUP.md)
+- ✅ Image/document storage (Supabase Storage integrated)
+- ✅ File validation and processing
+- ⚠️ Supabase Storage bucket setup required (see FILE_STORAGE_SETUP.md)
 
 ### 4.5 Notifications
-- ❌ Email notifications (SendGrid/AWS SES)
-- ❌ SMS notifications (Twilio)
-- ❌ Push notifications
-- ❌ WhatsApp notifications
-- ❌ Notification preferences management
+- ✅ Email notifications (SendGrid/AWS SES)
+  - SendGrid provider implemented (`lib/notifications/providers/email.ts`)
+  - AWS SES provider implemented (alternative)
+  - Email templates for all notification types (`lib/notifications/templates/email.ts`)
+  - Integrated into business logic (bookings, invoices, tasks, incidents)
+- ✅ SMS notifications (Twilio)
+  - Twilio SMS provider implemented (`lib/notifications/providers/sms.ts`)
+  - Integrated for high-priority notifications (incidents)
+- ✅ Push notifications
+  - Web Push provider implemented (`lib/notifications/providers/push.ts`)
+  - VAPID key support for browser push notifications
+  - Integrated into all notification types
+- ✅ WhatsApp notifications
+  - Twilio WhatsApp provider implemented (`lib/notifications/providers/whatsapp.ts`)
+  - Supports WhatsApp Business API via Twilio
+- ✅ Notification preferences management
+  - Database table for user preferences (`supabase/migrations/002_notification_preferences.sql`)
+  - API endpoints for preferences (`/api/v1/notifications/preferences`)
+  - Channel and type-specific preferences
+  - Default preferences with sensible defaults
+- ✅ Notification service
+  - Centralized notification service (`lib/notifications/service.ts`)
+  - Multi-channel delivery support
+  - Preference-based filtering
+  - Database integration for notification history
+- ✅ Database integration
+  - Notifications table with delivery tracking
+  - Notification preferences table
+  - CRUD operations (`lib/db/notifications.ts`)
+  - API endpoints (`/api/v1/notifications`)
 
 ### 4.6 Payment Processing
-- ❌ Payment gateway integration (Stripe/PayPal)
-- ❌ Invoice payment processing
-- ❌ Credit balance management
-- ❌ Refund handling
-- ❌ Payment history
+- ✅ Payment gateway integration (Stripe)
+  - ✅ Stripe payment intent creation and confirmation
+  - ✅ Customer management (create/retrieve Stripe customers)
+  - ✅ Payment processing with multiple methods (card, credit balance, both)
+  - ✅ Stripe API integration (`lib/payments/stripe.ts`)
+- ✅ Invoice payment processing
+  - ✅ Payment creation for invoices
+  - ✅ Payment confirmation workflow
+  - ✅ Automatic invoice status updates on payment success
+  - ✅ Support for partial payments
+- ✅ Credit balance management
+  - ✅ Customer credit balance tracking in database
+  - ✅ Credit balance usage for payments
+  - ✅ Credit balance adjustments via database functions
+  - ✅ Credit balance refunds
+- ✅ Refund handling
+  - ✅ Full and partial refunds
+  - ✅ Stripe refund integration
+  - ✅ Credit balance refunds
+  - ✅ Refund status tracking
+  - ✅ Automatic invoice status updates on refund
+- ✅ Payment history
+  - ✅ Payment transaction tracking
+  - ✅ Payment history API endpoint
+  - ✅ Refund history tracking
+  - ✅ Database schema for payments, transactions, and refunds (`supabase/migrations/003_payments_schema.sql`)
+  - ✅ Payment business logic (`lib/business-logic/payments.ts`)
+  - ✅ Payment database operations (`lib/db/payments.ts`)
+  - ✅ API routes for payments (`/api/v1/payments/*`)
+  - ⚠️ **Requires Stripe account setup:** Configure `STRIPE_SECRET_KEY` environment variable
 
 ### 4.7 Real-time Features
-- ❌ WebSocket/Server-Sent Events for real-time updates
-- ❌ Live task status updates
-- ❌ Real-time notifications
-- ❌ Live warehouse utilization
+- ✅ WebSocket/Server-Sent Events for real-time updates (Supabase Realtime)
+- ✅ Live task status updates (`lib/realtime/hooks.ts`, `useRealtimeTasks`)
+- ✅ Real-time notifications (`useRealtimeNotifications`)
+- ✅ Live warehouse utilization (`useRealtimeWarehouseUtilization`)
+- ✅ Real-time connection status indicators
+- ✅ Database migration for Realtime enabled (`supabase/migrations/003_enable_realtime.sql`)
+- ⚠️ Requires Supabase Realtime to be enabled in project settings
 
 ### 4.8 Advanced Features
 - ❌ Barcode/QR code scanning integration

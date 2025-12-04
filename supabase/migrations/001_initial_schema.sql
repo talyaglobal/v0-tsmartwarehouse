@@ -279,27 +279,35 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_warehouses_updated_at ON warehouses;
 CREATE TRIGGER update_warehouses_updated_at BEFORE UPDATE ON warehouses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_warehouse_floors_updated_at ON warehouse_floors;
 CREATE TRIGGER update_warehouse_floors_updated_at BEFORE UPDATE ON warehouse_floors
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_warehouse_halls_updated_at ON warehouse_halls;
 CREATE TRIGGER update_warehouse_halls_updated_at BEFORE UPDATE ON warehouse_halls
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_warehouse_zones_updated_at ON warehouse_zones;
 CREATE TRIGGER update_warehouse_zones_updated_at BEFORE UPDATE ON warehouse_zones
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_bookings_updated_at ON bookings;
 CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON bookings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_worker_shifts_updated_at ON worker_shifts;
 CREATE TRIGGER update_worker_shifts_updated_at BEFORE UPDATE ON worker_shifts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

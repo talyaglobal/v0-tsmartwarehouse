@@ -1,0 +1,363 @@
+import {
+  createPaymentIntent,
+  getPaymentIntent,
+  confirmPaymentIntent,
+  getOrCreateStripeCustomer,
+  createRefund as createStripeRefund,
+} from "@/lib/payments/stripe"
+import {
+  createPayment,
+  updatePayment,
+  getPaymentById,
+  createPaymentTransaction,
+  updateCustomerCreditBalance,
+  getCustomerCreditBalance,
+  createRefund,
+  updateRefund,
+  getRefundById,
+} from "@/lib/db/payments"
+import { getInvoiceById, updateInvoice } from "@/lib/db/invoices"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import type { Payment, PaymentStatus, Refund } from "@/types"
+
+/**
+ * Business Logic: Payment Processing
+ * 
+ * Handles:
+ * - Invoice payment processing (Stripe + credit balance)
+ * - Credit balance management
+ * - Refund processing
+ * - Payment history tracking
+ */
+
+export interface ProcessPaymentInput {
+  invoiceId: string
+  customerId: string
+  paymentMethod: "card" | "credit_balance" | "both"
+  amount?: number // If not provided, uses invoice total
+  useCreditBalance?: boolean
+  creditBalanceAmount?: number
+  paymentMethodId?: string // For Stripe card payments
+}
+
+export interface ProcessPaymentResult {
+  payment: Payment
+  message: string
+  clientSecret?: string // For Stripe payment intents
+}
+
+/**
+ * Process payment for an invoice
+ */
+export async function processInvoicePayment(
+  input: ProcessPaymentInput
+): Promise<ProcessPaymentResult> {
+  // Get invoice
+  const invoice = await getInvoiceById(input.invoiceId)
+  if (!invoice) {
+    throw new Error("Invoice not found")
+  }
+
+  if (invoice.status === "paid") {
+    throw new Error("Invoice is already paid")
+  }
+
+  if (invoice.customerId !== input.customerId) {
+    throw new Error("Invoice does not belong to this customer")
+  }
+
+  const amountToPay = input.amount || invoice.total
+  let remainingAmount = amountToPay
+  let creditBalanceUsed = 0
+
+  // Check if using credit balance
+  if (input.useCreditBalance || input.paymentMethod === "credit_balance" || input.paymentMethod === "both") {
+    const creditBalance = await getCustomerCreditBalance(input.customerId)
+    const creditToUse = input.creditBalanceAmount || Math.min(creditBalance, remainingAmount)
+    
+    if (creditToUse > 0 && creditBalance >= creditToUse) {
+      creditBalanceUsed = creditToUse
+      remainingAmount -= creditToUse
+      
+      // Deduct from credit balance
+      await updateCustomerCreditBalance(input.customerId, -creditBalanceUsed)
+      
+      // Create transaction record
+      await createPaymentTransaction({
+        paymentId: "", // Will be set after payment creation
+        type: "credit_adjustment",
+        amount: -creditBalanceUsed,
+        currency: "USD",
+        status: "succeeded",
+        description: `Credit balance used for invoice ${invoice.id}`,
+      })
+    }
+  }
+
+  // Create payment record
+  let payment: Payment
+  let stripePaymentIntentId: string | undefined
+  let clientSecret: string | undefined
+
+  if (remainingAmount > 0 && (input.paymentMethod === "card" || input.paymentMethod === "both")) {
+    // Process card payment via Stripe
+    if (!input.paymentMethodId) {
+      // Create payment intent for client-side confirmation
+      const supabase = createServerSupabaseClient()
+      const { data: user } = await supabase
+        .from("users")
+        .select("email, name")
+        .eq("id", input.customerId)
+        .single()
+
+      if (!user) {
+        throw new Error("Customer not found")
+      }
+
+      const stripeCustomer = await getOrCreateStripeCustomer({
+        email: user.email,
+        name: user.name,
+        metadata: {
+          customer_id: input.customerId,
+        },
+      })
+
+      const paymentIntent = await createPaymentIntent({
+        amount: remainingAmount,
+        customerId: stripeCustomer.id,
+        invoiceId: input.invoiceId,
+        metadata: {
+          invoice_id: input.invoiceId,
+          customer_id: input.customerId,
+        },
+      })
+
+      stripePaymentIntentId = paymentIntent.id
+      clientSecret = paymentIntent.client_secret || undefined
+
+      // Create payment record with pending status
+      payment = await createPayment({
+        invoiceId: input.invoiceId,
+        customerId: input.customerId,
+        amount: amountToPay,
+        currency: "USD",
+        status: "pending",
+        paymentMethod: input.paymentMethod === "both" ? "card" : "card",
+        stripePaymentIntentId,
+        creditBalanceUsed: creditBalanceUsed > 0 ? creditBalanceUsed : undefined,
+      })
+    } else {
+      // Confirm payment with provided payment method
+      // This would be called after client-side confirmation
+      throw new Error("Payment confirmation should be handled via confirmPayment endpoint")
+    }
+  } else if (remainingAmount === 0 && creditBalanceUsed > 0) {
+    // Payment fully covered by credit balance
+    payment = await createPayment({
+      invoiceId: input.invoiceId,
+      customerId: input.customerId,
+      amount: amountToPay,
+      currency: "USD",
+      status: "succeeded",
+      paymentMethod: "credit_balance",
+      creditBalanceUsed,
+    })
+
+    // Update invoice status
+    await updateInvoice(input.invoiceId, {
+      status: "paid",
+      paidDate: new Date().toISOString().split("T")[0],
+    })
+
+    // Create transaction record
+    await createPaymentTransaction({
+      paymentId: payment.id,
+      type: "payment",
+      amount: amountToPay,
+      currency: "USD",
+      status: "succeeded",
+      description: `Payment for invoice ${invoice.id} using credit balance`,
+    })
+  } else {
+    throw new Error("Invalid payment method or insufficient funds")
+  }
+
+  return {
+    payment,
+    message: creditBalanceUsed > 0
+      ? `Payment processed: $${creditBalanceUsed.toFixed(2)} from credit balance${remainingAmount > 0 ? `, $${remainingAmount.toFixed(2)} via card` : ""}`
+      : `Payment intent created for $${remainingAmount.toFixed(2)}`,
+    clientSecret,
+  }
+}
+
+/**
+ * Confirm a payment after client-side confirmation
+ */
+export async function confirmPayment(
+  paymentId: string,
+  paymentMethodId?: string
+): Promise<Payment> {
+  const payment = await getPaymentById(paymentId)
+  if (!payment) {
+    throw new Error("Payment not found")
+  }
+
+  if (payment.status !== "pending") {
+    throw new Error(`Payment is not pending. Current status: ${payment.status}`)
+  }
+
+  if (!payment.stripePaymentIntentId) {
+    throw new Error("Payment does not have a Stripe payment intent")
+  }
+
+  // Confirm payment intent
+  const paymentIntent = await confirmPaymentIntent(
+    payment.stripePaymentIntentId,
+    paymentMethodId
+  )
+
+  // Update payment status based on Stripe response
+  let status: PaymentStatus = "processing"
+  if (paymentIntent.status === "succeeded") {
+    status = "succeeded"
+  } else if (paymentIntent.status === "requires_action") {
+    status = "processing"
+  } else if (paymentIntent.status === "canceled" || paymentIntent.status === "requires_payment_method") {
+    status = "failed"
+  }
+
+  const updatedPayment = await updatePayment(paymentId, {
+    status,
+    stripeChargeId: paymentIntent.latest_charge as string | undefined,
+    completedAt: status === "succeeded" ? new Date().toISOString() : undefined,
+  })
+
+  // If payment succeeded, update invoice
+  if (status === "succeeded") {
+    const invoice = await getInvoiceById(payment.invoiceId)
+    if (invoice && invoice.status !== "paid") {
+      await updateInvoice(payment.invoiceId, {
+        status: "paid",
+        paidDate: new Date().toISOString().split("T")[0],
+      })
+    }
+
+    // Create transaction record
+    await createPaymentTransaction({
+      paymentId: payment.id,
+      type: "payment",
+      amount: payment.amount,
+      currency: payment.currency,
+      status: "succeeded",
+      description: `Payment confirmed for invoice ${payment.invoiceId}`,
+    })
+  }
+
+  return updatedPayment
+}
+
+/**
+ * Process a refund
+ */
+export interface ProcessRefundInput {
+  paymentId: string
+  amount?: number // If not provided, refunds full amount
+  reason?: string
+  refundToCredit?: boolean // If true, refunds to credit balance instead of original payment method
+}
+
+export async function processRefund(input: ProcessRefundInput): Promise<Refund> {
+  const payment = await getPaymentById(input.paymentId)
+  if (!payment) {
+    throw new Error("Payment not found")
+  }
+
+  if (payment.status !== "succeeded") {
+    throw new Error(`Cannot refund payment with status: ${payment.status}`)
+  }
+
+  const refundAmount = input.amount || payment.amount
+
+  if (refundAmount > payment.amount) {
+    throw new Error("Refund amount cannot exceed payment amount")
+  }
+
+  let stripeRefundId: string | undefined
+  let refundStatus: "pending" | "succeeded" | "failed" | "cancelled" = "pending"
+
+  // If payment was made via Stripe, process Stripe refund
+  if (payment.stripeChargeId && !input.refundToCredit) {
+    try {
+      const stripeRefund = await createStripeRefund({
+        chargeId: payment.stripeChargeId,
+        amount: refundAmount,
+        reason: input.reason ? (input.reason as any) : undefined,
+        metadata: {
+          payment_id: payment.id,
+          invoice_id: payment.invoiceId,
+        },
+      })
+
+      stripeRefundId = stripeRefund.id
+      refundStatus = stripeRefund.status === "succeeded" ? "succeeded" : "pending"
+    } catch (error) {
+      refundStatus = "failed"
+      throw new Error(`Stripe refund failed: ${error instanceof Error ? error.message : "Unknown error"}`)
+    }
+  } else if (input.refundToCredit || payment.paymentMethod === "credit_balance") {
+    // Refund to credit balance
+    await updateCustomerCreditBalance(payment.customerId, refundAmount)
+    refundStatus = "succeeded"
+  }
+
+  // Create refund record
+  const refund = await createRefund({
+    paymentId: payment.id,
+    invoiceId: payment.invoiceId,
+    customerId: payment.customerId,
+    amount: refundAmount,
+    currency: payment.currency,
+    reason: input.reason,
+    status: refundStatus,
+    stripeRefundId,
+    processedAt: refundStatus === "succeeded" ? new Date().toISOString() : undefined,
+  })
+
+  // Update payment status
+  const newPaymentStatus: PaymentStatus =
+    refundAmount === payment.amount ? "refunded" : "partially_refunded"
+  await updatePayment(payment.id, {
+    status: newPaymentStatus,
+  })
+
+  // Update invoice status if fully refunded
+  if (refundAmount === payment.amount) {
+    const invoice = await getInvoiceById(payment.invoiceId)
+    if (invoice) {
+      await updateInvoice(payment.invoiceId, {
+        status: "pending", // Reset to pending after refund
+      })
+    }
+  }
+
+  return refund
+}
+
+/**
+ * Get payment history for a customer
+ */
+export async function getPaymentHistory(customerId: string) {
+  const { getPayments, getPaymentTransactions } = await import("@/lib/db/payments")
+  
+  const payments = await getPayments({ customerId })
+  const transactions = await Promise.all(
+    payments.map((p) => getPaymentTransactions({ paymentId: p.id }))
+  )
+
+  return {
+    payments,
+    transactions: transactions.flat(),
+  }
+}
+

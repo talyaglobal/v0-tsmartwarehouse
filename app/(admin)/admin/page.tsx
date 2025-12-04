@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -5,9 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge, SeverityBadge } from "@/components/ui/status-badge"
-import { Package, DollarSign, Users, Building2, AlertCircle, ClipboardList } from "@/components/icons"
+import { Package, DollarSign, Users, Building2, AlertCircle, ClipboardList, Wifi, WifiOff } from "@/components/icons"
 import { mockBookings, mockIncidents, mockTasks, mockDashboardStats } from "@/lib/mock-data"
-import { WAREHOUSE_CONFIG } from "@/lib/constants"
+import { useRealtimeWarehouseUtilization } from "@/lib/realtime"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 
 export default function AdminDashboardPage() {
@@ -15,6 +17,9 @@ export default function AdminDashboardPage() {
   const recentBookings = mockBookings.slice(0, 5)
   const openIncidents = mockIncidents.filter((i) => i.status !== "closed")
   const pendingTasks = mockTasks.filter((t) => t.status === "pending" || t.status === "assigned")
+  
+  // Real-time warehouse utilization
+  const { utilization, isConnected } = useRealtimeWarehouseUtilization()
 
   return (
     <div className="space-y-6">
@@ -38,9 +43,18 @@ export default function AdminDashboardPage() {
         />
         <StatCard
           title="Warehouse Utilization"
-          value={`${stats.warehouseUtilization}%`}
+          value={`${utilization.utilizationPercent}%`}
           icon={Building2}
-          subtitle={`${formatNumber(WAREHOUSE_CONFIG.totalSqFt)} sq ft total`}
+          subtitle={
+            <div className="flex items-center gap-2">
+              <span>{formatNumber(utilization.totalSqFt)} sq ft total</span>
+              {isConnected ? (
+                <Wifi className="h-3 w-3 text-green-500" title="Live updates" />
+              ) : (
+                <WifiOff className="h-3 w-3 text-muted-foreground" title="Disconnected" />
+              )}
+            </div>
+          }
         />
         <StatCard
           title="Total Customers"
@@ -54,50 +68,58 @@ export default function AdminDashboardPage() {
       {/* Warehouse Layout Overview */}
       <Card>
         <CardHeader>
-          <CardTitle>Warehouse Layout - 3 Floors</CardTitle>
-          <CardDescription>
-            {formatNumber(WAREHOUSE_CONFIG.totalSqFt)} sq ft total capacity across 3 floors
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Warehouse Layout - 3 Floors</CardTitle>
+              <CardDescription>
+                {formatNumber(utilization.totalSqFt)} sq ft total capacity across 3 floors
+                {isConnected && (
+                  <span className="ml-2 flex items-center gap-1 text-green-600">
+                    <Wifi className="h-3 w-3" />
+                    Live
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            {WAREHOUSE_CONFIG.floors.map((floor) => {
-              const totalOccupied = floor.halls.reduce((sum, h) => sum + h.occupiedSqFt, 0)
-              const utilization = Math.round((totalOccupied / floor.totalSqFt) * 100)
-
-              return (
-                <div key={floor.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold">{floor.name}</h4>
-                    {floor.floorNumber === 3 && <Badge variant="secondary">Area Rental</Badge>}
+            {utilization.floors.map((floor) => (
+              <div key={floor.floorNumber} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">Floor {floor.floorNumber}</h4>
+                  {floor.floorNumber === 3 && <Badge variant="secondary">Area Rental</Badge>}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total</span>
+                    <span>{formatNumber(floor.totalSqFt)} sq ft</span>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total</span>
-                      <span>{formatNumber(floor.totalSqFt)} sq ft</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Utilization</span>
-                      <span className={utilization > 80 ? "text-amber-600" : "text-green-600"}>{utilization}%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${utilization > 80 ? "bg-amber-500" : "bg-green-500"}`}
-                        style={{ width: `${utilization}%` }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                      {floor.halls.map((hall) => (
-                        <div key={hall.id} className="text-xs p-2 bg-muted rounded">
-                          <div className="font-medium">Hall {hall.hallName}</div>
-                          <div className="text-muted-foreground">{formatNumber(hall.availableSqFt)} available</div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Utilization</span>
+                    <span className={floor.utilizationPercent > 80 ? "text-amber-600" : "text-green-600"}>
+                      {floor.utilizationPercent}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${floor.utilizationPercent > 80 ? "bg-amber-500" : "bg-green-500"}`}
+                      style={{ width: `${floor.utilizationPercent}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    {floor.halls.map((hall) => (
+                      <div key={hall.hallName} className="text-xs p-2 bg-muted rounded">
+                        <div className="font-medium">Hall {hall.hallName}</div>
+                        <div className="text-muted-foreground">{formatNumber(hall.availableSqFt)} available</div>
+                        <div className="text-muted-foreground text-[10px]">{hall.utilizationPercent}% used</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

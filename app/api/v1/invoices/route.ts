@@ -1,23 +1,37 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { mockInvoices } from "@/lib/mock-data"
+import { getInvoices } from "@/lib/db/invoices"
+import { handleApiError } from "@/lib/utils/logger"
+import type { InvoiceStatus } from "@/types"
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const customerId = searchParams.get("customerId")
-  const status = searchParams.get("status")
+  try {
+    const { searchParams } = new URL(request.url)
+    const customerId = searchParams.get("customerId")
+    const status = searchParams.get("status") as InvoiceStatus | null
+    const bookingId = searchParams.get("bookingId")
 
-  let invoices = [...mockInvoices]
+    const filters: {
+      customerId?: string
+      status?: InvoiceStatus
+      bookingId?: string
+    } = {}
 
-  if (customerId) {
-    invoices = invoices.filter((i) => i.customerId === customerId)
+    if (customerId) filters.customerId = customerId
+    if (status) filters.status = status
+    if (bookingId) filters.bookingId = bookingId
+
+    const invoices = await getInvoices(filters)
+
+    return NextResponse.json({
+      success: true,
+      data: invoices,
+      total: invoices.length,
+    })
+  } catch (error) {
+    const errorResponse = handleApiError(error, { path: "/api/v1/invoices" })
+    return NextResponse.json(
+      { success: false, error: errorResponse.message },
+      { status: errorResponse.statusCode }
+    )
   }
-  if (status) {
-    invoices = invoices.filter((i) => i.status === status)
-  }
-
-  return NextResponse.json({
-    success: true,
-    data: invoices,
-    total: invoices.length,
-  })
 }

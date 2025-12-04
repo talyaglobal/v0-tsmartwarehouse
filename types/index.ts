@@ -256,3 +256,52 @@ export interface PaginatedResponse<T> {
   pageSize: number
   totalPages: number
 }
+
+// Payment Types
+export type PaymentStatus = "pending" | "processing" | "succeeded" | "failed" | "refunded" | "partially_refunded"
+export type PaymentMethod = "card" | "credit_balance" | "bank_transfer" | "other"
+export type RefundStatus = "pending" | "succeeded" | "failed" | "cancelled"
+
+export interface Payment {
+  id: string
+  invoiceId: string
+  customerId: string
+  amount: number
+  currency: string
+  status: PaymentStatus
+  paymentMethod: PaymentMethod
+  stripePaymentIntentId?: string
+  stripeChargeId?: string
+  creditBalanceUsed?: number
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+  completedAt?: string
+}
+
+export interface PaymentTransaction {
+  id: string
+  paymentId: string
+  type: "payment" | "refund" | "credit_adjustment"
+  amount: number
+  currency: string
+  status: PaymentStatus
+  description: string
+  metadata?: Record<string, any>
+  createdAt: string
+}
+
+export interface Refund {
+  id: string
+  paymentId: string
+  invoiceId: string
+  customerId: string
+  amount: number
+  currency: string
+  reason?: string
+  status: RefundStatus
+  stripeRefundId?: string
+  metadata?: Record<string, any>
+  createdAt: string
+  processedAt?: string
+}

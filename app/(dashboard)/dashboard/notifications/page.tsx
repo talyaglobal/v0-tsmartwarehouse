@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Bell, Package, FileText, AlertCircle, CheckCircle, Mail, Smartphone, Settings } from "@/components/icons"
-import { mockNotifications } from "@/lib/mock-data"
+import { Bell, Package, FileText, AlertCircle, CheckCircle, Mail, Smartphone, Settings, Wifi, WifiOff } from "@/components/icons"
+import { useRealtimeNotifications } from "@/lib/realtime"
+import { useUser } from "@/lib/hooks/use-user"
 import { formatDate } from "@/lib/utils/format"
 
 const notificationIcons = {
@@ -22,22 +23,27 @@ const notificationIcons = {
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(mockNotifications)
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const { user } = useUser()
+  const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead } = useRealtimeNotifications(user?.id || "")
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
-  }
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-  }
+  const unreadNotifications = useMemo(() => {
+    return notifications.filter((n) => !n.read)
+  }, [notifications])
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Notifications"
-        description="Manage your alerts and preferences"
+        description={
+          <div className="flex items-center gap-2">
+            <span>Manage your alerts and preferences</span>
+            {isConnected ? (
+              <Wifi className="h-4 w-4 text-green-500" title="Real-time connected" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-muted-foreground" title="Real-time disconnected" />
+            )}
+          </div>
+        }
         action={
           unreadCount > 0 && (
             <Button variant="outline" onClick={markAllAsRead}>
@@ -114,11 +120,9 @@ export default function NotificationsPage() {
               <CardTitle>Unread Notifications</CardTitle>
             </CardHeader>
             <CardContent>
-              {notifications.filter((n) => !n.read).length > 0 ? (
+              {unreadNotifications.length > 0 ? (
                 <div className="space-y-4">
-                  {notifications
-                    .filter((n) => !n.read)
-                    .map((notification) => {
+                  {unreadNotifications.map((notification) => {
                       const Icon = notificationIcons[notification.type]
                       return (
                         <div

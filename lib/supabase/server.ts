@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Create a Supabase client for server-side operations (API routes, Server Components)
@@ -17,7 +17,7 @@ export function createServerSupabaseClient() {
   // For API routes, use service role key for admin operations
   // For authenticated user operations, use the anon key with user session
   if (supabaseServiceKey) {
-    return createClient(supabaseUrl, supabaseServiceKey, {
+    return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -31,7 +31,14 @@ export function createServerSupabaseClient() {
     throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey)
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+}
+
+/**
+ * Create a Supabase client for server-side operations (alias for compatibility)
+ */
+export function createClient() {
+  return createServerSupabaseClient()
 }
 
 /**

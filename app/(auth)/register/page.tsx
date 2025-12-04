@@ -5,7 +5,6 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,12 +12,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2 } from "@/components/icons"
+import { signUp } from "@/lib/auth/actions"
 
 export default function RegisterPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -34,77 +34,61 @@ export default function RegisterPage() {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    setSuccess(false)
 
-    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
+      setError("Passwords don't match")
       setIsLoading(false)
       return
     }
 
-    // Validate password strength
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long")
+    const formDataToSubmit = new FormData()
+    formDataToSubmit.append('email', formData.email)
+    formDataToSubmit.append('password', formData.password)
+    formDataToSubmit.append('confirmPassword', formData.confirmPassword)
+    formDataToSubmit.append('name', formData.name)
+    if (formData.company) formDataToSubmit.append('company', formData.company)
+    if (formData.phone) formDataToSubmit.append('phone', formData.phone)
+    if (formData.storageType) formDataToSubmit.append('storageType', formData.storageType)
+
+    const result = await signUp(formDataToSubmit)
+    
+    if (result?.error) {
+      setError(result.error.message)
       setIsLoading(false)
-      return
-    }
-
-    try {
-      // Sign up user
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-            company: formData.company,
-            phone: formData.phone,
-            storageType: formData.storageType,
-            role: 'customer', // Default role
-          },
-        },
-      })
-
-      if (signUpError) {
-        setError(signUpError.message)
-        setIsLoading(false)
-        return
-      }
-
-      if (authData.user) {
-        // Create profile in profiles table
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: formData.email,
-            name: formData.name,
-            company: formData.company,
-            phone: formData.phone,
-            role: 'customer',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError)
-          // Continue anyway - profile can be created later
-        }
-
-        // Check if email confirmation is required
-        if (authData.session) {
-          // User is automatically signed in
-          router.push("/dashboard")
-          router.refresh()
-        } else {
-          // Email confirmation required
-          router.push("/login?message=Check your email to confirm your account")
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during registration')
+    } else {
+      setSuccess(true)
       setIsLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl">Check your email</CardTitle>
+          <CardDescription>We've sent you a verification link</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 text-sm bg-muted rounded-md">
+            <p className="mb-2">
+              We've sent a verification email to <strong>{formData.email}</strong>
+            </p>
+            <p>
+              Please check your inbox and click the verification link to activate your account. 
+              You can close this window.
+            </p>
+          </div>
+          <Button
+            onClick={() => router.push('/login')}
+            className="w-full"
+            variant="outline"
+          >
+            Back to Sign In
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -116,7 +100,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
+            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md border border-destructive/20">
               {error}
             </div>
           )}
@@ -152,6 +136,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
+              autoComplete="email"
               disabled={isLoading}
             />
           </div>
@@ -193,6 +178,7 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
+                autoComplete="new-password"
                 disabled={isLoading}
               />
             </div>
@@ -205,6 +191,8 @@ export default function RegisterPage() {
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
+                autoComplete="new-password"
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -214,6 +202,7 @@ export default function RegisterPage() {
               checked={formData.acceptTerms}
               onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
               required
+              disabled={isLoading}
             />
             <Label htmlFor="terms" className="text-sm">
               I agree to the{" "}
