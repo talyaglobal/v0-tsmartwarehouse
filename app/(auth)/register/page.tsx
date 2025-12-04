@@ -129,6 +129,7 @@ export default function RegisterPage() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -138,6 +139,7 @@ export default function RegisterPage() {
                 placeholder="Acme Corp"
                 value={formData.company}
                 onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -150,6 +152,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -160,6 +163,7 @@ export default function RegisterPage() {
               placeholder="+1 (555) 123-4567"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -167,6 +171,7 @@ export default function RegisterPage() {
             <Select
               value={formData.storageType}
               onValueChange={(value) => setFormData({ ...formData, storageType: value })}
+              disabled={isLoading}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select storage type" />
@@ -188,6 +193,7 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
