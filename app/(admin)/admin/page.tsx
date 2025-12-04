@@ -111,16 +111,7 @@ export default function AdminDashboardPage() {
           title="Warehouse Utilization"
           value={`${utilization.utilizationPercent}%`}
           icon={Building2}
-          subtitle={
-            <div className="flex items-center gap-2">
-              <span>{formatNumber(utilization.totalSqFt)} sq ft total</span>
-              {isConnected ? (
-                <Wifi className="h-3 w-3 text-green-500" title="Live updates" />
-              ) : (
-                <WifiOff className="h-3 w-3 text-muted-foreground" title="Disconnected" />
-              )}
-            </div>
-          }
+          subtitle={`${formatNumber(utilization.totalSqFt)} sq ft total`}
         />
         <StatCard
           title="Total Customers"

@@ -29,7 +29,7 @@ export default function WarehousesPage() {
           title="Utilization"
           value={utilizationPercent + "%"}
           icon={Layers}
-          description={formatNumber(occupiedSqFt) + " sq ft occupied"}
+          subtitle={formatNumber(occupiedSqFt) + " sq ft occupied"}
         />
         <StatCard title="Active Pallets" value="2,450" icon={Package} subtitle="Across all floors" />
         <StatCard title="Area Rentals" value="2" icon={Square} subtitle="Level 3 leases" />
