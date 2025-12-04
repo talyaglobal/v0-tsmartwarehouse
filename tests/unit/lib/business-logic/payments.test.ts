@@ -22,10 +22,27 @@ import {
 } from '@/lib/payments/stripe'
 import { mockInvoice, mockUser } from '@/tests/utils/mocks'
 
+// Mock Stripe module before any imports
+jest.mock('@/lib/payments/stripe', () => ({
+  createPaymentIntent: jest.fn(),
+  getPaymentIntent: jest.fn(),
+  confirmPaymentIntent: jest.fn(),
+  getOrCreateStripeCustomer: jest.fn(),
+  createRefund: jest.fn(),
+}))
+
+// Mock Redis cache
+jest.mock('@/lib/cache/redis', () => ({
+  redis: {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  },
+}))
+
 // Mock dependencies
 jest.mock('@/lib/db/invoices')
 jest.mock('@/lib/db/payments')
-jest.mock('@/lib/payments/stripe')
 jest.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: jest.fn(() => ({
     from: jest.fn(() => ({
@@ -47,6 +64,7 @@ const mockUpdatePayment = updatePayment as jest.MockedFunction<typeof updatePaym
 const mockGetCustomerCreditBalance = getCustomerCreditBalance as jest.MockedFunction<typeof getCustomerCreditBalance>
 const mockUpdateCustomerCreditBalance = updateCustomerCreditBalance as jest.MockedFunction<typeof updateCustomerCreditBalance>
 const mockCreatePaymentIntent = createPaymentIntent as jest.MockedFunction<typeof createPaymentIntent>
+const mockConfirmPaymentIntent = confirmPaymentIntent as jest.MockedFunction<typeof confirmPaymentIntent>
 const mockGetOrCreateStripeCustomer = getOrCreateStripeCustomer as jest.MockedFunction<typeof getOrCreateStripeCustomer>
 
 describe('processInvoicePayment', () => {
