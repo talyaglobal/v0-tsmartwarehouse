@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { Button } from "@/components/ui/button"
@@ -77,24 +77,23 @@ export default function IncidentsPage() {
       <PageHeader
         title="Incidents"
         description="Track and manage warehouse incidents"
-        action={
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Report Incident
-          </Button>
-        }
-      />
+      >
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Report Incident
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           title="Open Incidents"
           value={openCount.toString()}
           icon={AlertCircle}
-          description="Requires attention"
+          subtitle="Requires attention"
         />
-        <StatCard title="Investigating" value={investigatingCount.toString()} icon={Clock} description="In progress" />
-        <StatCard title="Resolved (30d)" value="8" icon={CheckCircle} description="This month" />
-        <StatCard title="Avg Resolution" value="4.2 hrs" icon={AlertTriangle} description="Response time" />
+        <StatCard title="Investigating" value={investigatingCount.toString()} icon={Clock} subtitle="In progress" />
+        <StatCard title="Resolved (30d)" value="8" icon={CheckCircle} subtitle="This month" />
+        <StatCard title="Avg Resolution" value="4.2 hrs" icon={AlertTriangle} subtitle="Response time" />
       </div>
 
       <Card>

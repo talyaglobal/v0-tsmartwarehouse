@@ -74,3 +74,23 @@ export async function requireRole(
   return { user }
 }
 
+/**
+ * Alias for requireAuth that returns a consistent response format
+ * Used by payment routes
+ */
+export async function authenticateRequest(request: NextRequest) {
+  const user = await getAuthUser(request)
+
+  if (!user) {
+    return {
+      success: false,
+      error: 'Authentication required',
+    }
+  }
+
+  return {
+    success: true,
+    user,
+  }
+}
+

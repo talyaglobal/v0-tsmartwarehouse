@@ -140,7 +140,7 @@ export function withApiMiddleware<T = any>(
         method: request.method,
       })
 
-      const response = NextResponse.json(
+      let response = NextResponse.json(
         {
           error: errorResponse.message,
           ...(errorResponse.code && { code: errorResponse.code }),
@@ -196,4 +196,7 @@ export function apiError(
     { status }
   )
 }
+
+// Alias export for backward compatibility
+export const apiWrapper = withApiMiddleware
 

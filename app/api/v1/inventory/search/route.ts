@@ -34,7 +34,14 @@ export async function GET(request: NextRequest) {
       data: response,
     })
   } catch (error: any) {
-    return handleApiError(error, 'Failed to search inventory')
+    const errorResponse = handleApiError(error, { context: 'Failed to search inventory' })
+    return NextResponse.json(
+      {
+        error: errorResponse.message,
+        ...(errorResponse.code && { code: errorResponse.code }),
+      },
+      { status: errorResponse.statusCode }
+    )
   }
 }
 

@@ -9,8 +9,9 @@ import type { PaymentResponse, ErrorResponse } from "@/types/api"
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
@@ -23,7 +24,7 @@ export async function POST(
     }
 
     const { user } = authResult
-    const paymentId = params.id
+    const paymentId = id
 
     const body = await request.json()
     const { paymentMethodId } = body

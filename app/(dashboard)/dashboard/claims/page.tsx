@@ -51,15 +51,14 @@ export default function ClaimsPage() {
       <PageHeader
         title="Claims"
         description="Submit and track damage or loss claims"
-        action={
-          <Link href="/dashboard/claims/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Submit Claim
-            </Button>
-          </Link>
-        }
-      />
+      >
+        <Link href="/dashboard/claims/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Submit Claim
+          </Button>
+        </Link>
+      </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

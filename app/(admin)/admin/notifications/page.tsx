@@ -29,13 +29,12 @@ export default function NotificationsPage() {
       <PageHeader
         title="Notifications"
         description="Configure notification templates and channels"
-        action={
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Template
-          </Button>
-        }
-      />
+      >
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          New Template
+        </Button>
+      </PageHeader>
 
       <Tabs defaultValue="templates" className="space-y-4">
         <TabsList>

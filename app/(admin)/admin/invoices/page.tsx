@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -71,22 +71,21 @@ export default function InvoicesPage() {
       <PageHeader
         title="Invoices"
         description="Manage billing and payments"
-        action={
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Invoice
-          </Button>
-        }
-      />
+      >
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Invoice
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           title="Pending Amount"
           value={formatCurrency(totalPending)}
           icon={Clock}
-          description="Awaiting payment"
+          subtitle="Awaiting payment"
         />
-        <StatCard title="Paid (30d)" value={formatCurrency(totalPaid)} icon={CheckCircle} description="This month" />
+        <StatCard title="Paid (30d)" value={formatCurrency(totalPaid)} icon={CheckCircle} subtitle="This month" />
         <StatCard title="Total Invoices" value={invoices.length.toString()} icon={FileText} />
         <StatCard title="Avg. Invoice" value={formatCurrency(avgInvoice)} icon={DollarSign} />
       </div>

@@ -44,14 +44,13 @@ export default function NotificationsPage() {
             )}
           </div>
         }
-        action={
-          unreadCount > 0 && (
-            <Button variant="outline" onClick={markAllAsRead}>
-              Mark All as Read
-            </Button>
-          )
-        }
-      />
+      >
+        {unreadCount > 0 && (
+          <Button variant="outline" onClick={markAllAsRead}>
+            Mark All as Read
+          </Button>
+        )}
+      </PageHeader>
 
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>

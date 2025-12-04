@@ -4,6 +4,10 @@ import {
   getUtilizationData,
   getServiceBreakdown,
   getAnalyticsStats,
+  type RevenueData,
+  type UtilizationData,
+  type ServiceBreakdown,
+  type AnalyticsStats,
 } from '@/lib/db/analytics'
 import { handleApiError } from '@/lib/utils/logger'
 import type { ApiResponse, ErrorResponse } from '@/types/api'
@@ -21,35 +25,35 @@ export async function GET(request: NextRequest) {
     switch (type) {
       case 'revenue':
         const revenueData = await getRevenueData(months)
-        const responseData: ApiResponse = {
+        const revenueResponse: ApiResponse<RevenueData[]> = {
           success: true,
-          data: revenueData as any,
+          data: revenueData,
         }
-        return NextResponse.json(responseData)
+        return NextResponse.json(revenueResponse)
 
       case 'utilization':
         const utilizationData = await getUtilizationData(months)
-        const responseData: ApiResponse = {
+        const utilizationResponse: ApiResponse<UtilizationData[]> = {
           success: true,
-          data: utilizationData as any,
+          data: utilizationData,
         }
-        return NextResponse.json(responseData)
+        return NextResponse.json(utilizationResponse)
 
       case 'service-breakdown':
         const serviceBreakdown = await getServiceBreakdown()
-        const responseData: ApiResponse = {
+        const serviceResponse: ApiResponse<ServiceBreakdown[]> = {
           success: true,
-          data: serviceBreakdown as any,
+          data: serviceBreakdown,
         }
-        return NextResponse.json(responseData)
+        return NextResponse.json(serviceResponse)
 
       case 'stats':
         const stats = await getAnalyticsStats()
-        const responseData: ApiResponse = {
+        const statsResponse: ApiResponse<AnalyticsStats> = {
           success: true,
-          data: stats as any,
+          data: stats,
         }
-        return NextResponse.json(responseData)
+        return NextResponse.json(statsResponse)
 
       case 'all':
       default:
@@ -60,16 +64,21 @@ export async function GET(request: NextRequest) {
           getAnalyticsStats(),
         ])
 
-        const responseData: ApiResponse = {
+        const allDataResponse: ApiResponse<{
+          revenue: RevenueData[]
+          utilization: UtilizationData[]
+          serviceBreakdown: ServiceBreakdown[]
+          stats: AnalyticsStats
+        }> = {
           success: true,
           data: {
             revenue,
             utilization,
             serviceBreakdown: breakdown,
             stats: analyticsStats,
-          } as any,
+          },
         }
-        return NextResponse.json(responseData)
+        return NextResponse.json(allDataResponse)
     }
   } catch (error: any) {
     const errorResponse = handleApiError(error, { path: '/api/v1/analytics' })

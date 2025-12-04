@@ -86,13 +86,12 @@ export default function AnalyticsPage() {
       <PageHeader
         title="Analytics"
         description="Revenue, utilization, and performance metrics"
-        action={
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export Report
-          </Button>
-        }
-      />
+      >
+        <Button variant="outline">
+          <Download className="mr-2 h-4 w-4" />
+          Export Report
+        </Button>
+      </PageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -117,7 +116,7 @@ export default function AnalyticsPage() {
               title="Utilization"
               value={(stats?.warehouseUtilization || 0) + "%"}
               icon={BarChart3}
-              description="Across all floors"
+              subtitle="Across all floors"
             />
             <StatCard
               title="Active Customers"

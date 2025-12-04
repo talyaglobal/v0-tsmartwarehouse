@@ -78,17 +78,16 @@ export default function WorkersPage() {
       <PageHeader
         title="Workers"
         description="Manage warehouse staff and schedules"
-        action={
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Worker
-          </Button>
-        }
-      />
+      >
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Worker
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard title="Total Workers" value="12" icon={Users} />
-        <StatCard title="On Shift Now" value="8" icon={UserCheck} description="Currently working" />
+        <StatCard title="On Shift Now" value="8" icon={UserCheck} subtitle="Currently working" />
         <StatCard title="Tasks Today" value="24" icon={CheckCircle} />
         <StatCard title="Avg Hours/Week" value="38.5" icon={Clock} />
       </div>

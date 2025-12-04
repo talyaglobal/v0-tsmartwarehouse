@@ -23,7 +23,7 @@ export default function WarehousesPage() {
           title="Total Capacity"
           value={formatNumber(totalSqFt) + " sq ft"}
           icon={Building2}
-          description="240,000 sq ft facility"
+          subtitle="240,000 sq ft facility"
         />
         <StatCard
           title="Utilization"
@@ -31,8 +31,8 @@ export default function WarehousesPage() {
           icon={Layers}
           description={formatNumber(occupiedSqFt) + " sq ft occupied"}
         />
-        <StatCard title="Active Pallets" value="2,450" icon={Package} description="Across all floors" />
-        <StatCard title="Area Rentals" value="2" icon={Square} description="Level 3 leases" />
+        <StatCard title="Active Pallets" value="2,450" icon={Package} subtitle="Across all floors" />
+        <StatCard title="Area Rentals" value="2" icon={Square} subtitle="Level 3 leases" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

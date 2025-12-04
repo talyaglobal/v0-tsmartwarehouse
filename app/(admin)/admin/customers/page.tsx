@@ -79,17 +79,16 @@ export default function CustomersPage() {
       <PageHeader
         title="Customers"
         description="Manage customer accounts and memberships"
-        action={
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Customer
-          </Button>
-        }
-      />
+      >
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Customer
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard title="Total Customers" value={stats.total.toString()} icon={Users} trend={{ value: 12, isPositive: true }} />
-        <StatCard title="Gold Members" value={stats.goldMembers.toString()} icon={Crown} description="Premium tier" />
+        <StatCard title="Gold Members" value={stats.goldMembers.toString()} icon={Crown} subtitle="Premium tier" />
         <StatCard title="Active Bookings" value={stats.activeBookings.toString()} icon={Building2} />
         <StatCard title="Total Revenue" value={formatCurrency(stats.totalRevenue)} icon={Users} />
       </div>
