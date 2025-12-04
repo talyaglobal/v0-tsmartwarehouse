@@ -72,7 +72,9 @@ export async function POST(request: NextRequest) {
     // Create incident using database function
     const newIncident = await createIncident({
       ...validatedData,
-      status: validatedData.status || "open",
+      status: "open",
+      reportedBy: "system", // Default value - should be replaced with authenticated user ID
+      reportedByName: "System", // Default value - should be replaced with authenticated user name
     })
 
     // Send notification to admins

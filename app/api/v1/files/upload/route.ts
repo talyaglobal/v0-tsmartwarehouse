@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Validate file
     const validationError = validateFile(file, {
       maxSizeBytes: FILE_SIZE_LIMITS.DEFAULT,
-      allowedMimeTypes: ALLOWED_MIME_TYPES.ALL,
+      allowedMimeTypes: [...ALLOWED_MIME_TYPES.ALL],
     })
 
     if (validationError) {

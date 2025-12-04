@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       customerId: user.id,
       customerName: profile.name || user.email,
       ...validatedData,
-      status: validatedData.status || "submitted",
+      status: "submitted",
     })
 
     const responseData: ClaimResponse = {
