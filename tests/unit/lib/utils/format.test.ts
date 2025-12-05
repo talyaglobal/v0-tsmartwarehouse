@@ -99,9 +99,9 @@ describe('calculateAreaRentalCost', () => {
   it('calculates cost for valid area rental', () => {
     const result = calculateAreaRentalCost(40000, 'bronze')
     expect(result.isValid).toBe(true)
-    expect(result.annualCost).toBe(480000) // 40000 * $12
-    expect(result.monthlyCost).toBe(40000) // 480000 / 12
-    expect(result.total).toBe(480000)
+    expect(result.annualCost).toBe(800000) // 40000 * $20
+    expect(result.monthlyCost).toBeCloseTo(66666.67, 2) // 800000 / 12
+    expect(result.total).toBe(800000)
   })
 
   it('rejects area below minimum', () => {

@@ -20,7 +20,7 @@ export default function TermsPage() {
           <strong>Pallet Handling:</strong> $5.00 per pallet for both inbound and outbound
         </li>
         <li>
-          <strong>Area Rental:</strong> $12.00 per square foot per year (minimum 40,000 sq ft, Level 3 only)
+          <strong>Area Rental:</strong> $20.00 per square foot per year (minimum 40,000 sq ft, Level 3 only)
         </li>
         <li>
           <strong>Value-Added Services:</strong> Including pick-and-pack, labeling, and inventory management

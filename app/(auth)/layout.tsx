@@ -36,7 +36,7 @@ export default function AuthLayout({
                 <div className="text-sm opacity-80">Per Pallet/Mo</div>
               </div>
               <div>
-                <div className="text-3xl font-bold">$12</div>
+                <div className="text-3xl font-bold">$20</div>
                 <div className="text-sm opacity-80">Sq Ft/Year</div>
               </div>
             </div>

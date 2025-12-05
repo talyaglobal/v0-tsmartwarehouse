@@ -162,7 +162,7 @@ Complete TypeScript types defined in `types/index.ts`:
 - ✅ Pallet In: $5.00
 - ✅ Pallet Out: $5.00
 - ✅ Storage: $17.50/pallet/month
-- ✅ Area Rental: $12.00/sq ft/year (Level 3 only)
+- ✅ Area Rental: $20.00/sq ft/year (Level 3 only)
 - ✅ Volume discounts (10%, 15%, 20% at thresholds)
 - ✅ Membership discounts (Bronze, Silver, Gold, Platinum)
 
