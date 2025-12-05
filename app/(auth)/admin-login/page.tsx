@@ -36,13 +36,27 @@ export default function AdminLoginPage() {
     setError(null)
 
     try {
+      // Verify Supabase client is properly initialized
+      if (!supabase || !supabase.auth || typeof supabase.auth.signInWithPassword !== 'function') {
+        setError('Supabase client not properly initialized. Please check your environment variables and restart the development server.')
+        setIsLoading(false)
+        return
+      }
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (signInError) {
-        setError(signInError.message)
+        // Provide more helpful error messages
+        if (signInError.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check your credentials and try again.')
+        } else if (signInError.message.includes('not properly initialized')) {
+          setError('Supabase configuration error. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file and restart the server.')
+        } else {
+          setError(signInError.message)
+        }
         setIsLoading(false)
         return
       }

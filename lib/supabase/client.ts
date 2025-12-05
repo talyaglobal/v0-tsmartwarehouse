@@ -28,6 +28,8 @@ function createMockClient() {
 }
 
 export function createClient() {
+  // In Next.js, NEXT_PUBLIC_ variables are embedded at build time
+  // They are available in both server and client contexts via process.env
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -36,10 +38,14 @@ export function createClient() {
   const hasValidKey = supabaseAnonKey && typeof supabaseAnonKey === 'string' && supabaseAnonKey.trim() !== ''
   
   if (!hasValidUrl || !hasValidKey) {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    // Enhanced error logging for debugging
+    if (typeof window !== 'undefined') {
       console.error(
         '⚠️ Supabase client not initialized: Missing environment variables.\n' +
-        'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file.'
+        `URL present: ${!!supabaseUrl} (${supabaseUrl ? 'has value' : 'empty'})\n` +
+        `Key present: ${!!supabaseAnonKey} (${supabaseAnonKey ? 'has value' : 'empty'})\n` +
+        'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file.\n' +
+        'After adding variables, restart your development server with: npm run dev'
       )
     }
     return createMockClient()
@@ -47,18 +53,27 @@ export function createClient() {
 
   try {
     // Create the Supabase client for browser/client-side usage
-    return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+    const client = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
     })
+    
+    // Verify the client was created successfully
+    if (!client || !client.auth) {
+      throw new Error('Failed to create Supabase client: client or auth is null')
+    }
+    
+    return client
   } catch (error: any) {
     // If the library fails to create a client, return mock
     const errorMessage = error?.message || String(error || '')
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('Failed to create Supabase client, using mock:', errorMessage)
+      console.warn('URL:', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'missing')
+      console.warn('Key:', supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'missing')
     }
     return createMockClient()
   }
