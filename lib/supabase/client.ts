@@ -1,4 +1,4 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Store a mock client for build-time when env vars are missing
 let mockClient: any = null
@@ -46,8 +46,14 @@ export function createClient() {
   }
 
   try {
-    // Create the Supabase client with browser cookies support
-    return createBrowserClient(supabaseUrl, supabaseAnonKey)
+    // Create the Supabase client for browser/client-side usage
+    return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   } catch (error: any) {
     // If the library fails to create a client, return mock
     const errorMessage = error?.message || String(error || '')
