@@ -8,7 +8,7 @@ export const mockUser: User = {
   role: 'customer',
   company: 'Test Company',
   phone: '+1234567890',
-  avatar: null,
+  avatar: undefined,
   membershipTier: 'bronze',
   creditBalance: 0,
   createdAt: new Date().toISOString(),
