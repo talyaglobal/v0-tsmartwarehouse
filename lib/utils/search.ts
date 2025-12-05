@@ -58,7 +58,9 @@ export function filter<T extends Record<string, any>>(
 
       // Handle array filters
       if (Array.isArray(filterValue)) {
-        return filterValue.includes(itemValue)
+        // Use type assertion since filterValue can be string[] or number[]
+        // and itemValue type is compatible with both
+        return (filterValue as unknown[]).includes(itemValue)
       }
 
       // Handle exact match
