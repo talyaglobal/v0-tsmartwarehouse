@@ -14,9 +14,40 @@ export async function middleware(request: NextRequest) {
     strictTransportSecurity: process.env.NODE_ENV === 'production',
   })
 
+  // Check if Supabase environment variables are available
+  // During build time, these may not be available, so we skip auth checks
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // If env vars are missing (e.g., during build), skip auth checks and return early
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // For public routes, allow access during build
+    const pathname = request.nextUrl.pathname
+    const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
+    const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
+    
+    if (isPublicRoute || pathname.startsWith('/api')) {
+      return response
+    }
+    
+    // For protected routes during build, redirect to login
+    // This will be handled properly at runtime when env vars are available
+    const isAdminRoute = pathname.startsWith('/admin')
+    const isDashboardRoute = pathname.startsWith('/dashboard')
+    const isWorkerRoute = pathname.startsWith('/worker')
+    
+    if (isAdminRoute || isDashboardRoute || isWorkerRoute) {
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+    
+    return response
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -38,9 +69,17 @@ export async function middleware(request: NextRequest) {
   )
 
   // Refresh session if expired - required for Server Components
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser()
+    user = authUser
+  } catch (error) {
+    // If auth check fails (e.g., during build), continue without user
+    // This allows the build to complete
+    console.warn('Auth check failed in middleware:', error)
+  }
 
   const pathname = request.nextUrl.pathname
 
@@ -63,7 +102,7 @@ export async function middleware(request: NextRequest) {
   const isApiRoute = pathname.startsWith('/api')
 
   // If user is authenticated and tries to access auth pages, redirect to appropriate dashboard
-  if (user && isAuthRoute) {
+  if (user && isAuthRoute && supabaseUrl && supabaseAnonKey) {
     const userRole = user.user_metadata?.role || 'customer'
     if (userRole === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url))

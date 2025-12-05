@@ -3,6 +3,9 @@ import Link from "next/link"
 import { Warehouse } from "@/components/icons"
 import { ErrorBoundary } from "@/components/error-boundary"
 
+// Force dynamic rendering to prevent static generation issues with Supabase
+export const dynamic = 'force-dynamic'
+
 export default function AuthLayout({
   children,
 }: {
