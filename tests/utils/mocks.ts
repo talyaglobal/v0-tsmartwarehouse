@@ -41,9 +41,9 @@ export const mockBooking: Booking = {
   type: 'pallet',
   status: 'pending',
   palletCount: 50,
-  areaSqFt: null,
-  floorNumber: null,
-  hallId: null,
+  areaSqFt: undefined,
+  floorNumber: undefined,
+  hallId: undefined,
   startDate: '2024-01-01',
   endDate: '2024-12-31',
   totalAmount: 875.0,
@@ -67,7 +67,7 @@ export const mockTask: Task = {
   zone: 'A1',
   location: 'Floor 1, Hall A',
   dueDate: new Date().toISOString(),
-  completedAt: null,
+  completedAt: undefined,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 }
@@ -91,7 +91,7 @@ export const mockInvoice: Invoice = {
   tax: 87.5,
   total: 962.5,
   dueDate: '2024-12-31',
-  paidDate: null,
+  paidDate: undefined,
   createdAt: new Date().toISOString(),
 }
 
