@@ -61,7 +61,6 @@ class Logger {
     // Sentry integration
     if (process.env.SENTRY_DSN && typeof window === 'undefined') {
       // Dynamic import to avoid bundling Sentry in client
-      // @ts-expect-error - Sentry is optional and may not be installed
       import('@sentry/nextjs').then((Sentry: any) => {
         if (error) {
           Sentry.captureException(error, {
