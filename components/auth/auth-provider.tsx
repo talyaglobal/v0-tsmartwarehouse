@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { User } from '@supabase/supabase-js'
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import type { UserRole } from '@/types'
 import type { AuthUser } from '@/lib/auth/utils'
 
@@ -27,14 +27,28 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [supabase, setSupabase] = useState<any>(null)
 
-  // Check if Supabase environment variables are available
-  const hasSupabaseConfig = !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && 
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  // Lazy initialize Supabase client only in useEffect (client-side only)
+  // This prevents it from being called during static generation
+  useEffect(() => {
+    // Check if Supabase environment variables are available
+    const hasSupabaseConfig = !!(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && 
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    )
 
-  const supabase = hasSupabaseConfig ? createClient() : null
+    if (hasSupabaseConfig) {
+      try {
+        setSupabase(createClient())
+      } catch (error) {
+        console.warn('Failed to initialize Supabase client:', error)
+        setSupabase(null)
+      }
+    } else {
+      setSupabase(null)
+    }
+  }, [])
 
   const mapSupabaseUser = (supabaseUser: User | null): AuthUser | null => {
     if (!supabaseUser) return null
@@ -86,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(mapSupabaseUser(session?.user ?? null))
       setLoading(false)
     })
@@ -94,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase]) // Run when supabase is initialized
 
   return (
     <AuthContext.Provider value={{ user, loading, refresh, signOut }}>

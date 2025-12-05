@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { RealtimeChannel } from "@supabase/supabase-js"
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 import type { Task, Notification } from "@/types"
+
+type RealtimeChannelStatus = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR"
 
 /**
  * Generic hook for real-time subscriptions
@@ -44,7 +46,7 @@ export function useRealtimeSubscription<T>(
               table: table,
               filter: filter,
             },
-            (payload) => {
+            (payload: RealtimePostgresChangesPayload<any>) => {
               if (callback) {
                 callback(payload)
               }
@@ -65,7 +67,7 @@ export function useRealtimeSubscription<T>(
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status: RealtimeChannelStatus) => {
             setIsConnected(status === "SUBSCRIBED")
             if (status === "SUBSCRIBED") {
               setError(null)
@@ -132,7 +134,7 @@ export function useRealtimeTasks(userId?: string) {
               table: "tasks",
               filter: filter,
             },
-            (payload) => {
+            (payload: RealtimePostgresChangesPayload<Task>) => {
               if (payload.eventType === "INSERT") {
                 setTasks((prev) => [payload.new as Task, ...prev])
               } else if (payload.eventType === "UPDATE") {
@@ -148,7 +150,7 @@ export function useRealtimeTasks(userId?: string) {
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status: RealtimeChannelStatus) => {
             setIsConnected(status === "SUBSCRIBED")
             if (status === "SUBSCRIBED") {
               setError(null)
@@ -201,7 +203,7 @@ export function useRealtimeNotifications(userId: string) {
 
         const notificationsData = initialData || []
         setNotifications(notificationsData)
-        setUnreadCount(notificationsData.filter((n) => !n.read).length)
+        setUnreadCount(notificationsData.filter((n: Notification) => !n.read).length)
 
         // Set up real-time subscription
         channel = supabase
@@ -214,7 +216,7 @@ export function useRealtimeNotifications(userId: string) {
               table: "notifications",
               filter: `user_id=eq.${userId}`,
             },
-            (payload) => {
+            (payload: RealtimePostgresChangesPayload<Notification>) => {
               if (payload.eventType === "INSERT") {
                 const newNotification = payload.new as Notification
                 setNotifications((prev) => [newNotification, ...prev])
@@ -240,7 +242,7 @@ export function useRealtimeNotifications(userId: string) {
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status: RealtimeChannelStatus) => {
             setIsConnected(status === "SUBSCRIBED")
             if (status === "SUBSCRIBED") {
               setError(null)
@@ -361,7 +363,7 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
 
         // Get halls and calculate utilization
         const floorsData = await Promise.all(
-          (floors || []).map(async (floor) => {
+          (floors || []).map(async (floor: any) => {
             const { data: halls, error: hallsError } = await supabase
               .from("warehouse_halls")
               .select("*")
@@ -370,7 +372,7 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
 
             if (hallsError) throw hallsError
 
-            const hallsData = (halls || []).map((hall) => ({
+            const hallsData = (halls || []).map((hall: any) => ({
               hallName: hall.hall_name,
               totalSqFt: hall.sq_ft,
               occupiedSqFt: hall.occupied_sq_ft || 0,
@@ -382,11 +384,11 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
             }))
 
             const floorOccupied = hallsData.reduce(
-              (sum, hall) => sum + hall.occupiedSqFt,
+              (sum: number, hall: any) => sum + hall.occupiedSqFt,
               0
             )
             const floorTotal = hallsData.reduce(
-              (sum, hall) => sum + hall.totalSqFt,
+              (sum: number, hall: any) => sum + hall.totalSqFt,
               0
             )
 
@@ -403,11 +405,11 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
         )
 
         const totalOccupied = floorsData.reduce(
-          (sum, floor) => sum + floor.occupiedSqFt,
+          (sum: number, floor: any) => sum + floor.occupiedSqFt,
           0
         )
         const totalSqFt = floorsData.reduce(
-          (sum, floor) => sum + floor.totalSqFt,
+          (sum: number, floor: any) => sum + floor.totalSqFt,
           0
         )
 
@@ -487,7 +489,7 @@ export function useRealtimeConnectionStatus() {
     const supabase = createClient()
     const channel = supabase
       .channel("connection_status")
-      .subscribe((status) => {
+      .subscribe((status: RealtimeChannelStatus) => {
         setIsConnected(status === "SUBSCRIBED")
       })
 
