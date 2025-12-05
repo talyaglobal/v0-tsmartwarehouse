@@ -117,7 +117,7 @@ export async function reviewClaim(
 
   if (input.action === "approve") {
     // Validate approved amount
-    const approvedAmount = input.approvedAmount ?? input.amount
+    const approvedAmount = input.approvedAmount ?? claim.amount
     if (approvedAmount <= 0) {
       throw new Error("Approved amount must be greater than zero")
     }

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
 
     // Only customers can view their own payment history
-    if (user.role !== "customer") {
+    if (user?.role !== "customer") {
       const errorData: ErrorResponse = {
         success: false,
         error: "Only customers can view payment history",
@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
 
     const responseData: PaymentHistoryResponse = {
       success: true,
-      data: history,
-      total: history.length,
+      data: history.transactions,
+      total: history.transactions.length,
     }
     return NextResponse.json(responseData)
   } catch (error) {

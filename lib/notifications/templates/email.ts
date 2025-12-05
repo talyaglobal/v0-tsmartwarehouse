@@ -7,7 +7,7 @@ export interface EmailTemplateData {
 }
 
 export interface EmailTemplate {
-  subject: string
+  subject: string | ((data: EmailTemplateData) => string)
   html: (data: EmailTemplateData) => string
   text?: (data: EmailTemplateData) => string
 }

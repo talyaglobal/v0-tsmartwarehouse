@@ -45,13 +45,13 @@ export function withApiMiddleware<T = any>(
   handler: (request: NextRequest, context?: { user?: { id: string; email: string; role: UserRole } }) => Promise<NextResponse<T>>,
   options: ApiHandlerOptions = {}
 ) {
-  return async (request: NextRequest): Promise<NextResponse> => {
+  return async (request: NextRequest): Promise<NextResponse<T>> => {
     try {
       // Handle CORS preflight
       if (options.cors !== false) {
         const preflightResponse = handleCorsPreflight(request)
         if (preflightResponse) {
-          return preflightResponse
+          return preflightResponse as NextResponse<T>
         }
       }
 
@@ -60,7 +60,7 @@ export function withApiMiddleware<T = any>(
         return NextResponse.json(
           { error: 'Method not allowed' },
           { status: 405 }
-        )
+        ) as NextResponse<T>
       }
 
       // CSRF protection (for state-changing methods)
@@ -69,7 +69,7 @@ export function withApiMiddleware<T = any>(
         if (csrfResponse) {
           return applySecurityHeaders(
             applyCorsHeaders(request, csrfResponse, options.cors !== false ? {} : undefined)
-          )
+          ) as NextResponse<T>
         }
       }
 
@@ -94,7 +94,7 @@ export function withApiMiddleware<T = any>(
 
         return applySecurityHeaders(
           applyCorsHeaders(request, response, options.cors !== false ? {} : undefined)
-        )
+        ) as NextResponse<T>
       }
 
       // Authentication
@@ -104,13 +104,13 @@ export function withApiMiddleware<T = any>(
         if (options.requireRole) {
           const authResult = await requireRole(request, options.requireRole)
           if (authResult instanceof NextResponse) {
-            return applyCorsHeaders(request, authResult, options.cors !== false ? {} : undefined)
+            return applyCorsHeaders(request, authResult, options.cors !== false ? {} : undefined) as NextResponse<T>
           }
           user = authResult.user
         } else {
           const authResult = await requireAuth(request)
           if (authResult instanceof NextResponse) {
-            return applyCorsHeaders(request, authResult, options.cors !== false ? {} : undefined)
+            return applyCorsHeaders(request, authResult, options.cors !== false ? {} : undefined) as NextResponse<T>
           }
           user = authResult.user
         }
@@ -121,11 +121,11 @@ export function withApiMiddleware<T = any>(
 
       // Apply CORS headers
       if (options.cors !== false) {
-        response = applyCorsHeaders(request, response, {})
+        response = applyCorsHeaders(request, response, {}) as NextResponse<T>
       }
 
       // Apply security headers
-      response = applySecurityHeaders(response)
+      response = applySecurityHeaders(response) as NextResponse<T>
 
       // Add rate limit headers to successful responses
       response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString())
@@ -150,13 +150,13 @@ export function withApiMiddleware<T = any>(
 
       // Apply CORS headers even on error
       if (options.cors !== false) {
-        response = applyCorsHeaders(request, response)
+        response = applyCorsHeaders(request, response) as any
       }
 
       // Apply security headers even on error
-      response = applySecurityHeaders(response)
+      response = applySecurityHeaders(response) as any
 
-      return response
+      return response as NextResponse<T>
     }
   }
 }

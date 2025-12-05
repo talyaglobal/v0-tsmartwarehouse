@@ -140,7 +140,7 @@ export interface InvoiceItem {
 
 // Task Types (Worker Tasks)
 export type TaskStatus = "pending" | "assigned" | "in-progress" | "completed" | "cancelled"
-export type TaskPriority = "low" | "medium" | "high" | "urgent"
+export type TaskPriority = "low" | "normal" | "medium" | "high" | "urgent"
 export type TaskType = "receiving" | "putaway" | "picking" | "packing" | "shipping" | "inventory-check" | "maintenance"
 
 export interface Task {

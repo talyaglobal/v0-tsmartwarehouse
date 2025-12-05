@@ -61,12 +61,14 @@ export function applySecurityHeaders(
 
   // Permissions Policy (formerly Feature-Policy)
   if (config.permissionsPolicy !== false) {
-    const permissionsPolicy = config.permissionsPolicy || [
-      'camera=()',
-      'microphone=()',
-      'geolocation=()',
-      'interest-cohort=()',
-    ].join(', ')
+    const permissionsPolicy = typeof config.permissionsPolicy === 'string' 
+      ? config.permissionsPolicy 
+      : [
+          'camera=()',
+          'microphone=()',
+          'geolocation=()',
+          'interest-cohort=()',
+        ].join(', ')
     response.headers.set('Permissions-Policy', permissionsPolicy)
   }
 

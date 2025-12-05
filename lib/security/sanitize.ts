@@ -147,7 +147,7 @@ export function sanitizeObject<T extends Record<string, any>>(obj: T, options: {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item, options)) as T
+    return obj.map(item => sanitizeObject(item, options)) as unknown as T
   }
 
   const sanitized = {} as T

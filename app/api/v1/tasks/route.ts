@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     // Create task using database function
     const newTask = await createTask({
       ...validatedData,
-      status: validatedData.status || "pending",
+      status: "pending",
     })
 
     const responseData: TaskResponse = {

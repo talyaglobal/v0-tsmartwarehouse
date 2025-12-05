@@ -23,12 +23,16 @@ export function RealtimeIndicator({ className, showLabel = false, size = "md" }:
     <div className={cn("flex items-center gap-1.5", className)}>
       {isConnected ? (
         <>
-          <Wifi className={cn(sizeClasses[size], "text-green-500")} title="Real-time connected" />
+          <span title="Real-time connected">
+            <Wifi className={cn(sizeClasses[size], "text-green-500")} />
+          </span>
           {showLabel && <span className="text-xs text-green-600">Live</span>}
         </>
       ) : (
         <>
-          <WifiOff className={cn(sizeClasses[size], "text-muted-foreground")} title="Real-time disconnected" />
+          <span title="Real-time disconnected">
+            <WifiOff className={cn(sizeClasses[size], "text-muted-foreground")} />
+          </span>
           {showLabel && <span className="text-xs text-muted-foreground">Offline</span>}
         </>
       )}

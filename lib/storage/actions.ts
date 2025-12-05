@@ -32,7 +32,7 @@ export async function uploadFile(
     // Validate file
     const validationError = validateFile(file, {
       maxSizeBytes: options.maxSizeBytes || FILE_SIZE_LIMITS.DEFAULT,
-      allowedMimeTypes: options.allowedMimeTypes || ALLOWED_MIME_TYPES.ALL,
+      allowedMimeTypes: options.allowedMimeTypes || [...ALLOWED_MIME_TYPES.ALL],
     })
 
     if (validationError) {

@@ -4,10 +4,11 @@ import { getCurrentUser } from "@/lib/auth/utils"
 import { apiWrapper } from "@/lib/middleware/api-wrapper"
 import type { NotificationResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
-export const PATCH = apiWrapper(async (
+export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
-) => {
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const user = await getCurrentUser()
 
   if (!user) {
@@ -23,7 +24,7 @@ export const PATCH = apiWrapper(async (
     const { action } = await req.json()
 
     if (action === "mark_read") {
-      await markNotificationAsRead(params.id)
+      await markNotificationAsRead(id)
       const responseData: ApiResponse = {
         success: true,
         message: "Notification marked as read",
@@ -46,12 +47,13 @@ export const PATCH = apiWrapper(async (
     }
     return NextResponse.json(errorData, { status: 500 })
   }
-})
+}
 
-export const DELETE = apiWrapper(async (
+export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
-) => {
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const user = await getCurrentUser()
 
   if (!user) {
@@ -64,7 +66,7 @@ export const DELETE = apiWrapper(async (
   }
 
   try {
-    await deleteNotification(params.id)
+    await deleteNotification(id)
     const responseData: ApiResponse = {
       success: true,
       message: "Notification deleted",
@@ -79,5 +81,5 @@ export const DELETE = apiWrapper(async (
     }
     return NextResponse.json(errorData, { status: 500 })
   }
-})
+}
 

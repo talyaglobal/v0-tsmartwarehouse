@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/utils"
 import { apiWrapper } from "@/lib/middleware/api-wrapper"
 import type { NotificationsListResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
-export const GET = apiWrapper(async (req: NextRequest) => {
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser()
 
   if (!user) {
@@ -48,9 +48,9 @@ export const GET = apiWrapper(async (req: NextRequest) => {
     }
     return NextResponse.json(errorData, { status: 500 })
   }
-})
+}
 
-export const PATCH = apiWrapper(async (req: NextRequest) => {
+export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser()
 
   if (!user) {
@@ -89,5 +89,5 @@ export const PATCH = apiWrapper(async (req: NextRequest) => {
     }
     return NextResponse.json(errorData, { status: 500 })
   }
-})
+}
 

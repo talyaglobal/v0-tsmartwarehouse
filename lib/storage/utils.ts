@@ -79,7 +79,7 @@ export function validateFile(
   }
 
   // Check MIME type
-  if (!allowedMimeTypes.includes(file.type)) {
+  if (!allowedMimeTypes.includes(file.type as any)) {
     return {
       field: 'type',
       message: `File type "${file.type}" is not allowed. Allowed types: ${allowedMimeTypes.join(', ')}`,

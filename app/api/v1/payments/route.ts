@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Customers can only see their own payments
     // Admins can see all payments
     const filters: any = {}
-    if (user.role === "customer") {
+    if (user?.role === "customer") {
       filters.customerId = user.id
     } else if (invoiceId) {
       filters.invoiceId = invoiceId
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
 
     // Only customers can create payments for their own invoices
-    if (user.role !== "customer") {
+    if (user?.role !== "customer") {
       const errorData: ErrorResponse = {
         success: false,
         error: "Only customers can create payments",
