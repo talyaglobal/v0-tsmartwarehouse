@@ -5,6 +5,9 @@ import { WorkerHeader } from "@/components/worker/worker-header"
 import { requireRole } from "@/lib/auth/utils"
 import { ErrorBoundary } from "@/components/error-boundary"
 
+// Force dynamic rendering - requires authentication
+export const dynamic = 'force-dynamic'
+
 export default async function WorkerLayout({
   children,
 }: {

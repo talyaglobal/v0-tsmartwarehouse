@@ -53,7 +53,25 @@ export async function createAuthenticatedSupabaseClient() {
     throw new Error('Missing Supabase environment variables')
   }
 
-  const cookieStore = await cookies()
+  // During build time, cookies() may not be available
+  // Return a client that will fail gracefully
+  let cookieStore
+  try {
+    cookieStore = await cookies()
+  } catch (error) {
+    // During build, create a client without cookies
+    // This will allow the build to complete, but auth will fail at runtime
+    return createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return []
+        },
+        setAll() {
+          // No-op during build
+        },
+      },
+    })
+  }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
