@@ -7,7 +7,7 @@ export const PRICING: PricingConfig = {
   palletOut: 5.0,
   storagePerPalletPerMonth: 17.5,
   // Area Rental (Level 3 only)
-  areaRentalPerSqFtPerYear: 12.0,
+  areaRentalPerSqFtPerYear: 20.0,
   areaRentalMinSqFt: 40000,
   // Volume Discounts
   volumeDiscounts: [

@@ -3,6 +3,9 @@ import { authenticateRequest } from "@/lib/auth/api-middleware"
 import { confirmPayment } from "@/lib/business-logic/payments"
 import type { PaymentResponse, ErrorResponse } from "@/types/api"
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/v1/payments/[id]/confirm
  * Confirm a payment after client-side confirmation

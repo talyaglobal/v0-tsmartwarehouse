@@ -100,7 +100,7 @@ export interface PricingConfig {
   palletOut: number // $5.00
   storagePerPalletPerMonth: number // $17.50
   // Area Rental (Level 3 only)
-  areaRentalPerSqFtPerYear: number // $12.00
+  areaRentalPerSqFtPerYear: number // $20.00
   areaRentalMinSqFt: number // 40,000 sq ft
   // Discounts
   volumeDiscounts: {

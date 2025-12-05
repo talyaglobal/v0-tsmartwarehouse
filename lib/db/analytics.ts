@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCache, setCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
+import { PRICING } from '@/lib/constants'
 
 /**
  * Database operations for Analytics with caching
@@ -414,7 +415,7 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
   const storageEfficiency = 87 // This would be calculated based on actual space usage vs allocated
 
   // Area rental rate
-  const areaRentalRate = 12 // From constants
+  const areaRentalRate = PRICING.areaRentalPerSqFtPerYear
 
   const result: AnalyticsStats = {
     totalRevenue: Math.round(totalRevenue),
