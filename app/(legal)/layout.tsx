@@ -25,8 +25,17 @@ export default function LegalLayout({
         </header>
         <main className="container mx-auto py-12 px-4">{children}</main>
         <footer className="border-t py-6">
-          <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex gap-6">
+                <Link href="/admin" className="hover:text-foreground">
+                  Admin
+                </Link>
+              </div>
+              <div className="text-center">
+                &copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.
+              </div>
+            </div>
           </div>
         </footer>
       </div>

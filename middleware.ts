@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
   if (!supabaseUrl || !supabaseAnonKey) {
     // For public routes, allow access during build
     const pathname = request.nextUrl.pathname
-    const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
+    const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
     const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
     
     if (isPublicRoute || pathname.startsWith('/api')) {
@@ -36,7 +36,12 @@ export async function middleware(request: NextRequest) {
     const isDashboardRoute = pathname.startsWith('/dashboard')
     const isWorkerRoute = pathname.startsWith('/worker')
     
-    if (isAdminRoute || isDashboardRoute || isWorkerRoute) {
+    if (isAdminRoute) {
+      const redirectUrl = new URL('/admin-login', request.url)
+      redirectUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+    if (isDashboardRoute || isWorkerRoute) {
       const redirectUrl = new URL('/login', request.url)
       redirectUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(redirectUrl)

@@ -485,6 +485,11 @@ export default function HomePage() {
                     Privacy Policy
                   </Link>
                 </li>
+                <li>
+                  <Link href="/admin" className="hover:text-foreground">
+                    Admin
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
