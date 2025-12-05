@@ -28,7 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
+  // Check if Supabase environment variables are available
+  const hasSupabaseConfig = !!(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && 
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+
+  const supabase = hasSupabaseConfig ? createClient() : null
 
   const mapSupabaseUser = (supabaseUser: User | null): AuthUser | null => {
     if (!supabaseUser) return null
@@ -46,6 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const refresh = async () => {
+    if (!supabase) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+
     try {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser()
       setUser(mapSupabaseUser(supabaseUser))
@@ -58,10 +70,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    if (!supabase) return
     await supabase.auth.signOut()
   }
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
+
     // Get initial session
     refresh()
 

@@ -1,3 +1,6 @@
+// Force static generation for this page
+export const dynamic = 'force-static'
+
 export default function PrivacyPage() {
   return (
     <div className="prose prose-gray dark:prose-invert max-w-4xl mx-auto">
