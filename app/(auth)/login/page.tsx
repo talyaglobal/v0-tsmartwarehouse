@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "@/components/icons"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Loader2, Eye } from "@/components/icons"
+import { EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -23,10 +25,19 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(message)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
 
   useEffect(() => {
     if (message) {
       setError(message)
+    }
+    // Load saved email from localStorage if remember me was previously checked
+    const savedEmail = localStorage.getItem("rememberedEmail")
+    const savedRememberMe = localStorage.getItem("rememberMe") === "true"
+    if (savedEmail && savedRememberMe) {
+      setEmail(savedEmail)
+      setRememberMe(true)
     }
   }, [message])
 
@@ -48,6 +59,15 @@ export default function LoginPage() {
       }
 
       if (data.user) {
+        // Handle remember me functionality
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", email)
+          localStorage.setItem("rememberMe", "true")
+        } else {
+          localStorage.removeItem("rememberedEmail")
+          localStorage.removeItem("rememberMe")
+        }
+
         // Get user role from profile
         const { data: profile } = await supabase
           .from('profiles')
@@ -108,16 +128,46 @@ export default function LoginPage() {
                 Forgot password?
               </Link>
             </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                disabled={isLoading}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                disabled={isLoading}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember-me"
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
               disabled={isLoading}
             />
+            <Label
+              htmlFor="remember-me"
+              className="text-sm font-normal cursor-pointer"
+            >
+              Remember me
+            </Label>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
