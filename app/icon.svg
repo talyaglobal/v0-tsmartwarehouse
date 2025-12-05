@@ -1,0 +1,7 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black background with rounded corners -->
+  <rect width="64" height="64" rx="12" fill="#000000"/>
+  
+  <!-- White W letter -->
+  <path d="M8 16H14L20 40L32 16H38L50 40L56 16H62L52 48H44L32 24L20 48H12L8 16Z" fill="#FFFFFF"/>
+</svg>
