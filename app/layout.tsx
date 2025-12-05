@@ -37,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}>
+    <html lang="en" className="overflow-x-hidden">
+      <body className={`font-sans antialiased m-0 p-0 overflow-x-hidden`}>
         <ErrorBoundaryWrapper>
           <AuthProvider>
             {children}
