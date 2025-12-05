@@ -6,6 +6,11 @@ let mockClient: any = null
 // Create a mock client that matches the Supabase client interface
 function createMockClient() {
   if (!mockClient) {
+    const errorMessage = 
+      'Supabase client not properly initialized. ' +
+      'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file. ' +
+      'After adding or updating environment variables, restart your development server with: npm run dev'
+    
     mockClient = {
       auth: {
         getUser: async () => ({ data: { user: null }, error: null }),
@@ -14,11 +19,11 @@ function createMockClient() {
         signOut: async () => ({ error: null }),
         signInWithPassword: async () => ({ 
           data: { user: null, session: null }, 
-          error: { message: 'Supabase client not properly initialized. Please check your environment variables.' } 
+          error: { message: errorMessage } 
         }),
         signUp: async () => ({ 
           data: { user: null, session: null }, 
-          error: { message: 'Supabase client not properly initialized. Please check your environment variables.' } 
+          error: { message: errorMessage } 
         }),
         resetPasswordForEmail: async () => ({ error: null }),
       },
@@ -44,8 +49,11 @@ export function createClient() {
         '⚠️ Supabase client not initialized: Missing environment variables.\n' +
         `URL present: ${!!supabaseUrl} (${supabaseUrl ? 'has value' : 'empty'})\n` +
         `Key present: ${!!supabaseAnonKey} (${supabaseAnonKey ? 'has value' : 'empty'})\n` +
-        'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file.\n' +
-        'After adding variables, restart your development server with: npm run dev'
+        '\n💡 Troubleshooting:\n' +
+        '1. Check that .env.local exists and contains NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY\n' +
+        '2. Run: npm run check-env to verify your environment variables\n' +
+        '3. Restart your development server: npm run dev\n' +
+        '   (Next.js embeds NEXT_PUBLIC_* variables at server start time)'
       )
     }
     return createMockClient()
