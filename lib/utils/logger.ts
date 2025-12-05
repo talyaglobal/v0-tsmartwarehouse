@@ -61,26 +61,23 @@ class Logger {
     // Sentry integration
     if (process.env.SENTRY_DSN && typeof window === 'undefined') {
       // Dynamic import to avoid bundling Sentry in client
-      try {
-        import('@sentry/nextjs').then((Sentry) => {
-          if (error) {
-            Sentry.captureException(error, {
-              level: level as any,
-              tags: context,
-              extra: { message },
-            })
-          } else {
-            Sentry.captureMessage(message, {
-              level: level as any,
-              tags: context,
-            })
-          }
-        }).catch(() => {
-          // Sentry not installed or failed to load
-        })
-      } catch (importError) {
-        // Sentry module not found during build
-      }
+      // @ts-expect-error - Sentry is optional and may not be installed
+      import('@sentry/nextjs').then((Sentry: any) => {
+        if (error) {
+          Sentry.captureException(error, {
+            level: level as any,
+            tags: context,
+            extra: { message },
+          })
+        } else {
+          Sentry.captureMessage(message, {
+            level: level as any,
+            tags: context,
+          })
+        }
+      }).catch(() => {
+        // Sentry not installed or failed to load
+      })
     }
   }
 
