@@ -89,12 +89,13 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
+  const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
 
-  // Auth routes (login, register) - redirect if already authenticated
-  const authRoutes = ['/login', '/register']
+  // Auth routes (login, register, admin-login) - redirect if already authenticated
+  const authRoutes = ['/login', '/register', '/admin-login']
   const isAuthRoute = authRoutes.includes(pathname)
+  const isAdminLoginRoute = pathname === '/admin-login'
 
   // Protected routes that require authentication
   const adminRoutes = ['/admin']
@@ -108,7 +109,31 @@ export async function middleware(request: NextRequest) {
 
   // If user is authenticated and tries to access auth pages, redirect to appropriate dashboard
   if (user && isAuthRoute && supabaseUrl && supabaseAnonKey) {
-    const userRole = user.user_metadata?.role || 'customer'
+    // Get role from profile for more accurate role checking
+    let userRole = user.user_metadata?.role || 'customer'
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (profile?.role) {
+        userRole = profile.role
+      }
+    } catch (error) {
+      // If profile fetch fails, use metadata role
+    }
+
+    // Admin login page - redirect admins to admin panel, others to their dashboard
+    if (isAdminLoginRoute) {
+      if (userRole === 'admin') {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      } else {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+    }
+
+    // Regular login/register pages
     if (userRole === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
     } else if (userRole === 'worker') {
@@ -120,14 +145,29 @@ export async function middleware(request: NextRequest) {
 
   // Protected routes - require authentication
   if (!user && (isAdminRoute || isDashboardRoute || isWorkerRoute)) {
-    const redirectUrl = new URL('/login', request.url)
+    // Redirect admin routes to admin login, others to regular login
+    const loginPath = isAdminRoute ? '/admin-login' : '/login'
+    const redirectUrl = new URL(loginPath, request.url)
     redirectUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
   // Role-based access control
   if (user) {
-    const userRole = user.user_metadata?.role || 'customer'
+    // Get role from profile for more accurate role checking
+    let userRole = user.user_metadata?.role || 'customer'
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (profile?.role) {
+        userRole = profile.role
+      }
+    } catch (error) {
+      // If profile fetch fails, use metadata role
+    }
 
     // Admin routes - only admins can access
     if (isAdminRoute && userRole !== 'admin') {
