@@ -10,15 +10,16 @@ const nextConfig = {
     ignoreBuildErrors: false, // Enable type checking in production
   },
   
+  // Server external packages (moved from experimental in Next.js 16)
+  serverExternalPackages: ['@supabase/supabase-js'],
+  
   // Experimental features for performance
   experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'recharts'],
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
     // Enable server actions
     serverActions: {
       bodySizeLimit: '2mb',
     },
-    // Optimize server components
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
   },
   images: {
     // Enable Next.js Image Optimization
