@@ -63,7 +63,7 @@ export default function CustomersPage() {
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.company?.toLowerCase().includes(search.toLowerCase()),
+      (c.companyName && c.companyName.toLowerCase().includes(search.toLowerCase())),
   )
 
   if (loading) {
@@ -141,7 +141,7 @@ export default function CustomersPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{customer.company || "-"}</TableCell>
+                  <TableCell>{customer.companyName || "-"}</TableCell>
                   <TableCell>
                     {customer.membershipTier && (
                       <span

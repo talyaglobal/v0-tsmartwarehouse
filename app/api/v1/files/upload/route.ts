@@ -34,10 +34,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
+    // Determine validation rules based on bucket and folder
+    const isLogoUpload = bucket === 'docs' && folder === 'logo'
+    const maxSizeBytes = isLogoUpload ? 2 * 1024 * 1024 : FILE_SIZE_LIMITS.DEFAULT // 2MB for logos
+    const allowedMimeTypes = isLogoUpload 
+      ? ['image/jpeg', 'image/jpg', 'image/png'] 
+      : [...ALLOWED_MIME_TYPES.ALL]
+
     // Validate file
     const validationError = validateFile(file, {
-      maxSizeBytes: FILE_SIZE_LIMITS.DEFAULT,
-      allowedMimeTypes: [...ALLOWED_MIME_TYPES.ALL],
+      maxSizeBytes,
+      allowedMimeTypes,
     })
 
     if (validationError) {
@@ -53,7 +60,10 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
 
     // Generate file path
-    const filePath = generateFilePath(file.name, folder, user.id)
+    // For logo uploads, use logo folder without user ID prefix
+    const filePath = isLogoUpload
+      ? `logo/${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      : generateFilePath(file.name, folder, user.id)
 
     // Convert File to ArrayBuffer for upload
     const arrayBuffer = await file.arrayBuffer()

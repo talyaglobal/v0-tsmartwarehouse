@@ -15,7 +15,6 @@ const registerSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  company: z.string().optional(),
   phone: z.string().optional(),
   role: z.enum(['customer', 'admin', 'worker']).optional(),
   storageType: z.string().optional(),
@@ -108,7 +107,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const password = formData.get('password') as string
     const confirmPassword = formData.get('confirmPassword') as string
     const name = formData.get('name') as string
-    const company = formData.get('company') as string | null
     const phone = formData.get('phone') as string | null
     const storageType = formData.get('storageType') as string | null
 
@@ -118,7 +116,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       password,
       confirmPassword,
       name,
-      company: company || undefined,
       phone: phone || undefined,
       storageType: storageType || undefined,
     })
@@ -154,7 +151,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       email_confirm: true, // Auto-confirm email (no verification needed)
       user_metadata: {
         name: validation.data.name,
-        company: validation.data.company || null,
         phone: validation.data.phone || null,
         role: 'customer', // Default role for new users
         storage_interest: validation.data.storageType || null,
@@ -203,13 +199,74 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Request password reset (DISABLED - Email sending disabled)
+ * Request password reset via email
  */
-export async function requestPasswordReset(_formData: FormData): Promise<{ error?: AuthError }> {
-  return {
-    error: {
-      message: 'Password reset via email is currently disabled. Please contact support.',
-    },
+export async function requestPasswordReset(formData: FormData): Promise<{ error?: AuthError }> {
+  try {
+    const email = formData.get('email') as string
+
+    if (!email) {
+      return {
+        error: {
+          message: 'Email is required',
+          field: 'email',
+        },
+      }
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return {
+        error: {
+          message: 'Invalid email address',
+          field: 'email',
+        },
+      }
+    }
+
+    // Use unauthenticated client for password reset (no auth required)
+    const supabase = createServerSupabaseClient()
+    
+    // Get the site URL for redirect
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
+    const redirectUrl = `${siteUrl}/reset-password`
+
+    console.log('Sending password reset email to:', email)
+    console.log('Redirect URL:', redirectUrl)
+
+    // Send password reset email
+    // Supabase will only send email if user exists (for security)
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    })
+
+    console.log('Password reset response:', { data, error })
+
+    if (error) {
+      // Log the error for debugging
+      console.error('Password reset error:', error)
+      
+      // Check for specific errors that we should show
+      if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
+        return {
+          error: {
+            message: 'Too many requests. Please try again later.',
+          },
+        }
+      }
+      
+      // For other errors, don't reveal if email exists or not for security
+      // But log it for debugging
+      // Return success anyway to prevent email enumeration
+    }
+
+    // Always return success (don't reveal if email exists)
+    return undefined
+  } catch (error) {
+    console.error('Password reset request error:', error)
+    // Return success anyway to prevent email enumeration
+    return undefined
   }
 }
 

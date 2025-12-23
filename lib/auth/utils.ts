@@ -7,7 +7,6 @@ export interface AuthUser {
   name?: string
   role: UserRole
   phone?: string
-  company?: string
   avatar?: string
   emailVerified?: boolean
 }
@@ -33,7 +32,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       name: user.user_metadata?.name || user.user_metadata?.full_name,
       role: (user.user_metadata?.role as UserRole) || 'customer',
       phone: user.user_metadata?.phone,
-      company: user.user_metadata?.company,
       avatar: user.user_metadata?.avatar_url,
       emailVerified: user.email_confirmed_at !== null,
     }

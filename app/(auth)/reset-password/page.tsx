@@ -23,6 +23,38 @@ export default function ResetPasswordPage() {
     // Check if we have a valid reset token in the URL
     const checkToken = async () => {
       const supabase = createClient()
+      
+      // Check for token in URL hash (Supabase sends it here)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const type = hashParams.get('type')
+      const refreshToken = hashParams.get('refresh_token')
+
+      // Also check query params (some configurations use this)
+      const searchParams = new URLSearchParams(window.location.search)
+      const queryToken = searchParams.get('token')
+      const queryType = searchParams.get('type')
+
+      if ((accessToken && type === 'recovery') || (queryToken && queryType === 'recovery')) {
+        try {
+          // Set session from the recovery token
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+            
+            if (!sessionError) {
+              setIsValidToken(true)
+              return
+            }
+          }
+        } catch (error) {
+          console.error('Error setting session:', error)
+        }
+      }
+
+      // Fallback: check if we already have a valid session
       const { data: { session } } = await supabase.auth.getSession()
       setIsValidToken(!!session)
     }
@@ -69,8 +101,11 @@ export default function ResetPasswordPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 text-sm bg-muted rounded-md">
+            <p className="mb-2">
+              This password reset link is invalid or has expired. Password reset links expire after 24 hours.
+            </p>
             <p>
-              This password reset link is invalid or has expired. Please request a new password reset link.
+              Please request a new password reset link to continue.
             </p>
           </div>
           <div className="flex flex-col space-y-2">

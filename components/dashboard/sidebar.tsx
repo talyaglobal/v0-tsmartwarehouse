@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
@@ -37,6 +38,7 @@ const navigation = [
 export function DashboardSidebar() {
   const pathname = usePathname()
   const { user } = useUser()
+  const [logoError, setLogoError] = useState(false)
 
   // Fetch pending bookings count
   const { data: pendingCount = 0 } = useQuery({
@@ -70,7 +72,7 @@ export function DashboardSidebar() {
     refetchInterval: 60 * 1000, // Refetch every minute
   })
 
-  // Fetch user profile (name and membership tier)
+  // Fetch user profile (name, membership tier, company, and logo)
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
@@ -78,7 +80,7 @@ export function DashboardSidebar() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('profiles')
-        .select('name, membership_tier')
+        .select('name, membership_tier, company_id, companies(id, name, logo_url)')
         .eq('id', user.id)
         .single()
       
@@ -87,21 +89,41 @@ export function DashboardSidebar() {
         return null
       }
       
+      const company = data?.companies ? (Array.isArray(data.companies) ? data.companies[0] : data.companies) : null
+      
       return {
         name: data?.name || user.email?.split('@')[0] || 'User',
         membershipTier: (data?.membership_tier as MembershipTier) || 'bronze',
+        company: company?.name || null,
+        companyLogo: company?.logo_url || null,
       }
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
+  // Reset logo error when profile changes
+  useEffect(() => {
+    setLogoError(false)
+  }, [profile?.companyLogo])
+
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <Warehouse className="h-6 w-6 text-primary" />
-        <span className="font-bold">TSmart</span>
+        {profile?.companyLogo && !logoError ? (
+          <img 
+            src={profile.companyLogo} 
+            alt={profile?.company || 'Company logo'} 
+            className="h-8 w-8 object-contain rounded"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <Warehouse className="h-6 w-6 text-primary" />
+        )}
+        <span className="font-bold">
+          {profile?.company || 'TSmart'}
+        </span>
       </div>
 
       {/* New Booking Button */}

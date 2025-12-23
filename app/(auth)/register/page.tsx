@@ -23,7 +23,6 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    company: "",
     phone: "",
     password: "",
     confirmPassword: "",
@@ -52,7 +51,6 @@ export default function RegisterPage() {
     formDataToSubmit.append('password', formData.password)
     formDataToSubmit.append('confirmPassword', formData.confirmPassword)
     formDataToSubmit.append('name', formData.name)
-    if (formData.company) formDataToSubmit.append('company', formData.company)
     if (formData.phone) formDataToSubmit.append('phone', formData.phone)
     if (formData.storageType) formDataToSubmit.append('storageType', formData.storageType)
 
@@ -93,28 +91,16 @@ export default function RegisterPage() {
               {error}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input
-                id="company"
-                placeholder="Acme Corp"
-                value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                disabled={isLoading}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name</Label>
+            <Input
+              id="name"
+              placeholder="John Doe"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+              disabled={isLoading}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

@@ -37,21 +37,23 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // Email sending is disabled - show error message instead
   if (success) {
     return (
       <Card>
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Password Reset Unavailable</CardTitle>
-          <CardDescription>Email sending is currently disabled</CardDescription>
+          <CardTitle className="text-2xl">Check your email</CardTitle>
+          <CardDescription>We've sent you a password reset link</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 text-sm bg-muted rounded-md">
             <p className="mb-2">
-              Password reset via email is currently disabled.
+              If an account with the email <strong>{email}</strong> exists, you will receive a password reset link.
             </p>
-            <p>
-              Please contact support to reset your password.
+            <p className="mb-2">
+              Please check your inbox and click the link to reset your password.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The link will expire in 24 hours. If you don't see the email, check your spam folder.
             </p>
           </div>
           <Link href="/login">
@@ -68,7 +70,7 @@ export default function ForgotPasswordPage() {
     <Card>
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl">Forgot password</CardTitle>
-        <CardDescription>Password reset via email is currently disabled</CardDescription>
+        <CardDescription>Enter your email address and we'll send you a reset link</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">

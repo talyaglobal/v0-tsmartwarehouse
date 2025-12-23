@@ -1,5 +1,7 @@
 "use client"
 
+import { useState, useEffect, useRef } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,9 +10,346 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { User, Building2, Shield, Bell, Save } from "@/components/icons"
+import { User, Building2, Shield, Bell, Save, Loader2, Upload, X } from "@/components/icons"
+import { useUser } from "@/lib/hooks/use-user"
+import { createClient } from "@/lib/supabase/client"
+import { useUIStore } from "@/stores/ui.store"
+import { api } from "@/lib/api/client"
+
+interface Company {
+  id: string
+  name: string
+  logo_url: string | null
+  vat: string | null
+  address: string | null
+  postal_code: string | null
+  city: string | null
+  country: string | null
+}
 
 export default function SettingsPage() {
+  const { user } = useUser()
+  const queryClient = useQueryClient()
+  const { addNotification } = useUIStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    phone: "",
+  })
+  const [companyForm, setCompanyForm] = useState({
+    name: "",
+    vat: "",
+    address: "",
+    postalCode: "",
+    city: "",
+    country: "",
+    logoUrl: "",
+  })
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  // Fetch user profile with company
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user) return null
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name, phone, company_id, email, companies(id, name, logo_url, vat, address, postal_code, city, country)')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return null
+      }
+      
+      return data
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Update form when profile loads
+  useEffect(() => {
+    if (profile) {
+      setProfileForm({
+        name: profile.name || "",
+        phone: profile.phone || "",
+      })
+      
+      // Set company form if company exists
+      if (profile.companies) {
+        const company = Array.isArray(profile.companies) ? profile.companies[0] : profile.companies
+        if (company) {
+          setCompanyForm({
+            name: company.name || "",
+            vat: company.vat || "",
+            address: company.address || "",
+            postalCode: company.postal_code || "",
+            city: company.city || "",
+            country: company.country || "",
+            logoUrl: company.logo_url || "",
+          })
+        }
+      }
+    }
+  }, [profile])
+
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (updates: { name?: string; phone?: string }) => {
+      if (!user) throw new Error('User not found')
+      
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single()
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
+      addNotification({
+        type: 'success',
+        message: 'Profile updated successfully',
+        duration: 5000,
+      })
+    },
+    onError: (error: Error) => {
+      addNotification({
+        type: 'error',
+        message: error.message || 'Failed to update profile',
+        duration: 5000,
+      })
+    },
+  })
+
+  // Update company mutation
+  const updateCompanyMutation = useMutation({
+    mutationFn: async ({ companyId, updates }: { companyId: string; updates: Partial<Company> }) => {
+      const result = await api.patch<Company>(`/api/v1/companies/${companyId}`, updates, {
+        successMessage: 'Company updated successfully',
+        errorMessage: 'Failed to update company',
+      })
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to update company')
+      }
+      return result.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companies'] })
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
+      addNotification({
+        type: 'success',
+        message: 'Company updated successfully',
+        duration: 5000,
+      })
+    },
+    onError: (error: Error) => {
+      addNotification({
+        type: 'error',
+        message: error.message || 'Failed to update company',
+        duration: 5000,
+      })
+    },
+  })
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSaving(true)
+    
+    try {
+      await updateProfileMutation.mutateAsync({
+        name: profileForm.name || null,
+        phone: profileForm.phone || null,
+      })
+    } catch (error) {
+      console.error('Error updating profile:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCompanySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!profile?.company_id) {
+      addNotification({
+        type: 'error',
+        message: 'No company associated with your profile',
+        duration: 5000,
+      })
+      return
+    }
+
+    setIsSaving(true)
+    
+    try {
+      await updateCompanyMutation.mutateAsync({
+        companyId: profile.company_id,
+        updates: {
+          name: companyForm.name || null,
+          vat: companyForm.vat || null,
+          address: companyForm.address || null,
+          postal_code: companyForm.postalCode || null,
+          city: companyForm.city || null,
+          country: companyForm.country || null,
+          logo_url: companyForm.logoUrl || null,
+        },
+      })
+    } catch (error) {
+      console.error('Error updating company:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      addNotification({
+        type: 'error',
+        message: 'Please fill in all password fields',
+        duration: 5000,
+      })
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      addNotification({
+        type: 'error',
+        message: "New passwords don't match",
+        duration: 5000,
+      })
+      return
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      addNotification({
+        type: 'error',
+        message: 'Password must be at least 6 characters',
+        duration: 5000,
+      })
+      return
+    }
+
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      addNotification({
+        type: 'error',
+        message: 'New password must be different from current password',
+        duration: 5000,
+      })
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      const result = await api.post('/api/v1/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+        confirmPassword: passwordForm.confirmPassword,
+      }, {
+        successMessage: 'Password updated successfully',
+        errorMessage: 'Failed to update password',
+      })
+
+      if (result.success) {
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        })
+      }
+    } catch (error) {
+      console.error('Error changing password:', error)
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+      addNotification({
+        type: 'error',
+        message: 'Only JPEG and PNG images are allowed',
+        duration: 5000,
+      })
+      return
+    }
+
+    // Validate file size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      addNotification({
+        type: 'error',
+        message: 'File size must be less than 2MB',
+        duration: 5000,
+      })
+      return
+    }
+
+    setIsUploadingLogo(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('bucket', 'docs')
+      formData.append('folder', 'logo')
+
+      const result = await api.post('/api/v1/files/upload', formData, {
+        showToast: true,
+        successMessage: 'Logo uploaded successfully',
+        errorMessage: 'Failed to upload logo',
+      })
+
+      if (result.success && result.data?.url) {
+        setCompanyForm({ ...companyForm, logoUrl: result.data.url })
+        addNotification({
+          type: 'success',
+          message: 'Logo uploaded successfully. Click "Save Changes" to update the company.',
+          duration: 5000,
+        })
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error)
+    } finally {
+      setIsUploadingLogo(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  const company = profile?.companies ? (Array.isArray(profile.companies) ? profile.companies[0] : profile.companies) : null
+
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage your account preferences" />
@@ -32,29 +371,53 @@ export default function SettingsPage() {
               </div>
               <CardDescription>Update your personal details</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" defaultValue="Sarah Johnson" />
+            <CardContent>
+              <form onSubmit={handleProfileSubmit} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input
+                      id="name"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={profile?.email || user?.email || ""}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                      placeholder="+1 555-0101"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="customer@example.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" defaultValue="+1 555-0101" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="title">Job Title</Label>
-                  <Input id="title" defaultValue="Operations Manager" />
-                </div>
-              </div>
-              <Button>
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
-              </Button>
+                <Button type="submit" disabled={isSaving || updateProfileMutation.isPending}>
+                  {isSaving || updateProfileMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
@@ -68,39 +431,147 @@ export default function SettingsPage() {
               </div>
               <CardDescription>Your business information</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="company">Company Name</Label>
-                  <Input id="company" defaultValue="Acme Corp" />
+            <CardContent>
+              {!company ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No company associated with your profile.</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tax-id">Tax ID / EIN</Label>
-                  <Input id="tax-id" defaultValue="XX-XXXXXXX" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" defaultValue="123 Business Ave" />
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" defaultValue="New York" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input id="state" defaultValue="NY" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="zip">ZIP Code</Label>
-                  <Input id="zip" defaultValue="10001" />
-                </div>
-              </div>
-              <Button>
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
-              </Button>
+              ) : (
+                <form onSubmit={handleCompanySubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="company-name">Company Name</Label>
+                    <Input
+                      id="company-name"
+                      value={companyForm.name}
+                      onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
+                      placeholder="Enter your company name"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="vat">VAT Number</Label>
+                      <Input
+                        id="vat"
+                        value={companyForm.vat}
+                        onChange={(e) => setCompanyForm({ ...companyForm, vat: e.target.value })}
+                        placeholder="VAT/Tax ID"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postal-code">Postal Code</Label>
+                      <Input
+                        id="postal-code"
+                        value={companyForm.postalCode}
+                        onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })}
+                        placeholder="Postal Code"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      value={companyForm.address}
+                      onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
+                      placeholder="Street address"
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={companyForm.city}
+                        onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })}
+                        placeholder="City"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Input
+                        id="country"
+                        value={companyForm.country}
+                        onChange={(e) => setCompanyForm({ ...companyForm, country: e.target.value })}
+                        placeholder="Country"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="logo">Company Logo</Label>
+                    <div className="flex items-center gap-4">
+                      {companyForm.logoUrl && (
+                        <div className="relative">
+                          <img
+                            src={companyForm.logoUrl}
+                            alt="Company logo"
+                            className="h-20 w-20 object-contain border rounded"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                            onClick={() => setCompanyForm({ ...companyForm, logoUrl: "" })}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <Input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png"
+                          onChange={handleLogoUpload}
+                          disabled={isUploadingLogo}
+                          className="hidden"
+                          id="logo-upload"
+                        />
+                        <Label htmlFor="logo-upload" className="cursor-pointer">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploadingLogo}
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            {isUploadingLogo ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Upload Logo
+                              </>
+                            )}
+                          </Button>
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          JPEG or PNG, max 2MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <Button type="submit" disabled={isSaving || updateCompanyMutation.isPending}>
+                    {isSaving || updateCompanyMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -115,24 +586,65 @@ export default function SettingsPage() {
               <CardDescription>Manage your account security</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="font-medium">Change Password</h4>
-                <div className="grid gap-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label htmlFor="current-password">Current Password</Label>
-                    <Input id="current-password" type="password" />
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div className="space-y-4">
+                  <h4 className="font-medium">Change Password</h4>
+                  <div className="grid gap-4 max-w-md">
+                    <div className="space-y-2">
+                      <Label htmlFor="current-password">Current Password</Label>
+                      <Input
+                        id="current-password"
+                        type="password"
+                        value={passwordForm.currentPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                        required
+                        disabled={isChangingPassword}
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">New Password</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        required
+                        disabled={isChangingPassword}
+                        autoComplete="new-password"
+                        minLength={6}
+                      />
+                      <p className="text-xs text-muted-foreground">Password must be at least 6 characters</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">Confirm New Password</Label>
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                        required
+                        disabled={isChangingPassword}
+                        autoComplete="new-password"
+                        minLength={6}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input id="new-password" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input id="confirm-password" type="password" />
-                  </div>
+                  <Button type="submit" disabled={isChangingPassword}>
+                    {isChangingPassword ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Update Password
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button>Update Password</Button>
-              </div>
+              </form>
               <Separator />
               <div className="flex items-center justify-between">
                 <div>

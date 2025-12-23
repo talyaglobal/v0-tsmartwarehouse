@@ -9,7 +9,8 @@ export interface User {
   email: string
   name: string
   role: UserRole
-  company?: string
+  companyId?: string
+  companyName?: string
   phone?: string
   avatar?: string
   membershipTier?: MembershipTier

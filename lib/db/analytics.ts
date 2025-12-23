@@ -353,7 +353,7 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
 
   // Get total customers
   const { data: customers, error: customersError } = await supabase
-    .from('users')
+    .from('profiles')
     .select('id')
     .eq('role', 'customer')
 
