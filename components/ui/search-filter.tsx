@@ -1,11 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, X, Filter } from "@/components/icons"
+import { Search, X } from "@/components/icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { debounce } from "@/lib/utils/search"
 
 interface SearchFilterProps {
@@ -34,7 +32,6 @@ export function SearchFilter({
 }: SearchFilterProps) {
   const [searchQuery, setSearchQuery] = useState(value)
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({})
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   // Debounced search
   const debouncedSearch = debounce((query: string) => {
@@ -48,19 +45,6 @@ export function SearchFilter({
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value
     setSearchQuery(query)
-  }
-
-  const handleFilterChange = (key: string, value: any) => {
-    const newFilters = { ...activeFilters }
-    
-    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
-      delete newFilters[key]
-    } else {
-      newFilters[key] = value
-    }
-
-    setActiveFilters(newFilters)
-    onFilterChange?.(newFilters)
   }
 
   const clearFilters = () => {
@@ -112,38 +96,5 @@ export function SearchFilter({
       )}
     </div>
   )
-}
-
-function FilterField({
-  filter,
-  value,
-  onChange,
-}: {
-  filter: FilterOption
-  value: any
-  onChange: (value: any) => void
-}) {
-  if (filter.type === 'select' && filter.options) {
-    return (
-      <div className="space-y-2">
-        <Label>{filter.label}</Label>
-        <select
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value || null)}
-        >
-          <option value="">All</option>
-          {filter.options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    )
-  }
-
-  // Add more filter types as needed (multi-select, date, etc.)
-  return null
 }
 

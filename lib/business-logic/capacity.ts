@@ -1,5 +1,4 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { WAREHOUSE_CONFIG } from "@/lib/constants"
 import type { BookingType } from "@/types"
 
 /**
@@ -36,30 +35,11 @@ export interface WarehouseCapacity {
  * Check if warehouse has capacity for a pallet booking
  */
 export async function checkPalletCapacity(
-  warehouseId: string,
+  _warehouseId: string,
   requiredPallets: number,
   zoneType?: "pallet" | "cold-storage" | "hazmat"
 ): Promise<CapacityCheck> {
   const supabase = createServerSupabaseClient()
-
-  // Get all active pallet bookings
-  const { data: activeBookings, error: bookingsError } = await supabase
-    .from("bookings")
-    .select("pallet_count")
-    .eq("warehouse_id", warehouseId)
-    .eq("type", "pallet")
-    .in("status", ["pending", "confirmed", "active"])
-
-  if (bookingsError) {
-    throw new Error(`Failed to check capacity: ${bookingsError.message}`)
-  }
-
-  // Calculate total occupied slots
-  const occupiedSlots =
-    activeBookings?.reduce(
-      (sum, booking) => sum + (booking.pallet_count || 0),
-      0
-    ) || 0
 
   // Get total capacity from zones
   const { data: zones, error: zonesError } = await supabase
@@ -71,7 +51,6 @@ export async function checkPalletCapacity(
     throw new Error(`Failed to fetch zones: ${zonesError.message}`)
   }
 
-  const totalSlots = zones?.reduce((sum, zone) => sum + (zone.total_slots || 0), 0) || 0
   const availableSlots = zones?.reduce((sum, zone) => sum + (zone.available_slots || 0), 0) || 0
 
   // Check if we have enough capacity
@@ -119,19 +98,6 @@ export async function checkAreaRentalCapacity(
     throw new Error(`Failed to fetch floor: ${floorsError?.message}`)
   }
 
-  // Get active area rental bookings on this floor
-  const { data: activeBookings, error: bookingsError } = await supabase
-    .from("bookings")
-    .select("area_sq_ft, hall_id")
-    .eq("warehouse_id", warehouseId)
-    .eq("type", "area-rental")
-    .eq("floor_number", targetFloor)
-    .in("status", ["pending", "confirmed", "active"])
-
-  if (bookingsError) {
-    throw new Error(`Failed to check capacity: ${bookingsError.message}`)
-  }
-
   // Get halls on floor 3
   const { data: halls, error: hallsError } = await supabase
     .from("warehouse_halls")
@@ -142,8 +108,6 @@ export async function checkAreaRentalCapacity(
     throw new Error(`Failed to fetch halls: ${hallsError.message}`)
   }
 
-  const totalSqFt = halls?.reduce((sum, hall) => sum + hall.sq_ft, 0) || 0
-  const occupiedSqFt = halls?.reduce((sum, hall) => sum + hall.occupied_sq_ft, 0) || 0
   const availableSqFt = halls?.reduce((sum, hall) => sum + hall.available_sq_ft, 0) || 0
 
   // Check if we have enough capacity
@@ -224,7 +188,7 @@ export async function getWarehouseCapacity(
  * This should be called when a booking is confirmed
  */
 export async function reserveCapacity(
-  warehouseId: string,
+  _warehouseId: string,
   type: BookingType,
   amount: number, // pallet count or sq ft
   hallId?: string
@@ -294,7 +258,7 @@ export async function reserveCapacity(
  * Release capacity when a booking is cancelled or completed
  */
 export async function releaseCapacity(
-  warehouseId: string,
+  _warehouseId: string,
   type: BookingType,
   amount: number,
   hallId?: string,

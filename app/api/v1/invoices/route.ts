@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
       validatedParams = invoicesQuerySchema.parse(queryParams)
     } catch (error) {
       if (error && typeof error === "object" && "issues" in error) {
-        const zodError = error as { issues: Array<{ path: string[]; message: string }> }
         const errorData: ErrorResponse = {
           success: false,
           error: "Invalid query parameters",

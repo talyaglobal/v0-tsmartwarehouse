@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, getClientIdentifier, RATE_LIMIT_PRESETS } from './rate-limit'
 import { applyCorsHeaders, handleCorsPreflight } from './cors'
-import { logger, handleApiError, AppError } from '@/lib/utils/logger'
+import { handleApiError } from '@/lib/utils/logger'
 import { requireAuth, requireRole } from '@/lib/auth/api-middleware'
 import { validateCsrfToken } from '@/lib/security/csrf'
 import { applySecurityHeaders } from '@/lib/security/headers'

@@ -276,7 +276,6 @@ function FileItem({
   onRemove: () => void
   disabled?: boolean
 }) {
-  const isImage = file.preview || (file.file.type.startsWith('image/'))
   const Icon = isImageFile(file.file.type) ? ImageIcon : FileText
 
   return (

@@ -289,7 +289,7 @@ export class NotificationService {
     channel: NotificationChannel,
     options: NotificationOptions,
     userInfo: any,
-    preferences: any
+    _preferences: any
   ): Promise<ChannelResult> {
     try {
       switch (channel) {

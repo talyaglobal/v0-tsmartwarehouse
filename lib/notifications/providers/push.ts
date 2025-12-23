@@ -40,12 +40,10 @@ export interface PushResult {
 export class WebPushProvider implements PushProvider {
   private vapidPublicKey: string
   private vapidPrivateKey: string
-  private vapidSubject: string
 
   constructor() {
     this.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || ""
     this.vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ""
-    this.vapidSubject = process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_SITE_URL || "mailto:notifications@tsmart.com"
 
     if (!this.vapidPublicKey || !this.vapidPrivateKey) {
       console.warn("VAPID keys not configured. Push notifications will be disabled.")

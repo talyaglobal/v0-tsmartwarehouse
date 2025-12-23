@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic"
 import { Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCurrency } from "@/lib/utils/format"
 
 // Dynamically import recharts components to reduce initial bundle size
 const RevenueChartContent = dynamic(

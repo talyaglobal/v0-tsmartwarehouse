@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { unstable_cache } from 'next/cache'
-import { getCache, setCache, generateCacheKey, CACHE_TTL } from './redis'
+import { getCache, setCache, CACHE_TTL } from './redis'
 
 /**
  * API response caching utilities

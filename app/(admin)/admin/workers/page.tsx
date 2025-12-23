@@ -55,7 +55,7 @@ export default function WorkersPage() {
     return { shifts: 0, completedTasks, totalHours: 0 }
   }
 
-  const isOnShift = (workerId: string) => {
+  const isOnShift = (_workerId: string) => {
     // Note: This would need to check worker_shifts table
     return false
   }

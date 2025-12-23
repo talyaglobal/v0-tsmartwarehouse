@@ -52,18 +52,33 @@ class MemoryRateLimiter {
 // Create rate limiter instance
 let rateLimiter: Ratelimit | MemoryRateLimiter
 
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  // Production: Use Upstash Redis
-  const redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  })
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
 
-  rateLimiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(10, '10 s'), // 10 requests per 10 seconds by default
-    analytics: true,
-  })
+// Check if Redis URL is valid (not a placeholder)
+const isValidRedisUrl = redisUrl && 
+  typeof redisUrl === 'string' && 
+  redisUrl.trim() !== '' && 
+  (redisUrl.startsWith('https://') || redisUrl.startsWith('http://')) &&
+  !redisUrl.includes('your-upstash-redis-url')
+
+if (isValidRedisUrl && redisToken) {
+  try {
+    // Production: Use Upstash Redis
+    const redis = new Redis({
+      url: redisUrl,
+      token: redisToken,
+    })
+
+    rateLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, '10 s'), // 10 requests per 10 seconds by default
+      analytics: true,
+    })
+  } catch (error) {
+    console.warn('Failed to initialize Redis rate limiter, using in-memory limiter:', error)
+    rateLimiter = new MemoryRateLimiter()
+  }
 } else {
   // Development: Use in-memory rate limiter
   rateLimiter = new MemoryRateLimiter()

@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createTask, getTasks, updateTask } from "@/lib/db/tasks"
 import { getNotificationService } from "@/lib/notifications/service"
-import type { Task, TaskType, TaskPriority, TaskStatus } from "@/types"
+import type { Task, TaskType, TaskPriority } from "@/types"
 
 /**
  * Business Logic: Task Assignment Algorithms
@@ -117,7 +117,7 @@ export async function createAndAssignTask(
  * Get available workers for a task type
  */
 async function getAvailableWorkers(
-  warehouseId: string,
+  _warehouseId: string,
   taskType: TaskType
 ): Promise<WorkerAvailability[]> {
   const supabase = createServerSupabaseClient()
@@ -176,7 +176,7 @@ async function getAvailableWorkers(
 function selectBestWorker(
   availableWorkers: WorkerAvailability[],
   taskType: TaskType,
-  taskLocation?: string
+  _taskLocation?: string
 ): WorkerAvailability {
   if (availableWorkers.length === 0) {
     throw new Error("No available workers")
@@ -230,7 +230,7 @@ function calculateWorkloadScore(
 /**
  * Get worker skills (simplified - in production, this would query a skills table)
  */
-function getWorkerSkills(workerId: string, taskType: TaskType): TaskType[] {
+function getWorkerSkills(_workerId: string, _taskType: TaskType): TaskType[] {
   // In production, this would query a worker_skills table
   // For now, return all task types (workers are assumed to be generalists)
   return [
@@ -324,7 +324,7 @@ export async function autoAssignPendingTasks(
  * Reassigns tasks from overloaded workers to underloaded workers
  */
 export async function balanceWorkload(
-  warehouseId: string
+  _warehouseId: string
 ): Promise<{ reassigned: number; errors: string[] }> {
   const supabase = createServerSupabaseClient()
 

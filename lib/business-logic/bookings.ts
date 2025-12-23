@@ -1,5 +1,4 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { PRICING } from "@/lib/constants"
 import { checkPalletCapacity, checkAreaRentalCapacity, reserveCapacity } from "./capacity"
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
 import { getBookings, createBooking, updateBooking } from "@/lib/db/bookings"
@@ -47,8 +46,6 @@ export interface CreateBookingResult {
 export async function createBookingWithAvailability(
   input: CreateBookingInput
 ): Promise<CreateBookingResult> {
-  const supabase = createServerSupabaseClient()
-
   // Step 1: Check capacity
   let capacityCheck
   if (input.type === "pallet") {

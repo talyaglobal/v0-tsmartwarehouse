@@ -8,7 +8,7 @@ export interface SearchOptions {
   caseSensitive?: boolean
 }
 
-export interface FilterOptions<T> {
+export interface FilterOptions {
   [key: string]: string | string[] | number | number[] | boolean | null | undefined
 }
 
@@ -46,7 +46,7 @@ export function search<T extends Record<string, any>>(
  */
 export function filter<T extends Record<string, any>>(
   items: T[],
-  filters: FilterOptions<T>
+  filters: FilterOptions
 ): T[] {
   return items.filter((item) => {
     return Object.entries(filters).every(([key, filterValue]) => {
@@ -75,7 +75,7 @@ export function filter<T extends Record<string, any>>(
 export function searchAndFilter<T extends Record<string, any>>(
   items: T[],
   query?: string,
-  filters?: FilterOptions<T>,
+  filters?: FilterOptions,
   searchOptions?: SearchOptions
 ): T[] {
   let result = items

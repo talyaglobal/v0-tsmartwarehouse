@@ -53,7 +53,7 @@ export async function uploadFile(
     const fileBuffer = Buffer.from(arrayBuffer)
 
     // Upload file
-    const { data, error } = await supabase.storage.from(bucket).upload(filePath, fileBuffer, {
+    const { error } = await supabase.storage.from(bucket).upload(filePath, fileBuffer, {
       contentType: file.type,
       upsert: false,
     })

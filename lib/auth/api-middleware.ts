@@ -6,7 +6,7 @@ import type { UserRole } from '@/types'
 /**
  * Get the authenticated user from the request
  */
-export async function getAuthUser(request: NextRequest) {
+export async function getAuthUser(_request: NextRequest) {
   try {
     const supabase = await createClient()
     const {

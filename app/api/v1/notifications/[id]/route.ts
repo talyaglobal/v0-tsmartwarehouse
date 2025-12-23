@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { markNotificationAsRead, deleteNotification } from "@/lib/db/notifications"
 import { getCurrentUser } from "@/lib/auth/utils"
-import { apiWrapper } from "@/lib/middleware/api-wrapper"
-import type { NotificationResponse, ErrorResponse, ApiResponse } from "@/types/api"
+import type { ErrorResponse, ApiResponse } from "@/types/api"
 
 export async function PATCH(
   req: NextRequest,
@@ -50,7 +49,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params

@@ -49,10 +49,6 @@ export async function generateBookingInvoice(
     throw new Error("Booking not found")
   }
 
-  // Get customer's existing pallet count for membership calculation
-  const existingBookings = await getInvoices({
-    customerId: input.customerId,
-  })
   // This is simplified - in production, you'd get active bookings
   const existingPalletCount = 0
 

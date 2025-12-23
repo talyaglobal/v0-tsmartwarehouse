@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
       validatedData = createClaimSchema.parse(body)
     } catch (error) {
       if (error && typeof error === "object" && "issues" in error) {
-        const zodError = error as { issues: Array<{ path: string[]; message: string }> }
         const errorData: ErrorResponse = {
           success: false,
           error: "Validation error",

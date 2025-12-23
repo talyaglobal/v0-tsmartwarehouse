@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/utils"
 import { apiWrapper } from "@/lib/middleware/api-wrapper"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
 
-export const GET = apiWrapper(async (req: NextRequest) => {
+export const GET = apiWrapper(async (_req: NextRequest) => {
   const user = await getCurrentUser()
 
   if (!user) {

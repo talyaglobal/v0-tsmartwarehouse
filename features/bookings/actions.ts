@@ -6,14 +6,13 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createBooking, getBookings, updateBooking, deleteBooking } from '@/lib/db/bookings'
+import { createBooking, getBookings, updateBooking } from '@/lib/db/bookings'
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth/utils'
 import { success, failure, type Result } from '@/lib/shared/result'
 import { PRICING } from '@/lib/constants'
-import type { Booking, BookingStatus, BookingType } from '@/types'
+import type { Booking } from '@/types'
 
 // Validation schemas
 const createBookingSchema = z.object({
@@ -92,7 +91,7 @@ export async function createBookingAction(
       status: 'pending',
       palletCount: validated.type === 'pallet' ? validated.palletCount : undefined,
       areaSqFt: validated.type === 'area-rental' ? validated.areaSqFt : undefined,
-      floorNumber: validated.type === 'area-rental' ? validated.floorNumber || 3 : undefined,
+      floorNumber: validated.type === 'area-rental' ? (validated.floorNumber ?? 3) as 3 : undefined,
       hallId: validated.type === 'area-rental' ? validated.hallId : undefined,
       startDate: validated.startDate,
       endDate: validated.endDate || undefined,

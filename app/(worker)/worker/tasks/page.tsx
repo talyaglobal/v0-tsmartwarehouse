@@ -15,7 +15,7 @@ import type { TaskStatus } from "@/types"
 export default function WorkerTasksPage() {
   const [filter, setFilter] = useState<"all" | TaskStatus>("all")
   const { user } = useUser()
-  const { tasks, isConnected, error } = useRealtimeTasks(user?.id)
+  const { tasks, isConnected } = useRealtimeTasks(user?.id)
 
   const filteredTasks = useMemo(() => {
     if (filter === "all") return tasks

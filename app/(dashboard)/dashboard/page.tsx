@@ -60,7 +60,6 @@ export default function CustomerDashboardPage() {
   const activeBookings = bookings.filter((b) => b.status === "active" || b.status === "confirmed")
   const pendingInvoices = invoices.filter((i) => i.status === "pending")
   const totalPallets = activeBookings.reduce((sum, b) => sum + (b.palletCount || 0), 0)
-  const totalAreaRented = activeBookings.reduce((sum, b) => sum + (b.areaSqFt || 0), 0)
   const membershipTier = user?.membershipTier || "bronze"
   const creditBalance = user?.creditBalance || 0
 

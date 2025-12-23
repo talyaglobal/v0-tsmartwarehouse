@@ -56,12 +56,27 @@ class MemoryCache {
 // Create cache instance
 let cache: Redis | MemoryCache
 
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  // Production: Use Upstash Redis
-  cache = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  })
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
+
+// Check if Redis URL is valid (not a placeholder)
+const isValidRedisUrl = redisUrl && 
+  typeof redisUrl === 'string' && 
+  redisUrl.trim() !== '' && 
+  (redisUrl.startsWith('https://') || redisUrl.startsWith('http://')) &&
+  !redisUrl.includes('your-upstash-redis-url')
+
+if (isValidRedisUrl && redisToken) {
+  try {
+    // Production: Use Upstash Redis
+    cache = new Redis({
+      url: redisUrl,
+      token: redisToken,
+    })
+  } catch (error) {
+    console.warn('Failed to initialize Redis cache, using in-memory cache:', error)
+    cache = new MemoryCache()
+  }
 } else {
   // Development: Use in-memory cache
   cache = new MemoryCache()

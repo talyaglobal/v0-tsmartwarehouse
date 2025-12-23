@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { authenticateRequest } from "@/lib/auth/api-middleware"
-import { processInvoicePayment, getPaymentHistory } from "@/lib/business-logic/payments"
+import { processInvoicePayment } from "@/lib/business-logic/payments"
 import { getPayments } from "@/lib/db/payments"
 import type { PaymentsListResponse, PaymentResponse, ErrorResponse } from "@/types/api"
 

@@ -3,7 +3,7 @@ import { getBookings, createBooking } from "@/lib/db/bookings"
 import { PRICING } from "@/lib/constants"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
-import { setCacheHeaders, createApiCacheKey } from "@/lib/cache/api-cache"
+import { setCacheHeaders } from "@/lib/cache/api-cache"
 import { createBookingSchema, bookingsQuerySchema } from "@/lib/validation/schemas"
 import type { BookingStatus, BookingType } from "@/types"
 import type { BookingsListResponse, BookingResponse, ErrorResponse } from "@/types/api"
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    const { type, palletCount, areaSqFt, floorNumber, hallId, startDate, endDate, notes } = validatedData
+    const { type, palletCount, areaSqFt, hallId, startDate, endDate, notes } = validatedData
 
     // Get customer profile information
     const { createServerSupabaseClient } = await import('@/lib/supabase/server')

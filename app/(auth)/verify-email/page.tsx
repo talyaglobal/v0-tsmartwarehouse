@@ -1,10 +1,8 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, CheckCircle, XCircle } from "@/components/icons"
@@ -13,7 +11,6 @@ import { createClient } from "@/lib/supabase/client"
 
 export default function VerifyEmailPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'pending'>('loading')
   const [email, setEmail] = useState<string | null>(null)
   const [isResending, setIsResending] = useState(false)

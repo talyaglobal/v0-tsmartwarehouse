@@ -1,8 +1,7 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getClaimById, createClaim, updateClaim, getClaims } from "@/lib/db/claims"
 import { getIncidentById, updateIncident } from "@/lib/db/incidents"
 import { getBookingById } from "@/lib/db/bookings"
-import type { Claim, ClaimStatus, Incident } from "@/types"
+import type { Claim, ClaimStatus } from "@/types"
 
 /**
  * Business Logic: Claim Processing Workflow
@@ -171,7 +170,7 @@ export async function reviewClaim(
  */
 export async function startClaimReview(
   claimId: string,
-  reviewerId: string
+  _reviewerId: string
 ): Promise<ClaimProcessingResult> {
   const claim = await getClaimById(claimId)
   if (!claim) {
@@ -199,7 +198,7 @@ export async function startClaimReview(
  */
 export async function processClaimPayment(
   claimId: string,
-  paymentMethod?: string
+  _paymentMethod?: string
 ): Promise<ClaimProcessingResult> {
   const claim = await getClaimById(claimId)
   if (!claim) {

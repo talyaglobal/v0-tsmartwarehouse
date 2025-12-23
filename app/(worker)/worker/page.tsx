@@ -13,7 +13,7 @@ import type { Task } from "@/types"
 export default function WorkerHomePage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [shiftInfo, setShiftInfo] = useState({
+  const [shiftInfo, _setShiftInfo] = useState({
     hours: 0,
     minutes: 0,
     checkIn: "6:00 AM",

@@ -5,7 +5,7 @@ import { updateIncidentSchema } from "@/lib/validation/schemas"
 import type { IncidentResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -59,7 +59,6 @@ export async function PATCH(
   } catch (error) {
     // Handle Zod validation errors
     if (error && typeof error === "object" && "issues" in error) {
-      const zodError = error as { issues: Array<{ path: string[]; message: string }> }
       const errorData: ErrorResponse = {
         success: false,
         error: "Validation error",
@@ -78,7 +77,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

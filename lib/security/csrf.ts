@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { randomBytes, createHmac } from 'crypto'
+import { randomBytes } from 'crypto'
 
 /**
  * CSRF protection utilities

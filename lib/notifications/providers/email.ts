@@ -208,7 +208,7 @@ export class AWSSESProvider implements EmailProvider {
   }
 
   // Simplified AWS Signature V4 (for production, use AWS SDK)
-  private getAWS4Signature(method: string, url: string, headers: Record<string, string>): string {
+  private getAWS4Signature(_method: string, _url: string, _headers: Record<string, string>): string {
     // This is a placeholder - in production, use @aws-sdk/ses-client or proper AWS SDK
     // For now, we'll use a simplified approach
     return `AWS4-HMAC-SHA256 Credential=${this.accessKeyId}/${new Date().toISOString().split("T")[0]}/${this.region}/ses/aws4_request`

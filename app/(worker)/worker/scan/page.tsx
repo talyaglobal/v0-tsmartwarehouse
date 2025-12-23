@@ -74,7 +74,7 @@ export default function ScanPage() {
           scannerRef.current = null
           setIsScanning(false)
         },
-        (errorMessage) => {
+        (_errorMessage) => {
           // Ignore scanning errors (they're frequent during scanning)
         }
       )

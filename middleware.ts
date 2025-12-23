@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({
             request: {
               headers: request.headers,
@@ -88,24 +88,15 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
-  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
-
   // Auth routes (login, register, admin-login) - redirect if already authenticated
   const authRoutes = ['/login', '/register', '/admin-login']
   const isAuthRoute = authRoutes.includes(pathname)
   const isAdminLoginRoute = pathname === '/admin-login'
 
   // Protected routes that require authentication
-  const adminRoutes = ['/admin']
-  const dashboardRoutes = ['/dashboard']
-  const workerRoutes = ['/worker']
-
   const isAdminRoute = pathname.startsWith('/admin')
   const isDashboardRoute = pathname.startsWith('/dashboard')
   const isWorkerRoute = pathname.startsWith('/worker')
-  const isApiRoute = pathname.startsWith('/api')
 
   // If user is authenticated and tries to access auth pages, redirect to appropriate dashboard
   if (user && isAuthRoute && supabaseUrl && supabaseAnonKey) {

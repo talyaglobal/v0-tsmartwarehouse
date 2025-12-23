@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getNotifications, getUnreadCount, markAllNotificationsAsRead } from "@/lib/db/notifications"
 import { getCurrentUser } from "@/lib/auth/utils"
-import { apiWrapper } from "@/lib/middleware/api-wrapper"
 import type { NotificationsListResponse, ErrorResponse, ApiResponse } from "@/types/api"
 
 export async function GET(req: NextRequest) {

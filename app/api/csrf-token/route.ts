@@ -7,7 +7,7 @@ import type { ApiResponse, ErrorResponse } from '@/types/api'
  * GET /api/csrf-token
  * Get CSRF token for client-side use
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const token = await getCsrfToken()
     
