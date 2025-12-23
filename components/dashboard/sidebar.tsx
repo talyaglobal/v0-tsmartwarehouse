@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
-import type { Booking } from "@/types"
+import type { Booking, Claim } from "@/types"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -45,6 +45,22 @@ export function DashboardSidebar() {
       const result = await api.get<Booking[]>(`/api/v1/bookings?customerId=${user.id}`, { showToast: false })
       if (result.success && result.data) {
         return result.data.filter(booking => booking.status === 'pending').length
+      }
+      return 0
+    },
+    enabled: !!user,
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 60 * 1000, // Refetch every minute
+  })
+
+  // Fetch under-review claims count
+  const { data: underReviewCount = 0 } = useQuery({
+    queryKey: ['claims', user?.id, 'under-review-count'],
+    queryFn: async () => {
+      if (!user) return 0
+      const result = await api.get<Claim[]>('/api/v1/claims', { showToast: false })
+      if (result.success && result.data) {
+        return result.data.filter(claim => claim.status === 'under-review').length
       }
       return 0
     },
@@ -98,8 +114,14 @@ export function DashboardSidebar() {
                   {pendingCount}
                 </Badge>
               )}
+              {/* Show badge for Claims if there are under-review claims */}
+              {item.name === "Claims" && underReviewCount > 0 && (
+                <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                  {underReviewCount}
+                </Badge>
+              )}
               {/* Show badge for other items if badge is defined */}
-              {item.name !== "Bookings" && item.badge && (
+              {item.name !== "Bookings" && item.name !== "Claims" && item.badge && (
                 <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
                   {item.badge}
                 </Badge>
