@@ -12,12 +12,6 @@ import { formatNumber, formatCurrency } from "@/lib/utils/format"
 export default function WarehouseLayoutPage() {
   const [selectedFloor, setSelectedFloor] = useState("1")
 
-  const getFloorData = (floorNum: string) => {
-    return WAREHOUSE_CONFIG.floors.find((f) => f.floorNumber === Number(floorNum))
-  }
-
-  const currentFloor = getFloorData(selectedFloor)
-
   return (
     <div className="space-y-6">
       <PageHeader
