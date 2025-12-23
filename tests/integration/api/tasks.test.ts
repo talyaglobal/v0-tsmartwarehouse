@@ -51,7 +51,6 @@ describe('/api/v1/tasks', () => {
         'http://localhost:3000/api/v1/tasks?status=pending'
       )
       const response = await GET(request)
-      const data = await response.json()
 
       expect(response.status).toBe(200)
       expect(mockGetTasks).toHaveBeenCalledWith(
@@ -66,7 +65,6 @@ describe('/api/v1/tasks', () => {
         'http://localhost:3000/api/v1/tasks?priority=high'
       )
       const response = await GET(request)
-      const data = await response.json()
 
       expect(response.status).toBe(200)
       expect(mockGetTasks).toHaveBeenCalledWith(

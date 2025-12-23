@@ -10,13 +10,11 @@ import { AlertCircle, Plus, Clock, CheckCircle, FileText, Loader2, Eye, Edit, Tr
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Claim } from "@/types"
 import { api } from "@/lib/api/client"
-import { useUIStore } from "@/stores/ui.store"
 
 export default function ClaimsPage() {
   const [claims, setClaims] = useState<Claim[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const addNotification = useUIStore((state) => state.addNotification)
 
   useEffect(() => {
     fetchClaims()

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { ArrowLeft, FileText, DollarSign, Calendar, User, Package, Clock, Loader2 } from "@/components/icons"
+import { ArrowLeft, FileText, Calendar, User, Package, Clock, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Claim } from "@/types"
 import { api } from "@/lib/api/client"

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect } from "react"
+import { useEffect } from "react"
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from "lucide-react"
 import { useUIStore } from "@/stores/ui.store"
 import { cn } from "@/lib/utils"

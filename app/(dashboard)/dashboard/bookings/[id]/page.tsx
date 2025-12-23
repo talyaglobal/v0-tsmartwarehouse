@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { ArrowLeft, Package, Building2, Calendar, DollarSign, MapPin, FileText, Loader2 } from "@/components/icons"
+import { ArrowLeft, Package, Building2, Calendar, MapPin, FileText, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking } from "@/types"
 import { api } from "@/lib/api/client"

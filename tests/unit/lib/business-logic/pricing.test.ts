@@ -3,7 +3,6 @@ import {
   calculateAreaRentalPricing,
   calculateTotalPrice,
 } from '@/lib/business-logic/pricing'
-import { PRICING } from '@/lib/constants'
 
 describe('calculatePalletPricing', () => {
   it('calculates base pricing correctly', () => {

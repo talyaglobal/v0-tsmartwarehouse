@@ -69,7 +69,7 @@ export default function BookingsPage() {
       // Return a context object with the snapshotted value
       return { previousBookings }
     },
-    onError: (err, variables, context) => {
+    onError: (_err, _variables, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousBookings) {
         queryClient.setQueryData(['bookings', user?.id], context.previousBookings)

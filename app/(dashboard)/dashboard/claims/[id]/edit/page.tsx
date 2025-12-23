@@ -58,13 +58,18 @@ export default function EditClaimPage({ params }: { params: Promise<{ id: string
         setResolution(claimData.resolution || "")
         // Convert existing evidence URLs to UploadedFile format if needed
         if (claimData.evidence && claimData.evidence.length > 0) {
-          const existingFiles: UploadedFile[] = claimData.evidence.map((url, index) => ({
-            id: `existing-${index}`,
-            name: `Evidence ${index + 1}`,
-            url,
-            size: 0,
-            type: "image/*",
-          }))
+          // For existing files, we create a minimal UploadedFile structure
+          // Since we don't have the original File object, we'll use a placeholder
+          const existingFiles: UploadedFile[] = claimData.evidence.map((url, index) => {
+            // Create a dummy File object for existing files
+            const dummyFile = new File([], `Evidence ${index + 1}`, { type: "image/*" })
+            return {
+              id: `existing-${index}`,
+              file: dummyFile,
+              url,
+              status: 'success' as const,
+            }
+          })
           setUploadedFiles(existingFiles)
         }
       } else {

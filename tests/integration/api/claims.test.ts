@@ -30,6 +30,7 @@ const mockClaim = {
   customerName: 'Test User',
   bookingId: 'booking-123',
   incidentId: null,
+  type: 'damage',
   description: 'Test claim',
   amount: 1000,
   status: 'submitted',

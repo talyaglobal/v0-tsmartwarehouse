@@ -2,7 +2,6 @@ import {
   processInvoicePayment,
   confirmPayment,
   processRefund,
-  getPaymentHistory,
 } from '@/lib/business-logic/payments'
 import {
   getInvoiceById,

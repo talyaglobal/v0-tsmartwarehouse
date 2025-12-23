@@ -113,7 +113,7 @@ export default function LoginPage() {
         // Wait for auth state to be fully synchronized before redirecting
         // This ensures cookies are set and middleware can see the session
         const authStatePromise = new Promise<void>((resolve) => {
-          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
             if (event === 'SIGNED_IN' && session) {
               subscription.unsubscribe()
               resolve()

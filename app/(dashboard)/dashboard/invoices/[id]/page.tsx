@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { ArrowLeft, FileText, DollarSign, Calendar, Loader2 } from "@/components/icons"
+import { ArrowLeft, FileText, Calendar, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Invoice } from "@/types"
 import { api } from "@/lib/api/client"
@@ -127,12 +127,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </span>
               <span>{formatDate(invoice.dueDate)}</span>
             </div>
-            {invoice.issueDate && (
+            {invoice.createdAt && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-2">
                   <Calendar className="h-4 w-4" /> Issue Date
                 </span>
-                <span>{formatDate(invoice.issueDate)}</span>
+                <span>{formatDate(invoice.createdAt)}</span>
               </div>
             )}
             {invoice.paidDate && (

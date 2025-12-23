@@ -65,7 +65,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // Update booking using database function
-    const updatedBooking = await updateBooking(id, validatedData)
+    // Convert null to undefined for hallId to match Booking type
+    const updateData = {
+      ...validatedData,
+      hallId: validatedData.hallId === null ? undefined : validatedData.hallId,
+    }
+    const updatedBooking = await updateBooking(id, updateData)
 
     return NextResponse.json({
       success: true,

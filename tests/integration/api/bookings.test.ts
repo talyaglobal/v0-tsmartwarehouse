@@ -52,7 +52,6 @@ describe('/api/v1/bookings', () => {
         'http://localhost:3000/api/v1/bookings?status=pending'
       )
       const response = await GET(request)
-      const data = await response.json()
 
       expect(response.status).toBe(200)
       expect(mockGetBookings).toHaveBeenCalledWith(

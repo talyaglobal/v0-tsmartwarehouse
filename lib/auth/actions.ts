@@ -205,7 +205,7 @@ export async function signOut(): Promise<void> {
 /**
  * Request password reset (DISABLED - Email sending disabled)
  */
-export async function requestPasswordReset(formData: FormData): Promise<{ error?: AuthError }> {
+export async function requestPasswordReset(_formData: FormData): Promise<{ error?: AuthError }> {
   return {
     error: {
       message: 'Password reset via email is currently disabled. Please contact support.',
@@ -267,7 +267,7 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
 /**
  * Resend email verification (DISABLED - Email sending disabled)
  */
-export async function resendVerificationEmail(email: string): Promise<{ error?: AuthError }> {
+export async function resendVerificationEmail(_email: string): Promise<{ error?: AuthError }> {
   return {
     error: {
       message: 'Email verification is currently disabled. Your account is automatically verified.',
