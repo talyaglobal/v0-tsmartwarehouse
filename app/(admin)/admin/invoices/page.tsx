@@ -11,15 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { FileText, Search, MoreHorizontal, DollarSign, Clock, CheckCircle, Plus, Download, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
-import type { InvoiceStatus, Invoice } from "@/types"
-
-const statusColors: Record<InvoiceStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "secondary",
-  pending: "outline",
-  paid: "default",
-  overdue: "destructive",
-  cancelled: "secondary",
-}
+import type { Invoice } from "@/types"
 
 export default function InvoicesPage() {
   const [search, setSearch] = useState("")
