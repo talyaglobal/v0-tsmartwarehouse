@@ -21,7 +21,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
-import type { Booking, Claim } from "@/types"
+import { createClient } from "@/lib/supabase/client"
+import type { Booking, Claim, MembershipTier } from "@/types"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -67,6 +68,32 @@ export function DashboardSidebar() {
     enabled: !!user,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refetch every minute
+  })
+
+  // Fetch user profile (name and membership tier)
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user) return null
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name, membership_tier')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return null
+      }
+      
+      return {
+        name: data?.name || user.email?.split('@')[0] || 'User',
+        membershipTier: (data?.membership_tier as MembershipTier) || 'bronze',
+      }
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
   return (
@@ -138,8 +165,14 @@ export function DashboardSidebar() {
             <User className="h-4 w-4" />
           </div>
           <div className="flex-1 truncate">
-            <p className="text-sm font-medium">Sarah Johnson</p>
-            <p className="text-xs text-muted-foreground">Gold Member</p>
+            <p className="text-sm font-medium">
+              {profile?.name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {profile?.membershipTier 
+                ? `${profile.membershipTier.charAt(0).toUpperCase() + profile.membershipTier.slice(1)} Member`
+                : 'Member'}
+            </p>
           </div>
         </div>
         <Button variant="ghost" className="w-full justify-start gap-2 mt-2 text-muted-foreground">

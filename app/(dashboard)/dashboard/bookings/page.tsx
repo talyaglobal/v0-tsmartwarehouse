@@ -35,7 +35,9 @@ export default function BookingsPage() {
       return result.success ? (result.data || []) : []
     },
     enabled: !!user && !userLoading,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 0, // Always consider data stale to ensure fresh data
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   })
 
   // React Query: Update booking status mutation

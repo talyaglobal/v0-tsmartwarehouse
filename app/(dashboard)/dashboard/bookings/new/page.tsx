@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,9 +20,12 @@ import { formatCurrency, formatNumber, calculatePalletCost, calculateAreaRentalC
 import type { BookingType } from "@/types"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
+import { useUser } from "@/lib/hooks/use-user"
 
 export default function NewBookingPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const { user } = useUser()
   const { addNotification } = useUIStore()
   const [isLoading, setIsLoading] = useState(false)
   const [bookingType, setBookingType] = useState<BookingType>("pallet")
@@ -94,6 +98,14 @@ export default function NewBookingPage() {
       })
 
       if (result.success) {
+        // Invalidate bookings cache to ensure fresh data
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: ['bookings', user.id] })
+        }
+        // Also invalidate pending count cache
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: ['bookings', user.id, 'pending-count'] })
+        }
         // Redirect to bookings list
         router.push("/dashboard/bookings")
       } else {
