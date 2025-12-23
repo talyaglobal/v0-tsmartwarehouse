@@ -37,40 +37,28 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  // Email sending is disabled - show error message instead
   if (success) {
     return (
       <Card>
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Check your email</CardTitle>
-          <CardDescription>We've sent you a password reset link</CardDescription>
+          <CardTitle className="text-2xl">Password Reset Unavailable</CardTitle>
+          <CardDescription>Email sending is currently disabled</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 text-sm bg-muted rounded-md">
             <p className="mb-2">
-              We've sent a password reset link to <strong>{email}</strong>
+              Password reset via email is currently disabled.
             </p>
             <p>
-              Please check your inbox and click the link to reset your password. 
-              If you don't see the email, check your spam folder.
+              Please contact support to reset your password.
             </p>
           </div>
-          <div className="flex flex-col space-y-2">
-            <Button
-              onClick={() => {
-                setSuccess(false)
-                setEmail("")
-              }}
-              variant="outline"
-              className="w-full"
-            >
-              Send Another Email
+          <Link href="/login">
+            <Button variant="ghost" className="w-full">
+              Back to Sign In
             </Button>
-            <Link href="/login">
-              <Button variant="ghost" className="w-full">
-                Back to Sign In
-              </Button>
-            </Link>
-          </div>
+          </Link>
         </CardContent>
       </Card>
     )
@@ -80,7 +68,7 @@ export default function ForgotPasswordPage() {
     <Card>
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl">Forgot password</CardTitle>
-        <CardDescription>Enter your email to receive a reset link</CardDescription>
+        <CardDescription>Password reset via email is currently disabled</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">

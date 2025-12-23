@@ -6,6 +6,7 @@ import { Upload, X, FileText, ImageIcon, Loader2, AlertCircle } from "@/componen
 import { Button } from "@/components/ui/button"
 import { formatFileSize, isImageFile } from "@/lib/storage/utils"
 import Image from "next/image"
+import { api } from "@/lib/api/client"
 
 export interface UploadedFile {
   id: string
@@ -114,12 +115,11 @@ export function FileUpload({
 
     try {
       // Upload file via API route
-      const response = await fetch('/api/v1/files/upload', {
-        method: 'POST',
-        body: formData,
+      const result = await api.post('/api/v1/files/upload', formData, {
+        showToast: true,
+        successMessage: 'File uploaded successfully',
+        errorMessage: 'File upload failed',
       })
-
-      const result = await response.json()
 
       // Update with result
       const finalFiles = [...files]

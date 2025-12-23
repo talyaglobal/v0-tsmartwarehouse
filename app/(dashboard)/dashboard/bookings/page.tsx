@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Package, Building2, Eye, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking } from "@/types"
+import { api } from "@/lib/api/client"
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -22,10 +23,9 @@ export default function BookingsPage() {
   const fetchBookings = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/bookings')
-      if (response.ok) {
-        const data = await response.json()
-        setBookings(data.data || [])
+      const result = await api.get('/api/v1/bookings', { showToast: false })
+      if (result.success) {
+        setBookings(result.data || [])
       }
     } catch (error) {
       console.error('Failed to fetch bookings:', error)

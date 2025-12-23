@@ -36,10 +36,15 @@ if (!dbUrl) {
 console.log('Loaded env from:', envPath);
 console.log('Using DATABASE_URL:', dbUrl ? dbUrl.replace(/(:).*@(.*)/, ':*****@$2') : 'not set');
 
-const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+// Use shell: true for Windows compatibility
+const cmd = process.platform === 'win32' ? 'npx' : 'npx';
 const args = ['supabase', 'db', 'push', '--db-url', dbUrl];
 
-const res = spawnSync(cmd, args, { stdio: 'inherit' });
+const res = spawnSync(cmd, args, { 
+  stdio: 'inherit',
+  shell: true,
+  env: { ...process.env, ...env }
+});
 if (res.error) {
   console.error('Failed to run supabase db push:', res.error);
   process.exit(1);

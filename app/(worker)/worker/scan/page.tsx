@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { QrCode, Camera, CheckCircle, Search, MapPin, X } from "@/components/icons"
 import { Html5Qrcode } from "html5-qrcode"
+import { api } from "@/lib/api/client"
 
 interface ScanResult {
   id: string
@@ -91,12 +92,18 @@ export default function ScanPage() {
   const handleScannedCode = async (code: string) => {
     try {
       // Call API to fetch pallet information
-      const response = await fetch(`/api/v1/inventory/search?code=${encodeURIComponent(code)}`)
-      if (!response.ok) {
-        throw new Error("Pallet not found")
+      const result = await api.get(`/api/v1/inventory/search?code=${encodeURIComponent(code)}`, {
+        successMessage: 'Pallet found',
+        errorMessage: 'Pallet not found',
+      })
+      
+      if (result.success && result.data) {
+        setScanResult(result.data)
+        setError(null)
+      } else {
+        setError(result.error || "Pallet not found")
+        setScanResult(null)
       }
-      const data = await response.json()
-      setScanResult(data.data)
     } catch (err: any) {
       setError(err.message || "Failed to fetch pallet information")
       setScanResult(null)

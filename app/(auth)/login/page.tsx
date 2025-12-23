@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Eye } from "@/components/icons"
 import { EyeOff } from "lucide-react"
+import { useUIStore } from "@/stores/ui.store"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,17 +21,25 @@ export default function LoginPage() {
   const redirect = searchParams.get('redirect')
   const message = searchParams.get('message')
   const supabase = createClient()
+  const addNotification = useUIStore((state) => state.addNotification)
   
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(message)
+  const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
 
   useEffect(() => {
+    // Show success message from query param as toast
     if (message) {
-      setError(message)
+      addNotification({
+        type: 'success',
+        message: message,
+        duration: 5000,
+      })
+      // Clear the message from URL
+      router.replace('/login', { scroll: false })
     }
     // Load saved email from localStorage if remember me was previously checked
     const savedEmail = localStorage.getItem("rememberedEmail")
@@ -39,7 +48,7 @@ export default function LoginPage() {
       setEmail(savedEmail)
       setRememberMe(true)
     }
-  }, [message])
+  }, [message, addNotification, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,11 +63,18 @@ export default function LoginPage() {
 
       if (signInError) {
         setError(signInError.message)
+        addNotification({
+          type: 'error',
+          message: signInError.message === 'Invalid login credentials' 
+            ? 'Invalid email or password' 
+            : signInError.message,
+          duration: 5000,
+        })
         setIsLoading(false)
         return
       }
 
-      if (data.user) {
+      if (data.user && data.session) {
         // Handle remember me functionality
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", email)
@@ -77,17 +93,64 @@ export default function LoginPage() {
 
         const role = profile?.role || data.user.user_metadata?.role || 'customer'
 
-        // Redirect to original destination or role-based dashboard
+        // Determine redirect path
+        let redirectPath = '/dashboard'
         if (redirect) {
-          router.push(redirect)
+          redirectPath = redirect
         } else if (role === 'admin') {
-          router.push("/admin")
+          redirectPath = '/admin'
         } else if (role === 'worker') {
-          router.push("/worker")
-        } else {
-          router.push("/dashboard")
+          redirectPath = '/worker'
         }
-        router.refresh()
+
+        // Show success message
+        addNotification({
+          type: 'success',
+          message: 'Login successful! Redirecting...',
+          duration: 2000,
+        })
+
+        // Wait for auth state to be fully synchronized before redirecting
+        // This ensures cookies are set and middleware can see the session
+        const authStatePromise = new Promise<void>((resolve) => {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+              subscription.unsubscribe()
+              resolve()
+            }
+          })
+          
+          // Fallback timeout in case auth state change doesn't fire
+          setTimeout(() => {
+            subscription.unsubscribe()
+            resolve()
+          }, 1000)
+        })
+
+        await authStatePromise
+
+        // Small additional delay to ensure cookies are fully set
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Use window.location for hard redirect to ensure cookies are sent to server
+        window.location.href = redirectPath
+      } else if (data.user && !data.session) {
+        // User exists but no session - this shouldn't happen but handle it
+        setError('Session could not be established. Please try again.')
+        addNotification({
+          type: 'error',
+          message: 'Session could not be established. Please try again.',
+          duration: 5000,
+        })
+        setIsLoading(false)
+      } else {
+        setError('Login failed. Please try again.')
+        addNotification({
+          type: 'error',
+          message: 'Login failed. Please try again.',
+          duration: 5000,
+        })
+        setIsLoading(false)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during login')

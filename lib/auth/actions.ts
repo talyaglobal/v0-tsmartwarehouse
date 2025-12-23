@@ -1,6 +1,6 @@
 'use server'
 
-import { createAuthenticatedSupabaseClient, createClient } from '@/lib/supabase/server'
+import { createAuthenticatedSupabaseClient, createClient, createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -73,15 +73,7 @@ export async function signIn(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
-    // Check if email is verified
-    if (!data.user.email_confirmed_at) {
-      await supabase.auth.signOut()
-      return {
-        error: {
-          message: 'Please verify your email before signing in. Check your inbox for a verification link.',
-        },
-      }
-    }
+    // Email verification check removed - users can login immediately
 
     // Determine redirect based on user role
     const userRole = data.user.user_metadata?.role || 'customer'
@@ -140,21 +132,32 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
-    const supabase = await createAuthenticatedSupabaseClient()
+    // Use admin API to create user directly (no email sent)
+    const supabaseAdmin = createServerSupabaseClient()
     
-    // Sign up the user
-    const { data, error } = await supabase.auth.signUp({
+    // Check if user already exists
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const userExists = existingUsers?.users?.find(u => u.email === validation.data.email)
+    
+    if (userExists) {
+      return {
+        error: {
+          message: 'An account with this email already exists.',
+        },
+      }
+    }
+
+    // Create user directly with admin API (no email sent)
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: validation.data.email,
       password: validation.data.password,
-      options: {
-        data: {
-          name: validation.data.name,
-          company: validation.data.company || null,
-          phone: validation.data.phone || null,
-          role: 'customer', // Default role for new users
-          storage_interest: validation.data.storageType || null,
-        },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/verify-email`,
+      email_confirm: true, // Auto-confirm email (no verification needed)
+      user_metadata: {
+        name: validation.data.name,
+        company: validation.data.company || null,
+        phone: validation.data.phone || null,
+        role: 'customer', // Default role for new users
+        storage_interest: validation.data.storageType || null,
       },
     })
 
@@ -174,7 +177,10 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
-    // Registration successful - user will need to verify email
+    // Wait a moment for the trigger to create the profile
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Registration successful - user can login immediately (no email sent)
     return { error: undefined }
   } catch (error) {
     console.error('Sign up error:', error)
@@ -197,42 +203,13 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Request password reset
+ * Request password reset (DISABLED - Email sending disabled)
  */
 export async function requestPasswordReset(formData: FormData): Promise<{ error?: AuthError }> {
-  try {
-    const email = formData.get('email') as string
-
-    if (!email || !z.string().email().safeParse(email).success) {
-      return {
-        error: {
-          message: 'Invalid email address',
-          field: 'email',
-        },
-      }
-    }
-
-    const supabase = await createAuthenticatedSupabaseClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/reset-password`,
-    })
-
-    if (error) {
-      return {
-        error: {
-          message: error.message,
-        },
-      }
-    }
-
-    return { error: undefined }
-  } catch (error) {
-    console.error('Password reset request error:', error)
-    return {
-      error: {
-        message: 'An unexpected error occurred. Please try again.',
-      },
-    }
+  return {
+    error: {
+      message: 'Password reset via email is currently disabled. Please contact support.',
+    },
   }
 }
 
@@ -288,44 +265,13 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
 }
 
 /**
- * Resend email verification
+ * Resend email verification (DISABLED - Email sending disabled)
  */
 export async function resendVerificationEmail(email: string): Promise<{ error?: AuthError }> {
-  try {
-    if (!email || !z.string().email().safeParse(email).success) {
-      return {
-        error: {
-          message: 'Invalid email address',
-          field: 'email',
-        },
-      }
-    }
-
-    const supabase = await createAuthenticatedSupabaseClient()
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/verify-email`,
-      },
-    })
-
-    if (error) {
-      return {
-        error: {
-          message: error.message,
-        },
-      }
-    }
-
-    return { error: undefined }
-  } catch (error) {
-    console.error('Resend verification error:', error)
-    return {
-      error: {
-        message: 'An unexpected error occurred. Please try again.',
-      },
-    }
+  return {
+    error: {
+      message: 'Email verification is currently disabled. Your account is automatically verified.',
+    },
   }
 }
 

@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2 } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Booking, Invoice } from "@/types"
+import { api } from "@/lib/api/client"
 
 export default function CustomerDashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -25,30 +26,22 @@ export default function CustomerDashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const [bookingsRes, invoicesRes] = await Promise.all([
-        fetch('/api/v1/bookings'),
-        fetch('/api/v1/invoices'),
+      const [bookingsData, invoicesData, userData] = await Promise.all([
+        api.get('/api/v1/bookings', { showToast: false }),
+        api.get('/api/v1/invoices', { showToast: false }),
+        api.get('/api/v1/users/me', { showToast: false }).catch(() => ({ success: false, data: null })),
       ])
 
-      if (bookingsRes.ok) {
-        const bookingsData = await bookingsRes.json()
+      if (bookingsData.success) {
         setBookings(bookingsData.data || [])
       }
 
-      if (invoicesRes.ok) {
-        const invoicesData = await invoicesRes.json()
+      if (invoicesData.success) {
         setInvoices(invoicesData.data || [])
       }
 
-      // Fetch user info for membership tier and credit balance
-      try {
-        const userRes = await fetch('/api/v1/users/me')
-        if (userRes.ok) {
-          const userData = await userRes.json()
-          setUser(userData.data)
-        }
-      } catch (err) {
-        console.error('Failed to fetch user data:', err)
+      if (userData.success && userData.data) {
+        setUser(userData.data)
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)

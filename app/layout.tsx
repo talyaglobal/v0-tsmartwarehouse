@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { ErrorBoundaryWrapper } from '@/components/error-boundary-wrapper'
+import { ToastContainer } from '@/components/ui/toast'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default function RootLayout({
             {children}
           </AuthProvider>
         </ErrorBoundaryWrapper>
+        <ToastContainer />
         <Analytics />
       </body>
     </html>

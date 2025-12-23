@@ -13,12 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2 } from "@/components/icons"
 import { signUp } from "@/lib/auth/actions"
+import { useUIStore } from "@/stores/ui.store"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const addNotification = useUIStore((state) => state.addNotification)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -34,10 +35,14 @@ export default function RegisterPage() {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
-    setSuccess(false)
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords don't match")
+      addNotification({
+        type: 'error',
+        message: "Passwords don't match",
+        duration: 5000,
+      })
       setIsLoading(false)
       return
     }
@@ -55,40 +60,24 @@ export default function RegisterPage() {
     
     if (result?.error) {
       setError(result.error.message)
+      addNotification({
+        type: 'error',
+        message: result.error.message,
+        duration: 5000,
+      })
       setIsLoading(false)
     } else {
-      setSuccess(true)
-      setIsLoading(false)
+      // Show success toast
+      addNotification({
+        type: 'success',
+        message: 'Account created successfully. You can now sign in.',
+        duration: 5000,
+      })
+      // Redirect to login after a short delay
+      setTimeout(() => {
+        router.push('/login')
+      }, 500)
     }
-  }
-
-  if (success) {
-    return (
-      <Card>
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Check your email</CardTitle>
-          <CardDescription>We've sent you a verification link</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 text-sm bg-muted rounded-md">
-            <p className="mb-2">
-              We've sent a verification email to <strong>{formData.email}</strong>
-            </p>
-            <p>
-              Please check your inbox and click the verification link to activate your account. 
-              You can close this window.
-            </p>
-          </div>
-          <Button
-            onClick={() => router.push('/login')}
-            className="w-full"
-            variant="outline"
-          >
-            Back to Sign In
-          </Button>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (

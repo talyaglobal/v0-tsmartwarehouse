@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Package, Layers, Building2, Loader2 } from "@/components/icons"
 import { WAREHOUSE_CONFIG } from "@/lib/constants"
 import { formatNumber } from "@/lib/utils/format"
+import { api } from "@/lib/api/client"
 
 interface InventoryItem {
   id: string
@@ -49,18 +50,16 @@ export default function InventoryPage() {
       }
       // Note: In a real implementation, you'd filter by floor/hall based on selectedFloor
       
-      const [itemsResponse, statsResponse] = await Promise.all([
-        fetch(`/api/v1/inventory?${params.toString()}`),
-        fetch(`/api/v1/inventory?stats=true`),
+      const [itemsData, statsData] = await Promise.all([
+        api.get(`/api/v1/inventory?${params.toString()}`, { showToast: false }),
+        api.get(`/api/v1/inventory?stats=true`, { showToast: false }),
       ])
 
-      if (itemsResponse.ok) {
-        const itemsData = await itemsResponse.json()
+      if (itemsData.success) {
         setInventoryItems(itemsData.data || [])
       }
 
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
+      if (statsData.success) {
         setStats(statsData.data)
       }
     } catch (error) {

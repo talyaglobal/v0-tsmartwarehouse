@@ -15,6 +15,7 @@ import { FileUpload, type UploadedFile, getUploadedFileUrls } from "@/components
 import { ArrowLeft, Loader2 } from "@/components/icons"
 import Link from "next/link"
 import type { Booking } from "@/types"
+import { api } from "@/lib/api/client"
 
 export default function NewClaimPage() {
   const router = useRouter()
@@ -60,31 +61,24 @@ export default function NewClaimPage() {
       const evidenceUrls = getUploadedFileUrls(uploadedFiles)
 
       // Submit claim to API
-      const response = await fetch('/api/v1/claims', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          bookingId,
-          type: claimType,
-          amount: parseFloat(amount),
-          description,
-          evidence: evidenceUrls,
-        }),
+      const result = await api.post('/api/v1/claims', {
+        bookingId,
+        type: claimType,
+        amount: parseFloat(amount),
+        description,
+        evidence: evidenceUrls,
+      }, {
+        successMessage: 'Claim submitted successfully',
+        errorMessage: 'Failed to submit claim',
       })
-
-      const result = await response.json()
 
       if (result.success) {
         router.push("/dashboard/claims")
       } else {
-        alert(result.error || 'Failed to submit claim. Please try again.')
         setIsSubmitting(false)
       }
     } catch (error) {
       console.error('Error submitting claim:', error)
-      alert('An error occurred while submitting your claim. Please try again.')
       setIsSubmitting(false)
     }
   }

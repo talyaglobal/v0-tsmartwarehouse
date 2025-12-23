@@ -23,7 +23,7 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container mx-auto flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Warehouse className="h-8 w-8 text-primary" />
             <span className="text-xl font-bold">TSmart Warehouse</span>
@@ -57,7 +57,7 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="relative py-20 md:py-32 overflow-hidden min-h-[calc(100vh-4rem)] flex items-center">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-          <div className="container relative w-full">
+          <div className="container mx-auto relative w-full">
             <div className="mx-auto max-w-4xl text-center">
               <Badge variant="outline" className="mb-4">
                 240,000 sq ft of Premium Storage Space
@@ -111,7 +111,7 @@ export default function HomePage() {
 
         {/* Services Section */}
         <section id="services" className="py-20 bg-muted/50">
-          <div className="container">
+          <div className="container mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold mb-4">Our Services</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Comprehensive warehouse solutions for your business</p>
@@ -197,7 +197,7 @@ export default function HomePage() {
 
         {/* Facility Section */}
         <section id="facility" className="py-20">
-          <div className="container">
+          <div className="container mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold mb-4">Our Facility</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -285,7 +285,7 @@ export default function HomePage() {
 
         {/* Pricing Section */}
         <section id="pricing" className="py-20 bg-muted/50">
-          <div className="container">
+          <div className="container mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold mb-4">Simple, Transparent Pricing</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">No hidden fees. Pay only for what you use.</p>
@@ -383,7 +383,7 @@ export default function HomePage() {
 
         {/* Contact Section */}
         <section id="contact" className="py-20">
-          <div className="container">
+          <div className="container mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold mb-4">Contact Us</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Get in touch with our team</p>
@@ -421,7 +421,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t py-12 bg-muted/30">
-        <div className="container">
+        <div className="container mx-auto">
           <div className="grid gap-8 md:grid-cols-4">
             <div>
               <Link href="/" className="flex items-center gap-2 mb-4">

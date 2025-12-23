@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 // Store a mock client for build-time when env vars are missing
 let mockClient: any = null
@@ -60,14 +60,9 @@ export function createClient() {
   }
 
   try {
-    // Create the Supabase client for browser/client-side usage
-    const client = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    })
+    // Create the Supabase client for browser/client-side usage with SSR support
+    // This ensures cookies are properly managed for Next.js SSR
+    const client = createBrowserClient(supabaseUrl, supabaseAnonKey)
     
     // Verify the client was created successfully
     if (!client || !client.auth) {
