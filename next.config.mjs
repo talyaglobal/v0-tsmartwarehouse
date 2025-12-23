@@ -12,7 +12,13 @@ const nextConfig = {
   
   // Experimental features for performance
   experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'recharts'],
+    // Enable server actions
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+    // Optimize server components
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
   },
   images: {
     // Enable Next.js Image Optimization
