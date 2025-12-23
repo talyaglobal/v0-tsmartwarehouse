@@ -35,10 +35,11 @@ export default function NewClaimPage() {
   const fetchBookings = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/bookings')
-      if (response.ok) {
-        const data = await response.json()
-        const activeBookings = (data.data || []).filter(
+      // Use api client to ensure credentials are included
+      const result = await api.get('/api/v1/bookings', { showToast: false })
+      if (result.success) {
+        // Filter to only show active, confirmed, or completed bookings (pending bookings can't have claims)
+        const activeBookings = (result.data || []).filter(
           (b: Booking) => b.status === "active" || b.status === "completed" || b.status === "confirmed"
         )
         setBookings(activeBookings)

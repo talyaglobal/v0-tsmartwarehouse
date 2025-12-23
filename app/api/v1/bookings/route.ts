@@ -13,6 +13,15 @@ export const revalidate = 300
 
 export async function GET(request: NextRequest) {
   try {
+    // Try to get authenticated user (optional for GET - allows public access with customerId param)
+    const authResult = await requireAuth(request)
+    let authenticatedUserId: string | undefined = undefined
+    
+    if (!(authResult instanceof NextResponse)) {
+      // User is authenticated, use their ID as default filter
+      authenticatedUserId = authResult.user.id
+    }
+
     const { searchParams } = new URL(request.url)
     
     // Validate query parameters
@@ -46,14 +55,27 @@ export async function GET(request: NextRequest) {
       warehouseId?: string
       limit?: number
       offset?: number
+      useCache?: boolean
     } = {}
 
-    if (validatedParams.customerId) filters.customerId = validatedParams.customerId
+    // If authenticated and no customerId specified, use authenticated user's ID
+    // Otherwise use the provided customerId or leave undefined for all bookings
+    if (validatedParams.customerId) {
+      filters.customerId = validatedParams.customerId
+    } else if (authenticatedUserId) {
+      // Authenticated user - show only their bookings by default
+      filters.customerId = authenticatedUserId
+    }
+    
     if (validatedParams.status) filters.status = validatedParams.status
     if (validatedParams.type) filters.type = validatedParams.type
     if (validatedParams.warehouseId) filters.warehouseId = validatedParams.warehouseId
     if (validatedParams.limit) filters.limit = validatedParams.limit
     if (validatedParams.offset) filters.offset = validatedParams.offset
+
+    // Disable cache for authenticated requests to ensure fresh data
+    // Cache can cause issues when new bookings are created
+    filters.useCache = false
 
     const bookings = await getBookings(filters)
 
@@ -146,21 +168,74 @@ export async function POST(request: NextRequest) {
       totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
     }
 
-    // Get default warehouse ID from environment or use first available
-    const defaultWarehouseId = process.env.DEFAULT_WAREHOUSE_ID || body.warehouseId || "wh-001"
+    // Get default warehouse ID from database or environment
+    let warehouseId = body.warehouseId || process.env.DEFAULT_WAREHOUSE_ID
+    
+    if (!warehouseId) {
+      // Get first warehouse from database
+      const { data: warehouses, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id')
+        .limit(1)
+        .single()
+      
+      if (warehouseError || !warehouses) {
+        // If no warehouse exists, create a default one
+        const { data: newWarehouse, error: createError } = await supabase
+          .from('warehouses')
+          .insert({
+            name: 'TSmart Warehouse - Main Facility',
+            address: '735 S Front St',
+            city: 'Elizabeth',
+            state: 'NJ',
+            zip_code: '07202',
+            total_sq_ft: 240000,
+          })
+          .select('id')
+          .single()
+        
+        if (createError || !newWarehouse) {
+          const errorData: ErrorResponse = {
+            success: false,
+            error: "Failed to get or create warehouse",
+            statusCode: 500,
+            details: createError?.message || 'No warehouse found and failed to create default',
+          }
+          return NextResponse.json(errorData, { status: 500 })
+        }
+        
+        warehouseId = newWarehouse.id
+      } else {
+        warehouseId = warehouses.id
+      }
+    }
+
+    // Validate hallId if provided (must be UUID format)
+    let validHallId: string | undefined = undefined
+    if (type === "area-rental" && hallId) {
+      // Check if hallId is a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (uuidRegex.test(hallId)) {
+        validHallId = hallId
+      } else {
+        // If not UUID, try to find hall by name or skip it
+        // For now, we'll skip it since hallId is optional
+        console.warn(`Invalid hallId format: ${hallId}, skipping hall assignment`)
+      }
+    }
 
     // Create booking using database function
     const newBooking = await createBooking({
       customerId: user.id,
       customerName: profile.name || user.email,
       customerEmail: profile.email || user.email,
-      warehouseId: defaultWarehouseId,
+      warehouseId,
       type,
       status: "pending",
       palletCount: type === "pallet" ? palletCount : undefined,
       areaSqFt: type === "area-rental" ? areaSqFt : undefined,
       floorNumber: type === "area-rental" ? 3 : undefined,
-      hallId: type === "area-rental" ? hallId : undefined,
+      hallId: validHallId,
       startDate,
       endDate: endDate || undefined,
       totalAmount,

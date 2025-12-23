@@ -10,7 +10,7 @@ export const createBookingSchema = z.object({
   palletCount: z.number().int().positive().optional(),
   areaSqFt: z.number().int().positive().min(40000).optional(),
   floorNumber: z.number().int().min(1).max(3).optional(),
-  hallId: z.string().uuid().optional(),
+  hallId: z.string().optional(), // Made more flexible - UUID validation happens in API
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
   months: z.number().int().positive().optional(),
@@ -29,10 +29,13 @@ export const createBookingSchema = z.object({
 )
 
 export const updateBookingSchema = z.object({
+  type: z.enum(["pallet", "area-rental"]).optional(),
   status: z.enum(["pending", "confirmed", "active", "completed", "cancelled"]).optional(),
   notes: z.string().max(1000).optional(),
   palletCount: z.number().int().positive().optional(),
   areaSqFt: z.number().int().positive().min(40000).optional(),
+  hallId: z.string().nullable().optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
 })
 
 // Task schemas

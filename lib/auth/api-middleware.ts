@@ -1,20 +1,47 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import type { UserRole } from '@/types'
 
 /**
  * Get the authenticated user from the request
+ * Uses cookies from the request to authenticate
  */
-export async function getAuthUser(_request: NextRequest) {
+export async function getAuthUser(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+
+    // Create Supabase client that reads cookies from NextRequest
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          // In API routes, we can't set cookies in the response here
+          // The middleware handles cookie updates
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value)
+          })
+        },
+      },
+    })
+
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser()
 
     if (error || !user) {
+      if (error) {
+        console.error('Error getting user from Supabase:', error.message)
+      }
       return null
     }
 

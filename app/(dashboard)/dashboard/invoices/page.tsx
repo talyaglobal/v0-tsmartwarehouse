@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Download, Eye, Loader2 } from "@/components/icons"
+import { Download, Eye, Loader2, Edit, Trash } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Invoice } from "@/types"
+import { api } from "@/lib/api/client"
+import Link from "next/link"
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchInvoices()
@@ -21,15 +24,36 @@ export default function InvoicesPage() {
   const fetchInvoices = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/invoices')
-      if (response.ok) {
-        const data = await response.json()
-        setInvoices(data.data || [])
+      const result = await api.get('/api/v1/invoices', { showToast: false })
+      if (result.success) {
+        setInvoices(result.data || [])
       }
     } catch (error) {
       console.error('Failed to fetch invoices:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async (invoiceId: string) => {
+    if (!confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+      return
+    }
+
+    setDeletingId(invoiceId)
+    try {
+      const result = await api.delete(`/api/v1/invoices/${invoiceId}`, {
+        successMessage: 'Invoice deleted successfully',
+        errorMessage: 'Failed to delete invoice',
+      })
+
+      if (result.success) {
+        setInvoices(prev => prev.filter(i => i.id !== invoiceId))
+      }
+    } catch (error) {
+      console.error('Failed to delete invoice:', error)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -80,11 +104,28 @@ export default function InvoicesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Download className="h-4 w-4" />
+                      <Link href={`/dashboard/invoices/${invoice.id}`}>
+                        <Button variant="ghost" size="sm" title="View details">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link href={`/dashboard/invoices/${invoice.id}/edit`}>
+                        <Button variant="ghost" size="sm" title="Edit invoice">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Delete invoice"
+                        onClick={() => handleDelete(invoice.id)}
+                        disabled={deletingId === invoice.id}
+                      >
+                        {deletingId === invoice.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash className="h-4 w-4 text-destructive" />
+                        )}
                       </Button>
                     </div>
                   </TableCell>

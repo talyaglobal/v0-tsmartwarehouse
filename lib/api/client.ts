@@ -87,9 +87,32 @@ export async function apiClient<T = any>(
     const response = await fetch(url, {
       ...fetchOptions,
       headers,
+      credentials: 'include', // Include cookies for authentication
     })
 
-    const data: ApiResponse<T> = await response.json()
+    // Try to parse JSON response
+    let data: ApiResponse<T>
+    try {
+      const responseText = await response.clone().text()
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        // If JSON parsing fails, create a basic error response with the raw text
+        data = {
+          success: false,
+          error: `Invalid JSON response`,
+          message: responseText.substring(0, 200),
+          status: response.status,
+        } as ApiResponse<T>
+      }
+    } catch (error) {
+      // If reading response fails completely
+      data = {
+        success: false,
+        error: 'Failed to read response',
+        status: response.status,
+      } as ApiResponse<T>
+    }
 
     // Show toast notifications
     if (showToast) {
@@ -104,12 +127,21 @@ export async function apiClient<T = any>(
           duration: 5000,
         })
       } else {
-        // Error response
-        const message = errorMessage || getErrorMessage(data, 'An error occurred')
+        // Error response - include status code and full response
+        let message = errorMessage || getErrorMessage(data, 'An error occurred')
+        if (data.details) {
+          message = `${message}: ${data.details}`
+        }
+        
+        // Add status code and response to message
+        const statusCode = response.status
+        const responseJson = JSON.stringify(data, null, 2)
+        message = `${message}\n\n${statusCode}: ${responseJson}`
+        
         uiStore.addNotification({
           type: 'error',
           message,
-          duration: 5000,
+          duration: 10000, // Longer duration for detailed error messages
         })
       }
     }
@@ -119,11 +151,19 @@ export async function apiClient<T = any>(
     // Network error or parsing error
     if (showToast) {
       const uiStore = getUIStore()
-      const message = errorMessage || (error instanceof Error ? error.message : 'Network error occurred')
+      let message = errorMessage || (error instanceof Error ? error.message : 'Network error occurred')
+      
+      // Add error details if available
+      if (error instanceof Error && error.stack) {
+        message = `${message}\n\nError: ${error.stack}`
+      } else if (error) {
+        message = `${message}\n\nError: ${JSON.stringify(error, null, 2)}`
+      }
+      
       uiStore.addNotification({
         type: 'error',
         message,
-        duration: 5000,
+        duration: 10000,
       })
     }
 

@@ -170,15 +170,16 @@ export async function updateBooking(
   const supabase = createServerSupabaseClient()
   
   const updateRow: Record<string, any> = {}
+  if (updates.type !== undefined) updateRow.type = updates.type
   if (updates.status !== undefined) updateRow.status = updates.status
   if (updates.palletCount !== undefined) updateRow.pallet_count = updates.palletCount
   if (updates.areaSqFt !== undefined) updateRow.area_sq_ft = updates.areaSqFt
   if (updates.floorNumber !== undefined) updateRow.floor_number = updates.floorNumber
-  if (updates.hallId !== undefined) updateRow.hall_id = updates.hallId
+  if (updates.hallId !== undefined) updateRow.hall_id = updates.hallId ?? null
   if (updates.startDate !== undefined) updateRow.start_date = updates.startDate
-  if (updates.endDate !== undefined) updateRow.end_date = updates.endDate
+  if (updates.endDate !== undefined) updateRow.end_date = updates.endDate ?? null
   if (updates.totalAmount !== undefined) updateRow.total_amount = updates.totalAmount
-  if (updates.notes !== undefined) updateRow.notes = updates.notes
+  if (updates.notes !== undefined) updateRow.notes = updates.notes ?? null
 
   const { data, error } = await supabase
     .from('bookings')

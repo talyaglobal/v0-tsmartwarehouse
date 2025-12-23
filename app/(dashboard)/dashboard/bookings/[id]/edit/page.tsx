@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,23 +13,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { PageHeader } from "@/components/ui/page-header"
 import { Badge } from "@/components/ui/badge"
-import { Package, Building2, Loader2, CheckCircle, Info } from "@/components/icons"
+import { ArrowLeft, Package, Building2, Loader2, CheckCircle, Info } from "@/components/icons"
 import { PRICING, WAREHOUSE_CONFIG } from "@/lib/constants"
 import { formatCurrency, formatNumber, calculatePalletCost, calculateAreaRentalCost } from "@/lib/utils/format"
-import type { BookingType } from "@/types"
+import type { Booking, BookingType, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
-import { useUIStore } from "@/stores/ui.store"
 
-export default function NewBookingPage() {
+export default function EditBookingPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
-  const { addNotification } = useUIStore()
-  const [isLoading, setIsLoading] = useState(false)
+  const [bookingId, setBookingId] = useState<string>("")
+  const [booking, setBooking] = useState<Booking | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  
+  // Form state
   const [bookingType, setBookingType] = useState<BookingType>("pallet")
   const [palletCount, setPalletCount] = useState(10)
   const [months, setMonths] = useState(1)
   const [areaSqFt, setAreaSqFt] = useState(40000)
   const [selectedHall, setSelectedHall] = useState("")
   const [notes, setNotes] = useState("")
+  const [status, setStatus] = useState<BookingStatus>("pending")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
 
   // Calculate costs
   const palletCost = calculatePalletCost(palletCount, months, "gold")
@@ -38,81 +44,168 @@ export default function NewBookingPage() {
   // Get Level 3 halls for area rental
   const level3Halls = WAREHOUSE_CONFIG.floors.find((f) => f.floorNumber === 3)?.halls || []
 
+  useEffect(() => {
+    const resolveParams = async () => {
+      const resolvedParams = params instanceof Promise ? await params : params
+      setBookingId(resolvedParams.id)
+    }
+    resolveParams()
+  }, [params])
+
+  useEffect(() => {
+    if (bookingId) {
+      fetchBooking()
+    }
+  }, [bookingId])
+
+  const fetchBooking = async () => {
+    if (!bookingId) return
+    try {
+      setLoading(true)
+      const result = await api.get<Booking>(`/api/v1/bookings/${bookingId}`, { showToast: false })
+      if (result.success && result.data) {
+        const bookingData = result.data
+        setBooking(bookingData)
+        
+        // Populate form with existing booking data
+        setBookingType(bookingData.type)
+        setStatus(bookingData.status)
+        setNotes(bookingData.notes || "")
+        setStartDate(bookingData.startDate)
+        setEndDate(bookingData.endDate || "")
+        
+        if (bookingData.type === "pallet") {
+          setPalletCount(bookingData.palletCount || 10)
+          // Calculate months from start and end date if available
+          if (bookingData.startDate && bookingData.endDate) {
+            const start = new Date(bookingData.startDate)
+            const end = new Date(bookingData.endDate)
+            const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+            setMonths(diffMonths > 0 ? diffMonths : 1)
+          }
+        } else if (bookingData.type === "area-rental") {
+          setAreaSqFt(bookingData.areaSqFt || 40000)
+          setSelectedHall(bookingData.hallId || "")
+        }
+      } else {
+        console.error('Failed to fetch booking:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to fetch booking:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setIsSaving(true)
 
     try {
-      // Calculate start date (today) and end date
-      const startDate = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      // Prepare update body - only include changed fields
+      const updateBody: any = {}
       
-      let endDate: string | undefined
-      if (bookingType === "pallet" && months) {
-        const end = new Date()
-        end.setMonth(end.getMonth() + months)
-        endDate = end.toISOString().split('T')[0]
-      } else if (bookingType === "area-rental") {
-        // Area rental is typically annual, so add 1 year
-        const end = new Date()
-        end.setFullYear(end.getFullYear() + 1)
-        endDate = end.toISOString().split('T')[0]
+      // Check if type changed
+      if (bookingType !== booking?.type) {
+        updateBody.type = bookingType
+      }
+      
+      // Always include status and notes if they exist
+      if (status !== booking?.status) {
+        updateBody.status = status
+      }
+      if (notes !== (booking?.notes || "")) {
+        updateBody.notes = notes || undefined
       }
 
-      // Prepare request body
-      const requestBody: any = {
-        type: bookingType,
-        startDate,
-        notes: notes || undefined,
-      }
-
+      // Update type-specific fields
       if (bookingType === "pallet") {
-        requestBody.palletCount = palletCount
-        requestBody.months = months
-        if (endDate) {
-          requestBody.endDate = endDate
+        if (palletCount !== booking?.palletCount) {
+          updateBody.palletCount = palletCount
+        }
+        
+        // Calculate new end date if months changed
+        if (months !== undefined) {
+          const start = new Date(startDate)
+          const newEnd = new Date(start)
+          newEnd.setMonth(newEnd.getMonth() + months)
+          const newEndDateStr = newEnd.toISOString().split('T')[0]
+          if (newEndDateStr !== endDate) {
+            updateBody.endDate = newEndDateStr
+          }
         }
       } else if (bookingType === "area-rental") {
-        requestBody.areaSqFt = areaSqFt
-        requestBody.floorNumber = 3
-        // Only include hallId if it's a valid UUID format
-        if (selectedHall) {
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          if (uuidRegex.test(selectedHall)) {
-            requestBody.hallId = selectedHall
-          }
-          // If not UUID, skip it (hallId is optional)
+        if (areaSqFt !== booking?.areaSqFt) {
+          updateBody.areaSqFt = areaSqFt
         }
-        if (endDate) {
-          requestBody.endDate = endDate
+        if (selectedHall !== (booking?.hallId || "")) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          if (selectedHall && uuidRegex.test(selectedHall)) {
+            updateBody.hallId = selectedHall
+          } else if (selectedHall === "") {
+            updateBody.hallId = null
+          }
         }
       }
 
-      // Submit booking to API
-      const result = await api.post('/api/v1/bookings', requestBody, {
-        successMessage: 'Booking created successfully!',
-        errorMessage: 'Failed to create booking. Please try again.',
+      // Only send update if there are changes
+      if (Object.keys(updateBody).length === 0) {
+        router.push(`/dashboard/bookings/${bookingId}`)
+        return
+      }
+
+      const result = await api.patch(`/api/v1/bookings/${bookingId}`, updateBody, {
+        successMessage: 'Booking updated successfully',
+        errorMessage: 'Failed to update booking',
       })
 
       if (result.success) {
-        // Redirect to bookings list
-        router.push("/dashboard/bookings")
+        router.push(`/dashboard/bookings/${bookingId}`)
       } else {
-        setIsLoading(false)
+        setIsSaving(false)
       }
     } catch (error) {
-      console.error('Error creating booking:', error)
-      addNotification({
-        type: 'error',
-        message: 'An unexpected error occurred. Please try again.',
-        duration: 5000,
-      })
-      setIsLoading(false)
+      console.error('Error updating booking:', error)
+      setIsSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!booking) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-bold">Edit Booking</h1>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center text-destructive">
+            <p>Booking not found.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="New Booking" description="Create a new warehouse storage booking" />
+      <div className="flex items-center gap-4">
+        <Link href={`/dashboard/bookings/${bookingId}`}>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <PageHeader title="Edit Booking" description="Update booking information" />
+      </div>
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-3">
@@ -166,6 +259,28 @@ export default function NewBookingPage() {
                     </div>
                   </Label>
                 </RadioGroup>
+              </CardContent>
+            </Card>
+
+            {/* Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Status</CardTitle>
+                <CardDescription>Current booking status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={status} onValueChange={(value) => setStatus(value as BookingStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
 
@@ -246,11 +361,12 @@ export default function NewBookingPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="hall">Select Hall</Label>
-                      <Select value={selectedHall} onValueChange={setSelectedHall}>
+                      <Select value={selectedHall || "none"} onValueChange={(value) => setSelectedHall(value === "none" ? "" : value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choose a hall" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
                           {level3Halls.map((hall) => (
                             <SelectItem key={hall.id} value={hall.id}>
                               Hall {hall.hallName} - {formatNumber(hall.availableSqFt)} sq ft available
@@ -371,14 +487,19 @@ export default function NewBookingPage() {
                   </>
                 )}
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col gap-3 sm:flex-row">
+                <Link href={`/dashboard/bookings/${bookingId}`} className="w-full sm:flex-1">
+                  <Button type="button" variant="outline" className="w-full">
+                    Cancel
+                  </Button>
+                </Link>
                 <Button
                   type="submit"
-                  className="w-full"
-                  disabled={isLoading || (bookingType === "area-rental" && !areaCost.isValid)}
+                  className="w-full sm:flex-1"
+                  disabled={isSaving || (bookingType === "area-rental" && !areaCost.isValid)}
                 >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Submit Booking Request
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update Booking
                 </Button>
               </CardFooter>
             </Card>

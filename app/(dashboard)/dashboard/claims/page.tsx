@@ -6,13 +6,17 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertCircle, Plus, Clock, CheckCircle, FileText, Loader2 } from "@/components/icons"
+import { AlertCircle, Plus, Clock, CheckCircle, FileText, Loader2, Eye, Edit, Trash } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Claim } from "@/types"
+import { api } from "@/lib/api/client"
+import { useUIStore } from "@/stores/ui.store"
 
 export default function ClaimsPage() {
   const [claims, setClaims] = useState<Claim[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const addNotification = useUIStore((state) => state.addNotification)
 
   useEffect(() => {
     fetchClaims()
@@ -21,15 +25,36 @@ export default function ClaimsPage() {
   const fetchClaims = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/claims')
-      if (response.ok) {
-        const data = await response.json()
-        setClaims(data.data || [])
+      const result = await api.get('/api/v1/claims', { showToast: false })
+      if (result.success) {
+        setClaims(result.data || [])
       }
     } catch (error) {
       console.error('Failed to fetch claims:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async (claimId: string) => {
+    if (!confirm('Are you sure you want to delete this claim? This action cannot be undone.')) {
+      return
+    }
+
+    setDeletingId(claimId)
+    try {
+      const result = await api.delete(`/api/v1/claims/${claimId}`, {
+        successMessage: 'Claim deleted successfully',
+        errorMessage: 'Failed to delete claim',
+      })
+
+      if (result.success) {
+        setClaims(prev => prev.filter(c => c.id !== claimId))
+      }
+    } catch (error) {
+      console.error('Failed to delete claim:', error)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -109,12 +134,13 @@ export default function ClaimsPage() {
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Submitted</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {customerClaims.map((claim) => (
                   <TableRow key={claim.id}>
-                    <TableCell className="font-medium">#{claim.id}</TableCell>
+                    <TableCell className="font-medium">#{claim.id.substring(0, 8)}</TableCell>
                     <TableCell className="capitalize">{claim.type}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{claim.description}</TableCell>
                     <TableCell>{formatCurrency(claim.amount)}</TableCell>
@@ -122,6 +148,33 @@ export default function ClaimsPage() {
                       <StatusBadge status={claim.status} />
                     </TableCell>
                     <TableCell>{formatDate(claim.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/dashboard/claims/${claim.id}`}>
+                          <Button variant="ghost" size="sm" title="View details">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/dashboard/claims/${claim.id}/edit`}>
+                          <Button variant="ghost" size="sm" title="Edit claim">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Delete claim"
+                          onClick={() => handleDelete(claim.id)}
+                          disabled={deletingId === claim.id}
+                        >
+                          {deletingId === claim.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash className="h-4 w-4 text-destructive" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

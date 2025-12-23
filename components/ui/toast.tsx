@@ -63,14 +63,14 @@ function Toast({ notification, onClose }: ToastProps) {
   return (
     <div
       className={cn(
-        "flex items-start gap-3 p-4 rounded-lg border shadow-lg transition-all duration-300 ease-in-out toast-enter",
+        "flex items-start gap-3 p-4 rounded-lg border shadow-lg transition-all duration-300 ease-in-out toast-enter max-h-[400px] overflow-y-auto",
         styles[notification.type]
       )}
       role="alert"
     >
       <Icon className="h-5 w-5 flex-shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{notification.message}</p>
+        <p className="text-sm font-medium whitespace-pre-wrap break-words">{notification.message}</p>
       </div>
       <button
         onClick={onClose}

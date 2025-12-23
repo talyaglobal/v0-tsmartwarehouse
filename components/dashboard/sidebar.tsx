@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import {
   Warehouse,
@@ -18,10 +19,13 @@ import {
 } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { api } from "@/lib/api/client"
+import { useUser } from "@/lib/hooks/use-user"
+import type { Booking } from "@/types"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Bookings", href: "/dashboard/bookings", icon: Package, badge: 3 },
+  { name: "Bookings", href: "/dashboard/bookings", icon: Package },
   { name: "Invoices", href: "/dashboard/invoices", icon: FileText },
   { name: "Claims", href: "/dashboard/claims", icon: AlertCircle },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2 },
@@ -31,6 +35,23 @@ const navigation = [
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const { user } = useUser()
+
+  // Fetch pending bookings count
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ['bookings', user?.id, 'pending-count'],
+    queryFn: async () => {
+      if (!user) return 0
+      const result = await api.get<Booking[]>(`/api/v1/bookings?customerId=${user.id}`, { showToast: false })
+      if (result.success && result.data) {
+        return result.data.filter(booking => booking.status === 'pending').length
+      }
+      return 0
+    },
+    enabled: !!user,
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 60 * 1000, // Refetch every minute
+  })
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
@@ -53,7 +74,11 @@ export function DashboardSidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3">
         {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          // For Dashboard, only match exact path to avoid matching child routes
+          // For other items, match exact path or child routes
+          const isActive = item.href === "/dashboard"
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + "/")
           return (
             <Link
               key={item.name}
@@ -67,7 +92,14 @@ export function DashboardSidebar() {
             >
               <item.icon className="h-4 w-4" />
               {item.name}
-              {item.badge && (
+              {/* Show badge for Bookings if there are pending bookings */}
+              {item.name === "Bookings" && pendingCount > 0 && (
+                <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                  {pendingCount}
+                </Badge>
+              )}
+              {/* Show badge for other items if badge is defined */}
+              {item.name !== "Bookings" && item.badge && (
                 <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
                   {item.badge}
                 </Badge>
