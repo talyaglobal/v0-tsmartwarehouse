@@ -15,4 +15,6 @@ export * from './payments'
 export * from './inventory'
 export * from './analytics'
 export * from './audit'
+export * from './companies'
+export * from './warehouses'
 
