@@ -57,7 +57,6 @@ export function useToastNotifications() {
 
       // Show toast
       addNotification({
-        id: `toast-${latestNotification.id}`,
         type: toastType,
         message: `${latestNotification.title}\n${latestNotification.message}`,
         duration: 5000, // 5 seconds

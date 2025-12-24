@@ -8,8 +8,13 @@ import type {
   EventPayload,
   BookingRequestedPayload,
   BookingProposalCreatedPayload,
+  BookingProposalAcceptedPayload,
+  BookingProposalRejectedPayload,
   BookingApprovedPayload,
+  BookingRejectedPayload,
   InvoiceGeneratedPayload,
+  InvoicePaidPayload,
+  InvoiceOverduePayload,
   WarehouseOccupancyUpdatedPayload,
   TeamMemberInvitedPayload,
 } from './types'
@@ -120,7 +125,7 @@ async function handleBookingProposalCreated(
  * Handle booking proposal accepted event
  */
 async function handleBookingProposalAccepted(
-  payload: BookingProposalCreatedPayload
+  payload: BookingProposalAcceptedPayload
 ): Promise<void> {
   const supabase = await createServerSupabaseClient()
 
@@ -146,7 +151,7 @@ async function handleBookingProposalAccepted(
  * Handle booking proposal rejected event
  */
 async function handleBookingProposalRejected(
-  payload: BookingProposalCreatedPayload
+  payload: BookingProposalRejectedPayload
 ): Promise<void> {
   const supabase = await createServerSupabaseClient()
 
@@ -211,7 +216,7 @@ async function handleBookingApproved(payload: BookingApprovedPayload): Promise<v
 /**
  * Handle booking rejected event
  */
-async function handleBookingRejected(payload: BookingApprovedPayload): Promise<void> {
+async function handleBookingRejected(payload: BookingRejectedPayload): Promise<void> {
   const supabase = await createServerSupabaseClient()
 
   await supabase.from('notification_events').insert({
@@ -274,7 +279,7 @@ async function handleInvoiceGenerated(payload: InvoiceGeneratedPayload): Promise
 /**
  * Handle invoice paid event
  */
-async function handleInvoicePaid(payload: InvoiceGeneratedPayload): Promise<void> {
+async function handleInvoicePaid(payload: InvoicePaidPayload): Promise<void> {
   const supabase = await createServerSupabaseClient()
 
   await supabase.from('notification_events').insert({
@@ -289,7 +294,7 @@ async function handleInvoicePaid(payload: InvoiceGeneratedPayload): Promise<void
 /**
  * Handle invoice overdue event
  */
-async function handleInvoiceOverdue(payload: InvoiceGeneratedPayload): Promise<void> {
+async function handleInvoiceOverdue(payload: InvoiceOverduePayload): Promise<void> {
   const supabase = await createServerSupabaseClient()
 
   await supabase.from('notification_events').insert({

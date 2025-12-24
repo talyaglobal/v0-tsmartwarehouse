@@ -91,18 +91,23 @@ export async function getRetryableEmails(
 ): Promise<EmailQueueItem[]> {
   const supabase = await createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  // Get failed emails and filter in memory (since we can't use raw SQL in Supabase client)
+  const { data: allFailed, error: fetchError } = await supabase
     .from('email_queue')
     .select('*')
     .eq('status', 'failed')
-    .lt('retry_count', supabase.raw('max_retries'))
     .order('priority', { ascending: false })
     .order('created_at', { ascending: true })
-    .limit(limit)
+    .limit(limit * 2) // Get more to filter
 
-  if (error) {
-    throw new Error(`Failed to get retryable emails: ${error.message}`)
+  if (fetchError) {
+    throw new Error(`Failed to get retryable emails: ${fetchError.message}`)
   }
+
+  // Filter where retry_count < max_retries
+  const data = (allFailed || []).filter(
+    (item) => item.retry_count < item.max_retries
+  ).slice(0, limit)
 
   return (data || []).map(mapEmailQueueItem)
 }

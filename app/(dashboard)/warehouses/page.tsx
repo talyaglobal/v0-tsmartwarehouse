@@ -4,10 +4,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/page-header'
-import { Building2, MapPin, DollarSign, Package, Search } from '@/components/icons'
-import { formatCurrency } from '@/lib/utils/format'
+import { Building2, MapPin, Package, Search } from '@/components/icons'
 import { api } from '@/lib/api/client'
 import type { Warehouse } from '@/types'
 
@@ -15,14 +13,10 @@ export default function WarehouseMarketplacePage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filters, setFilters] = useState({
-    city: '',
-    state: '',
-  })
 
   useEffect(() => {
     fetchWarehouses()
-  }, [filters])
+  }, [])
 
   async function fetchWarehouses() {
     try {
@@ -42,14 +36,18 @@ export default function WarehouseMarketplacePage() {
     if (searchTerm && !w.name.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false
     }
-    if (filters.city && w.city !== filters.city) {
-      return false
-    }
-    if (filters.state && w.state !== filters.state) {
-      return false
-    }
     return true
   })
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">Loading warehouses...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

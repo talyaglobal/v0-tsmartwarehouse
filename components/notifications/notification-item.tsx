@@ -11,7 +11,6 @@ function formatTimeAgo(date: Date): string {
   return `${Math.floor(seconds / 604800)}w ago`
 }
 import { useRealtimeNotifications } from '@/lib/realtime/hooks'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Notification } from '@/types'
 import {

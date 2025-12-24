@@ -24,17 +24,21 @@ export async function processNotificationEvent(
 ): Promise<ProcessedEvent> {
   const supabase = await createServerSupabaseClient()
 
+  let event: any = null
+
   try {
     // Fetch the event
-    const { data: event, error: fetchError } = await supabase
+    const { data: fetchedEvent, error: fetchError } = await supabase
       .from('notification_events')
       .select('*')
       .eq('id', eventId)
       .single()
 
-    if (fetchError || !event) {
+    if (fetchError || !fetchedEvent) {
       throw new Error(`Event not found: ${eventId}`)
     }
+
+    event = fetchedEvent
 
     // Check if already processed
     if (event.status === 'completed') {
@@ -83,8 +87,7 @@ export async function processNotificationEvent(
       recipients.map(async (recipient) => {
         const notificationOptions = await buildNotificationOptions(
           payload,
-          recipient.userId,
-          recipient.role
+          recipient.userId
         )
 
         if (notificationOptions) {
@@ -139,17 +142,18 @@ export async function processNotificationEvent(
     }
   } catch (error) {
     // Update event with error
-    await supabase
-      .from('notification_events')
-      .update({
-        status: 'failed',
-        error_message: error instanceof Error ? error.message : String(error),
-        retry_count: (event?.retry_count || 0) + 1,
-      })
-      .eq('id', eventId)
-      .catch(() => {
-        // Ignore update errors
-      })
+    try {
+      await supabase
+        .from('notification_events')
+        .update({
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : String(error),
+          retry_count: (event?.retry_count || 0) + 1,
+        })
+        .eq('id', eventId)
+    } catch (updateError) {
+      // Ignore update errors
+    }
 
     return {
       id: eventId,
@@ -290,11 +294,8 @@ async function determineRecipients(
  */
 async function buildNotificationOptions(
   payload: EventPayload,
-  userId: string,
-  role?: string
+  userId: string
 ): Promise<any | null> {
-  const notificationService = getNotificationService()
-
   let title = ''
   let message = ''
   let type: 'booking' | 'invoice' | 'task' | 'incident' | 'system' = 'system'

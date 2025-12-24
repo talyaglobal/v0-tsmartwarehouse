@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
 import { createBookingRequest } from '@/features/bookings/actions'
 import { api } from '@/lib/api/client'
-import { formatCurrency } from '@/lib/utils/format'
 import type { Warehouse } from '@/types'
 
 export default function BookWarehousePage() {

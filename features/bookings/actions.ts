@@ -6,6 +6,7 @@ import { getEventEmitter } from '@/lib/events/event-emitter'
 import type {
   BookingRequestedPayload,
   BookingProposalCreatedPayload,
+  BookingProposalAcceptedPayload,
   BookingApprovedPayload,
   BookingRejectedPayload,
 } from '@/lib/events/types'
@@ -259,7 +260,7 @@ export async function acceptBookingProposal(
       customerId: proposal.bookings.customer_id,
       warehouseOwnerId: proposal.bookings.warehouses.owner_company_id,
       timestamp: new Date().toISOString(),
-    } as BookingProposalCreatedPayload)
+    } as BookingProposalAcceptedPayload)
 
     revalidatePath('/dashboard/bookings')
     return { success: true }
@@ -480,6 +481,60 @@ export async function rejectBooking(
     } as BookingRejectedPayload)
 
     revalidatePath('/warehouse-owner/bookings')
+    revalidatePath('/dashboard/bookings')
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Cancel booking (customer)
+ */
+export async function cancelBookingAction(
+  bookingId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createServerSupabaseClient()
+
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    // Get booking
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .single()
+
+    if (!booking) {
+      return { success: false, error: 'Booking not found' }
+    }
+
+    // Verify user is customer
+    if (booking.customer_id !== user.id) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    // Update booking status
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status: 'cancelled' })
+      .eq('id', bookingId)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
     revalidatePath('/dashboard/bookings')
     return { success: true }
   } catch (error) {

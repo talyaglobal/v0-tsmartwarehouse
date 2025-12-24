@@ -82,6 +82,12 @@ export async function createWarehouseAction(
     // Create warehouse
     const warehouse = await createWarehouse({
       ...input,
+      amenities: input.amenities || [],
+      operatingHours: input.operatingHours || {
+        open: '08:00',
+        close: '18:00',
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+      },
       ownerCompanyId: profile.company_id,
     })
 
@@ -119,13 +125,6 @@ export async function updateWarehouseAction(
     if (!warehouse) {
       return { success: false, error: 'Warehouse not found' }
     }
-
-    // Get user's profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .single()
 
     // Verify ownership (this will be checked via RLS in production)
     // For now, we'll allow if user is admin or warehouse owner

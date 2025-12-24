@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { RealtimeChannel, RealtimeChannelStatus } from '@supabase/supabase-js'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Notification } from '@/types'
 
 export interface UseNotificationSubscriptionOptions {
@@ -52,14 +52,14 @@ export function useNotificationSubscription({
             table: 'notifications',
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
+          (payload: any) => {
             const notification = payload.new as Notification
             if (onNewNotification) {
               onNewNotification(notification)
             }
           }
         )
-        .subscribe((status: RealtimeChannelStatus) => {
+        .subscribe((status: string) => {
           setIsConnected(status === 'SUBSCRIBED')
           setError(null)
           isConnectingRef.current = false
