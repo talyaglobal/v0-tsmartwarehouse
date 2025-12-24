@@ -225,44 +225,41 @@ export async function requestPasswordReset(formData: FormData): Promise<{ error?
       }
     }
 
-    // Use unauthenticated client for password reset (no auth required)
-    const supabase = createServerSupabaseClient()
-    
-    // Get the site URL for redirect
+    // Use API endpoint that uses nodemailer
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
-    const redirectUrl = `${siteUrl}/reset-password`
+    const apiUrl = `${siteUrl}/api/v1/auth/request-password-reset`
 
-    console.log('Sending password reset email to:', email)
-    console.log('Redirect URL:', redirectUrl)
+    console.log('Requesting password reset via API:', email)
 
-    // Send password reset email
-    // Supabase will only send email if user exists (for security)
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    })
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
 
-    console.log('Password reset response:', { data, error })
+      const result = await response.json()
 
-    if (error) {
-      // Log the error for debugging
-      console.error('Password reset error:', error)
-      
-      // Check for specific errors that we should show
-      if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
-        return {
-          error: {
-            message: 'Too many requests. Please try again later.',
-          },
+      if (!result.success) {
+        // Check for specific errors that we should show
+        if (result.error?.includes('rate limit') || result.error?.includes('too many requests')) {
+          return {
+            error: {
+              message: 'Too many requests. Please try again later.',
+            },
+          }
         }
       }
-      
-      // For other errors, don't reveal if email exists or not for security
-      // But log it for debugging
-      // Return success anyway to prevent email enumeration
-    }
 
-    // Always return success (don't reveal if email exists)
-    return undefined
+      // Always return success (don't reveal if email exists)
+      return undefined
+    } catch (error) {
+      console.error('Password reset API error:', error)
+      // Return success anyway to prevent email enumeration
+      return undefined
+    }
   } catch (error) {
     console.error('Password reset request error:', error)
     // Return success anyway to prevent email enumeration
