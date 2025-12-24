@@ -16,6 +16,7 @@ const registerSchema = z.object({
   confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().optional(),
+  companyName: z.string().min(2, 'Company name must be at least 2 characters'),
   role: z.enum(['customer', 'admin', 'worker']).optional(),
   storageType: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -108,6 +109,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const confirmPassword = formData.get('confirmPassword') as string
     const name = formData.get('name') as string
     const phone = formData.get('phone') as string | null
+    const companyName = formData.get('companyName') as string | null
     const storageType = formData.get('storageType') as string | null
 
     // Validate input
@@ -117,6 +119,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       confirmPassword,
       name,
       phone: phone || undefined,
+      companyName: companyName || undefined,
       storageType: storageType || undefined,
     })
 
@@ -222,7 +225,104 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       // Profile doesn't exist, create it manually
       console.log('Profile not found, creating manually...')
       
-      // Try to create profile with upsert to handle race conditions
+      // Get company name from form data
+      const companyName = formData.get('companyName') as string | null
+      
+      if (!companyName || !companyName.trim()) {
+        // Try to delete the user if company name is missing
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+          console.log('User deleted after missing company name')
+        } catch (deleteError) {
+          console.error('Failed to delete user:', deleteError)
+        }
+        return {
+          error: {
+            message: 'Company name is required.',
+          },
+        }
+      }
+
+      // Check if company exists (exact match, case-insensitive)
+      const trimmedCompanyName = companyName.trim()
+      
+      // Search for companies with similar names
+      const { data: similarCompanies } = await supabaseAdmin
+        .from('companies')
+        .select('id, name')
+        .ilike('name', `%${trimmedCompanyName}%`)
+        .eq('type', 'customer_company')
+      
+      // Find exact match (case-insensitive)
+      const existingCompany = similarCompanies?.find(
+        (c) => c.name.toLowerCase() === trimmedCompanyName.toLowerCase()
+      ) || null
+      
+      const isExactMatch = !!existingCompany
+
+      let companyId: string
+
+      if (isExactMatch && existingCompany) {
+        // Exact match found - use existing company
+        companyId = existingCompany.id
+        console.log('Using existing company:', existingCompany.name)
+      } else {
+        // No exact match - create new company
+        // But first check if company name already exists (prevent duplicates)
+        const { data: duplicateCheck } = await supabaseAdmin
+          .from('companies')
+          .select('id, name')
+          .eq('type', 'customer_company')
+          .limit(100) // Get all to check exact match
+        
+        const duplicate = duplicateCheck?.find(
+          (c) => c.name.toLowerCase() === trimmedCompanyName.toLowerCase()
+        )
+        
+        if (duplicate) {
+          // Company already exists - user should select it
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            console.log('User deleted - company already exists')
+          } catch (deleteError) {
+            console.error('Failed to delete user:', deleteError)
+          }
+          return {
+            error: {
+              message: `Company "${duplicate.name}" already exists. Please select it from the suggestions.`,
+            },
+          }
+        }
+        
+        // Create new company
+        const { data: newCompany, error: companyCreateError } = await supabaseAdmin
+          .from('companies')
+          .insert({
+            name: trimmedCompanyName,
+            type: 'customer_company',
+          })
+          .select()
+          .single()
+
+        if (companyCreateError) {
+          console.error('Company creation error:', companyCreateError)
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            console.log('User deleted after company creation failure')
+          } catch (deleteError) {
+            console.error('Failed to delete user after company creation error:', deleteError)
+          }
+          return {
+            error: {
+              message: `Failed to create company: ${companyCreateError.message}. Please try again.`,
+            },
+          }
+        }
+        companyId = newCompany.id
+        console.log('Created new company:', newCompany.name)
+      }
+
+      // Now create profile with company_id
       const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
         .from('profiles')
         .upsert({
@@ -232,6 +332,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           role: 'customer',
           phone: validation.data.phone || null,
           storage_interest: validation.data.storageType || null,
+          company_id: companyId,
         }, {
           onConflict: 'id'
         })
@@ -247,12 +348,16 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           hint: profileCreateError.hint,
         })
         
-        // Don't delete the user - let them try to login and we can fix the profile later
-        // The user was created successfully, profile is just missing
-        console.warn('User created but profile creation failed. User ID:', data.user.id)
+        // Try to delete the user if profile creation fails
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+          console.log('User deleted after profile creation failure')
+        } catch (deleteError) {
+          console.error('Failed to cleanup after profile creation error:', deleteError)
+        }
         return {
           error: {
-            message: `Account created but profile setup failed: ${profileCreateError.message}. Please contact support with user ID: ${data.user.id}`,
+            message: `Account creation failed: ${profileCreateError.message}. Please try again.`,
           },
         }
       }
