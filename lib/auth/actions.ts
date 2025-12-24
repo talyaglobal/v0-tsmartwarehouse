@@ -132,8 +132,29 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     // Use admin API to create user directly (no email sent)
     const supabaseAdmin = createServerSupabaseClient()
     
+    // Check if service role key is configured
+    const hasServiceRoleKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!hasServiceRoleKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured!')
+      return {
+        error: {
+          message: 'Server configuration error. Please contact support.',
+        },
+      }
+    }
+    
     // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+    
+    if (listError) {
+      console.error('Error checking existing users:', listError)
+      return {
+        error: {
+          message: 'Database error. Please try again.',
+        },
+      }
+    }
+    
     const userExists = existingUsers?.users?.find(u => u.email === validation.data.email)
     
     if (userExists) {
@@ -145,6 +166,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     }
 
     // Create user directly with admin API (no email sent)
+    console.log('Creating user with email:', validation.data.email)
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: validation.data.email,
       password: validation.data.password,
@@ -158,9 +180,15 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     })
 
     if (error) {
+      console.error('User creation error:', error)
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      })
       return {
         error: {
-          message: error.message,
+          message: error.message || 'Database error creating new user',
         },
       }
     }
@@ -173,8 +201,65 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
+    console.log('User created successfully, ID:', data.user.id)
+    
     // Wait a moment for the trigger to create the profile
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Verify profile was created by trigger, if not create it manually
+    console.log('Checking if profile exists...')
+    const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profileCheckError) {
+      console.log('Profile check error (might be normal if profile does not exist yet):', profileCheckError.message)
+    }
+
+    if (profileCheckError || !existingProfile) {
+      // Profile doesn't exist, create it manually
+      console.log('Profile not found, creating manually...')
+      
+      // Try to create profile with upsert to handle race conditions
+      const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: data.user.id,
+          email: validation.data.email,
+          name: validation.data.name,
+          role: 'customer',
+          phone: validation.data.phone || null,
+          storage_interest: validation.data.storageType || null,
+        }, {
+          onConflict: 'id'
+        })
+        .select()
+        .single()
+
+      if (profileCreateError) {
+        console.error('Profile creation error:', profileCreateError)
+        console.error('Profile creation error details:', {
+          code: profileCreateError.code,
+          message: profileCreateError.message,
+          details: profileCreateError.details,
+          hint: profileCreateError.hint,
+        })
+        
+        // Don't delete the user - let them try to login and we can fix the profile later
+        // The user was created successfully, profile is just missing
+        console.warn('User created but profile creation failed. User ID:', data.user.id)
+        return {
+          error: {
+            message: `Account created but profile setup failed: ${profileCreateError.message}. Please contact support with user ID: ${data.user.id}`,
+          },
+        }
+      }
+      console.log('Profile created manually:', insertedProfile?.id)
+    } else {
+      console.log('Profile already exists (created by trigger)')
+    }
 
     // Registration successful - user can login immediately (no email sent)
     return { error: undefined }
