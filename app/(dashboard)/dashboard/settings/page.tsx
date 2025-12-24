@@ -18,7 +18,7 @@ import { api } from "@/lib/api/client"
 
 interface Company {
   id: string
-  name: string
+  name: string | null
   logo_url: string | null
   vat: string | null
   address: string | null
@@ -105,7 +105,7 @@ export default function SettingsPage() {
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: async (updates: { name?: string; phone?: string }) => {
+    mutationFn: async (updates: { name?: string | null; phone?: string | null }) => {
       if (!user) throw new Error('User not found')
       
       const supabase = createClient()
@@ -176,8 +176,8 @@ export default function SettingsPage() {
     
     try {
       await updateProfileMutation.mutateAsync({
-        name: profileForm.name || null,
-        phone: profileForm.phone || null,
+        name: profileForm.name || undefined,
+        phone: profileForm.phone || undefined,
       })
     } catch (error) {
       console.error('Error updating profile:', error)
@@ -203,13 +203,13 @@ export default function SettingsPage() {
       await updateCompanyMutation.mutateAsync({
         companyId: profile.company_id,
         updates: {
-          name: companyForm.name || null,
-          vat: companyForm.vat || null,
-          address: companyForm.address || null,
-          postal_code: companyForm.postalCode || null,
-          city: companyForm.city || null,
-          country: companyForm.country || null,
-          logo_url: companyForm.logoUrl || null,
+          name: companyForm.name || undefined,
+          vat: companyForm.vat || undefined,
+          address: companyForm.address || undefined,
+          postal_code: companyForm.postalCode || undefined,
+          city: companyForm.city || undefined,
+          country: companyForm.country || undefined,
+          logo_url: companyForm.logoUrl || undefined,
         },
       })
     } catch (error) {

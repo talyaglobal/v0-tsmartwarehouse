@@ -254,16 +254,16 @@ export async function requestPasswordReset(formData: FormData): Promise<{ error?
       }
 
       // Always return success (don't reveal if email exists)
-      return undefined
+      return {}
     } catch (error) {
       console.error('Password reset API error:', error)
       // Return success anyway to prevent email enumeration
-      return undefined
+      return {}
     }
   } catch (error) {
     console.error('Password reset request error:', error)
     // Return success anyway to prevent email enumeration
-    return undefined
+    return {}
   }
 }
 

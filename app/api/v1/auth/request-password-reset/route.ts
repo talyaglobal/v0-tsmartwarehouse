@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { handleApiError } from "@/lib/utils/logger"
 import { sendEmail } from "@/lib/email/nodemailer"
 import { getPasswordResetEmailTemplate } from "@/lib/email/templates/password-reset"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
@@ -116,7 +115,8 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(responseData)
   } catch (error) {
-    const errorResponse = handleApiError(error, { path: "/api/v1/auth/request-password-reset", method: "POST" })
+    // Log error for debugging
+    console.error('Password reset request error:', error)
     // For security, don't reveal the error
     const responseData: ApiResponse = {
       success: true,

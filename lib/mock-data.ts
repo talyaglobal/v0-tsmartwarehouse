@@ -16,7 +16,7 @@ export const mockUsers: User[] = [
     email: "customer@example.com",
     name: "Sarah Johnson",
     role: "customer",
-    company: "Acme Corp",
+    companyName: "Acme Corp",
     phone: "+1 555-0101",
     membershipTier: "gold",
     creditBalance: 2500,

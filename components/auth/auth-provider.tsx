@@ -59,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name,
       role: (supabaseUser.user_metadata?.role as UserRole) || 'customer',
       phone: supabaseUser.user_metadata?.phone,
-      company: supabaseUser.user_metadata?.company,
       avatar: supabaseUser.user_metadata?.avatar_url,
       emailVerified: !!supabaseUser.email_confirmed_at,
     }
