@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
 
     // Admin login page - redirect admins to admin panel, others to their dashboard
     if (isAdminLoginRoute) {
-      if (userRole === 'admin') {
+      if (userRole === 'super_admin') {
         return NextResponse.redirect(new URL('/admin', request.url))
       } else {
         return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -125,7 +125,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Regular login/register pages
-    if (userRole === 'admin') {
+    if (userRole === 'super_admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
     } else if (userRole === 'worker') {
       return NextResponse.redirect(new URL('/worker', request.url))
@@ -161,8 +161,8 @@ export async function middleware(request: NextRequest) {
       // If profile fetch fails, use metadata role
     }
 
-    // Admin routes - only admins can access
-    if (isAdminRoute && userRole !== 'admin') {
+    // Admin routes - only super admins can access
+    if (isAdminRoute && userRole !== 'super_admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
@@ -171,8 +171,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Dashboard routes - customers, admins, and owners can access
-    if (isDashboardRoute && !['customer', 'admin', 'owner'].includes(userRole)) {
+    // Dashboard routes - customers, super admins, and owners can access
+    if (isDashboardRoute && !['customer', 'super_admin', 'owner'].includes(userRole)) {
       return NextResponse.redirect(new URL('/worker', request.url))
     }
   }

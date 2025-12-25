@@ -18,7 +18,7 @@ export async function DELETE(
     const { id: companyId, invitationId } = await params
 
     // Check if user has permission
-    if (user.role !== 'admin') {
+    if (user.role !== 'super_admin') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {

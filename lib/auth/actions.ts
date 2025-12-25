@@ -17,7 +17,7 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().optional(),
   companyName: z.string().min(2, 'Company name must be at least 2 characters'),
-  role: z.enum(['customer', 'admin', 'worker']).optional(),
+  role: z.enum(['customer', 'super_admin', 'worker']).optional(),
   storageType: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -81,7 +81,7 @@ export async function signIn(formData: FormData): Promise<{ error?: AuthError }>
 
     if (redirectTo && !redirectTo.startsWith('/login') && !redirectTo.startsWith('/register')) {
       redirectPath = redirectTo
-    } else if (userRole === 'admin') {
+    } else if (userRole === 'super_admin') {
       redirectPath = '/admin'
     } else if (userRole === 'worker') {
       redirectPath = '/worker'

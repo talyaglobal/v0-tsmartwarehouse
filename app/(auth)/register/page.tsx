@@ -250,7 +250,7 @@ export default function RegisterPage() {
 
           // Determine redirect path based on role
           let redirectPath = '/dashboard'
-          if (role === 'admin') {
+          if (role === 'super_admin') {
             redirectPath = '/admin'
           } else if (role === 'worker') {
             redirectPath = '/worker'

@@ -18,7 +18,7 @@ export async function GET(
     const { id: companyId } = await params
 
     // Check if user has permission to view company members
-    if (user.role !== 'admin') {
+    if (user.role !== 'super_admin') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {

@@ -78,7 +78,7 @@ export default function AdminLoginPage() {
         const role = profile?.role || data.user.user_metadata?.role || 'customer'
 
         // Verify user is an admin
-        if (role !== 'admin') {
+        if (role !== 'super_admin') {
           // Sign out the user since they're not an admin
           await supabase.auth.signOut()
           setError('Access denied. Admin privileges required.')

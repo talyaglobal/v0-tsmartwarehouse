@@ -6,7 +6,7 @@ export const mockUsers: User[] = [
     id: "user-1",
     email: "admin@tsmart.com",
     name: "John Admin",
-    role: "admin",
+    role: "super_admin",
     phone: "+1 555-0100",
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",

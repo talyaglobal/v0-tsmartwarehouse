@@ -158,7 +158,7 @@ export default function LoginPage() {
         let redirectPath = '/dashboard'
         if (redirect) {
           redirectPath = redirect
-        } else if (role === 'admin') {
+        } else if (role === 'super_admin') {
           redirectPath = '/admin'
         } else if (role === 'worker') {
           redirectPath = '/worker'

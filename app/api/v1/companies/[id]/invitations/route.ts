@@ -21,7 +21,7 @@ export async function GET(
     const { id: companyId } = await params
 
     // Check if user has permission
-    if (user.role !== 'admin') {
+    if (user.role !== 'super_admin') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {
@@ -188,7 +188,7 @@ export async function POST(
     }
 
     // Check if user has permission
-    if (user.role !== 'admin') {
+    if (user.role !== 'super_admin') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {
@@ -343,7 +343,7 @@ export async function POST(
         // Store role in profile (will be used when invitation is accepted)
         // Store password temporarily for auto-login (will be cleared when invitation is accepted)
         // DO NOT set company_id yet - it will be set when invitation is accepted
-        const profileRole = role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'customer'
+        const profileRole = role === 'owner' ? 'owner' : role === 'company_admin' ? 'company_admin' : 'customer'
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
           .update({ 
@@ -370,7 +370,7 @@ export async function POST(
         console.log('✅ Profile updated with invitation token')
       } else {
         // Profile doesn't exist, create it with invitation token, role, and password (no company_id)
-        const profileRole = role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'customer'
+        const profileRole = role === 'owner' ? 'owner' : role === 'company_admin' ? 'company_admin' : 'customer'
         const { error: profileCreateError } = await supabaseAdmin
           .from('profiles')
           .insert({

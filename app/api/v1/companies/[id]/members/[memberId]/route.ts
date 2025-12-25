@@ -73,16 +73,16 @@ export async function PATCH(
 
     // Map invitation role to profile role
     const profileRole = role === 'owner' ? 'owner' :
-                       role === 'admin' ? 'admin' :
+                       role === 'company_admin' ? 'company_admin' :
                        role === 'member' ? 'customer' :
                        undefined
 
     const updates: Record<string, any> = {}
     if (profileRole !== undefined) {
-      if (!['owner', 'admin', 'customer'].includes(profileRole)) {
+      if (!['owner', 'company_admin', 'customer'].includes(profileRole)) {
         const errorData: ErrorResponse = {
           success: false,
-          error: "Invalid role. Must be 'owner', 'admin', or 'member'",
+          error: "Invalid role. Must be 'owner', 'company_admin', or 'member'",
           statusCode: 400,
         }
         return NextResponse.json(errorData, { status: 400 })
@@ -140,7 +140,7 @@ export async function DELETE(
     const { id: companyId, memberId } = await params
 
     // Check if user has permission
-    if (user.role !== 'admin') {
+    if (user.role !== 'super_admin') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {

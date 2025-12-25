@@ -1,7 +1,7 @@
 // Core Types for TSmart Warehouse Management System
 
 // User Types
-export type UserRole = "admin" | "customer" | "worker"
+export type UserRole = "super_admin" | "customer" | "worker"
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
 export interface User {
@@ -11,7 +11,7 @@ export interface User {
   role: UserRole
   companyId?: string
   companyName?: string
-  companyRole?: 'owner' | 'admin' | 'member' | null // Role in company (from company_members table)
+  companyRole?: 'owner' | 'company_admin' | 'member' | null // Role in company (from company_members table)
   phone?: string
   avatar?: string
   membershipTier?: MembershipTier

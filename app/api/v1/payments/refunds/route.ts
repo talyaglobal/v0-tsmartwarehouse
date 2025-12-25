@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
 
     // Only admins can create refunds
-    if (user?.role !== "admin") {
+    if (user?.role !== "super_admin") {
       const errorData: ErrorResponse = {
         success: false,
         error: "Only admins can create refunds",

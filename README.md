@@ -20,12 +20,14 @@ Modern, enterprise-grade warehouse management system featuring:
 
 All documentation is located in the `/docs` folder:
 
+- **[IMPLEMENTATION_STATUS.md](./docs/IMPLEMENTATION_STATUS.md)** - 🆕 Complete project status and progress tracking
 - **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - Detailed architecture documentation
 - **[MIGRATION_GUIDE.md](./docs/MIGRATION_GUIDE.md)** - Migration guide from old patterns
 - **[MODERNIZATION_SUMMARY.md](./docs/MODERNIZATION_SUMMARY.md)** - Summary of modernization changes
 - **[QUICK_START.md](./docs/QUICK_START.md)** - Quick start guide for developers
 - **[API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md)** - API documentation
 - **[DEVELOPER_SETUP.md](./docs/DEVELOPER_SETUP.md)** - Developer setup guide
+- **[DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md)** - Complete database schema documentation
 
 ## 🏗️ Architecture
 
