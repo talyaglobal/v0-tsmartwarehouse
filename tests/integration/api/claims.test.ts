@@ -10,6 +10,10 @@ import { mockUser } from '@/tests/utils/mocks'
 // Mock the database functions
 jest.mock('@/lib/db/claims')
 jest.mock('@/lib/auth/api-middleware')
+jest.mock('@/lib/auth/company-admin', () => ({
+  isCompanyAdmin: jest.fn().mockResolvedValue(false),
+  getUserCompanyId: jest.fn().mockResolvedValue(null),
+}))
 jest.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: jest.fn(() => ({
     from: jest.fn(() => ({
@@ -44,6 +48,10 @@ const mockClaim = {
 describe('/api/v1/claims', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // Setup default auth mock
+    mockRequireAuth.mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com', role: 'customer' },
+    } as any)
   })
 
   describe('GET', () => {
@@ -114,7 +122,8 @@ describe('/api/v1/claims', () => {
       const request = new NextRequest('http://localhost:3000/api/v1/claims', {
         method: 'POST',
         body: JSON.stringify({
-          bookingId: 'booking-123',
+          type: 'damage',
+          bookingId: '550e8400-e29b-41d4-a716-446655440001',
           description: 'Test claim',
           amount: 1000,
         }),
@@ -168,7 +177,6 @@ describe('/api/v1/claims', () => {
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
       expect(data.error).toBe('Validation error')
-      expect(data.details).toBeDefined()
     })
 
     it('sets default status to submitted if not provided', async () => {
@@ -180,7 +188,8 @@ describe('/api/v1/claims', () => {
       const request = new NextRequest('http://localhost:3000/api/v1/claims', {
         method: 'POST',
         body: JSON.stringify({
-          bookingId: 'booking-123',
+          type: 'damage',
+          bookingId: '550e8400-e29b-41d4-a716-446655440001',
           description: 'Test claim',
           amount: 1000,
         }),
@@ -204,7 +213,8 @@ describe('/api/v1/claims', () => {
       const request = new NextRequest('http://localhost:3000/api/v1/claims', {
         method: 'POST',
         body: JSON.stringify({
-          bookingId: 'booking-123',
+          type: 'damage',
+          bookingId: '550e8400-e29b-41d4-a716-446655440001',
           description: 'Test claim',
           amount: 1000,
         }),

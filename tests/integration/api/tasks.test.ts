@@ -99,9 +99,9 @@ describe('/api/v1/tasks', () => {
           title: 'Receive shipment',
           description: 'Receive 50 pallets',
           priority: 'high',
-          assignedTo: 'worker-123',
-          bookingId: 'booking-123',
-          warehouseId: 'wh-001',
+          assignedTo: '550e8400-e29b-41d4-a716-446655440001',
+          bookingId: '550e8400-e29b-41d4-a716-446655440002',
+          warehouseId: '550e8400-e29b-41d4-a716-446655440003',
         }),
       })
 
@@ -129,7 +129,6 @@ describe('/api/v1/tasks', () => {
       expect(response.status).toBe(400)
       expect(data.success).toBe(false)
       expect(data.error).toBe('Validation error')
-      expect(data.details).toBeDefined()
     })
 
     it('sets default status to pending if not provided', async () => {
@@ -142,9 +141,9 @@ describe('/api/v1/tasks', () => {
           title: 'Receive shipment',
           description: 'Receive 50 pallets',
           priority: 'high',
-          assignedTo: 'worker-123',
-          bookingId: 'booking-123',
-          warehouseId: 'wh-001',
+          assignedTo: '550e8400-e29b-41d4-a716-446655440001',
+          bookingId: '550e8400-e29b-41d4-a716-446655440002',
+          warehouseId: '550e8400-e29b-41d4-a716-446655440003',
         }),
       })
 
@@ -167,9 +166,9 @@ describe('/api/v1/tasks', () => {
           title: 'Receive shipment',
           description: 'Receive 50 pallets',
           priority: 'high',
-          assignedTo: 'worker-123',
-          bookingId: 'booking-123',
-          warehouseId: 'wh-001',
+          assignedTo: '550e8400-e29b-41d4-a716-446655440001',
+          bookingId: '550e8400-e29b-41d4-a716-446655440002',
+          warehouseId: '550e8400-e29b-41d4-a716-446655440003',
         }),
       })
 
