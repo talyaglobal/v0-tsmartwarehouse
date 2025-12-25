@@ -7,6 +7,7 @@ import type { Claim, ClaimStatus } from '@/types'
 
 export async function getClaims(filters?: {
   customerId?: string
+  companyId?: string
   status?: ClaimStatus
   bookingId?: string
   incidentId?: string
@@ -17,6 +18,23 @@ export async function getClaims(filters?: {
   if (filters?.customerId) {
     query = query.eq('customer_id', filters.customerId)
   }
+  
+  if (filters?.companyId) {
+    // Filter by company: get all customer_ids from profiles that belong to this company
+    const { data: companyProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('company_id', filters.companyId)
+    
+    if (companyProfiles && companyProfiles.length > 0) {
+      const companyUserIds = companyProfiles.map(p => p.id)
+      query = query.in('customer_id', companyUserIds)
+    } else {
+      // No users in company, return empty result
+      query = query.eq('customer_id', '00000000-0000-0000-0000-000000000000') // Non-existent ID
+    }
+  }
+
   if (filters?.status) {
     query = query.eq('status', filters.status)
   }

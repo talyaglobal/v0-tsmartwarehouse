@@ -8,6 +8,7 @@ import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_PREFIXES, 
 
 interface GetBookingsOptions {
   customerId?: string
+  companyId?: string
   status?: BookingStatus
   type?: BookingType
   warehouseId?: string
@@ -19,6 +20,7 @@ interface GetBookingsOptions {
 export async function getBookings(filters?: GetBookingsOptions) {
   const {
     customerId,
+    companyId,
     status,
     type,
     warehouseId,
@@ -30,7 +32,7 @@ export async function getBookings(filters?: GetBookingsOptions) {
   // Generate cache key
   const cacheKey = generateCacheKey(
     CACHE_PREFIXES.BOOKINGS,
-    customerId || 'all',
+    customerId || companyId || 'all',
     status || 'all',
     type || 'all',
     warehouseId || 'all',
@@ -55,6 +57,23 @@ export async function getBookings(filters?: GetBookingsOptions) {
 
   if (customerId) {
     query = query.eq('customer_id', customerId)
+  }
+  
+  if (companyId) {
+    // Filter by company: get all customer_ids from profiles that belong to this company
+    // Then filter bookings by those customer_ids
+    const { data: companyProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('company_id', companyId)
+    
+    if (companyProfiles && companyProfiles.length > 0) {
+      const companyUserIds = companyProfiles.map(p => p.id)
+      query = query.in('customer_id', companyUserIds)
+    } else {
+      // No users in company, return empty result
+      query = query.eq('customer_id', '00000000-0000-0000-0000-000000000000') // Non-existent ID
+    }
   }
   if (status) {
     query = query.eq('status', status)

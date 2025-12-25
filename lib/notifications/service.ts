@@ -352,7 +352,7 @@ export class NotificationService {
           ...options.templateData,
           userName: userInfo.name,
           customerName: userInfo.name,
-          dashboardUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+          dashboardUrl: `${getSiteUrl()}/dashboard`,
         }
         subject = typeof template.subject === "function" ? template.subject(templateData) : template.subject
         html = template.html(templateData)

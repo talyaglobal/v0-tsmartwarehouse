@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getClaims, createClaim } from "@/lib/db/claims"
 import { requireAuth } from "@/lib/auth/api-middleware"
+import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import { createClaimSchema } from "@/lib/validation/schemas"
 import type { ClaimStatus } from "@/types"
@@ -8,18 +9,43 @@ import type { ClaimsListResponse, ClaimResponse, ErrorResponse } from "@/types/a
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+    const { user } = authResult
+
     const { searchParams } = new URL(request.url)
-    const customerId = searchParams.get("customerId")
     const status = searchParams.get("status") as ClaimStatus | null
+
+    // Check if user is company admin
+    const userCompanyId = await getUserCompanyId(user.id)
+    const isCompanyAdminUser = userCompanyId ? await isCompanyAdmin(user.id, userCompanyId) : false
 
     const filters: {
       customerId?: string
+      companyId?: string
       status?: ClaimStatus
       bookingId?: string
       incidentId?: string
     } = {}
 
-    if (customerId) filters.customerId = customerId
+    // System admin users can see all claims (or filter by customerId if provided)
+    if (user.role === 'admin') {
+      const customerId = searchParams.get("customerId")
+      if (customerId) {
+        filters.customerId = customerId
+      }
+      // If no customerId provided, admin sees all claims
+    } else if (isCompanyAdminUser && userCompanyId) {
+      // Company admin - show all claims from their company
+      filters.companyId = userCompanyId
+    } else {
+      // Regular users can only see their own claims
+      filters.customerId = user.id
+    }
+
     if (status) filters.status = status
 
     const claims = await getClaims(filters)

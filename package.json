@@ -31,6 +31,7 @@
     "check-env": "node scripts/check-env.js",
     "create-admin": "node scripts/create-admin-user.js",
     "supabase:push": "node scripts/push-supabase.js",
+    "db:migrate": "node scripts/push-all-migrations.js",
     "db:setup": "npm run supabase:push && prisma generate"
   },
   "dependencies": {

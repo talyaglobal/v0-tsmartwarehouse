@@ -7,6 +7,7 @@ import { getEventEmitter } from '@/lib/events/event-emitter'
 import type { TeamMemberInvitedPayload } from '@/lib/events/types'
 import { addEmailToQueue } from '@/lib/notifications/email/queue'
 import { getEmailTemplate } from '@/lib/notifications/templates/email'
+import { getSiteUrl } from '@/lib/utils/site-url'
 
 /**
  * Invite team member
@@ -28,36 +29,29 @@ export async function inviteTeamMember(input: {
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Verify user is company admin
-    const { data: member } = await supabase
-      .from('company_members')
-      .select('role')
+    // Verify user is company admin (using profiles.role)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, company_id')
+      .eq('id', user.id)
       .eq('company_id', input.companyId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single()
+      .in('role', ['owner', 'admin'])
+      .maybeSingle()
 
-    if (!member || !['owner', 'admin'].includes(member.role)) {
+    if (!profile) {
       return { success: false, error: 'Unauthorized' }
     }
 
     // Check if user already exists
     const { data: existingUser } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, company_id')
       .eq('email', input.email)
-      .single()
+      .maybeSingle()
 
     if (existingUser) {
       // Check if already a member
-      const { data: existingMember } = await supabase
-        .from('company_members')
-        .select('id')
-        .eq('company_id', input.companyId)
-        .eq('user_id', existingUser.id)
-        .single()
-
-      if (existingMember) {
+      if (existingUser.company_id === input.companyId) {
         return { success: false, error: 'User is already a member' }
       }
     }
@@ -67,22 +61,33 @@ export async function inviteTeamMember(input: {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiry
 
-    // Create invitation
-    const { data: invitation, error } = await supabase
-      .from('company_invitations')
-      .insert({
-        company_id: input.companyId,
-        email: input.email,
-        role: input.role,
-        invited_by: user.id,
-        token,
-        expires_at: expiresAt.toISOString(),
-      })
-      .select()
-      .single()
+    const supabaseAdmin = await createServerSupabaseClient({ admin: true })
 
-    if (error) {
-      return { success: false, error: error.message }
+    // Update or create profile with invitation data
+    let invitation: any
+    if (existingUser) {
+      // Update existing profile with invitation data
+      const { data: updatedProfile, error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          invitation_token: token,
+          invitation_expires_at: expiresAt.toISOString(),
+          invitation_company_id: input.companyId,
+          invitation_role: input.role,
+          invited_by: user.id,
+        })
+        .eq('id', existingUser.id)
+        .select()
+        .single()
+      
+      if (updateError) {
+        return { success: false, error: updateError.message }
+      }
+      invitation = updatedProfile
+    } else {
+      // For new users, we would need to create them via API
+      // This function is deprecated in favor of the API endpoint
+      return { success: false, error: 'Please use the API endpoint to invite new users' }
     }
 
     // Get company name
@@ -100,7 +105,7 @@ export async function inviteTeamMember(input: {
       .single()
 
     // Send invitation email
-    const acceptUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation/${token}`
+    const acceptUrl = `${getSiteUrl()}/accept-invitation/${token}`
     const template = getEmailTemplate('team-invitation')
 
     if (template) {
@@ -163,7 +168,7 @@ export async function inviteTeamMember(input: {
  */
 export async function acceptInvitation(
   token: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; requiresRegistration?: boolean }> {
   try {
     const supabase = await createServerSupabaseClient()
 
@@ -172,73 +177,169 @@ export async function acceptInvitation(
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user) {
-      return { success: false, error: 'Unauthorized' }
-    }
+    // Get admin client for profile operations
+    const supabaseAdmin = await createServerSupabaseClient({ admin: true })
 
-    // Get invitation
-    const { data: invitation } = await supabase
-      .from('company_invitations')
-      .select('*')
-      .eq('token', token)
-      .single()
+    // Find profile with this invitation token
+    const { data: invitationProfile, error: invitationError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, name, invitation_token, invitation_expires_at, company_id, role, invited_by')
+      .eq('invitation_token', token)
+      .maybeSingle()
 
-    if (!invitation) {
+    if (invitationError || !invitationProfile || !invitationProfile.invitation_token) {
       return { success: false, error: 'Invitation not found' }
     }
 
     // Check if expired
-    if (new Date(invitation.expires_at) < new Date()) {
+    if (invitationProfile.invitation_expires_at && new Date(invitationProfile.invitation_expires_at) < new Date()) {
       return { success: false, error: 'Invitation has expired' }
     }
 
-    // Check if already accepted
-    if (invitation.accepted_at) {
-      return { success: false, error: 'Invitation already accepted' }
-    }
+    // Check if already accepted (if invitation_token is null, invitation was accepted)
+    // Since we already filtered by invitation_token, if we got here, invitation is still pending
+    // But check anyway for safety
 
-    // Verify email matches
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.email !== invitation.email) {
-      return {
-        success: false,
-        error: 'Invitation email does not match your account',
+    // If user is not logged in, they need to register first
+    if (!user) {
+      return { 
+        success: false, 
+        error: 'Please log in or create an account to accept this invitation',
+        requiresRegistration: true 
       }
     }
 
-    // Create company member
-    const { error: memberError } = await supabase
-      .from('company_members')
-      .insert({
-        company_id: invitation.company_id,
-        user_id: user.id,
-        role: invitation.role,
-        invited_by: invitation.invited_by,
-        invited_at: invitation.created_at,
-        joined_at: new Date().toISOString(),
-        status: 'active',
-      })
-
-    if (memberError) {
-      return { success: false, error: memberError.message }
+    // Verify email matches (invitation email must match logged-in user email)
+    if (invitationProfile.email?.toLowerCase() !== user.email?.toLowerCase()) {
+      return {
+        success: false,
+        error: 'Invitation email does not match your account. Please log in with the email address that received the invitation.',
+      }
     }
 
-    // Update invitation
-    await supabase
-      .from('company_invitations')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('id', invitation.id)
+    // Verify that invitation profile ID matches user ID (for safety)
+    // In most cases, invitation profile ID should match user.id, but we'll update using token to be safe
+    if (invitationProfile.id !== user.id) {
+      console.warn(`Warning: Invitation profile ID (${invitationProfile.id}) does not match user ID (${user.id}). Proceeding with token-based update.`)
+    }
 
-    // Update user's company_id in profile
-    await supabase
+    // Get user details from auth
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+    if (!authUser?.user) {
+      return {
+        success: false,
+        error: 'User not found in authentication system',
+      }
+    }
+
+    const userMetadata = authUser.user.user_metadata || {}
+
+    // Use fullname from profile if available, otherwise from user_metadata, otherwise email prefix
+    const fullName = invitationProfile.name?.trim() || 
+                    userMetadata.name || 
+                    user.email?.split('@')[0] || 
+                    'User'
+
+    // We need to get the company_id from the inviter's profile
+    // The invitation profile should have invited_by set
+    let targetCompanyId: string | null = null
+    
+    if (invitationProfile.invited_by) {
+      const { data: inviterProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('company_id')
+        .eq('id', invitationProfile.invited_by)
+        .single()
+      
+      if (inviterProfile?.company_id) {
+        targetCompanyId = inviterProfile.company_id
+      }
+    }
+
+    if (!targetCompanyId) {
+      return {
+        success: false,
+        error: 'Cannot determine company from invitation. Invitation may be invalid.',
+      }
+    }
+
+    // Role is already stored in the profile when invitation was created
+    // We just need to set company_id when invitation is accepted
+    const updateData: any = {
+      company_id: targetCompanyId, // Set company_id when invitation is accepted
+      // Role is already set in profile from invitation creation, no need to update it
+      // Clear invitation fields after acceptance (including password for security)
+      invitation_token: null,
+      invitation_expires_at: null,
+      invitation_password: null, // Clear password after acceptance for security
+    }
+
+    // Update name if empty
+    if (!invitationProfile.name || invitationProfile.name.trim() === '') {
+      updateData.name = fullName
+    }
+
+    // If profile doesn't have invited_by, set it from the invitation (if we can find who invited)
+    // Note: We don't have invited_by in the invitation fields anymore, so we'll skip this
+    // The invited_by should have been set when the invitation was created
+
+    // targetCompanyId is already set above from inviter's profile
+    
+    // Update profile using the invitation profile ID
+    // Clear invitation_token and invitation_expires_at to mark invitation as accepted
+    // company_id and role are already set when invitation was created
+    const { error: updateProfileError } = await supabaseAdmin
       .from('profiles')
-      .update({ company_id: invitation.company_id })
-      .eq('id', user.id)
+      .update(updateData)
+      .eq('id', invitationProfile.id)
+    
+    if (updateProfileError) {
+      console.error('Error updating profile:', updateProfileError)
+      return {
+        success: false,
+        error: `Failed to accept invitation: ${updateProfileError.message}`,
+      }
+    }
+    
+    // Verify the update was successful - check that invitation fields were cleared
+    const { data: updatedProfile, error: verifyError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, company_id, invitation_token, email, role')
+      .eq('id', invitationProfile.id)
+      .single()
+    
+    if (verifyError || !updatedProfile) {
+      console.error('Error verifying profile update:', verifyError)
+      return {
+        success: false,
+        error: `Failed to verify invitation acceptance: ${verifyError?.message || 'Profile not found after update'}`,
+      }
+    }
+    
+    // Verify that invitation_token was cleared (invitation accepted)
+    if (updatedProfile.invitation_token !== null) {
+      console.error('Warning: invitation_token was not cleared! Attempting to clear again...')
+      const { error: fixError } = await supabaseAdmin
+        .from('profiles')
+        .update({ invitation_token: null, invitation_expires_at: null })
+        .eq('id', invitationProfile.id)
+      
+      if (fixError) {
+        console.error('Error clearing invitation_token:', fixError)
+        return {
+          success: false,
+          error: `Failed to clear invitation_token: ${fixError.message}`,
+        }
+      }
+    }
+    
+    console.log('✅ Invitation accepted successfully, profile updated:', {
+      profileId: updatedProfile.id,
+      email: updatedProfile.email,
+      companyId: updatedProfile.company_id,
+      role: updatedProfile.role,
+      invitationTokenCleared: updatedProfile.invitation_token === null
+    })
 
     // Emit team member joined event
     const emitter = getEventEmitter()
@@ -247,9 +348,9 @@ export async function acceptInvitation(
       entityType: 'team_member',
       entityId: user.id,
       memberId: user.id,
-      companyId: invitation.company_id,
+      companyId: invitationProfile.invitation_company_id,
       userId: user.id,
-      role: invitation.role,
+      role: invitationProfile.invitation_role || 'member',
       timestamp: new Date().toISOString(),
     })
 
@@ -264,60 +365,15 @@ export async function acceptInvitation(
 }
 
 /**
- * Remove team member
+ * Remove team member (deprecated - use API endpoint instead)
+ * This function is kept for backwards compatibility but should not be used
  */
 export async function removeTeamMember(
   companyId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = await createServerSupabaseClient()
-
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false, error: 'Unauthorized' }
-    }
-
-    // Verify user is company admin
-    const { data: member } = await supabase
-      .from('company_members')
-      .select('role')
-      .eq('company_id', companyId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single()
-
-    if (!member || !['owner', 'admin'].includes(member.role)) {
-      return { success: false, error: 'Unauthorized' }
-    }
-
-    // Cannot remove yourself
-    if (userId === user.id) {
-      return { success: false, error: 'Cannot remove yourself' }
-    }
-
-    // Deactivate member
-    const { error } = await supabase
-      .from('company_members')
-      .update({ status: 'inactive' })
-      .eq('company_id', companyId)
-      .eq('user_id', userId)
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath('/dashboard/team')
-    return { success: true }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
-  }
+  // This function is deprecated - company_members table no longer exists
+  // Use the API endpoint DELETE /api/v1/companies/[id]/members/[memberId] instead
+  return { success: false, error: 'This function is deprecated. Please use the API endpoint to remove members.' }
 }
 

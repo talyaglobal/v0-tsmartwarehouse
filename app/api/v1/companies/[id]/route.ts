@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
+import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
 
@@ -15,9 +16,36 @@ export async function PATCH(
       return authResult
     }
 
+    const { user } = authResult
     const { id } = await params
     const body = await request.json()
     const { name, logo_url, vat, address, postal_code, city, country } = body
+
+    // Check if user has permission to update this company
+    // System admin can update any company
+    // Company admin/owner can only update their own company
+    if (user.role !== 'admin') {
+      const userCompanyId = await getUserCompanyId(user.id)
+      if (userCompanyId !== id) {
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "Forbidden: You don't have permission to update this company",
+          statusCode: 403,
+        }
+        return NextResponse.json(errorData, { status: 403 })
+      }
+      
+      // Verify user is company admin or owner
+      const isAdmin = await isCompanyAdmin(user.id, id)
+      if (!isAdmin) {
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "Forbidden: Only company admins can update company information",
+          statusCode: 403,
+        }
+        return NextResponse.json(errorData, { status: 403 })
+      }
+    }
 
     const supabase = createServerSupabaseClient()
     
@@ -31,7 +59,32 @@ export async function PATCH(
         }
         return NextResponse.json(errorData, { status: 400 })
       }
-      updates.name = name.trim()
+      
+      const trimmedName = name.trim()
+      
+      // Check if a company with this name already exists (excluding current company)
+      // Use case-insensitive comparison
+      const { data: existingCompany, error: checkError } = await supabase
+        .from('companies')
+        .select('id, name')
+        .ilike('name', trimmedName)
+        .neq('id', id)
+        .maybeSingle()
+      
+      if (checkError) {
+        throw new Error(`Failed to check company name: ${checkError.message}`)
+      }
+      
+      if (existingCompany) {
+        const errorData: ErrorResponse = {
+          success: false,
+          error: `A company with the name "${trimmedName}" already exists`,
+          statusCode: 409, // Conflict
+        }
+        return NextResponse.json(errorData, { status: 409 })
+      }
+      
+      updates.name = trimmedName
     }
     if (logo_url !== undefined) {
       updates.logo_url = logo_url || null

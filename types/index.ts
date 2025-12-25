@@ -11,6 +11,7 @@ export interface User {
   role: UserRole
   companyId?: string
   companyName?: string
+  companyRole?: 'owner' | 'admin' | 'member' | null // Role in company (from company_members table)
   phone?: string
   avatar?: string
   membershipTier?: MembershipTier

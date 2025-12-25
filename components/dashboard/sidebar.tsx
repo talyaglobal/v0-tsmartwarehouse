@@ -17,6 +17,7 @@ import {
   CreditCard,
   AlertCircle,
   Plus,
+  Users,
 } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,7 +26,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
 
-const navigation = [
+const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Bookings", href: "/dashboard/bookings", icon: Package },
   { name: "Invoices", href: "/dashboard/invoices", icon: FileText },
@@ -39,6 +40,7 @@ export function DashboardSidebar() {
   const pathname = usePathname()
   const { user } = useUser()
   const [logoError, setLogoError] = useState(false)
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
 
   // Fetch pending bookings count
   const { data: pendingCount = 0 } = useQuery({
@@ -78,29 +80,85 @@ export function DashboardSidebar() {
     queryFn: async () => {
       if (!user) return null
       const supabase = createClient()
-      const { data, error } = await supabase
+      
+      // First get profile data
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('name, membership_tier, company_id, companies(id, name, logo_url)')
+        .select('name, membership_tier, company_id')
         .eq('id', user.id)
         .single()
       
-      if (error) {
-        console.error('Error fetching profile:', error)
+      if (profileError) {
+        console.error('Error fetching profile:', profileError)
         return null
       }
       
-      const company = data?.companies ? (Array.isArray(data.companies) ? data.companies[0] : data.companies) : null
+      // Get company_id from profiles table
+      const companyId = profileData?.company_id || null
+      
+      // Fetch company data if we have a company_id
+      let company = null
+      if (companyId) {
+        const { data: companyData, error: companyError } = await supabase
+          .from('companies')
+          .select('id, name, logo_url')
+          .eq('id', companyId)
+          .single()
+        
+        if (!companyError && companyData) {
+          company = companyData
+        }
+      }
       
       return {
-        name: data?.name || user.email?.split('@')[0] || 'User',
-        membershipTier: (data?.membership_tier as MembershipTier) || 'bronze',
+        name: profileData?.name || user.email?.split('@')[0] || 'User',
+        membershipTier: (profileData?.membership_tier as MembershipTier) || 'bronze',
         company: company?.name || null,
         companyLogo: company?.logo_url || null,
+        companyId: companyId,
       }
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
+
+  // Check if user is company admin (using profiles.role and company_id)
+  const { data: companyAdminStatus } = useQuery({
+    queryKey: ['company-admin', user?.id, profile?.companyId],
+    queryFn: async () => {
+      if (!user) return false
+      const supabase = createClient()
+      
+      // First get profile to check company_id
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, company_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      
+      if (profileError || !profileData) {
+        return false
+      }
+      
+      // User must have a company_id and be owner or admin
+      if (!profileData.company_id) {
+        return false
+      }
+      
+      // Check if user is owner or admin
+      if (!['owner', 'admin'].includes(profileData.role)) {
+        return false
+      }
+      
+      return true
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  useEffect(() => {
+    setIsCompanyAdmin(companyAdminStatus || false)
+  }, [companyAdminStatus])
 
   // Reset logo error when profile changes
   useEffect(() => {
@@ -138,7 +196,18 @@ export function DashboardSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3">
-        {navigation.map((item) => {
+        {(() => {
+          // Add Team Members if user is company admin
+          const navigation = isCompanyAdmin
+            ? [
+                ...baseNavigation.slice(0, 5), // Dashboard, Bookings, Invoices, Claims, Notifications
+                { name: "Team Members", href: "/dashboard/team", icon: Users },
+                ...baseNavigation.slice(5), // Membership, Settings
+              ]
+            : baseNavigation
+          
+          return navigation
+        })().map((item) => {
           // For Dashboard, only match exact path to avoid matching child routes
           // For other items, match exact path or child routes
           const isActive = item.href === "/dashboard"

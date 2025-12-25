@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getBookings, createBooking } from "@/lib/db/bookings"
 import { PRICING } from "@/lib/constants"
 import { requireAuth } from "@/lib/auth/api-middleware"
+import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import { setCacheHeaders } from "@/lib/cache/api-cache"
 import { createBookingSchema, bookingsQuerySchema } from "@/lib/validation/schemas"
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
 
     const filters: {
       customerId?: string
+      companyId?: string
       status?: BookingStatus
       type?: BookingType
       warehouseId?: string
@@ -58,13 +60,46 @@ export async function GET(request: NextRequest) {
       useCache?: boolean
     } = {}
 
-    // If authenticated and no customerId specified, use authenticated user's ID
-    // Otherwise use the provided customerId or leave undefined for all bookings
+    // Check if user is company admin
+    let userCompanyId: string | null = null
+    let isAdmin = false
+    if (authenticatedUserId) {
+      userCompanyId = await getUserCompanyId(authenticatedUserId)
+      if (userCompanyId) {
+        isAdmin = await isCompanyAdmin(authenticatedUserId, userCompanyId)
+      }
+    }
+
+    // If authenticated and no customerId specified
     if (validatedParams.customerId) {
-      filters.customerId = validatedParams.customerId
+      // If user is company admin, they can see bookings of users in their company
+      if (isAdmin && userCompanyId) {
+        // Verify the requested customerId belongs to the same company
+        const { createServerSupabaseClient } = await import('@/lib/supabase/server')
+        const supabase = createServerSupabaseClient()
+        const { data: customerProfile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', validatedParams.customerId)
+          .single()
+        
+        if (customerProfile?.company_id === userCompanyId) {
+          filters.customerId = validatedParams.customerId
+        } else {
+          // Customer doesn't belong to admin's company
+          filters.customerId = authenticatedUserId // Fallback to own bookings
+        }
+      } else {
+        filters.customerId = validatedParams.customerId
+      }
     } else if (authenticatedUserId) {
-      // Authenticated user - show only their bookings by default
-      filters.customerId = authenticatedUserId
+      if (isAdmin && userCompanyId) {
+        // Company admin - show all bookings from their company
+        filters.companyId = userCompanyId
+      } else {
+        // Regular user - show only their bookings
+        filters.customerId = authenticatedUserId
+      }
     }
     
     if (validatedParams.status) filters.status = validatedParams.status

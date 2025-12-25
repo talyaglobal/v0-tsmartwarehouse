@@ -19,9 +19,11 @@ const tierColors: Record<MembershipTier, string> = {
   platinum: "bg-purple-100 text-purple-800",
 }
 
+type CustomerWithRole = User & { companyRole?: 'owner' | 'admin' | 'member' | null }
+
 export default function CustomersPage() {
   const [search, setSearch] = useState("")
-  const [customers, setCustomers] = useState<User[]>([])
+  const [customers, setCustomers] = useState<CustomerWithRole[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     total: 0,
@@ -42,7 +44,7 @@ export default function CustomersPage() {
       const response = await fetch('/api/v1/users?role=customer')
       if (response.ok) {
         const data = await response.json()
-        setCustomers(data.data || [])
+        setCustomers((data.data || []) as CustomerWithRole[])
         setStats({
           total: data.data?.length || 0,
           goldMembers: data.data?.filter((u: User) => u.membershipTier === 'gold' || u.membershipTier === 'platinum').length || 0,
@@ -114,6 +116,7 @@ export default function CustomersPage() {
               <TableRow>
                 <TableHead>Customer</TableHead>
                 <TableHead>Company</TableHead>
+                <TableHead>Company Role</TableHead>
                 <TableHead>Membership</TableHead>
                 <TableHead>Credit Balance</TableHead>
                 <TableHead>Contact</TableHead>
@@ -123,7 +126,7 @@ export default function CustomersPage() {
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No customers found
                   </TableCell>
                 </TableRow>
@@ -142,6 +145,23 @@ export default function CustomersPage() {
                     </div>
                   </TableCell>
                   <TableCell>{customer.companyName || "-"}</TableCell>
+                  <TableCell>
+                    {customer.companyRole && (
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          customer.companyRole === 'owner'
+                            ? 'bg-purple-100 text-purple-800'
+                            : customer.companyRole === 'admin'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {customer.companyRole === 'owner' && <Crown className="mr-1 h-3 w-3" />}
+                        {customer.companyRole}
+                      </span>
+                    )}
+                    {!customer.companyRole && <span className="text-muted-foreground">-</span>}
+                  </TableCell>
                   <TableCell>
                     {customer.membershipTier && (
                       <span

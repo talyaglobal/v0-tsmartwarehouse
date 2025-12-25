@@ -266,6 +266,23 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         // Exact match found - use existing company
         companyId = existingCompany.id
         console.log('Using existing company:', existingCompany.name)
+        
+        // Update profile with company_id and role
+        // company_members table no longer exists, company_id and role are in profiles table
+        const { error: profileUpdateError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            company_id: companyId,
+            role: 'customer', // Default role for new members
+          })
+          .eq('id', data.user.id)
+        
+        if (profileUpdateError) {
+          console.error('Profile update error:', profileUpdateError)
+          // Don't fail registration if profile update fails, but log it
+        } else {
+          console.log('User profile updated with company_id')
+        }
       } else {
         // No exact match - create new company
         // But first check if company name already exists (prevent duplicates)
@@ -320,6 +337,23 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         }
         companyId = newCompany.id
         console.log('Created new company:', newCompany.name)
+        
+        // Update profile with company_id and owner role
+        // company_members table no longer exists, company_id and role are in profiles table
+        const { error: profileUpdateError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            company_id: companyId,
+            role: 'owner', // Company creator is owner
+          })
+          .eq('id', data.user.id)
+        
+        if (profileUpdateError) {
+          console.error('Profile update error:', profileUpdateError)
+          // Don't fail registration if profile update fails, but log it
+        } else {
+          console.log('User profile updated with company_id and owner role')
+        }
       }
 
       // Now create profile with company_id

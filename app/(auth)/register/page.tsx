@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,12 +16,15 @@ import { Eye } from "@/components/icons"
 import { PhoneInput } from 'react-international-phone'
 import 'react-international-phone/style.css'
 import { signUp } from "@/lib/auth/actions"
+import { acceptInvitation } from "@/features/companies/actions"
 import { useUIStore } from "@/stores/ui.store"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const invitationToken = searchParams.get('invitation')
   const addNotification = useUIStore((state) => state.addNotification)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +46,31 @@ export default function RegisterPage() {
   const [exactCompanyMatch, setExactCompanyMatch] = useState<{ id: string; name: string } | null>(null)
   const companyInputRef = useRef<HTMLInputElement>(null)
   const companySuggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Load invitation details if token is present
+  useEffect(() => {
+    if (invitationToken) {
+      const loadInvitation = async () => {
+        try {
+          const response = await fetch(`/api/v1/invitations/${invitationToken}`)
+          const data = await response.json()
+          
+          if (data.success && data.data) {
+            // Pre-fill email from invitation
+            setFormData(prev => ({
+              ...prev,
+              email: data.data.email || prev.email,
+            }))
+          }
+        } catch (error) {
+          console.error('Error loading invitation:', error)
+          // Don't fail if invitation can't be loaded
+        }
+      }
+      
+      loadInvitation()
+    }
+  }, [invitationToken])
 
   // Memoize phone change handler to prevent re-renders
   const handlePhoneChange = useCallback((value: string) => {
@@ -235,11 +263,69 @@ export default function RegisterPage() {
             duration: 3000,
           })
 
-          // Wait a moment for auth state to sync, then redirect
-          setTimeout(() => {
-            router.push(redirectPath)
-            router.refresh()
-          }, 500)
+          // If there's an invitation token, accept it after registration
+          if (invitationToken && signInData.user) {
+            try {
+              const acceptResult = await acceptInvitation(invitationToken)
+              if (acceptResult.success) {
+                addNotification({
+                  type: 'success',
+                  message: 'Invitation accepted! Welcome to the team.',
+                  duration: 5000,
+                })
+              } else {
+                console.error('Failed to accept invitation:', acceptResult.error)
+                // Don't fail registration if invitation acceptance fails
+              }
+            } catch (inviteError) {
+              console.error('Error accepting invitation:', inviteError)
+              // Don't fail registration if invitation acceptance fails
+            }
+          }
+
+          // Wait for auth state to sync and ensure session is established
+          const authStatePromise = new Promise<void>((resolve) => {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
+              if (event === 'SIGNED_IN' && session) {
+                subscription.unsubscribe()
+                resolve()
+              }
+            })
+            
+            // Fallback timeout in case auth state change doesn't fire
+            setTimeout(() => {
+              subscription.unsubscribe()
+              resolve()
+            }, 1000)
+          })
+
+          await authStatePromise
+          
+          // Additional delay to ensure cookies are set
+          await new Promise(resolve => setTimeout(resolve, 300))
+          
+          // Check if user has a name, if not redirect to settings/profile
+          // This applies to both invitation and regular registration
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', signInData.user.id)
+            .single()
+          
+          if (!userProfile?.name || userProfile.name.trim() === '') {
+            // Redirect to settings/profile to complete profile
+            addNotification({
+              type: 'info',
+              message: 'Please complete your profile information.',
+              duration: 5000,
+            })
+            // Use window.location for hard redirect to ensure session is established
+            window.location.href = '/dashboard/settings?tab=profile'
+            return
+          }
+
+          // Use window.location for hard redirect to ensure session is established
+          window.location.href = redirectPath
         } else {
           // Fallback to login page
           addNotification({

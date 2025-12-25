@@ -130,6 +130,7 @@ export async function middleware(request: NextRequest) {
     } else if (userRole === 'worker') {
       return NextResponse.redirect(new URL('/worker', request.url))
     } else {
+      // owner and customer roles go to dashboard
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
@@ -170,8 +171,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Dashboard routes - customers and admins can access
-    if (isDashboardRoute && !['customer', 'admin'].includes(userRole)) {
+    // Dashboard routes - customers, admins, and owners can access
+    if (isDashboardRoute && !['customer', 'admin', 'owner'].includes(userRole)) {
       return NextResponse.redirect(new URL('/worker', request.url))
     }
   }

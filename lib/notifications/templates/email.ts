@@ -2,6 +2,8 @@
  * Email Templates for Notifications
  */
 
+import { getSiteUrl } from '@/lib/utils/site-url'
+
 export interface EmailTemplateData {
   [key: string]: any
 }
@@ -70,7 +72,7 @@ export const emailTemplates: Record<string, EmailTemplate> = {
         </ul>
         <p>You can view your booking details in your dashboard.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
       return baseEmailTemplate("Booking Confirmed", content, actionUrl, "View Booking")
     },
     text: (data: EmailTemplateData) => {
@@ -107,7 +109,7 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
         </ul>
         <p>Please ensure you're prepared for your scheduled booking.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
       return baseEmailTemplate("Booking Reminder", content, actionUrl, "View Booking")
     },
   },
@@ -127,7 +129,7 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
         </ul>
         <p>Please review and pay your invoice before the due date.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/invoices`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`
       return baseEmailTemplate("New Invoice", content, actionUrl, "View Invoice")
     },
   },
@@ -147,7 +149,7 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
         </ul>
         <p>Please make payment before the due date to avoid any late fees.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/invoices`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`
       return baseEmailTemplate("Invoice Due Reminder", content, actionUrl, "Pay Invoice")
     },
   },
@@ -167,7 +169,7 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
         </ul>
         <p>Please review and complete the task as soon as possible.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/worker/tasks`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/worker/tasks`
       return baseEmailTemplate("Task Assigned", content, actionUrl, "View Task")
     },
   },
@@ -188,7 +190,7 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
         </ul>
         <p>Please review and take appropriate action.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/admin/incidents`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/admin/incidents`
       return baseEmailTemplate("Incident Reported", content, actionUrl, "View Incident")
     },
   },
@@ -223,7 +225,7 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
         </ul>
         <p>Please review the request and provide a price proposal.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/warehouse-owner/bookings`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/warehouse-owner/bookings`
       return baseEmailTemplate("New Booking Request", content, actionUrl, "Review Request")
     },
     text: (data: EmailTemplateData) => {
@@ -265,7 +267,7 @@ View request: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/wareho
         </ul>
         <p>Please review and accept or reject the proposal.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
       return baseEmailTemplate("Price Proposal Received", content, actionUrl, "Review Proposal")
     },
     text: (data: EmailTemplateData) => {
@@ -307,7 +309,7 @@ View proposal: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashb
         </ul>
         <p>Your booking is now active. You can manage it from your dashboard.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
       return baseEmailTemplate("Booking Approved", content, actionUrl, "View Booking")
     },
     text: (data: EmailTemplateData) => {
@@ -349,7 +351,7 @@ View booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashbo
         ${data.reason ? `<p><strong>Reason for rejection:</strong> ${data.reason}</p>` : ""}
         <p>If you have any questions, please contact support.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
       return baseEmailTemplate("Booking Request Rejected", content, actionUrl, "View Booking")
     },
     text: (data: EmailTemplateData) => {
@@ -389,7 +391,7 @@ View booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashbo
         </ul>
         <p>Please make payment as soon as possible to avoid any additional fees or service interruptions.</p>
       `
-      const actionUrl = data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/invoices`
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`
       return baseEmailTemplate("Invoice Overdue", content, actionUrl, "Pay Invoice")
     },
     text: (data: EmailTemplateData) => {
@@ -428,7 +430,7 @@ Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboa
         </ul>
         <p>Click the button below to accept the invitation and create your account.</p>
       `
-      const actionUrl = data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation/${data.token}`
+      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
       return baseEmailTemplate("Team Invitation", content, actionUrl, "Accept Invitation")
     },
     text: (data: EmailTemplateData) => {
@@ -448,6 +450,102 @@ ${data.expiresAt ? `- Expires At: ${data.expiresAt}` : ""}
 Click the link below to accept the invitation and create your account.
 
 Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation/${data.token}`}
+      `.trim()
+    },
+  },
+
+  "team-invitation": {
+    subject: (data: EmailTemplateData) => `You've been invited to join ${data.companyName || "a company"} on TSmart Warehouse`,
+    html: (data: EmailTemplateData) => {
+      const content = `
+        <p>Dear ${data.invitedName || "User"},</p>
+        <p>You've been invited by <strong>${data.invitedBy || "an admin"}</strong> to join <strong>${data.companyName || "a company"}</strong> on TSmart Warehouse as a <strong>${data.role || "member"}</strong>.</p>
+        <p><strong>Invitation Details:</strong></p>
+        <ul>
+          <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
+          <li><strong>Role:</strong> ${data.role || "member"}</li>
+          <li><strong>Invited by:</strong> ${data.invitedBy || "Admin"}</li>
+          <li><strong>Expires:</strong> ${data.expiresAt || "7 days"}</li>
+        </ul>
+        <p>Click the button below to accept this invitation and join the team.</p>
+      `
+      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
+      return baseEmailTemplate("Team Invitation", content, actionUrl, "Accept Invitation")
+    },
+    text: (data: EmailTemplateData) => {
+      return `
+You've been invited to join ${data.companyName || "a company"} on TSmart Warehouse
+
+Dear ${data.invitedName || "User"},
+
+You've been invited by ${data.invitedBy || "an admin"} to join ${data.companyName || "a company"} on TSmart Warehouse as a ${data.role || "member"}.
+
+Invitation Details:
+- Company: ${data.companyName || "N/A"}
+- Role: ${data.role || "member"}
+- Invited by: ${data.invitedBy || "Admin"}
+- Expires: ${data.expiresAt || "7 days"}
+
+Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation/${data.token}`}
+      `.trim()
+    },
+  },
+
+  "welcome-invitation": {
+    subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "TSmart Warehouse"}!`,
+    html: (data: EmailTemplateData) => {
+      const passwordSection = data.password ? `
+        <p><strong>Your Login Credentials:</strong></p>
+        <ul>
+          <li><strong>Email:</strong> ${data.email || "Your email address"}</li>
+          <li><strong>Password:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${data.password}</code></li>
+        </ul>
+        <p><strong>Important:</strong> Please save this password. You can change it after logging in.</p>
+      ` : ''
+      
+      const content = `
+        <p>Dear ${data.fullName || data.invitedName || "User"},</p>
+        <p>Welcome to <strong>${data.companyName || "TSmart Warehouse"}</strong>! You've been invited to join our team.</p>
+        <p><strong>Your Invitation Details:</strong></p>
+        <ul>
+          <li><strong>Full Name:</strong> ${data.fullName || data.invitedName || "N/A"}</li>
+          <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
+          <li><strong>Role:</strong> ${data.role || "member"}</li>
+          <li><strong>Invited by:</strong> ${data.invitedBy || "Admin"}</li>
+        </ul>
+        ${passwordSection}
+        <p>Click the button below to accept the invitation and automatically log in to your account.</p>
+      `
+      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
+      return baseEmailTemplate("Welcome to TSmart Warehouse", content, actionUrl, "Accept Invitation & Login")
+    },
+    text: (data: EmailTemplateData) => {
+      const passwordSection = data.password ? `
+Your Login Credentials:
+- Email: ${data.email || "Your email address"}
+- Password: ${data.password}
+
+Important: Please save this password. You can change it after logging in.
+      ` : ''
+      
+      return `
+Welcome to ${data.companyName || "TSmart Warehouse"}!
+
+Dear ${data.fullName || data.invitedName || "User"},
+
+Welcome to ${data.companyName || "TSmart Warehouse"}! You've been invited to join our team.
+
+Your Invitation Details:
+- Full Name: ${data.fullName || data.invitedName || "N/A"}
+- Company: ${data.companyName || "N/A"}
+- Role: ${data.role || "member"}
+- Invited by: ${data.invitedBy || "Admin"}
+
+${passwordSection}
+
+Click the link below to accept the invitation and automatically log in to your account.
+
+Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`}
       `.trim()
     },
   },

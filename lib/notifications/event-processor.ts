@@ -267,18 +267,17 @@ async function determineRecipients(
     }
 
     case 'team.member.joined': {
-      // Notify company admins
+      // Notify company admins (from profiles table)
       if ('companyId' in payload && payload.companyId) {
         const { data: admins } = await supabase
-          .from('company_members')
-          .select('user_id')
+          .from('profiles')
+          .select('id')
           .eq('company_id', payload.companyId)
           .in('role', ['owner', 'admin'])
-          .eq('status', 'active')
 
         if (admins) {
           for (const admin of admins) {
-            recipients.push({ userId: admin.user_id })
+            recipients.push({ userId: admin.id })
           }
         }
       }

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
@@ -54,11 +54,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Get the current authenticated supabase client (preserves session)
-    const supabase = await createAuthenticatedSupabaseClient()
-    
     // Verify current password by attempting to sign in with a separate client instance
-    // This won't affect the current authenticated session
     const verifyClient = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -87,11 +83,12 @@ export async function POST(request: NextRequest) {
     // Sign out from the verify client to clean up
     await verifyClient.auth.signOut()
 
-    // If current password is correct, update to new password using the original authenticated session
-    // The supabase client still has the original session from cookies
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    })
+    // Use Admin API to update password (since we already verified current password)
+    const supabaseAdmin = createServerSupabaseClient()
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      user.id,
+      { password: newPassword }
+    )
 
     if (updateError) {
       const errorData: ErrorResponse = {

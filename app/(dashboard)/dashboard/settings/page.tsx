@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -29,12 +30,18 @@ interface Company {
 
 export default function SettingsPage() {
   const { user } = useUser()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Get tab from URL search params
+  const defaultTab = searchParams?.get('tab') || 'profile'
   const [profileForm, setProfileForm] = useState({
     name: "",
     phone: "",
+    email: "",
   })
   const [companyForm, setCompanyForm] = useState({
     name: "",
@@ -55,26 +62,73 @@ export default function SettingsPage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   // Fetch user profile with company
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user) return null
       const supabase = createClient()
-      const { data, error } = await supabase
+      
+      // First get profile
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('name, phone, company_id, email, companies(id, name, logo_url, vat, address, postal_code, city, country)')
+        .select('name, phone, company_id, email')
         .eq('id', user.id)
         .single()
       
-      if (error) {
-        console.error('Error fetching profile:', error)
+      if (profileError) {
+        console.error('Error fetching profile:', profileError)
         return null
       }
       
-      return data
+      if (!profileData) {
+        return null
+      }
+      
+      // Get company_id from profiles table
+      const companyId = profileData.company_id
+      let company = null
+      
+      // Fetch company data if we have a company_id
+      if (companyId) {
+        const { data: companyData, error: companyError } = await supabase
+          .from('companies')
+          .select('id, name, logo_url, vat, address, postal_code, city, country')
+          .eq('id', companyId)
+          .single()
+        
+        if (companyError) {
+          console.error('Error fetching company:', companyError)
+        } else if (companyData) {
+          company = companyData
+        }
+      }
+      
+      // Get company role from profiles.role
+      let companyRole: 'owner' | 'admin' | 'member' | null = null
+      if (profileData.role === 'owner') {
+        companyRole = 'owner'
+      } else if (profileData.role === 'admin') {
+        companyRole = 'admin'
+      } else if (profileData.role === 'customer') {
+        companyRole = 'member'
+      }
+      
+      const result = {
+        ...profileData,
+        company_id: companyId || profileData.company_id,
+        companies: company,
+        companyRole,
+        canChangeEmail: companyRole === 'owner', // Only owners can change email
+      }
+      
+      console.log('Final profile result:', result)
+      
+      return result
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // Always refetch to get latest data
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   })
 
   // Update form when profile loads
@@ -83,53 +137,114 @@ export default function SettingsPage() {
       setProfileForm({
         name: profile.name || "",
         phone: profile.phone || "",
+        email: profile.email || user?.email || "",
       })
       
       // Set company form if company exists
       if (profile.companies) {
-        const company = Array.isArray(profile.companies) ? profile.companies[0] : profile.companies
-        if (company) {
-          setCompanyForm({
-            name: company.name || "",
-            vat: company.vat || "",
-            address: company.address || "",
-            postalCode: company.postal_code || "",
-            city: company.city || "",
-            country: company.country || "",
-            logoUrl: company.logo_url || "",
-          })
-        }
+        const company = profile.companies
+        setCompanyForm({
+          name: company.name || "",
+          vat: company.vat || "",
+          address: company.address || "",
+          postalCode: company.postal_code || "",
+          city: company.city || "",
+          country: company.country || "",
+          logoUrl: company.logo_url || "",
+        })
+      } else {
+        // Reset company form if no company
+        setCompanyForm({
+          name: "",
+          vat: "",
+          address: "",
+          postalCode: "",
+          city: "",
+          country: "",
+          logoUrl: "",
+        })
       }
     }
   }, [profile])
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: async (updates: { name?: string | null; phone?: string | null }) => {
+    mutationFn: async (updates: { name?: string | null; phone?: string | null; email?: string | null }) => {
       if (!user) throw new Error('User not found')
       
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id)
-        .select()
-        .single()
       
-      if (error) {
-        throw new Error(error.message)
+      // If email is being updated, use API endpoint (no confirmation required)
+      if (updates.email && updates.email !== user.email) {
+        const response = await fetch('/api/v1/profile/email', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: updates.email }),
+        })
+
+        const result = await response.json()
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update email')
+        }
+
+        // Update name and phone separately
+        if (updates.name || updates.phone) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .update({ name: updates.name, phone: updates.phone })
+            .eq('id', user.id)
+            .select()
+            .single()
+          
+          if (error) {
+            throw new Error(error.message)
+          }
+          
+          return data
+        }
+
+        return result.data?.profile || { email: updates.email }
+      } else {
+        // Just update profile (name, phone)
+        const { data, error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id)
+          .select()
+          .single()
+        
+        if (error) {
+          throw new Error(error.message)
+        }
+        
+        return data
       }
-      
-      return data
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
-      addNotification({
-        type: 'success',
-        message: 'Profile updated successfully',
-        duration: 5000,
-      })
+      
+      // If email was updated, show special message
+      if (variables.email) {
+        addNotification({
+          type: 'success',
+          message: 'Email updated successfully',
+          duration: 5000,
+        })
+        // Refresh user data to get updated email
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      } else {
+        addNotification({
+          type: 'success',
+          message: 'Profile updated successfully',
+          duration: 5000,
+        })
+      }
     },
     onError: (error: Error) => {
       addNotification({
@@ -144,8 +259,7 @@ export default function SettingsPage() {
   const updateCompanyMutation = useMutation({
     mutationFn: async ({ companyId, updates }: { companyId: string; updates: Partial<Company> }) => {
       const result = await api.patch<Company>(`/api/v1/companies/${companyId}`, updates, {
-        successMessage: 'Company updated successfully',
-        errorMessage: 'Failed to update company',
+        showToast: false, // We'll handle notification in onSuccess/onError
       })
       if (!result.success || !result.data) {
         throw new Error(result.error || 'Failed to update company')
@@ -175,10 +289,17 @@ export default function SettingsPage() {
     setIsSaving(true)
     
     try {
-      await updateProfileMutation.mutateAsync({
+      const updates: { name?: string | null; phone?: string | null; email?: string | null } = {
         name: profileForm.name || undefined,
         phone: profileForm.phone || undefined,
-      })
+      }
+      
+      // Only include email if user can change it and it's different
+      if (profile?.canChangeEmail && profileForm.email && profileForm.email !== (profile?.email || user?.email)) {
+        updates.email = profileForm.email
+      }
+      
+      await updateProfileMutation.mutateAsync(updates)
     } catch (error) {
       console.error('Error updating profile:', error)
     } finally {
@@ -188,7 +309,8 @@ export default function SettingsPage() {
 
   const handleCompanySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profile?.company_id) {
+    const companyId = profile?.company_id || profile?.companies?.id
+    if (!companyId) {
       addNotification({
         type: 'error',
         message: 'No company associated with your profile',
@@ -201,7 +323,7 @@ export default function SettingsPage() {
     
     try {
       await updateCompanyMutation.mutateAsync({
-        companyId: profile.company_id,
+        companyId: companyId,
         updates: {
           name: companyForm.name || undefined,
           vat: companyForm.vat || undefined,
@@ -348,13 +470,13 @@ export default function SettingsPage() {
     )
   }
 
-  const company = profile?.companies ? (Array.isArray(profile.companies) ? profile.companies[0] : profile.companies) : null
+  const company = profile?.companies || null
 
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage your account preferences" />
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="company">Company</TabsTrigger>
@@ -388,11 +510,17 @@ export default function SettingsPage() {
                     <Input
                       id="email"
                       type="email"
-                      value={profile?.email || user?.email || ""}
-                      disabled
-                      className="bg-muted"
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                      disabled={!profile?.canChangeEmail}
+                      className={!profile?.canChangeEmail ? "bg-muted" : ""}
+                      placeholder="Enter your email"
                     />
-                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                    {!profile?.canChangeEmail && (
+                      <p className="text-xs text-muted-foreground">
+                        To change your email, please contact your administrator.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone</Label>

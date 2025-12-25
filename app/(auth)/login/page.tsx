@@ -84,12 +84,73 @@ export default function LoginPage() {
           localStorage.removeItem("rememberMe")
         }
 
-        // Get user role from profile
+        // Check if profile exists, if not create it from auth data
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('id, role, name, email, invitation_token, company_id')
           .eq('id', data.user.id)
-          .single()
+          .maybeSingle()
+
+        // If profile has a pending invitation (invitation_token exists and company_id is NULL),
+        // automatically accept it since user has logged in with the correct credentials
+        if (profile && profile.invitation_token && !profile.company_id) {
+          console.log('📧 User has pending invitation, accepting automatically...')
+          try {
+            const acceptResponse = await fetch(`/api/v1/invitations/${profile.invitation_token}/accept`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            })
+            
+            if (acceptResponse.ok) {
+              console.log('✅ Invitation accepted automatically')
+              addNotification({
+                type: 'success',
+                message: 'Your invitation has been accepted automatically',
+                duration: 5000,
+              })
+            } else {
+              console.error('Failed to accept invitation:', await acceptResponse.text())
+            }
+          } catch (acceptError) {
+            console.error('Error accepting invitation:', acceptError)
+            // Continue with login even if invitation acceptance fails
+          }
+        }
+
+        // If profile doesn't exist, create it from auth data
+        if (!profile) {
+          console.log('📝 Profile not found, creating profile from auth data...')
+          
+          const userMetadata = data.user.user_metadata || {}
+          const userEmail = data.user.email || email
+          const userName = userMetadata.name || userEmail.split('@')[0]
+          const userRole = userMetadata.role || 'customer'
+
+          // Call API to create profile (server-side to use admin client)
+          const createProfileResponse = await fetch('/api/v1/profile/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: data.user.id,
+              email: userEmail,
+              name: userName,
+              role: userRole,
+              phone: userMetadata.phone || null,
+              company: userMetadata.company || null,
+            }),
+          })
+
+          if (!createProfileResponse.ok) {
+            console.error('Failed to create profile, but continuing with login...')
+            // Don't fail login, continue
+          } else {
+            console.log('✅ Profile created successfully from auth data')
+          }
+        }
 
         const role = profile?.role || data.user.user_metadata?.role || 'customer'
 
