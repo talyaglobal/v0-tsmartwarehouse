@@ -9,6 +9,7 @@ Welcome to the TSmart Warehouse Management System documentation!
 ### 🎯 Start Here
 
 - **[PROJECT_STATUS_SUMMARY.md](./PROJECT_STATUS_SUMMARY.md)** - 🆕 Quick status overview (read this first!)
+- **[TODO_LIST.md](./TODO_LIST.md)** - 🆕 Comprehensive todo list with all pending work
 - **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - 🆕 Complete detailed status and progress
 - **[TASK_HISTORY.md](./TASK_HISTORY.md)** - 🆕 Task tracking and project history
 
@@ -54,9 +55,10 @@ Welcome to the TSmart Warehouse Management System documentation!
 3. **[DEVELOPER_SETUP.md](./DEVELOPER_SETUP.md)** - Complete setup guide
 
 ### Working on Features?
-1. **[TASK_HISTORY.md](./TASK_HISTORY.md)** - Check previous work and context
-2. **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - See what's done and what's next
-3. **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Understand the system design
+1. **[TODO_LIST.md](./TODO_LIST.md)** - See all pending tasks organized by priority
+2. **[TASK_HISTORY.md](./TASK_HISTORY.md)** - Check previous work and context
+3. **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - See what's done and what's next
+4. **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Understand the system design
 
 ### Need Technical Details?
 - **[DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)** - Database structure
@@ -72,8 +74,10 @@ Welcome to the TSmart Warehouse Management System documentation!
 
 ### ✅ Complete & Up-to-Date (December 25, 2025)
 - ✅ **PROJECT_STATUS_SUMMARY.md** - Quick status overview
+- ✅ **TODO_LIST.md** - Comprehensive todo list
 - ✅ **IMPLEMENTATION_STATUS.md** - Detailed status tracking
 - ✅ **TASK_HISTORY.md** - Task and progress log
+- ✅ **DOCUMENTATION_MAP.md** - Documentation navigation guide
 - ✅ **ARCHITECTURE.md** - System architecture
 - ✅ **API_DOCUMENTATION.md** - API reference
 - ✅ **DATABASE_SCHEMA.md** - Database documentation

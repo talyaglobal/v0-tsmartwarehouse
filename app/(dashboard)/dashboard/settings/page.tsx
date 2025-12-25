@@ -103,11 +103,11 @@ export default function SettingsPage() {
       }
       
       // Get company role from profiles.role
-      let companyRole: 'owner' | 'admin' | 'member' | null = null
+      let companyRole: 'owner' | 'company_admin' | 'member' | null = null
       if (profileData.role === 'owner') {
         companyRole = 'owner'
-      } else if (profileData.role === 'admin') {
-        companyRole = 'admin'
+      } else if (profileData.role === 'company_admin') {
+        companyRole = 'company_admin'
       } else if (profileData.role === 'customer') {
         companyRole = 'member'
       }

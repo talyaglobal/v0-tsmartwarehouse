@@ -69,7 +69,7 @@ export async function updateSession(request: NextRequest) {
     const role = profile?.role || user.user_metadata?.role || 'customer'
     
     const url = request.nextUrl.clone()
-    if (role === 'admin') {
+    if (role === 'super_admin') {
       url.pathname = '/admin'
     } else if (role === 'worker') {
       url.pathname = '/worker'
@@ -90,8 +90,8 @@ export async function updateSession(request: NextRequest) {
     const role = profile?.role || user.user_metadata?.role || 'customer'
     const pathname = request.nextUrl.pathname
 
-    // Admin routes - only accessible by admin
-    if (pathname.startsWith('/admin') && role !== 'admin') {
+    // Admin routes - only accessible by super admin
+    if (pathname.startsWith('/admin') && role !== 'super_admin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

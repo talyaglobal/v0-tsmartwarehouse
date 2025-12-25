@@ -35,10 +35,15 @@
 
 ## Overview
 
-The database schema supports a multi-tenant warehouse management system with three user roles:
-- **Admin**: Full system access
+The database schema supports a multi-tenant warehouse management system with three system-wide user roles:
+- **Super Admin**: Full system access across all companies
 - **Customer**: Booking and claim management
 - **Worker**: Task and inventory management
+
+And three company-level roles:
+- **Owner**: Company owner with full control
+- **Company Admin**: Company administrator who can manage team members
+- **Member**: Regular company member
 
 The warehouse structure consists of:
 - 3 floors
@@ -86,7 +91,7 @@ Stores user account information.
 | `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | User unique identifier |
 | `email` | TEXT | UNIQUE, NOT NULL | User email address |
 | `name` | TEXT | NOT NULL | User full name |
-| `role` | TEXT | NOT NULL, CHECK IN ('admin', 'customer', 'worker') | User role |
+| `role` | TEXT | NOT NULL, CHECK IN ('super_admin', 'customer', 'worker', 'owner', 'company_admin') | User role (system-wide or company-level) |
 | `company` | TEXT | | Company name (optional) |
 | `phone` | TEXT | | Phone number (optional) |
 | `avatar` | TEXT | | Avatar URL (optional) |
@@ -409,7 +414,7 @@ Stores Supabase Auth user profiles (linked to auth.users).
 | `id` | UUID | PRIMARY KEY, FK → auth.users(id) | User ID (from Supabase Auth) |
 | `name` | TEXT | | User full name |
 | `email` | TEXT | | User email |
-| `role` | TEXT | CHECK IN ('admin', 'customer', 'worker') | User role |
+| `role` | TEXT | CHECK IN ('super_admin', 'customer', 'worker', 'owner', 'company_admin') | User role (system-wide or company-level) |
 | `company` | TEXT | | Company name |
 | `phone` | TEXT | | Phone number |
 | `avatar` | TEXT | | Avatar URL |

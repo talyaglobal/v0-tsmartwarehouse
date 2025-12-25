@@ -19,7 +19,7 @@ const tierColors: Record<MembershipTier, string> = {
   platinum: "bg-purple-100 text-purple-800",
 }
 
-type CustomerWithRole = User & { companyRole?: 'owner' | 'admin' | 'member' | null }
+type CustomerWithRole = User & { companyRole?: 'owner' | 'company_admin' | 'member' | null }
 
 export default function CustomersPage() {
   const [search, setSearch] = useState("")
@@ -151,13 +151,13 @@ export default function CustomersPage() {
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           customer.companyRole === 'owner'
                             ? 'bg-purple-100 text-purple-800'
-                            : customer.companyRole === 'admin'
+                            : customer.companyRole === 'company_admin'
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
                         {customer.companyRole === 'owner' && <Crown className="mr-1 h-3 w-3" />}
-                        {customer.companyRole}
+                        {customer.companyRole === 'company_admin' ? 'Company Admin' : customer.companyRole}
                       </span>
                     )}
                     {!customer.companyRole && <span className="text-muted-foreground">-</span>}

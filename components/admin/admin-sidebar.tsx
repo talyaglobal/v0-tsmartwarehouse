@@ -95,6 +95,7 @@ const navSections: NavSection[] = [
       { name: "Pricing", href: "/admin/pricing", icon: DollarSign },
       { name: "Settings", href: "/admin/settings", icon: Settings },
       { name: "Notifications", href: "/admin/notifications", icon: Bell },
+      { name: "Send SMS", href: "/admin/notifications/send-sms", icon: Bell },
       { name: "Security", href: "/admin/security", icon: Shield },
     ],
     defaultOpen: false,

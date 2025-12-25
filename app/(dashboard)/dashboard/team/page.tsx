@@ -222,7 +222,7 @@ export default function TeamMembersPage() {
 
   const handleEdit = (member: CompanyMember) => {
     setSelectedMember(member)
-    setEditForm({ role: member.role === 'customer' ? 'member' : member.role as 'owner' | 'admin' | 'member' })
+    setEditForm({ role: member.role === 'customer' ? 'member' : member.role as 'owner' | 'company_admin' | 'member' })
     setEditDialogOpen(true)
   }
 
@@ -245,7 +245,7 @@ export default function TeamMembersPage() {
     switch (role) {
       case 'owner':
         return 'bg-purple-100 text-purple-800'
-      case 'admin':
+      case 'company_admin':
         return 'bg-blue-100 text-blue-800'
       default:
         return 'bg-gray-100 text-gray-800'
@@ -382,14 +382,14 @@ export default function TeamMembersPage() {
                 <Label htmlFor="role">Role</Label>
                 <Select
                   value={inviteForm.role}
-                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as 'owner' | 'admin' | 'member' })}
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as 'owner' | 'company_admin' | 'member' })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="company_admin">Company Admin</SelectItem>
                     <SelectItem value="owner">Owner</SelectItem>
                   </SelectContent>
                 </Select>
@@ -572,7 +572,7 @@ export default function TeamMembersPage() {
               <Label htmlFor="edit-role">Role</Label>
               <Select
                 value={editForm.role}
-                onValueChange={(value) => setEditForm({ ...editForm, role: value as 'owner' | 'admin' | 'member' })}
+                onValueChange={(value) => setEditForm({ ...editForm, role: value as 'owner' | 'company_admin' | 'member' })}
                 disabled={selectedMember?.role === 'owner'}
               >
                 <SelectTrigger>
@@ -580,7 +580,7 @@ export default function TeamMembersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="company_admin">Company Admin</SelectItem>
                   <SelectItem value="owner" disabled={selectedMember?.role !== 'owner'}>Owner</SelectItem>
                 </SelectContent>
               </Select>

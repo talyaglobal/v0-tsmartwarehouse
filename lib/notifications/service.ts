@@ -399,9 +399,17 @@ export class NotificationService {
       }
     }
 
+    // Format message (max 160 characters for single SMS)
+    let message = `${options.title}\n\n${options.message}`
+    
+    // Truncate if too long (NetGSM limit is 160 characters)
+    if (message.length > 160) {
+      message = message.substring(0, 157) + "..."
+    }
+
     const result = await this.smsProvider.send({
       to: userInfo.phone,
-      message: `${options.title}\n\n${options.message}`,
+      message,
     })
 
     return {
