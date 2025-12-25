@@ -253,6 +253,141 @@ NETGSM_HEADER=TALYA SMART
 
 ---
 
+### December 25, 2025 - API Migration to Server Actions (Sprint 1)
+
+**Task**: Migrate API routes to Server Actions
+
+**What Was Done**:
+1. ✅ **Migrated Tasks API to Server Actions**
+   - Created `features/tasks/types.ts` - Task types and interfaces
+   - Created `features/tasks/lib/queries.ts` - Server Component queries with caching
+   - Created `features/tasks/actions.ts` - Server Actions for CRUD operations
+   - Implemented: createTask, updateTask, assignTask, completeTask, deleteTask, cancelTask
+   - Added proper authentication and authorization checks
+   - Implemented revalidation for affected paths
+
+2. ✅ **Migrated Invoices API to Server Actions**
+   - Created `features/invoices/types.ts` - Invoice types and interfaces
+   - Created `features/invoices/lib/queries.ts` - Server Component queries with caching
+   - Created `features/invoices/actions.ts` - Server Actions for invoice operations
+   - Implemented: createInvoice, updateInvoice, markAsPaid, cancelInvoice, generateInvoiceForBooking
+   - Integrated with Redis cache invalidation
+   - Added invoice generation logic with automatic calculations
+
+3. ✅ **Migrated Claims API to Server Actions**
+   - Created `features/claims/types.ts` - Claim types and interfaces
+   - Created `features/claims/lib/queries.ts` - Server Component queries with caching
+   - Created `features/claims/actions.ts` - Server Actions for claim operations
+   - Implemented: createClaim, updateClaim, approveClaim, rejectClaim, markAsPaid, deleteClaim
+   - Added approval/rejection workflow
+   - Proper authorization for admin-only actions
+
+4. ✅ **Migrated Incidents API to Server Actions**
+   - Created `features/incidents/types.ts` - Incident types and interfaces
+   - Created `features/incidents/lib/queries.ts` - Server Component queries with caching
+   - Created `features/incidents/actions.ts` - Server Actions for incident operations
+   - Implemented: createIncident, updateIncident, resolveIncident, deleteIncident
+   - Added incident statistics query
+   - Proper role-based access control
+
+**Files Created**:
+- `features/tasks/types.ts`
+- `features/tasks/lib/queries.ts`
+- `features/tasks/actions.ts`
+- `features/invoices/types.ts`
+- `features/invoices/lib/queries.ts`
+- `features/invoices/actions.ts`
+- `features/claims/types.ts`
+- `features/claims/lib/queries.ts`
+- `features/claims/actions.ts`
+- `features/incidents/types.ts`
+- `features/incidents/lib/queries.ts`
+- `features/incidents/actions.ts`
+
+**Technical Improvements**:
+- All Server Actions use proper error handling with try-catch
+- All queries use React cache() for request deduplication
+- Proper TypeScript types throughout
+- Zod validation for inputs
+- Path revalidation after mutations
+- Redis cache invalidation where applicable
+- Role-based authorization checks
+- Consistent response format: `{ success, data?, error? }`
+
+**API Migration Progress**:
+- ✅ Bookings (previously completed)
+- ✅ Companies (previously completed)
+- ✅ Warehouses (previously completed)
+- ✅ Tasks (completed today)
+- ✅ Invoices (completed today)
+- ✅ Claims (completed today)
+- ✅ Incidents (completed today)
+- ⏳ Notifications (pending)
+
+**Migration Status**: 87.5% complete (7/8 features migrated)
+
+**Key Benefits**:
+- Type-safe mutations with full TypeScript support
+- Automatic revalidation of affected pages
+- Better performance with Server Components
+- Reduced client-side JavaScript bundle
+- Simplified data fetching patterns
+- Better error handling and user feedback
+
+**Next Steps**:
+- Migrate Notifications API to Server Actions
+- Update page components to use new Server Actions
+- Remove deprecated API routes
+- Add unit tests for Server Actions
+- Update API documentation
+
+---
+
+### December 25, 2025 - Unit & Integration Tests Added
+
+**Task**: Add comprehensive test coverage for new Server Actions
+
+**What Was Done**:
+1. ✅ **Added Unit Tests for Business Logic**
+   - Created `tests/unit/features/bookings.test.ts` - 30+ test cases
+   - Created `tests/unit/features/tasks.test.ts` - 25+ test cases
+   - Created `tests/unit/features/invoices.test.ts` - 30+ test cases
+   - Created `tests/unit/features/claims.test.ts` - 25+ test cases
+   - Created `tests/unit/features/incidents.test.ts` - 20+ test cases
+
+2. ✅ **Added Integration Tests for Database Operations**
+   - Created `tests/integration/features/tasks-integration.test.ts`
+   - Created `tests/integration/features/invoices-integration.test.ts`
+   - Created `tests/integration/features/claims-integration.test.ts`
+   - Created `tests/integration/features/incidents-integration.test.ts`
+
+**Test Coverage Areas**:
+- **Bookings**: Validation, calculations, status workflow, date validation, authorization
+- **Tasks**: Task types, status workflow, priority levels, assignment, completion, authorization
+- **Invoices**: Calculations (subtotal, tax, total), status workflow, item management, generation, authorization
+- **Claims**: Status workflow, amounts (requested vs approved), evidence handling, resolution, authorization
+- **Incidents**: Severity levels, status workflow, resolution, reporting, authorization, priority
+
+**Files Created**: 9 test files
+- 5 unit test files (~130 test cases)
+- 4 integration test files (~20 test scenarios)
+
+**Test Types**:
+- ✅ Validation tests
+- ✅ Business logic tests
+- ✅ Calculation tests
+- ✅ Workflow tests
+- ✅ Authorization tests
+- ✅ Integration tests (placeholders for actual DB tests)
+
+**Next Steps**:
+- Run tests with `npm test`
+- Set up CI/CD test automation
+- Add E2E tests for critical user flows
+- Increase coverage to 80%+ target
+
+---
+
 ## Earlier Work (December 2024)
 
 ### Core Foundation
