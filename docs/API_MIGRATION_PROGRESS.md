@@ -185,7 +185,7 @@ This document tracks the migration from legacy API routes (`/api/v1/*`) to moder
 ## ⏳ Pending Migrations
 
 ### 8. Notifications Feature
-**Status**: ⏳ Pending  
+**Status**: ⏳ Pending (Low Priority)
 **Current**: API routes in `/api/v1/notifications`  
 **Target**: `features/notifications/`
 
@@ -196,6 +196,8 @@ This document tracks the migration from legacy API routes (`/api/v1/*`) to moder
 - `updatePreferencesAction`
 
 **Estimated Effort**: 1-2 days
+
+**Note**: Push notifications have been implemented separately using Firebase Cloud Messaging. The remaining migration is for the notification management API routes.
 
 ---
 

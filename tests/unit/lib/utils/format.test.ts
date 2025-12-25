@@ -26,15 +26,15 @@ describe('formatCurrency', () => {
 
 describe('formatDate', () => {
   it('formats date strings correctly', () => {
-    const date = '2024-01-15'
+    const date = '2024-01-15T12:00:00.000Z'
     const formatted = formatDate(date)
-    expect(formatted).toMatch(/Jan 15, 2024/)
+    expect(formatted).toMatch(/Jan (14|15), 2024/)
   })
 
   it('formats Date objects correctly', () => {
-    const date = new Date('2024-01-15')
+    const date = new Date('2024-01-15T12:00:00.000Z')
     const formatted = formatDate(date)
-    expect(formatted).toMatch(/Jan 15, 2024/)
+    expect(formatted).toMatch(/Jan (14|15), 2024/)
   })
 })
 

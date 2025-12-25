@@ -24,13 +24,24 @@ if (typeof globalThis.ReadableStream === 'undefined') {
 // Polyfill for Next.js Request/Response APIs in Jest environment
 if (typeof globalThis.Request === 'undefined') {
   try {
-    const { Request, Response, Headers } = require('undici')
+    // Try to use Node.js built-in fetch (Node 18+)
+    const { Request, Response, Headers, FormData } = require('undici')
     globalThis.Request = Request
     globalThis.Response = Response
     globalThis.Headers = Headers
+    globalThis.FormData = FormData
+    globalThis.fetch = require('undici').fetch
   } catch (e) {
-    // If undici fails, create minimal mocks
-    // This is expected in some environments
+    // If undici fails, try node-fetch as fallback
+    try {
+      const fetch = require('node-fetch')
+      globalThis.fetch = fetch
+      globalThis.Request = fetch.Request
+      globalThis.Response = fetch.Response
+      globalThis.Headers = fetch.Headers
+    } catch (e2) {
+      console.warn('Could not polyfill Request/Response APIs')
+    }
   }
 }
 

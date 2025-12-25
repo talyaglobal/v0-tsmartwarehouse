@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { NextRequest } from 'next/server'
 import { GET, POST } from '@/app/api/v1/tasks/route'
 import { getTasks, createTask } from '@/lib/db/tasks'

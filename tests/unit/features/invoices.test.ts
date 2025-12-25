@@ -137,12 +137,12 @@ describe('Invoices Feature', () => {
     })
 
     it('should set due date 30 days from creation', () => {
-      const createdAt = new Date('2024-01-01')
+      const createdAt = new Date('2024-01-01T00:00:00.000Z')
       const dueDate = new Date(createdAt)
-      dueDate.setDate(dueDate.getDate() + 30)
+      dueDate.setUTCDate(dueDate.getUTCDate() + 30)
 
-      expect(dueDate.getDate()).toBe(31)
-      expect(dueDate.getMonth()).toBe(0) // January
+      expect(dueDate.getUTCDate()).toBe(31)
+      expect(dueDate.getUTCMonth()).toBe(0) // January
     })
   })
 
