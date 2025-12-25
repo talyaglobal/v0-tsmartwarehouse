@@ -40,8 +40,7 @@ export async function DELETE(
       }
     }
 
-    const supabase = createServerSupabaseClient()
-    const supabaseAdmin = createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = createServerSupabaseClient()
     
     // Verify invitation belongs to this company (invitationId is now profile ID)
     const { data: profile, error: profileError } = await supabaseAdmin

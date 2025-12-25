@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,6 @@ interface Company {
 
 export default function SettingsPage() {
   const { user } = useUser()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
@@ -62,7 +61,7 @@ export default function SettingsPage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   // Fetch user profile with company
-  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user) return null
@@ -223,7 +222,7 @@ export default function SettingsPage() {
         return data
       }
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
       

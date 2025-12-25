@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Users, Plus, Mail, MoreHorizontal, Edit, Trash2, Loader2, UserPlus } from "@/components/icons"
+import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
@@ -84,7 +84,7 @@ export default function TeamMembersPage() {
   }, [companyData])
 
   // Fetch company members
-  const { data: members = [], isLoading: membersLoading, refetch: refetchMembers } = useQuery({
+  const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ['company-members', companyId],
     queryFn: async () => {
       if (!companyId) return []
@@ -95,7 +95,7 @@ export default function TeamMembersPage() {
   })
 
   // Fetch invitations
-  const { data: invitations = [], isLoading: invitationsLoading, refetch: refetchInvitations } = useQuery({
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery({
     queryKey: ['company-invitations', companyId],
     queryFn: async () => {
       if (!companyId) return []
@@ -249,19 +249,6 @@ export default function TeamMembersPage() {
         return 'bg-blue-100 text-blue-800'
       default:
         return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400'
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400'
     }
   }
 

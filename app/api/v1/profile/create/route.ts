@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use admin client to create profile (bypasses RLS)
-    const supabaseAdmin = createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = createServerSupabaseClient()
 
     // Check if profile already exists
     const { data: existingProfile } = await supabaseAdmin

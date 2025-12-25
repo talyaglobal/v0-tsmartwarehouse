@@ -17,7 +17,7 @@ export async function PATCH(
     const { user } = authResult
     const { id: companyId, memberId } = await params
     const body = await request.json()
-    const { role, status } = body
+    const { role } = body
 
     // Check if user has permission
     if (user.role !== 'admin') {

@@ -43,8 +43,7 @@ export async function GET(
       }
     }
 
-    const supabase = createServerSupabaseClient()
-    const supabaseAdmin = createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = createServerSupabaseClient()
     
     // Fetch pending invitations from profiles table
     // Simple rule: Show invitation ONLY if:
@@ -77,7 +76,7 @@ export async function GET(
     }
 
     if (!allPendingInvitations || allPendingInvitations.length === 0) {
-      const responseData: ListResponse = {
+      const responseData: ListResponse<any> = {
         success: true,
         data: [],
         total: 0,
@@ -129,7 +128,7 @@ export async function GET(
       },
     }))
 
-    const responseData: ListResponse = {
+    const responseData: ListResponse<any> = {
       success: true,
       data: invitations,
       total: invitations.length,
@@ -212,7 +211,7 @@ export async function POST(
     }
 
     const supabase = createServerSupabaseClient()
-    const supabaseAdmin = createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = createServerSupabaseClient()
     
     // Check if user with this email exists in profiles table
     const { data: existingProfile } = await supabase
@@ -265,9 +264,6 @@ export async function POST(
       // Continue, we'll handle this case below
       // If listing fails, we'll try to create user and handle the error if user already exists
     }
-
-    // Determine the actual user ID (from profiles or auth)
-    let actualUserId = existingProfile?.id || existingAuthUser?.id || null
 
     // Check if user is already a member (if profile exists)
     if (existingProfile && existingProfile.company_id === companyId) {
@@ -327,7 +323,6 @@ export async function POST(
       }
 
       createdUserId = newUser.user.id
-      actualUserId = createdUserId
 
       // Wait a moment for the trigger to create the profile
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -403,7 +398,6 @@ export async function POST(
       }
     } else if (existingAuthUser && !existingProfile) {
       // User exists in Auth but not in profiles - create profile with invitation token, role, and password
-      actualUserId = existingAuthUser.id
       const profileRole = role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'customer'
       // Note: For existing Auth users, we don't have the generated password, so invitation_password will be NULL
       // They can still login with their existing password or use the invitation link
@@ -433,7 +427,6 @@ export async function POST(
       console.log('✅ Profile created for existing auth user with invitation token')
     } else if (existingProfile) {
       // User exists in profiles, update with invitation token, role, and password (if new user was created)
-      actualUserId = existingProfile.id
       const profileRole = role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'customer'
       const updateData: any = {
         role: profileRole, // Update role from invitation (will be used when accepted)

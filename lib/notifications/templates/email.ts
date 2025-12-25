@@ -416,45 +416,6 @@ Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboa
   },
 
   "team-invitation": {
-    subject: (data: EmailTemplateData) => `Team Invitation - ${data.companyName || "Company"}`,
-    html: (data: EmailTemplateData) => {
-      const content = `
-        <p>Dear ${data.invitedName || "User"},</p>
-        <p>You have been invited to join <strong>${data.companyName || "a company"}</strong> on TSmart Warehouse.</p>
-        <p><strong>Invitation Details:</strong></p>
-        <ul>
-          <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
-          <li><strong>Role:</strong> ${data.role || "Member"}</li>
-          <li><strong>Invited By:</strong> ${data.invitedBy || "N/A"}</li>
-          ${data.expiresAt ? `<li><strong>Expires At:</strong> ${data.expiresAt}</li>` : ""}
-        </ul>
-        <p>Click the button below to accept the invitation and create your account.</p>
-      `
-      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
-      return baseEmailTemplate("Team Invitation", content, actionUrl, "Accept Invitation")
-    },
-    text: (data: EmailTemplateData) => {
-      return `
-Team Invitation - ${data.companyName || "Company"}
-
-Dear ${data.invitedName || "User"},
-
-You have been invited to join ${data.companyName || "a company"} on TSmart Warehouse.
-
-Invitation Details:
-- Company: ${data.companyName || "N/A"}
-- Role: ${data.role || "Member"}
-- Invited By: ${data.invitedBy || "N/A"}
-${data.expiresAt ? `- Expires At: ${data.expiresAt}` : ""}
-
-Click the link below to accept the invitation and create your account.
-
-Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation/${data.token}`}
-      `.trim()
-    },
-  },
-
-  "team-invitation": {
     subject: (data: EmailTemplateData) => `You've been invited to join ${data.companyName || "a company"} on TSmart Warehouse`,
     html: (data: EmailTemplateData) => {
       const content = `

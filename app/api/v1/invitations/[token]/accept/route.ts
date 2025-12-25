@@ -9,7 +9,7 @@ import { acceptInvitation } from "@/features/companies/actions"
  * Accept an invitation by token (called automatically on login if user has pending invitation)
  */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {

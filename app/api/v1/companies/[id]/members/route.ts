@@ -65,7 +65,7 @@ export async function GET(
       throw new Error(`Failed to fetch company members: ${error.message}`)
     }
 
-    const responseData: ListResponse = {
+    const responseData: ListResponse<any> = {
       success: true,
       data: members || [],
       total: members?.length || 0,

@@ -61,7 +61,7 @@ export async function inviteTeamMember(input: {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiry
 
-    const supabaseAdmin = await createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = await createServerSupabaseClient()
 
     // Update or create profile with invitation data
     let invitation: any
@@ -178,7 +178,7 @@ export async function acceptInvitation(
     } = await supabase.auth.getUser()
 
     // Get admin client for profile operations
-    const supabaseAdmin = await createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = await createServerSupabaseClient()
 
     // Find profile with this invitation token
     const { data: invitationProfile, error: invitationError } = await supabaseAdmin
@@ -348,9 +348,9 @@ export async function acceptInvitation(
       entityType: 'team_member',
       entityId: user.id,
       memberId: user.id,
-      companyId: invitationProfile.invitation_company_id,
+      companyId: targetCompanyId || updatedProfile.company_id,
       userId: user.id,
-      role: invitationProfile.invitation_role || 'member',
+      role: updatedProfile.role || invitationProfile.role || 'member',
       timestamp: new Date().toISOString(),
     })
 
@@ -369,8 +369,8 @@ export async function acceptInvitation(
  * This function is kept for backwards compatibility but should not be used
  */
 export async function removeTeamMember(
-  companyId: string,
-  userId: string
+  _companyId: string,
+  _userId: string
 ): Promise<{ success: boolean; error?: string }> {
   // This function is deprecated - company_members table no longer exists
   // Use the API endpoint DELETE /api/v1/companies/[id]/members/[memberId] instead

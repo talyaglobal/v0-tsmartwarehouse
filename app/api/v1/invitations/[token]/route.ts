@@ -8,13 +8,12 @@ import type { ErrorResponse, ApiResponse } from "@/types/api"
  * Get invitation details by token (public endpoint for pre-filling registration form)
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
     const { token } = await params
-    const supabase = createServerSupabaseClient()
-    const supabaseAdmin = createServerSupabaseClient({ admin: true })
+    const supabaseAdmin = createServerSupabaseClient()
     
     // Find profile with this invitation token
     const { data: profile, error } = await supabaseAdmin
@@ -56,7 +55,7 @@ export async function GET(
     // Since we already filtered by invitation_token, if we got here, invitation is still pending
 
     const companyName = profile.companies 
-      ? (Array.isArray(profile.companies) ? profile.companies[0]?.name : profile.companies?.name)
+      ? (Array.isArray(profile.companies) ? profile.companies[0]?.name : (profile.companies as { name?: string })?.name)
       : null
 
     const responseData: ApiResponse = {

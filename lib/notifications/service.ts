@@ -10,6 +10,7 @@ import { createPushProvider } from "./providers/push"
 import { createWhatsAppProvider } from "./providers/whatsapp"
 import { getEmailTemplate } from "./templates/email"
 import { createClient } from "@/lib/supabase/server"
+import { getSiteUrl } from "@/lib/utils/site-url"
 
 export interface NotificationOptions {
   userId: string
