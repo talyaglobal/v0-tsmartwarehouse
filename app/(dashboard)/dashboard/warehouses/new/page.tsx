@@ -17,7 +17,6 @@ import Link from "next/link"
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
 import { LocationPicker } from "@/components/maps/location-picker"
 import { useCountries, useCities } from "@/lib/hooks/use-countries-cities"
-import { searchCities } from "@/lib/api/countries-cities"
 
 export default function NewWarehousePage() {
   const router = useRouter()
@@ -25,8 +24,7 @@ export default function NewWarehousePage() {
   const { addNotification } = useUIStore()
   const [isLoading, setIsLoading] = useState(false)
   const [country, setCountry] = useState("US")
-  const [citySearchTerm, setCitySearchTerm] = useState("")
-  const [showCityDropdown, setShowCityDropdown] = useState(false)
+  const [city, setCity] = useState("")
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -42,12 +40,7 @@ export default function NewWarehousePage() {
 
   // Fetch countries and cities from API
   const { data: countries = [] } = useCountries()
-  const { data: cities = [] } = useCities(country)
-
-  // Get filtered cities based on search
-  const filteredCities = citySearchTerm
-    ? searchCities(cities, citySearchTerm)
-    : cities
+  const { data: cities = [], isLoading: citiesLoading, error: citiesError } = useCities(country)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -187,11 +180,14 @@ export default function NewWarehousePage() {
               {/* Country Selection */}
               <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
-                <Select value={country} onValueChange={(value) => {
-                  setCountry(value)
-                  setFormData({ ...formData, city: "" })
-                  setCitySearchTerm("")
-                }}>
+                <Select
+                  value={country}
+                  onValueChange={(value) => {
+                    setCountry(value)
+                    setCity("")
+                    setFormData({ ...formData, city: "" })
+                  }}
+                >
                   <SelectTrigger id="country">
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
@@ -210,44 +206,54 @@ export default function NewWarehousePage() {
                 <Label htmlFor="city">
                   City <span className="text-destructive">*</span>
                 </Label>
-                <div className="relative">
-                  <Input
-                    id="city"
-                    value={citySearchTerm}
-                    onChange={(e) => {
-                      setCitySearchTerm(e.target.value)
-                      setShowCityDropdown(true)
-                      if (filteredCities.length === 1 && e.target.value === filteredCities[0].name) {
-                        setFormData({ ...formData, city: filteredCities[0].name })
-                      }
-                    }}
-                    onFocus={() => setShowCityDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
-                    placeholder="Type to search cities"
-                    required
-                  />
-                  {showCityDropdown && filteredCities.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredCities.map((cityOption) => (
-                        <div
-                          key={cityOption.name}
-                          className="px-3 py-2 cursor-pointer hover:bg-accent text-sm"
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            const cityDisplayName = cityOption.state
-                              ? `${cityOption.name}, ${cityOption.state}`
-                              : cityOption.name
-                            setCitySearchTerm(cityDisplayName)
-                            setFormData({ ...formData, city: cityOption.name })
-                            setShowCityDropdown(false)
-                          }}
-                        >
-                          {cityOption.state ? `${cityOption.name}, ${cityOption.state}` : cityOption.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <Select
+                  value={city}
+                  onValueChange={(value) => {
+                    setCity(value)
+                    setFormData({ ...formData, city: value })
+                  }}
+                  disabled={!country || citiesLoading}
+                >
+                  <SelectTrigger id="city">
+                    <SelectValue placeholder={citiesLoading ? "Loading cities..." : country ? "Select a city" : "Select a country first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {citiesError && (
+                      <div className="px-2 py-1.5 text-sm text-red-600 dark:text-red-400 space-y-1">
+                        <div className="font-medium">Error loading cities</div>
+                        <div className="text-xs">{citiesError.message}</div>
+                        {citiesError.message.includes('not enabled') && (
+                          <div className="text-xs mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                            GeoNames account needs to be enabled for webservice. Please enable it at{' '}
+                            <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer" className="underline">
+                              https://www.geonames.org/manageaccount
+                            </a>
+                          </div>
+                        )}
+                        {citiesError.message.includes('rate limit') && (
+                          <div className="text-xs mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                            Please contact the administrator to configure GeoNames API username in .env.local
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {cities.length === 0 && !citiesLoading && !citiesError && (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No cities found for this country. Please try again later or contact support.
+                      </div>
+                    )}
+                    {cities.map((cityOption) => {
+                      const cityDisplayName = cityOption.state
+                        ? `${cityOption.name}, ${cityOption.state}`
+                        : cityOption.name
+                      return (
+                        <SelectItem key={cityOption.name} value={cityOption.name}>
+                          {cityDisplayName}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Address with Google Maps Places Autocomplete */}

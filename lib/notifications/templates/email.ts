@@ -510,6 +510,55 @@ Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data
       `.trim()
     },
   },
+
+  "welcome-member": {
+    subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "TSmart Warehouse"}!`,
+    html: (data: EmailTemplateData) => {
+      const content = `
+        <p>Dear ${data.fullName || "User"},</p>
+        <p>Welcome to ${data.companyName || "TSmart Warehouse"}! Your account has been created successfully.</p>
+        <p><strong>Your Login Credentials:</strong></p>
+        <ul>
+          <li><strong>Email:</strong> ${data.email || "N/A"}</li>
+          <li><strong>Password:</strong> ${data.password || "Please contact your administrator"}</li>
+        </ul>
+        <p><strong>Account Details:</strong></p>
+        <ul>
+          <li><strong>Full Name:</strong> ${data.fullName || "N/A"}</li>
+          <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
+          <li><strong>Role:</strong> ${data.role || "member"}</li>
+        </ul>
+        <p>You can now log in to your account using the credentials above.</p>
+        <p><strong>Important:</strong> For security reasons, please change your password after your first login.</p>
+      `
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/login`
+      return baseEmailTemplate("Welcome to TSmart Warehouse!", content, actionUrl, "Login to Dashboard")
+    },
+    text: (data: EmailTemplateData) => {
+      return `
+Welcome to ${data.companyName || "TSmart Warehouse"}!
+
+Dear ${data.fullName || "User"},
+
+Welcome to ${data.companyName || "TSmart Warehouse"}! Your account has been created successfully.
+
+Your Login Credentials:
+- Email: ${data.email || "N/A"}
+- Password: ${data.password || "Please contact your administrator"}
+
+Account Details:
+- Full Name: ${data.fullName || "N/A"}
+- Company: ${data.companyName || "N/A"}
+- Role: ${data.role || "member"}
+
+You can now log in to your account using the credentials above.
+
+Important: For security reasons, please change your password after your first login.
+
+Login: ${data.dashboardUrl || `${getSiteUrl()}/login`}
+      `.trim()
+    },
+  },
 }
 
 export function getEmailTemplate(templateName: string): EmailTemplate | null {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus } from "@/components/icons"
+import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus, Eye, EyeOff, Upload, User, X } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { useUIStore } from "@/stores/ui.store"
+import { PhoneInput } from 'react-international-phone'
+import 'react-international-phone/style.css'
 
 interface CompanyMember {
   id: string
@@ -54,22 +56,37 @@ export function TeamMembersTab() {
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<CompanyMember | null>(null)
   const [inviteForm, setInviteForm] = useState({
     email: "",
     fullName: "",
-    role: "member" as "owner" | "company_admin" | "member",
+    role: "member" as "company_admin" | "member" | "warehouse_staff",
   })
+  const [addMemberForm, setAddMemberForm] = useState({
+    email: "",
+    fullName: "",
+    role: "member" as "company_admin" | "member" | "warehouse_staff",
+    password: "",
+  })
+  const [showAddPassword, setShowAddPassword] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [showEditPassword, setShowEditPassword] = useState(false)
   const [editForm, setEditForm] = useState({
     name: "",
     email: "",
     phone: "",
     role: "member" as "root" | "company_admin" | "member" | "warehouse_staff" | "owner",
-    avatar_url: "",
-    membership_tier: "none" as "none" | "bronze" | "silver" | "gold" | "platinum",
-    credit_balance: "0",
+    avatarUrl: "",
+    password: "",
   })
+  
+  // Handle phone change for edit form
+  const handleEditPhoneChange = useCallback((value: string) => {
+    setEditForm((prev) => ({ ...prev, phone: value }))
+  }, [])
 
   // Get user's company ID
   const { data: companyId, isLoading: isLoadingCompanyId } = useQuery({
@@ -126,9 +143,20 @@ export function TeamMembersTab() {
     enabled: !!companyId,
   })
 
+  // Generate password function
+  const generatePassword = () => {
+    const length = 16
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    let password = ""
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length))
+    }
+    return password
+  }
+
   // Invite member mutation
   const inviteMutation = useMutation({
-    mutationFn: async ({ email, fullName, role }: { email: string; fullName: string; role: 'owner' | 'company_admin' | 'member' }) => {
+    mutationFn: async ({ email, fullName, role }: { email: string; fullName: string; role: 'company_admin' | 'member' | 'warehouse_staff' }) => {
       if (!companyId) throw new Error("No company ID")
       const result = await api.post(`/api/v1/companies/${companyId}/invitations`, { email, fullName, role }, { showToast: false })
       if (!result.success) {
@@ -150,6 +178,43 @@ export function TeamMembersTab() {
       addNotification({
         type: 'error',
         message: error.message || 'Failed to send invitation',
+        duration: 5000,
+      })
+    },
+  })
+
+  // Add member directly mutation (no invitation email)
+  const addMemberMutation = useMutation({
+    mutationFn: async ({ email, fullName, role, password }: { email: string; fullName: string; role: 'company_admin' | 'member' | 'warehouse_staff'; password: string }) => {
+      if (!companyId) throw new Error("No company ID")
+      const result = await api.post(`/api/v1/companies/${companyId}/members`, { email, fullName, role, password }, { showToast: false })
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to add member')
+      }
+      return result.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['company-members', companyId] })
+      setAddMemberDialogOpen(false)
+      setAddMemberForm({ email: "", fullName: "", role: "member", password: "" })
+      
+      let message = data.message || 'Member added successfully. User can now login with the provided credentials.'
+      if (data.emailSent === false && data.emailError) {
+        message += ` However, welcome email could not be sent: ${data.emailError}`
+      } else if (data.emailSent === true) {
+        message += ' Welcome email has been sent.'
+      }
+      
+      addNotification({
+        type: 'success',
+        message: message,
+        duration: 7000,
+      })
+    },
+    onError: (error: Error) => {
+      addNotification({
+        type: 'error',
+        message: error.message || 'Failed to add member',
         duration: 5000,
       })
     },
@@ -287,13 +352,131 @@ export function TeamMembersTab() {
                 Manage your company team members and invitations
               </CardDescription>
             </div>
-            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Invite Member
-                </Button>
-              </DialogTrigger>
+            <div className="flex gap-2">
+              <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add New Member
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Team Member</DialogTitle>
+                    <DialogDescription>
+                      Create a new user account and add them directly to your company
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="add-email">Email *</Label>
+                      <Input
+                        id="add-email"
+                        type="email"
+                        placeholder="colleague@example.com"
+                        value={addMemberForm.email}
+                        onChange={(e) => setAddMemberForm({ ...addMemberForm, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-fullName">Full Name *</Label>
+                      <Input
+                        id="add-fullName"
+                        placeholder="John Doe"
+                        value={addMemberForm.fullName}
+                        onChange={(e) => setAddMemberForm({ ...addMemberForm, fullName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-role">Role *</Label>
+                      <Select
+                        value={addMemberForm.role}
+                        onValueChange={(value: "company_admin" | "member" | "warehouse_staff") =>
+                          setAddMemberForm({ ...addMemberForm, role: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="company_admin">Company Admin</SelectItem>
+                          <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="add-password">Password *</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setAddMemberForm({ ...addMemberForm, password: generatePassword() })}
+                        >
+                          Generate
+                        </Button>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          id="add-password"
+                          type={showAddPassword ? "text" : "password"}
+                          placeholder="Set initial password"
+                          value={addMemberForm.password}
+                          onChange={(e) => setAddMemberForm({ ...addMemberForm, password: e.target.value })}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAddPassword(!showAddPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showAddPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        User will use this password to login
+                      </p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setAddMemberDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        addMemberMutation.mutate({
+                          email: addMemberForm.email,
+                          fullName: addMemberForm.fullName,
+                          role: addMemberForm.role,
+                          password: addMemberForm.password,
+                        })
+                      }}
+                      disabled={addMemberMutation.isPending || !addMemberForm.email || !addMemberForm.fullName || !addMemberForm.password}
+                    >
+                      {addMemberMutation.isPending && (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      )}
+                      Add Member
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Invite Member
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Invite Team Member</DialogTitle>
@@ -325,7 +508,7 @@ export function TeamMembersTab() {
                     <Label htmlFor="role">Role</Label>
                     <Select
                       value={inviteForm.role}
-                      onValueChange={(value: "owner" | "company_admin" | "member") =>
+                      onValueChange={(value: "company_admin" | "member" | "warehouse_staff") =>
                         setInviteForm({ ...inviteForm, role: value })
                       }
                     >
@@ -335,7 +518,7 @@ export function TeamMembersTab() {
                       <SelectContent>
                         <SelectItem value="member">Member</SelectItem>
                         <SelectItem value="company_admin">Company Admin</SelectItem>
-                        <SelectItem value="owner">Owner</SelectItem>
+                        <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -364,7 +547,8 @@ export function TeamMembersTab() {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -416,10 +600,10 @@ export function TeamMembersTab() {
                                     email: member.email || "",
                                     phone: member.phone || "",
                                     role: member.role,
-                                    avatar_url: member.avatar_url || "",
-                                    membership_tier: (member.membership_tier || "none") as "none" | "bronze" | "silver" | "gold" | "platinum",
-                                    credit_balance: member.credit_balance?.toString() || "0",
+                                    avatarUrl: member.avatar_url || "",
+                                    password: "",
                                   })
+                                  setShowEditPassword(false)
                                   setEditDialogOpen(true)
                                 }}
                               >
@@ -531,16 +715,165 @@ export function TeamMembersTab() {
                 />
               </div>
             </div>
+            {/* Avatar Upload Section */}
+            <div className="space-y-2">
+              <Label>Profile Avatar</Label>
+              <div className="flex items-center gap-4">
+                {editForm.avatarUrl && editForm.avatarUrl.trim() !== "" ? (
+                  <div className="relative">
+                    <img
+                      src={editForm.avatarUrl}
+                      alt="Profile avatar"
+                      className="h-20 w-20 object-cover border rounded-full"
+                      onError={(e) => {
+                        const img = e.currentTarget
+                        img.style.display = 'none'
+                        const fallback = img.nextElementSibling as HTMLElement
+                        if (fallback) {
+                          fallback.style.display = 'flex'
+                        }
+                      }}
+                    />
+                    <div className="hidden h-20 w-20 rounded-full bg-muted flex items-center justify-center border">
+                      <User className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                      onClick={() => setEditForm((prev) => ({ ...prev, avatarUrl: "" }))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border">
+                    <User className="h-10 w-10 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <Input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+
+                      // Validate file type
+                      if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+                        addNotification({
+                          type: 'error',
+                          message: 'Only JPEG and PNG images are allowed',
+                          duration: 5000,
+                        })
+                        return
+                      }
+
+                      // Validate file size (2MB)
+                      if (file.size > 2 * 1024 * 1024) {
+                        addNotification({
+                          type: 'error',
+                          message: 'File size must be less than 2MB',
+                          duration: 5000,
+                        })
+                        return
+                      }
+
+                      setIsUploadingAvatar(true)
+
+                      try {
+                        const formDataUpload = new FormData()
+                        formDataUpload.append('file', file)
+                        formDataUpload.append('bucket', 'docs')
+                        formDataUpload.append('folder', 'avatar')
+
+                        const result = await api.post('/api/v1/files/upload', formDataUpload, {
+                          showToast: false,
+                        })
+
+                        if (result.success && result.data?.url) {
+                          const newAvatarUrl = result.data.url
+                          setEditForm((prev) => ({ ...prev, avatarUrl: newAvatarUrl }))
+                          addNotification({
+                            type: 'success',
+                            message: 'Avatar uploaded successfully',
+                            duration: 5000,
+                          })
+                        } else {
+                          addNotification({
+                            type: 'error',
+                            message: result.error || 'Failed to upload avatar',
+                            duration: 5000,
+                          })
+                        }
+                      } catch (error) {
+                        console.error('Error uploading avatar:', error)
+                        addNotification({
+                          type: 'error',
+                          message: 'Failed to upload avatar',
+                          duration: 5000,
+                        })
+                      } finally {
+                        setIsUploadingAvatar(false)
+                        if (avatarInputRef.current) {
+                          avatarInputRef.current.value = ''
+                        }
+                      }
+                    }}
+                    disabled={isUploadingAvatar}
+                    className="hidden"
+                    id="edit-avatar-upload"
+                  />
+                  <Label htmlFor="edit-avatar-upload" className="cursor-pointer">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isUploadingAvatar}
+                      onClick={() => avatarInputRef.current?.click()}
+                    >
+                      {isUploadingAvatar ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload Avatar
+                        </>
+                      )}
+                    </Button>
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    JPEG or PNG, max 2MB
+                  </p>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  type="tel"
-                  placeholder="+1 234 567 8900"
-                  value={editForm.phone}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                />
+                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+                  <PhoneInput
+                    defaultCountry="us"
+                    value={editForm.phone || ""}
+                    onChange={handleEditPhoneChange}
+                    disabled={updateMemberMutation.isPending}
+                    inputProps={{
+                      name: 'edit-phone',
+                      id: 'edit-phone',
+                      required: false,
+                      autoFocus: false,
+                      autoComplete: 'tel',
+                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                    }}
+                    countrySelectorStyleProps={{
+                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                    }}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-role">Role</Label>
@@ -566,48 +899,34 @@ export function TeamMembersTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-avatar">Avatar URL</Label>
-              <Input
-                id="edit-avatar"
-                type="url"
-                placeholder="https://example.com/avatar.jpg"
-                value={editForm.avatar_url}
-                onChange={(e) => setEditForm({ ...editForm, avatar_url: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-membership-tier">Membership Tier</Label>
-                <Select
-                  value={editForm.membership_tier}
-                  onValueChange={(value: "none" | "bronze" | "silver" | "gold" | "platinum") =>
-                    setEditForm({ ...editForm, membership_tier: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select tier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="bronze">Bronze</SelectItem>
-                    <SelectItem value="silver">Silver</SelectItem>
-                    <SelectItem value="gold">Gold</SelectItem>
-                    <SelectItem value="platinum">Platinum</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-credit-balance">Credit Balance</Label>
+              <Label htmlFor="edit-password">Password</Label>
+              <div className="relative">
                 <Input
-                  id="edit-credit-balance"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={editForm.credit_balance}
-                  onChange={(e) => setEditForm({ ...editForm, credit_balance: e.target.value })}
+                  id="edit-password"
+                  type={showEditPassword ? "text" : "password"}
+                  placeholder="Leave empty to keep current password"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  disabled={updateMemberMutation.isPending}
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  disabled={updateMemberMutation.isPending}
+                >
+                  {showEditPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Leave empty to keep the current password
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -623,21 +942,66 @@ export function TeamMembersTab() {
             <Button
               onClick={() => {
                 const updates: any = {}
-                if (editForm.name !== selectedMember?.name) updates.name = editForm.name
-                if (editForm.email !== selectedMember?.email) updates.email = editForm.email
-                if (editForm.phone !== selectedMember?.phone) updates.phone = editForm.phone
-                if (editForm.role !== selectedMember?.role) updates.role = editForm.role
-                const currentAvatar = selectedMember?.avatar_url || ""
-                if (editForm.avatar_url !== currentAvatar) updates.avatar_url = editForm.avatar_url
-                if (editForm.membership_tier !== "none") {
-                  updates.membership_tier = editForm.membership_tier
-                } else if (selectedMember?.membership_tier) {
-                  // If changing from a tier to "none", set to null
-                  updates.membership_tier = null
+                
+                // Normalize empty strings to null for comparison (nullable fields)
+                const normalizeEmptyToNull = (value: string | null | undefined): string | null => {
+                  if (value === null || value === undefined || value.trim() === "") return null
+                  return value.trim()
                 }
-                const creditBalance = parseFloat(editForm.credit_balance)
-                if (!isNaN(creditBalance) && creditBalance !== (selectedMember?.credit_balance || 0)) {
-                  updates.credit_balance = creditBalance
+                
+                // Compare name (nullable field - normalize empty strings to null)
+                const normalizedName = normalizeEmptyToNull(editForm.name)
+                const currentName = normalizeEmptyToNull(selectedMember?.name || null)
+                if (normalizedName !== currentName) {
+                  updates.name = normalizedName
+                }
+                
+                // Compare email (required field, but we still need to check for changes)
+                const normalizedEmail = editForm.email.trim()
+                if (normalizedEmail !== (selectedMember?.email || "").trim()) {
+                  updates.email = normalizedEmail
+                }
+                
+                // Compare phone (nullable field - normalize empty strings to null)
+                const normalizedPhone = normalizeEmptyToNull(editForm.phone)
+                const currentPhone = normalizeEmptyToNull(selectedMember?.phone || null)
+                if (normalizedPhone !== currentPhone) {
+                  updates.phone = normalizedPhone
+                }
+                
+                // Compare role (required field)
+                if (editForm.role !== selectedMember?.role) {
+                  updates.role = editForm.role
+                }
+                
+                // Compare avatar_url (nullable field - normalize empty strings to null)
+                const normalizedAvatarUrl = normalizeEmptyToNull(editForm.avatarUrl)
+                const currentAvatarUrl = normalizeEmptyToNull(selectedMember?.avatar_url || null)
+                if (normalizedAvatarUrl !== currentAvatarUrl) {
+                  updates.avatar_url = normalizedAvatarUrl
+                }
+                
+                // Only update password if it's provided and not empty
+                if (editForm.password && editForm.password.trim() !== "") {
+                  if (editForm.password.length < 6) {
+                    addNotification({
+                      type: 'error',
+                      message: 'Password must be at least 6 characters',
+                      duration: 5000,
+                    })
+                    return
+                  }
+                  updates.password = editForm.password
+                }
+
+                // Only make the API call if there are actual updates
+                if (Object.keys(updates).length === 0) {
+                  addNotification({
+                    type: 'info',
+                    message: 'No changes to save',
+                    duration: 3000,
+                  })
+                  return
                 }
 
                 updateMemberMutation.mutate(updates)

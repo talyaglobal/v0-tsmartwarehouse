@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ApiResponse } from "@/types/api"
 
@@ -34,7 +33,6 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
     const { createClient } = await import('@supabase/supabase-js')
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -47,7 +45,8 @@ export async function POST(
       return NextResponse.json(errorData, { status: 500 })
     }
 
-    const supabaseAuthAdmin = createClient(
+    // Use admin client for all operations to bypass RLS
+    const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceRoleKey,
       {
@@ -58,8 +57,10 @@ export async function POST(
       }
     )
 
-    // Find profile with this invitation token
-    const { data: profile, error: profileError } = await supabase
+    const supabaseAuthAdmin = supabaseAdmin // Same client for both auth and database operations
+
+    // Find profile with this invitation token (use admin client to bypass RLS)
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select(`
         id,
@@ -107,10 +108,10 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Get inviter's company_id
+    // Get inviter's company_id (use admin client)
     let companyId: string | null = null
     if (profile.invited_by) {
-      const { data: inviter } = await supabase
+      const { data: inviter } = await supabaseAdmin
         .from('profiles')
         .select('company_id')
         .eq('id', profile.invited_by)
@@ -182,22 +183,21 @@ export async function POST(
       }
     }
 
-    // Update profile: set company_id, clear invitation fields, set status = true if it was false
+    // Update profile: set company_id, clear invitation fields, set status = true
+    // Status must always be true when invitation is accepted
     const updateData: any = {
       company_id: companyId,
       invitation_token: null,
       invitation_expires_at: null,
       invitation_password: null,
+      status: true, // Always set status to true when invitation is accepted
       // Keep invited_by for reference
     }
 
-    // If profile was soft-deleted (status = false), reactivate it
-    if (profile.status === false) {
-      updateData.status = true
-      console.log(`✅ Reactivating soft-deleted profile ${profile.id}`)
-    }
+    console.log(`✅ Accepting invitation for profile ${profile.id}, setting company_id: ${companyId}, status: true`)
 
-    const { error: updateError } = await supabase
+    // Use admin client to bypass RLS
+    const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update(updateData)
       .eq('id', profile.id)

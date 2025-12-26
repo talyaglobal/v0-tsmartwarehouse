@@ -27,6 +27,7 @@ export interface WarehouseWithPricing {
   longitude?: number
   totalSqFt: number
   totalPalletStorage?: number
+  ownerCompanyId?: string | null
   pricing: {
     pallet?: WarehousePricing
     areaRental?: WarehousePricing
@@ -129,6 +130,8 @@ export async function GET(request: NextRequest) {
     const warehousesWithPricing: WarehouseWithPricing[] = await Promise.all(
       warehouses.map(async (warehouse) => {
         const warehousePricing = pricingMap.get(warehouse.id) || {}
+        // warehouse is of type Warehouse & { ownerCompanyId?: string | null } from transformWarehouseRow
+        const warehouseWithOwnerId = warehouse as { ownerCompanyId?: string | null }
 
         const result: WarehouseWithPricing = {
           id: warehouse.id,
@@ -140,6 +143,7 @@ export async function GET(request: NextRequest) {
           longitude: warehouse.longitude,
           totalSqFt: warehouse.totalSqFt,
           totalPalletStorage: warehouse.totalPalletStorage,
+          ownerCompanyId: warehouseWithOwnerId.ownerCompanyId || null,
           pricing: {
             pallet: warehousePricing.pallet,
             areaRental: warehousePricing.area,

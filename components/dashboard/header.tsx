@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Bell, Search, Menu, LogOut, User, ChevronDown } from "@/components/icons"
+import { Bell, Search, Menu, LogOut, User, ChevronDown, Home } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -126,10 +126,28 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <div className="px-2 py-1.5">
+            <div 
+              className="px-2 py-1.5 cursor-pointer hover:bg-accent rounded-sm"
+              onClick={() => router.push('/dashboard/settings?tab=profile')}
+            >
               <p className="text-sm font-medium">{profile?.name || 'User'}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => router.push('/')} 
+              className="cursor-pointer"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Homepage
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => router.push('/dashboard/settings?tab=profile')} 
+              className="cursor-pointer"
+            >
+              <User className="h-4 w-4 mr-2" />
+              My Profile
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />

@@ -49,36 +49,89 @@ export async function fetchCountries(): Promise<Country[]> {
 
 /**
  * Fetch cities for a country
- * Uses GeoNames API (free, no key required for basic usage)
- * Limited to 1000 requests/hour per IP
+ * Uses GeoNames API (free, requires registration for better rate limits)
  * 
- * For better rate limits, you can register at geonames.org and use a username
- * Then set GEONAMES_USERNAME environment variable
+ * Setup instructions:
+ * 1. Register at https://www.geonames.org/login (free)
+ * 2. Activate your account via email
+ * 3. Add GEONAMES_USERNAME=your_username to .env.local
+ * 
+ * Rate limits:
+ * - Without username (demo): Very limited, may fail
+ * - With registered username: 1000 requests/hour (free tier)
  */
 export async function fetchCitiesByCountry(countryCode: string): Promise<City[]> {
   try {
-    // Use environment variable if available, otherwise use 'demo' (limited)
+    // Check for GeoNames username - warn if not set
     const username = process.env.GEONAMES_USERNAME || 'demo'
     
-    // Fetch major cities (PPLC = capital, PPLA = admin division, PPL = populated place)
-    const response = await fetch(
-      `https://secure.geonames.org/searchJSON?country=${countryCode}&featureCode=PPL&featureCode=PPLC&featureCode=PPLA&maxRows=1000&orderby=population&username=${username}`,
-      {
+    if (username === 'demo') {
+      console.warn(
+        'GeoNames API: Using demo username (very limited). ' +
+        'Register at https://www.geonames.org/login and set GEONAMES_USERNAME in .env.local for better rate limits.'
+      )
+    }
+    
+    // GeoNames API endpoint - using PPL feature code for populated places (cities)
+    // PPL = populated place (cities, towns, villages)
+    // orderby=population sorts by population (most populous first)
+    const url = `https://secure.geonames.org/searchJSON?country=${countryCode}&featureCode=PPL&maxRows=1000&orderby=population&username=${username}`
+    
+    // Create AbortController for timeout (more compatible than AbortSignal.timeout)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+    
+    let response: Response
+    try {
+      response = await fetch(url, {
         headers: {
           'Accept': 'application/json',
         },
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId)
+      // Handle timeout/abort errors
+      if (fetchError.name === 'AbortError' || controller.signal.aborted) {
+        console.error(`GeoNames API timeout for country ${countryCode}`)
+        throw new Error('Request timed out. Please try again later.')
       }
-    )
+      throw fetchError
+    }
 
     if (!response.ok) {
-      throw new Error('Failed to fetch cities')
+      const errorText = await response.text().catch(() => 'Unknown error')
+      throw new Error(`GeoNames API returned status ${response.status}: ${errorText}`)
     }
 
     const data = await response.json()
     
+    // Check for GeoNames API errors (API returns 200 OK but with error in status field)
+    if (data.status && data.status.message) {
+      const errorMsg = data.status.message
+      console.error(`GeoNames API error for country ${countryCode}: ${errorMsg}`)
+      
+      // Check if account is not enabled for webservice
+      if (errorMsg.includes('not enabled') || errorMsg.includes('enable it on your account')) {
+        const error = new Error(`GeoNames account not enabled. Please enable webservice at https://www.geonames.org/manageaccount`)
+        error.name = 'GeoNamesAccountNotEnabledError'
+        throw error
+      }
+      
+      // Check if it's a rate limit error (demo account limit exceeded)
+      if (errorMsg.includes('daily limit') || errorMsg.includes('limit') || errorMsg.includes('exceeded') || errorMsg.includes('demo')) {
+        const error = new Error(`GeoNames API rate limit exceeded. Please register at https://www.geonames.org/login and set GEONAMES_USERNAME in .env.local`)
+        error.name = 'GeoNamesRateLimitError'
+        throw error
+      }
+      
+      throw new Error(`GeoNames API error: ${errorMsg}`)
+    }
+    
     if (!data.geonames || data.geonames.length === 0) {
-      // Fallback: return empty array or common cities for major countries
-      return getFallbackCities(countryCode)
+      console.warn(`No cities found for country ${countryCode} via GeoNames API`)
+      return []
     }
 
     // Extract unique city names, group by name to handle duplicates
@@ -86,21 +139,24 @@ export async function fetchCitiesByCountry(countryCode: string): Promise<City[]>
     
     data.geonames.forEach((city: any) => {
       const cityName = city.name
-      const adminCode = city.adminCode1 // State/province code
-      const adminName = city.adminName1 // State/province name
+      const adminCode = city.adminCode1 // State/province code (e.g., "CA" for California)
+      const adminName = city.adminName1 // State/province name (e.g., "California")
       
-      // Use admin code if available, otherwise admin name
+      // Prefer admin code (shorter) over admin name, use name if code not available
       const state = adminCode || adminName || undefined
       
-      if (!cityMap.has(cityName)) {
-        cityMap.set(cityName, {
+      // Create unique key combining city name and state (if available)
+      const cityKey = state ? `${cityName}_${state}` : cityName
+      
+      if (!cityMap.has(cityKey)) {
+        cityMap.set(cityKey, {
           name: cityName,
           state: state,
           countryCode: countryCode,
         })
       } else {
         // If city exists but doesn't have state, update it if we found one
-        const existing = cityMap.get(cityName)!
+        const existing = cityMap.get(cityKey)!
         if (!existing.state && state) {
           existing.state = state
         }
@@ -109,50 +165,45 @@ export async function fetchCitiesByCountry(countryCode: string): Promise<City[]>
 
     const cities = Array.from(cityMap.values())
     
-    // Sort cities alphabetically
+    // Sort cities alphabetically by name, then by state if available
     return cities.sort((a, b) => {
-      if (a.name < b.name) return -1
-      if (a.name > b.name) return 1
+      const nameCompare = a.name.localeCompare(b.name)
+      if (nameCompare !== 0) return nameCompare
+      
+      // If names are equal, sort by state
+      if (a.state && b.state) {
+        return a.state.localeCompare(b.state)
+      }
+      if (a.state) return -1
+      if (b.state) return 1
       return 0
     })
-  } catch (error) {
+  } catch (error: any) {
+    // Re-throw account not enabled errors
+    if (error.name === 'GeoNamesAccountNotEnabledError') {
+      throw error
+    }
+    
+    // Re-throw rate limit errors so they can be handled by the API route
+    if (error.name === 'GeoNamesRateLimitError' || 
+        (error.message && (error.message.includes('rate limit') || error.message.includes('limit exceeded')))) {
+      throw error
+    }
+    
+    // Handle timeout errors
+    if (error.message && error.message.includes('timed out')) {
+      console.error(`GeoNames API timeout for country ${countryCode}`)
+      return [] // Return empty array on timeout
+    }
+    
+    // Handle other errors - log but don't throw to avoid breaking the UI
     console.error(`Error fetching cities for country ${countryCode}:`, error)
-    // Return fallback cities if API fails
-    return getFallbackCities(countryCode)
+    
+    // Return empty array if API fails - caller can handle empty result
+    return []
   }
 }
 
-/**
- * Fallback cities for major countries if API fails
- */
-function getFallbackCities(countryCode: string): City[] {
-  const fallbackCities: Record<string, City[]> = {
-    US: [
-      { name: 'New York', state: 'NY' },
-      { name: 'Los Angeles', state: 'CA' },
-      { name: 'Chicago', state: 'IL' },
-      { name: 'Houston', state: 'TX' },
-      { name: 'Phoenix', state: 'AZ' },
-      { name: 'Philadelphia', state: 'PA' },
-      { name: 'San Antonio', state: 'TX' },
-      { name: 'San Diego', state: 'CA' },
-      { name: 'Dallas', state: 'TX' },
-      { name: 'San Jose', state: 'CA' },
-    ],
-    TR: [
-      { name: 'İstanbul' },
-      { name: 'Ankara' },
-      { name: 'İzmir' },
-      { name: 'Bursa' },
-      { name: 'Antalya' },
-      { name: 'Adana' },
-      { name: 'Konya' },
-      { name: 'Gaziantep' },
-    ],
-  }
-  
-  return fallbackCities[countryCode] || []
-}
 
 /**
  * Search cities by name (case-insensitive)

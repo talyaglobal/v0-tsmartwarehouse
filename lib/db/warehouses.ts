@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, amenities, operating_hours, status, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, amenities, operating_hours, status, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -57,7 +57,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
 
   const { data, error } = await supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, amenities, operating_hours, status, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, amenities, operating_hours, status, created_at, updated_at')
     .eq('id', id)
     .eq('status', true) // Soft delete filter
     .single()
@@ -172,8 +172,8 @@ export async function deleteWarehouse(id: string): Promise<void> {
 /**
  * Transform database row to Warehouse type
  */
-function transformWarehouseRow(row: any): Warehouse {
-  return {
+function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string | null } {
+  const warehouse: Warehouse = {
     id: row.id,
     name: row.name,
     address: row.address,
@@ -191,6 +191,8 @@ function transformWarehouseRow(row: any): Warehouse {
     },
     floors: [], // Floors should be loaded separately
   }
+  // Add ownerCompanyId as an additional property
+  return { ...warehouse, ownerCompanyId: row.owner_company_id || null }
 }
 
 /**

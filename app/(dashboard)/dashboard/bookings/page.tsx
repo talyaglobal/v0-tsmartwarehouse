@@ -8,11 +8,17 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Package, Building2, Eye, Loader2, Edit, Trash } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
+import { createClient } from "@/lib/supabase/client"
+
+const BOOKINGS_TAB_STORAGE_KEY = 'bookings-page-active-tab'
+
+type BookingsTab = 'my-bookings' | 'warehouse-bookings'
 
 export default function BookingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -21,24 +27,79 @@ export default function BookingsPage() {
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null)
   const { user, isLoading: userLoading } = useUser()
   const queryClient = useQueryClient()
+  
+  // Get active tab from localStorage, default to 'my-bookings'
+  const [activeTab, setActiveTab] = useState<BookingsTab>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(BOOKINGS_TAB_STORAGE_KEY) as BookingsTab | null
+      return saved && (saved === 'my-bookings' || saved === 'warehouse-bookings') ? saved : 'my-bookings'
+    }
+    return 'my-bookings'
+  })
 
-  // React Query: Fetch bookings
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(BOOKINGS_TAB_STORAGE_KEY, activeTab)
+    }
+  }, [activeTab])
+
+  // Get user's company ID
+  const { data: userCompanyId } = useQuery({
+    queryKey: ['user-company-id', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null
+      const supabase = createClient()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      return profile?.company_id || null
+    },
+    enabled: !!user?.id,
+  })
+
+  // React Query: Fetch my bookings (bookings I made)
   const {
-    data: bookings = [],
-    isLoading: loading,
-    error,
+    data: myBookings = [],
+    isLoading: myBookingsLoading,
+    error: myBookingsError,
   } = useQuery({
-    queryKey: ['bookings', user?.id],
+    queryKey: ['bookings', 'my-bookings', user?.id],
     queryFn: async () => {
       if (!user) return []
       const result = await api.get<Booking[]>(`/api/v1/bookings?customerId=${user.id}`, { showToast: false })
       return result.success ? (result.data || []) : []
     },
-    enabled: !!user && !userLoading,
-    staleTime: 0, // Always consider data stale to ensure fresh data
-    refetchOnMount: true, // Refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    enabled: !!user && !userLoading && activeTab === 'my-bookings',
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   })
+
+  // React Query: Fetch warehouse bookings (bookings to my company's warehouses)
+  const {
+    data: warehouseBookings = [],
+    isLoading: warehouseBookingsLoading,
+    error: warehouseBookingsError,
+  } = useQuery({
+    queryKey: ['bookings', 'warehouse-bookings', userCompanyId],
+    queryFn: async () => {
+      if (!userCompanyId) return []
+      const result = await api.get<Booking[]>(`/api/v1/bookings?warehouseCompanyId=${userCompanyId}`, { showToast: false })
+      return result.success ? (result.data || []) : []
+    },
+    enabled: !!userCompanyId && activeTab === 'warehouse-bookings',
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  })
+
+  // Use appropriate data based on active tab
+  const bookings = activeTab === 'my-bookings' ? myBookings : warehouseBookings
+  const loading = activeTab === 'my-bookings' ? myBookingsLoading : warehouseBookingsLoading
+  const error = activeTab === 'my-bookings' ? myBookingsError : warehouseBookingsError
 
   // React Query: Update booking status mutation
   const statusMutation = useMutation({
@@ -55,31 +116,42 @@ export default function BookingsPage() {
       return result.data
     },
     onMutate: async ({ bookingId, newStatus }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['bookings', user?.id] })
+      // Cancel any outgoing refetches for both queries
+      await queryClient.cancelQueries({ queryKey: ['bookings', 'my-bookings', user?.id] })
+      await queryClient.cancelQueries({ queryKey: ['bookings', 'warehouse-bookings', userCompanyId] })
 
-      // Snapshot the previous value
-      const previousBookings = queryClient.getQueryData<Booking[]>(['bookings', user?.id])
+      // Snapshot the previous values
+      const previousMyBookings = queryClient.getQueryData<Booking[]>(['bookings', 'my-bookings', user?.id])
+      const previousWarehouseBookings = queryClient.getQueryData<Booking[]>(['bookings', 'warehouse-bookings', userCompanyId])
 
-      // Optimistically update to the new value
-      queryClient.setQueryData<Booking[]>(['bookings', user?.id], (old = []) =>
+      // Optimistically update both queries
+      queryClient.setQueryData<Booking[]>(['bookings', 'my-bookings', user?.id], (old = []) =>
+        old.map(booking =>
+          booking.id === bookingId ? { ...booking, status: newStatus } : booking
+        )
+      )
+      queryClient.setQueryData<Booking[]>(['bookings', 'warehouse-bookings', userCompanyId], (old = []) =>
         old.map(booking =>
           booking.id === bookingId ? { ...booking, status: newStatus } : booking
         )
       )
 
-      // Return a context object with the snapshotted value
-      return { previousBookings }
+      // Return a context object with the snapshotted values
+      return { previousMyBookings, previousWarehouseBookings }
     },
     onError: (_err, _variables, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
-      if (context?.previousBookings) {
-        queryClient.setQueryData(['bookings', user?.id], context.previousBookings)
+      if (context?.previousMyBookings) {
+        queryClient.setQueryData(['bookings', 'my-bookings', user?.id], context.previousMyBookings)
+      }
+      if (context?.previousWarehouseBookings) {
+        queryClient.setQueryData(['bookings', 'warehouse-bookings', userCompanyId], context.previousWarehouseBookings)
       }
     },
     onSettled: () => {
       // Always refetch after error or success to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ['bookings', user?.id] })
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'my-bookings', user?.id] })
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'warehouse-bookings', userCompanyId] })
     },
   })
 
@@ -206,10 +278,21 @@ export default function BookingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Bookings</CardTitle>
-          <CardDescription>View and manage all your warehouse bookings</CardDescription>
+          <CardTitle>Bookings</CardTitle>
+          <CardDescription>
+            {activeTab === 'my-bookings' 
+              ? 'View and manage bookings you have created' 
+              : 'View and manage bookings to your company warehouses'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as BookingsTab)}>
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="my-bookings">My Bookings</TabsTrigger>
+              <TabsTrigger value="warehouse-bookings">Warehouse Bookings</TabsTrigger>
+            </TabsList>
+            <TabsContent value="my-bookings" className="mt-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -329,6 +412,129 @@ export default function BookingsPage() {
               )}
             </TableBody>
           </Table>
+            </TabsContent>
+            <TabsContent value="warehouse-bookings" className="mt-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Booking ID</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {warehouseBookings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    No bookings found for your company warehouses
+                  </TableCell>
+                </TableRow>
+              ) : (
+                warehouseBookings.map((booking) => (
+                <TableRow key={booking.id}>
+                  <TableCell className="font-medium">{booking.id}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {booking.type === "pallet" ? (
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      {getBookingTypeLabel(booking.type)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {booking.type === "pallet"
+                      ? `${booking.palletCount} pallets`
+                      : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+                  </TableCell>
+                  <TableCell>{formatDate(booking.startDate)}</TableCell>
+                  <TableCell>{formatCurrency(booking.totalAmount)}</TableCell>
+                  <TableCell>
+                    <div className="relative status-dropdown-container">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setDropdownPosition({ top: rect.bottom + 4, left: rect.left })
+                          setOpenStatusDropdown(openStatusDropdown === booking.id ? null : booking.id)
+                        }}
+                        disabled={statusMutation.isPending}
+                        className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <StatusBadge status={booking.status} />
+                      </button>
+                      {openStatusDropdown === booking.id && dropdownPosition && (
+                        <>
+                          <div 
+                            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg min-w-[180px]"
+                            style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
+                          >
+                            <div className="py-1">
+                              {['pending', 'confirmed', 'active', 'completed', 'cancelled'].map((status) => (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  onClick={() => handleStatusSelect(booking.id, status as BookingStatus)}
+                                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  disabled={status === booking.status}
+                                >
+                                  <StatusBadge status={status as BookingStatus} />
+                                  {status === booking.status && <span className="text-xs text-muted-foreground">(current)</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Backdrop to close dropdown when clicking outside */}
+                          <div 
+                            className="fixed inset-0 z-[9998]" 
+                            onClick={() => {
+                              setOpenStatusDropdown(null)
+                              setDropdownPosition(null)
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link href={`/dashboard/bookings/${booking.id}`}>
+                        <Button variant="ghost" size="sm" title="View details">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link href={`/dashboard/bookings/${booking.id}/edit`}>
+                        <Button variant="ghost" size="sm" title="Edit booking">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Delete booking"
+                        onClick={() => handleDelete(booking.id)}
+                        disabled={deletingId === booking.id || deleteMutation.isPending}
+                      >
+                        {deletingId === booking.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash className="h-4 w-4 text-destructive" />
+                        )}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

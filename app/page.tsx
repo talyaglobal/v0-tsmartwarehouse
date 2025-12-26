@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,8 +19,11 @@ import {
 } from "@/components/icons"
 import { PRICING, WAREHOUSE_CONFIG } from "@/lib/constants"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
+import { useUser } from "@/lib/hooks/use-user"
 
 export default function HomePage() {
+  const { user } = useUser()
+  
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
@@ -43,12 +48,20 @@ export default function HomePage() {
             </Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost">Sign In</Button>
-            </Link>
-            <Link href="/register">
-              <Button>Get Started</Button>
-            </Link>
+            {user ? (
+              <Link href="/dashboard">
+                <Button variant="ghost">Dashboard</Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost">Sign In</Button>
+                </Link>
+                <Link href="/register">
+                  <Button>Get Started</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>

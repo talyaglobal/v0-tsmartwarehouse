@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
   if (!supabaseUrl || !supabaseAnonKey) {
     // For public routes, allow access during build
     const pathname = request.nextUrl.pathname
-    const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy']
+    const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/auth/callback']
     const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
     
     if (isPublicRoute || pathname.startsWith('/api')) {
@@ -159,6 +159,12 @@ export async function middleware(request: NextRequest) {
       // Regular login/register pages - redirect to appropriate route
       return NextResponse.redirect(new URL(targetRoute, request.url))
     }
+  }
+
+  // Allow OAuth callback route (it handles its own auth)
+  const isOAuthCallback = pathname === '/auth/callback'
+  if (isOAuthCallback) {
+    return response
   }
 
   // Protected routes - require authentication

@@ -194,14 +194,15 @@ export async function POST(
       'admin': 'company_admin',
       'company_admin': 'company_admin',
       'member': 'member',
+      'warehouse_staff': 'warehouse_staff',
     }
     
     const dbRole = roleMap[role] || 'member'
     
-    if (!['owner', 'admin', 'company_admin', 'member'].includes(role)) {
+    if (!['admin', 'company_admin', 'member', 'warehouse_staff'].includes(role)) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Invalid role. Must be 'owner', 'admin', 'company_admin', or 'member'",
+        error: "Invalid role. Must be 'admin', 'company_admin', 'member', or 'warehouse_staff'",
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })
@@ -232,6 +233,15 @@ export async function POST(
 
     const supabase = createServerSupabaseClient()
     const supabaseAdmin = createServerSupabaseClient()
+    
+    // Get inviter's storage_interest to inherit it
+    const { data: inviterProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('storage_interest')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    const storageInterest = inviterProfile?.storage_interest || null
     
     // Check if user with this email exists in profiles table (including soft-deleted ones)
     // Use supabaseAdmin to bypass RLS and see all profiles including soft-deleted ones
@@ -415,6 +425,7 @@ export async function POST(
           invitation_expires_at: expiresAt.toISOString(),
           invitation_password: generatedPassword, // Store password temporarily for auto-login
           invited_by: user.id,
+          storage_interest: storageInterest, // Inherit storage_interest from inviter
           // Do NOT set company_id - it will be set when invitation is accepted
         }
         
@@ -451,6 +462,7 @@ export async function POST(
           invitation_expires_at: expiresAt.toISOString(),
           invitation_password: generatedPassword, // Store password temporarily for auto-login
           invited_by: user.id,
+          storage_interest: storageInterest, // Inherit storage_interest from inviter
         }
         
         // If reactivating, set status = true
@@ -489,6 +501,7 @@ export async function POST(
           invitation_expires_at: expiresAt.toISOString(),
           invitation_password: null, // Existing Auth user already has password
           invited_by: user.id,
+          storage_interest: storageInterest, // Inherit storage_interest from inviter
         })
 
       if (profileCreateError) {
@@ -510,6 +523,7 @@ export async function POST(
         invitation_token: token,
         invitation_expires_at: expiresAt.toISOString(),
         invited_by: user.id,
+        storage_interest: storageInterest, // Inherit storage_interest from inviter
         // Do NOT update company_id - it will be set when invitation is accepted
       }
       

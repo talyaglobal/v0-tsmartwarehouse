@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { PageHeader } from "@/components/ui/page-header"
 import { Badge } from "@/components/ui/badge"
-import { Package, Building2, Loader2, CheckCircle, Info, MapPin, Search } from "@/components/icons"
+import { Package, Building2, Loader2, Info, MapPin } from "@/components/icons"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import type { BookingType } from "@/types"
 import { api } from "@/lib/api/client"
@@ -21,7 +21,7 @@ import { useUIStore } from "@/stores/ui.store"
 import { useUser } from "@/lib/hooks/use-user"
 import type { WarehouseWithPricing } from "@/app/api/v1/warehouses/by-city/route"
 import { useCountries, useCities } from "@/lib/hooks/use-countries-cities"
-import { searchCities } from "@/lib/api/countries-cities"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { WarehouseMapSelector } from "@/components/maps/warehouse-map-selector"
 import { CityMapSelector } from "@/components/maps/city-map-selector"
@@ -42,8 +42,6 @@ export default function NewBookingPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [country, setCountry] = useState("US")
   const [city, setCity] = useState("")
-  const [citySearchTerm, setCitySearchTerm] = useState("")
-  const [showCityDropdown, setShowCityDropdown] = useState(false)
   const [showCityMapModal, setShowCityMapModal] = useState(false)
   const [showWarehouseMapModal, setShowWarehouseMapModal] = useState(false)
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("")
@@ -56,12 +54,23 @@ export default function NewBookingPage() {
 
   // Fetch countries and cities from API
   const { data: countries = [] } = useCountries()
-  const { data: cities = [] } = useCities(country)
+  const { data: cities = [], isLoading: citiesLoading, error: citiesError } = useCities(country)
 
-  // Get filtered cities based on search
-  const filteredCities = citySearchTerm
-    ? searchCities(cities, citySearchTerm)
-    : cities
+  // Get user's company ID
+  const { data: userCompanyId } = useQuery({
+    queryKey: ['user-company-id', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null
+      const supabase = createClient()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      return profile?.company_id || null
+    },
+    enabled: !!user?.id,
+  })
 
   // Get membership data
   const { data: membershipData } = useQuery<{ success: boolean; data: MembershipData }>({
@@ -320,8 +329,7 @@ export default function NewBookingPage() {
                     value={country}
                     onValueChange={(value) => {
                       setCountry(value)
-                      setCity("")
-                      setCitySearchTerm("")
+                      setCity("") // Reset city when country changes
                       setSelectedWarehouseId("") // Reset selection when country changes
                     }}
                   >
@@ -339,60 +347,54 @@ export default function NewBookingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
-                  <div className="relative">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="city"
-                        placeholder="Search or select a city..."
-                        value={citySearchTerm}
-                        onChange={(e) => {
-                          setCitySearchTerm(e.target.value)
-                          setShowCityDropdown(true)
-                          if (!e.target.value) {
-                            setCity("")
-                            setSelectedWarehouseId("")
-                          }
-                        }}
-                        onFocus={() => setShowCityDropdown(true)}
-                        onBlur={() => {
-                          // Delay to allow click on dropdown item
-                          setTimeout(() => setShowCityDropdown(false), 200)
-                        }}
-                        required
-                      />
-                    </div>
-                    {showCityDropdown && filteredCities.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredCities.map((cityOption) => {
-                          const cityDisplayName = cityOption.state
-                            ? `${cityOption.name}, ${cityOption.state}`
-                            : cityOption.name
-                          return (
-                            <div
-                              key={cityDisplayName}
-                              className="px-4 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                setCity(cityOption.name)
-                                setCitySearchTerm(cityDisplayName)
-                                setShowCityDropdown(false)
-                                setSelectedWarehouseId("") // Reset selection when city changes
-                              }}
-                            >
-                              {cityDisplayName}
+                  <Select
+                    value={city}
+                    onValueChange={(value) => {
+                      setCity(value)
+                      setSelectedWarehouseId("") // Reset selection when city changes
+                    }}
+                    disabled={!country || citiesLoading}
+                  >
+                    <SelectTrigger id="city">
+                      <SelectValue placeholder={citiesLoading ? "Loading cities..." : country ? "Select a city" : "Select a country first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {citiesError && (
+                        <div className="px-2 py-1.5 text-sm text-red-600 dark:text-red-400 space-y-1">
+                          <div className="font-medium">Error loading cities</div>
+                          <div className="text-xs">{citiesError.message}</div>
+                          {citiesError.message.includes('not enabled') && (
+                            <div className="text-xs mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                              GeoNames account needs to be enabled for webservice. Please enable it at{' '}
+                              <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer" className="underline">
+                                https://www.geonames.org/manageaccount
+                              </a>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  {city && (
-                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>Selected: {city}{filteredCities.find(c => c.name === city)?.state ? `, ${filteredCities.find(c => c.name === city)?.state}` : ''}</span>
-                    </div>
-                  )}
+                          )}
+                          {citiesError.message.includes('rate limit') && (
+                            <div className="text-xs mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                              Please contact the administrator to configure GeoNames API username in .env.local
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {cities.length === 0 && !citiesLoading && !citiesError && (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No cities found for this country. Please try again later or contact support.
+                        </div>
+                      )}
+                      {cities.map((cityOption) => {
+                        const cityDisplayName = cityOption.state
+                          ? `${cityOption.name}, ${cityOption.state}`
+                          : cityOption.name
+                        return (
+                          <SelectItem key={cityOption.name} value={cityOption.name}>
+                            {cityDisplayName}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -472,45 +474,58 @@ export default function NewBookingPage() {
                       onValueChange={setSelectedWarehouseId}
                       className="space-y-3"
                     >
-                      {warehouses.map((warehouse) => (
-                        <Label
-                          key={warehouse.id}
-                          htmlFor={`warehouse-${warehouse.id}`}
-                          className={`flex items-start gap-3 border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                            selectedWarehouseId === warehouse.id
-                              ? "border-primary bg-primary/5"
-                              : "border-muted hover:border-primary/50"
-                          }`}
-                        >
-                          <RadioGroupItem
-                            value={warehouse.id}
-                            id={`warehouse-${warehouse.id}`}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold">{warehouse.name}</h3>
+                      {warehouses.map((warehouse) => {
+                        const isOwnWarehouse = userCompanyId && warehouse.ownerCompanyId === userCompanyId
+                        return (
+                          <Label
+                            key={warehouse.id}
+                            htmlFor={`warehouse-${warehouse.id}`}
+                            className={`flex items-start gap-3 border-2 rounded-lg p-4 transition-colors ${
+                              isOwnWarehouse
+                                ? "border-muted bg-muted/50 cursor-not-allowed opacity-60"
+                                : selectedWarehouseId === warehouse.id
+                                  ? "border-primary bg-primary/5 cursor-pointer"
+                                  : "border-muted hover:border-primary/50 cursor-pointer"
+                            }`}
+                          >
+                            <RadioGroupItem
+                              value={warehouse.id}
+                              id={`warehouse-${warehouse.id}`}
+                              className="mt-1"
+                              disabled={isOwnWarehouse}
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold">
+                                  {warehouse.name}
+                                  {isOwnWarehouse && (
+                                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                                      (My Company's Warehouse)
+                                    </span>
+                                  )}
+                                </h3>
+                                {warehouse.latitude && warehouse.longitude && (
+                                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {warehouse.address}, {warehouse.city}
+                              </p>
                               {warehouse.latitude && warehouse.longitude && (
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                <a
+                                  href={`https://www.google.com/maps?q=${warehouse.latitude},${warehouse.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  View on Google Maps
+                                </a>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {warehouse.address}, {warehouse.city}
-                            </p>
-                            {warehouse.latitude && warehouse.longitude && (
-                              <a
-                                href={`https://www.google.com/maps?q=${warehouse.latitude},${warehouse.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                View on Google Maps
-                              </a>
-                            )}
-                          </div>
-                        </Label>
-                      ))}
+                          </Label>
+                        )
+                      })}
                     </RadioGroup>
                   )}
                 </CardContent>
@@ -753,15 +768,6 @@ export default function NewBookingPage() {
               selectedCity={city}
               onSelect={(cityName) => {
                 setCity(cityName)
-                const cityOption = cities.find(c => c.name === cityName)
-                if (cityOption) {
-                  const cityDisplayName = cityOption.state
-                    ? `${cityOption.name}, ${cityOption.state}`
-                    : cityOption.name
-                  setCitySearchTerm(cityDisplayName)
-                } else {
-                  setCitySearchTerm(cityName)
-                }
                 setSelectedWarehouseId("") // Reset warehouse selection
                 setShowCityMapModal(false)
               }}

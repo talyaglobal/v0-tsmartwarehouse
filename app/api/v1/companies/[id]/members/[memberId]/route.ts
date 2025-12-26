@@ -23,8 +23,7 @@ export async function PATCH(
       email, 
       phone, 
       avatar_url,
-      membership_tier, 
-      credit_balance 
+      password
     } = body
 
     // Check if user has permission
@@ -107,47 +106,22 @@ export async function PATCH(
       updates.role = role
     }
 
-    // Update name
+    // Update name (nullable field - normalize empty strings to null)
     if (name !== undefined) {
-      updates.name = name || null
+      // Normalize empty string to null for nullable fields
+      updates.name = (name && name.trim() !== "") ? name.trim() : null
     }
 
-    // Update phone
+    // Update phone (nullable field - normalize empty strings to null)
     if (phone !== undefined) {
-      updates.phone = phone || null
+      // Normalize empty string to null for nullable fields
+      updates.phone = (phone && phone.trim() !== "") ? phone.trim() : null
     }
 
-    // Update avatar_url
+    // Update avatar_url (nullable field - normalize empty strings to null)
     if (avatar_url !== undefined) {
-      updates.avatar_url = avatar_url || null
-    }
-
-    // Update membership_tier
-    if (membership_tier !== undefined) {
-      const validTiers = ['bronze', 'silver', 'gold', 'platinum']
-      if (membership_tier && !validTiers.includes(membership_tier)) {
-        const errorData: ErrorResponse = {
-          success: false,
-          error: `Invalid membership_tier. Must be one of: ${validTiers.join(', ')}`,
-          statusCode: 400,
-        }
-        return NextResponse.json(errorData, { status: 400 })
-      }
-      updates.membership_tier = membership_tier || null
-    }
-
-    // Update credit_balance
-    if (credit_balance !== undefined) {
-      const balance = parseFloat(credit_balance)
-      if (isNaN(balance) || balance < 0) {
-        const errorData: ErrorResponse = {
-          success: false,
-          error: "Invalid credit_balance. Must be a non-negative number",
-          statusCode: 400,
-        }
-        return NextResponse.json(errorData, { status: 400 })
-      }
-      updates.credit_balance = balance
+      // Normalize empty string to null for nullable fields
+      updates.avatar_url = (avatar_url && avatar_url.trim() !== "") ? avatar_url.trim() : null
     }
 
     // Update email (also update in auth.users)
@@ -196,6 +170,55 @@ export async function PATCH(
       } catch (authUpdateError) {
         console.error('Error updating email in auth.users:', authUpdateError)
         // Continue with profile update
+      }
+    }
+
+    // Update password (in auth.users only, not in profiles)
+    if (password !== undefined && password !== null && password.trim() !== "") {
+      // Validate password length
+      if (password.length < 6) {
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "Password must be at least 6 characters",
+          statusCode: 400,
+        }
+        return NextResponse.json(errorData, { status: 400 })
+      }
+
+      try {
+        const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+        const supabaseAdmin = createAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false,
+            },
+          }
+        )
+        
+        const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(memberId, {
+          password: password,
+        })
+
+        if (passwordError) {
+          console.error('Failed to update password in auth.users:', passwordError)
+          const errorData: ErrorResponse = {
+            success: false,
+            error: `Failed to update password: ${passwordError.message}`,
+            statusCode: 500,
+          }
+          return NextResponse.json(errorData, { status: 500 })
+        }
+      } catch (passwordUpdateError) {
+        console.error('Error updating password in auth.users:', passwordUpdateError)
+        const errorData: ErrorResponse = {
+          success: false,
+          error: 'Failed to update password',
+          statusCode: 500,
+        }
+        return NextResponse.json(errorData, { status: 500 })
       }
     }
 

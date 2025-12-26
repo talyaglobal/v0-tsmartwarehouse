@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     const filters: {
       customerId?: string
       companyId?: string
+      warehouseCompanyId?: string
       status?: BookingStatus
       type?: BookingType
       warehouseId?: string
@@ -99,6 +100,19 @@ export async function GET(request: NextRequest) {
       } else {
         // Regular user - show only their bookings
         filters.customerId = authenticatedUserId
+      }
+    }
+    
+    if (validatedParams.warehouseCompanyId) {
+      // Filter by warehouse company - verify user has permission
+      if (authenticatedUserId && userCompanyId) {
+        // User can only see bookings for their own company's warehouses
+        if (validatedParams.warehouseCompanyId === userCompanyId) {
+          filters.warehouseCompanyId = validatedParams.warehouseCompanyId
+        }
+      } else {
+        // Unauthenticated or no company - reject
+        filters.warehouseCompanyId = undefined
       }
     }
     

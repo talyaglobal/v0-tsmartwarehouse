@@ -69,6 +69,7 @@ export const updateInvoiceSchema = z.object({
 // Query parameter schemas for GET requests
 export const bookingsQuerySchema = z.object({
   customerId: z.string().uuid().optional(),
+  warehouseCompanyId: z.string().uuid().optional(),
   status: z.enum(["pending", "confirmed", "active", "completed", "cancelled"]).optional(),
   type: z.enum(["pallet", "area-rental"]).optional(),
   warehouseId: z.string().uuid().optional(),

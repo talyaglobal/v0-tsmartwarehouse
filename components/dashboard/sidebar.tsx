@@ -13,7 +13,6 @@ import {
   Settings,
   CreditCard,
   AlertCircle,
-  Plus,
   Calendar,
   Wrench,
   ShoppingCart,
@@ -195,18 +194,8 @@ export function DashboardSidebar() {
         </span>
       </div>
 
-      {/* New Booking Button */}
-      <div className="p-4">
-        <Link href="/dashboard/bookings/new">
-          <Button className="w-full gap-2">
-            <Plus className="h-4 w-4" />
-            New Booking
-          </Button>
-        </Link>
-      </div>
-
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="flex-1 space-y-1 px-3 mt-4">
         {baseNavigation.map((item) => {
           // For Dashboard, only match exact path to avoid matching child routes
           // For other items, match exact path or child routes
