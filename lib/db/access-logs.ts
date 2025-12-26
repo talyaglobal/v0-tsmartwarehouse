@@ -31,7 +31,7 @@ export async function getAccessLogs(filters?: AccessLogFilters): Promise<AccessL
   }
 
   if (filters?.status) {
-    query = query.eq('access_log_status', filters.status)
+    query = query.eq('status', filters.status)
   }
 
   if (filters?.personId) {
@@ -54,7 +54,7 @@ export async function getAccessLogs(filters?: AccessLogFilters): Promise<AccessL
     const searchTerm = filters.search
     // Search across name, license plate, and ID number
     query = query.or(
-      `person_name.ilike.%${searchTerm}%,vehicle_license_plate.ilike.%${searchTerm}%,person_id_number.ilike.%${searchTerm}%`
+      `person_name.ilike.%${searchTerm}%,vehicle_license_plate.ilike.%${searchTerm}%,person_id_number.ilike.%${searchTerm}%,company_name.ilike.%${searchTerm}%`
     )
   }
 
@@ -106,7 +106,7 @@ export async function createAccessLog(
     warehouse_id: accessLog.warehouseId,
     entry_time: accessLog.entryTime,
     exit_time: accessLog.exitTime || null,
-    access_log_status: accessLog.status || 'checked_in',
+    status: accessLog.status || 'checked_in',
     person_name: accessLog.personName,
     person_id_number: accessLog.personIdNumber || null,
     person_phone: accessLog.personPhone || null,
@@ -153,7 +153,7 @@ export async function updateAccessLog(
   if (updates.warehouseId !== undefined) updateRow.warehouse_id = updates.warehouseId
   if (updates.entryTime !== undefined) updateRow.entry_time = updates.entryTime
   if (updates.exitTime !== undefined) updateRow.exit_time = updates.exitTime
-  if (updates.status !== undefined) updateRow.access_log_status = updates.status
+  if (updates.status !== undefined) updateRow.status = updates.status
   if (updates.personName !== undefined) updateRow.person_name = updates.personName
   if (updates.personIdNumber !== undefined) updateRow.person_id_number = updates.personIdNumber
   if (updates.personPhone !== undefined) updateRow.person_phone = updates.personPhone
@@ -199,7 +199,7 @@ export async function checkOutAccessLog(
     .from('access_logs')
     .update({
       exit_time: exitTime,
-      access_log_status: 'checked_out',
+      status: 'checked_out',
       checked_out_by: checkedOutBy,
     })
     .eq('id', id)
@@ -215,10 +215,9 @@ export async function checkOutAccessLog(
 
 export async function deleteAccessLog(id: string): Promise<void> {
   const supabase = createServerSupabaseClient()
-  // Soft delete: set status = false
   const { error } = await supabase
     .from('access_logs')
-    .update({ status: false })
+    .delete()
     .eq('id', id)
 
   if (error) {
@@ -236,7 +235,7 @@ function transformAccessLogRow(row: any): AccessLog {
     warehouseId: row.warehouse_id,
     entryTime: row.entry_time,
     exitTime: row.exit_time ?? undefined,
-    status: row.access_log_status,
+    status: row.status,
     personName: row.person_name,
     personIdNumber: row.person_id_number ?? undefined,
     personPhone: row.person_phone ?? undefined,

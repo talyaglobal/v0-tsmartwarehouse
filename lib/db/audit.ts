@@ -11,6 +11,21 @@ import type { CreateAuditLogParams, AuditLog } from '@/lib/audit/types'
 export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog> {
   const supabase = createServerSupabaseClient()
 
+  // Get user's company_id from profile
+  let companyId: string | null = null
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', params.userId)
+      .maybeSingle()
+    
+    companyId = profile?.company_id || null
+  } catch (error) {
+    // If we can't get company_id, continue without it
+    console.warn('Failed to get company_id for audit log:', error)
+  }
+
   const { data, error } = await supabase
     .from('audit_logs')
     .insert({
@@ -20,6 +35,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
       action: params.action,
       entity: params.entity,
       entity_id: params.entityId,
+      company_id: companyId,
       changes: params.changes || null,
       metadata: params.metadata || null,
       ip_address: params.ipAddress || null,
@@ -35,6 +51,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
     return {
       id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       ...params,
+      companyId: companyId || undefined,
       createdAt: new Date().toISOString(),
     }
   }
@@ -47,6 +64,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
     action: data.action,
     entity: data.entity,
     entityId: data.entity_id,
+    companyId: data.company_id || undefined,
     changes: data.changes || undefined,
     metadata: data.metadata || undefined,
     ipAddress: data.ip_address || undefined,
@@ -60,6 +78,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
  */
 export async function getAuditLogs(filters: {
   userId?: string
+  companyId?: string
   entity?: string
   entityId?: string
   action?: string
@@ -76,6 +95,10 @@ export async function getAuditLogs(filters: {
 
   if (filters.userId) {
     query = query.eq('user_id', filters.userId)
+  }
+
+  if (filters.companyId) {
+    query = query.eq('company_id', filters.companyId)
   }
 
   if (filters.entity) {
@@ -121,6 +144,7 @@ export async function getAuditLogs(filters: {
     action: log.action,
     entity: log.entity,
     entityId: log.entity_id,
+    companyId: log.company_id || undefined,
     changes: log.changes || undefined,
     metadata: log.metadata || undefined,
     ipAddress: log.ip_address || undefined,
@@ -153,6 +177,7 @@ export async function getAuditLogById(id: string): Promise<AuditLog | null> {
     action: data.action,
     entity: data.entity,
     entityId: data.entity_id,
+    companyId: data.company_id || undefined,
     changes: data.changes || undefined,
     metadata: data.metadata || undefined,
     ipAddress: data.ip_address || undefined,

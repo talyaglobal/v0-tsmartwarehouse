@@ -3,6 +3,7 @@
  */
 
 import type { Booking, Task, Invoice, Incident, Claim, Notification, Payment, PaymentTransaction, Refund, AccessLog } from "./index"
+import type { AuditLog } from "@/lib/audit/types"
 
 // Base API Response
 export interface ApiResponse<T = unknown> {
@@ -59,6 +60,10 @@ export type RefundsListResponse = ListResponse<Refund>
 // Access Log API Responses
 export type AccessLogResponse = ApiResponse<AccessLog>
 export type AccessLogsListResponse = ListResponse<AccessLog>
+
+// Audit Log API Responses
+export type AuditLogResponse = ApiResponse<AuditLog>
+export type AuditLogsListResponse = ListResponse<AuditLog>
 
 // Generic/Other API Responses
 export type HealthResponse = ApiResponse<{

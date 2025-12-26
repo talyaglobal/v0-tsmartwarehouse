@@ -41,7 +41,7 @@ export function CompanyInformationTab() {
   })
 
   // Get user's company ID
-  const { data: companyId } = useQuery({
+  const { data: companyId, isLoading: isLoadingCompanyId } = useQuery({
     queryKey: ['user-company-id', user?.id],
     queryFn: async () => {
       if (!user) return null
@@ -57,7 +57,7 @@ export function CompanyInformationTab() {
   })
 
   // Fetch company information
-  const { data: company, isLoading } = useQuery({
+  const { data: company, isLoading: isLoadingCompany } = useQuery({
     queryKey: ['company', companyId],
     queryFn: async () => {
       if (!companyId) return null
@@ -194,6 +194,9 @@ export function CompanyInformationTab() {
       }
     }
   }
+
+  // Show loading if companyId or company are loading
+  const isLoading = isLoadingCompanyId || isLoadingCompany
 
   if (isLoading) {
     return (

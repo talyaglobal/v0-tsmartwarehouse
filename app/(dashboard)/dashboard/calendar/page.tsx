@@ -90,8 +90,8 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b">
+    <div className="flex flex-col h-[calc(100vh-8rem)] -m-6">
+      <div className="border-b bg-card px-6 py-4">
         <PageHeader 
           title="Calendar" 
           description="View all bookings, tasks, and requests in calendar format"

@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/lib/hooks/use-user"
+import { createClient } from "@/lib/supabase/client"
 import {
   Warehouse,
   LayoutDashboard,
@@ -117,13 +119,48 @@ const navSections: NavSection[] = [
     ],
     defaultOpen: false,
   },
+  {
+    title: "System",
+    items: [
+      { name: "Audit Logs", href: "/admin/audit-logs", icon: FileText },
+    ],
+    defaultOpen: false,
+  },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const { user } = useUser()
+  const [isRoot, setIsRoot] = useState(false)
   const [openSections, setOpenSections] = useState<Set<string>>(
     new Set(navSections.filter(s => s.defaultOpen).map(s => s.title))
   )
+
+  useEffect(() => {
+    if (user) {
+      checkRootRole()
+    }
+  }, [user])
+
+  const checkRootRole = async () => {
+    if (!user) return
+    const supabase = createClient()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    setIsRoot(profile?.role === 'root')
+  }
+
+  // Filter sections based on user role
+  const visibleSections = navSections.filter(section => {
+    if (section.title === "System" && !isRoot) {
+      return false
+    }
+    return true
+  })
 
   const toggleSection = (title: string) => {
     setOpenSections(prev => {
@@ -159,7 +196,7 @@ export function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
-        {navSections.map((section) => {
+        {visibleSections.map((section) => {
           const isOpen = openSections.has(section.title)
           const hasActiveItem = section.items.some(item => isActive(item.href))
 

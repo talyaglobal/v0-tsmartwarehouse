@@ -72,7 +72,7 @@ export function TeamMembersTab() {
   })
 
   // Get user's company ID
-  const { data: companyId } = useQuery({
+  const { data: companyId, isLoading: isLoadingCompanyId } = useQuery({
     queryKey: ['user-company-id', user?.id],
     queryFn: async () => {
       if (!user) return null
@@ -248,7 +248,10 @@ export function TeamMembersTab() {
     return <Badge variant={roleInfo.variant}>{roleInfo.label}</Badge>
   }
 
-  if (membersLoading || invitationsLoading) {
+  // Show loading if companyId, members, or invitations are loading
+  const isLoading = isLoadingCompanyId || membersLoading || invitationsLoading
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

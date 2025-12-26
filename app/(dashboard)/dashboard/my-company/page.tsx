@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,10 +12,28 @@ import { createClient } from "@/lib/supabase/client"
 import { TeamMembersTab } from "@/features/my-company/components/team-members-tab"
 import { WarehousesTab } from "@/features/my-company/components/warehouses-tab"
 import { CompanyInformationTab } from "@/features/my-company/components/company-information-tab"
+import { AccessLogsTab } from "@/features/my-company/components/access-logs-tab"
 
 export default function MyCompanyPage() {
   const { user } = useUser()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [activeTab, setActiveTab] = useState("team")
+
+  // Handle tab query parameter
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab && ["team", "warehouses", "information", "access-logs"].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
+  // Update URL when tab changes to trigger loading bar
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    router.push(`${pathname}?tab=${value}`, { scroll: false })
+  }
 
   // Check if user is company admin
   const { data: isCompanyAdmin, isLoading: checkingRole } = useQuery({
@@ -64,11 +83,12 @@ export default function MyCompanyPage() {
         description="Manage your company settings, team members, and warehouses"
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
           <TabsTrigger value="team">Team Members</TabsTrigger>
           <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
           <TabsTrigger value="information">Company Information</TabsTrigger>
+          <TabsTrigger value="access-logs">Access Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="team" className="space-y-4">
@@ -81,6 +101,10 @@ export default function MyCompanyPage() {
 
         <TabsContent value="information" className="space-y-4">
           <CompanyInformationTab />
+        </TabsContent>
+
+        <TabsContent value="access-logs" className="space-y-4">
+          <AccessLogsTab />
         </TabsContent>
       </Tabs>
     </div>

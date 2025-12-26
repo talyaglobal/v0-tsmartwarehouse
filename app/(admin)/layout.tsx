@@ -2,6 +2,7 @@ import type React from "react"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { TopLoadingBar } from "@/components/ui/top-loading-bar"
 
 // Force dynamic rendering - requires authentication
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,7 @@ export default async function AdminLayout({
 
   return (
     <ErrorBoundary>
+      <TopLoadingBar />
       <div className="flex h-screen">
         {/* Sidebar */}
         <aside className="hidden lg:block">

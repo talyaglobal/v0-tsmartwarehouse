@@ -17,7 +17,7 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().optional(),
   companyName: z.string().min(2, 'Company name must be at least 2 characters'),
-  role: z.enum(['customer', 'super_admin', 'worker']).optional(),
+  role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'owner']).optional(),
   storageType: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -76,7 +76,7 @@ export async function signIn(formData: FormData): Promise<{ error?: AuthError }>
     // Email verification check removed - users can login immediately
 
     // Determine redirect based on user role
-    const userRole = data.user.user_metadata?.role || 'customer'
+    const userRole = data.user.user_metadata?.role || 'member'
     let redirectPath = '/dashboard'
 
     if (redirectTo && !redirectTo.startsWith('/login') && !redirectTo.startsWith('/register')) {
@@ -177,7 +177,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       user_metadata: {
         name: validation.data.name,
         phone: validation.data.phone || null,
-        role: 'customer', // Default role for new users
+        role: 'member', // Default role for new users
         storage_interest: validation.data.storageType || null,
       },
     })
@@ -273,7 +273,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           .from('profiles')
           .update({
             company_id: companyId,
-            role: 'customer', // Default role for new members
+            role: 'member', // Default role for new members
           })
           .eq('id', data.user.id)
         
@@ -363,7 +363,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           id: data.user.id,
           email: validation.data.email,
           name: validation.data.name,
-          role: 'customer',
+          role: 'member',
           phone: validation.data.phone || null,
           storage_interest: validation.data.storageType || null,
           company_id: companyId,

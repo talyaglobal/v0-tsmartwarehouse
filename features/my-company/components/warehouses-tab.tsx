@@ -14,7 +14,7 @@ export function WarehousesTab() {
   const { user } = useUser()
 
   // Get user's company ID
-  const { data: companyId } = useQuery({
+  const { data: companyId, isLoading: isLoadingCompanyId } = useQuery({
     queryKey: ['user-company-id', user?.id],
     queryFn: async () => {
       if (!user) return null
@@ -30,7 +30,7 @@ export function WarehousesTab() {
   })
 
   // Fetch warehouses for company
-  const { data: warehouses = [], isLoading } = useQuery({
+  const { data: warehouses = [], isLoading: isLoadingWarehouses } = useQuery({
     queryKey: ['company-warehouses', companyId],
     queryFn: async () => {
       if (!companyId) return []
@@ -39,6 +39,7 @@ export function WarehousesTab() {
         .from('warehouses')
         .select('id, name, address, city, state, zip_code, total_sq_ft, owner_company_id')
         .eq('owner_company_id', companyId)
+        .eq('status', true) // Only show active warehouses
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -46,6 +47,9 @@ export function WarehousesTab() {
     },
     enabled: !!companyId,
   })
+
+  // Show loading if either companyId or warehouses are loading
+  const isLoading = isLoadingCompanyId || isLoadingWarehouses
 
   if (isLoading) {
     return (

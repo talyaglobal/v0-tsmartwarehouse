@@ -34,6 +34,7 @@ export interface AuditLog {
   action: AuditAction
   entity: AuditEntity
   entityId: string
+  companyId?: string
   changes?: Record<string, { old: any; new: any }>
   metadata?: Record<string, any>
   ipAddress?: string

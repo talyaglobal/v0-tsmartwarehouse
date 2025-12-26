@@ -3,6 +3,7 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { AIAssistant } from "@/components/dashboard/ai-assistant"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { TopLoadingBar } from "@/components/ui/top-loading-bar"
 
 // Force dynamic rendering - requires authentication
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,7 @@ export default async function DashboardLayout({
 
   return (
     <ErrorBoundary>
+      <TopLoadingBar />
       <div className="flex h-screen">
         {/* Sidebar */}
         <aside className="hidden lg:block">

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Plus, Loader2, LogOut } from "@/components/icons"
 import { formatDateTime } from "@/lib/utils/format"
+import { AccessLogCheckInForm } from "@/components/admin/access-log-checkin-form"
 import type { AccessLog, AccessLogVisitorType } from "@/types"
 
 import type { LucideIcon } from "lucide-react"
@@ -28,6 +29,7 @@ export function AccessLogsList({ visitorType, title, description, icon: Icon }: 
   const [loading, setLoading] = useState(true)
   const [checkOutDialogOpen, setCheckOutDialogOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState<AccessLog | null>(null)
+  const [checkInDialogOpen, setCheckInDialogOpen] = useState(false)
 
   useEffect(() => {
     fetchAccessLogs()
@@ -105,7 +107,7 @@ export function AccessLogsList({ visitorType, title, description, icon: Icon }: 
   return (
     <div className="space-y-6">
       <PageHeader title={title} description={description}>
-        <Button onClick={() => {/* TODO: Open check-in form */}}>
+        <Button onClick={() => setCheckInDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Check In
         </Button>
@@ -253,6 +255,15 @@ export function AccessLogsList({ visitorType, title, description, icon: Icon }: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AccessLogCheckInForm
+        open={checkInDialogOpen}
+        onOpenChange={setCheckInDialogOpen}
+        visitorType={visitorType}
+        onSuccess={() => {
+          fetchAccessLogs()
+        }}
+      />
     </div>
   )
 }
