@@ -66,9 +66,11 @@ export interface Warehouse {
   name: string
   address: string
   city: string
-  state: string
   zipCode: string
   totalSqFt: number // 240,000 sq ft
+  totalPalletStorage?: number // Total pallet storage capacity
+  latitude?: number // Google Maps latitude
+  longitude?: number // Google Maps longitude
   floors: WarehouseFloor[]
   amenities: string[]
   operatingHours: {

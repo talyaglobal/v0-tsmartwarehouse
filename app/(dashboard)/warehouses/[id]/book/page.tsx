@@ -185,7 +185,7 @@ export default function BookWarehousePage() {
             <div>
               <p className="text-sm text-muted-foreground">Location</p>
               <p className="font-medium">
-                {warehouse.address}, {warehouse.city}, {warehouse.state}
+                {warehouse.address}, {warehouse.city}
               </p>
             </div>
             <div>

@@ -96,6 +96,7 @@ export const CACHE_TTL = {
  * Cache key prefixes
  */
 export const CACHE_PREFIXES = {
+  MEMBERSHIP: 'membership',
   BOOKING: 'booking',
   BOOKINGS: 'bookings',
   INVOICE: 'invoice',
@@ -110,6 +111,7 @@ export const CACHE_PREFIXES = {
   DASHBOARD_STATS: 'dashboard_stats',
   INVENTORY: 'inventory',
   INVENTORY_ITEM: 'inventory_item',
+  WAREHOUSES: 'warehouses',
 } as const
 
 /**

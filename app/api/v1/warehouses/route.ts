@@ -10,9 +10,11 @@ const createWarehouseSchema = z.object({
   name: z.string().min(1, "Name is required"),
   address: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
   zipCode: z.string().min(1, "Zip code is required"),
   totalSqFt: z.number().positive("Total square feet must be positive"),
+  totalPalletStorage: z.number().positive("Total pallet storage must be positive").optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   amenities: z.array(z.string()).optional(),
   operatingHours: z.object({
     open: z.string(),

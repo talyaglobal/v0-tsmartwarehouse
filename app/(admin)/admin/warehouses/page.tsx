@@ -113,7 +113,7 @@ export default function WarehousesPage() {
                 <p className="text-sm text-muted-foreground">
                   {WAREHOUSE_LAYOUT.address}
                   <br />
-                  {WAREHOUSE_LAYOUT.city}, {WAREHOUSE_LAYOUT.state} {WAREHOUSE_LAYOUT.zipCode}
+                  {WAREHOUSE_LAYOUT.city} {WAREHOUSE_LAYOUT.zipCode}
                 </p>
               </div>
             </div>

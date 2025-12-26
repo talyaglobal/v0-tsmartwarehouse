@@ -50,9 +50,10 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
   const supabase = createServerSupabaseClient()
   
   // Optimize: Only select needed fields instead of '*'
+  // Note: invoice_status is the business status, status is for soft delete
   let query = supabase
     .from('invoices')
-    .select('id, booking_id, service_order_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+    .select('id, booking_id, service_order_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
 
   if (customerId) {
     query = query.eq('customer_id', customerId)
@@ -73,8 +74,11 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
       query = query.eq('customer_id', '00000000-0000-0000-0000-000000000000') // Non-existent ID
     }
   }
+  // Add soft delete filter - only non-deleted invoices
+  query = query.eq('status', true)
+  
   if (status) {
-    query = query.eq('status', status)
+    query = query.eq('invoice_status', status)
   }
   if (bookingId) {
     query = query.eq('booking_id', bookingId)
@@ -118,8 +122,9 @@ export async function getInvoiceById(id: string, useCache: boolean = true): Prom
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, booking_id, service_order_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+    .select('id, booking_id, service_order_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
     .eq('id', id)
+    .eq('status', true) // Soft delete filter
     .single()
 
   if (error) {
@@ -147,7 +152,8 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>):
     service_order_id: invoice.serviceOrderId || null,
     customer_id: invoice.customerId,
     customer_name: invoice.customerName,
-    status: invoice.status,
+    invoice_status: invoice.status, // Business status (draft, pending, paid, etc.)
+    status: true, // Soft delete (always true for new invoices)
     items: invoice.items,
     subtotal: invoice.subtotal,
     tax: invoice.tax,
@@ -181,7 +187,7 @@ export async function updateInvoice(
   const supabase = createServerSupabaseClient()
   
   const updateRow: Record<string, any> = {}
-  if (updates.status !== undefined) updateRow.status = updates.status
+  if (updates.status !== undefined) updateRow.invoice_status = updates.status // Business status
   if (updates.paidDate !== undefined) updateRow.paid_date = updates.paidDate
 
   const { data, error } = await supabase
@@ -213,7 +219,7 @@ function transformInvoiceRow(row: any): Invoice {
     serviceOrderId: row.service_order_id || undefined,
     customerId: row.customer_id,
     customerName: row.customer_name,
-    status: row.status as InvoiceStatus,
+    status: (row.invoice_status || row.status) as InvoiceStatus, // invoice_status is business status, fallback to status for backward compatibility
     items: row.items,
     subtotal: parseFloat(row.subtotal),
     tax: parseFloat(row.tax),

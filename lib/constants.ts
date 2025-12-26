@@ -31,9 +31,9 @@ export const WAREHOUSE_CONFIG: Warehouse = {
   name: "TSmart Warehouse - Main Facility",
   address: "735 S Front St",
   city: "Elizabeth",
-  state: "NJ",
   zipCode: "07202",
   totalSqFt: 240000,
+  totalPalletStorage: 0,
   floors: [
     {
       id: "floor-1",

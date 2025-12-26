@@ -4,6 +4,7 @@ import { getBookingById } from "@/lib/db/bookings"
 import { createInvoice, getInvoices } from "@/lib/db/invoices"
 import { getServiceOrderById } from "@/lib/db/orders"
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
+import { getMembershipSettingByTier } from "@/lib/db/membership"
 import { getNotificationService } from "@/lib/notifications/service"
 import type { Invoice, InvoiceItem, MembershipTier } from "@/types"
 
@@ -58,8 +59,9 @@ export async function generateBookingInvoice(
   let items: InvoiceItem[] = []
 
   if (booking.type === "pallet" && booking.palletCount) {
-    pricingResult = calculatePalletPricing({
+    pricingResult = await calculatePalletPricing({
       type: "pallet",
+      warehouseId: booking.warehouseId,
       palletCount: booking.palletCount,
       months: 1, // Initial invoice is for first month
       membershipTier: input.membershipTier,
@@ -92,8 +94,9 @@ export async function generateBookingInvoice(
       })
     }
   } else if (booking.type === "area-rental" && booking.areaSqFt) {
-    pricingResult = calculateAreaRentalPricing({
+    pricingResult = await calculateAreaRentalPricing({
       type: "area-rental",
+      warehouseId: booking.warehouseId,
       areaSqFt: booking.areaSqFt,
       membershipTier: input.membershipTier,
     })
@@ -209,16 +212,52 @@ export async function generateMonthlyStorageInvoice(
     throw new Error("Monthly invoice already generated for this month")
   }
 
-  // Calculate storage cost
-  const storageCost = booking.palletCount * PRICING.storagePerPalletPerMonth
+  // Calculate storage cost using warehouse-specific pricing
+  const supabase = createServerSupabaseClient()
+  let storagePerPalletPerMonth: number
+  let membershipDiscountPercent = 0
 
-  // Apply membership discount
-  const membershipDiscountInfo = PRICING.membershipDiscounts.find(
-    (d) => d.tier === input.membershipTier
-  )
+  // Try to get warehouse pricing
+  const { data: warehousePricing } = await supabase
+    .from('warehouse_pricing')
+    .select('base_price, unit')
+    .eq('warehouse_id', booking.warehouseId)
+    .eq('pricing_type', 'pallet')
+    .eq('status', true)
+    .single()
+
+  if (warehousePricing) {
+    // Parse unit to determine pricing structure
+    if (warehousePricing.unit.includes('per_month')) {
+      storagePerPalletPerMonth = parseFloat(warehousePricing.base_price.toString())
+    } else {
+      storagePerPalletPerMonth = parseFloat(warehousePricing.base_price.toString())
+    }
+  } else {
+    // Fall back to static pricing
+    storagePerPalletPerMonth = PRICING.storagePerPalletPerMonth
+  }
+
+  // Get membership discount from database (dynamic)
+  if (input.membershipTier) {
+    try {
+      const membershipSetting = await getMembershipSettingByTier(input.membershipTier)
+      if (membershipSetting) {
+        membershipDiscountPercent = membershipSetting.discountPercent
+      }
+    } catch (error) {
+      // Fall back to static config if database lookup fails
+      const membershipDiscountInfo = PRICING.membershipDiscounts.find(
+        (d) => d.tier === input.membershipTier
+      )
+      membershipDiscountPercent = membershipDiscountInfo?.discountPercent || 0
+    }
+  }
+
+  const storageCost = booking.palletCount * storagePerPalletPerMonth
   const membershipDiscount =
-    membershipDiscountInfo && membershipDiscountInfo.discountPercent > 0
-      ? (storageCost * membershipDiscountInfo.discountPercent) / 100
+    membershipDiscountPercent > 0
+      ? (storageCost * membershipDiscountPercent) / 100
       : 0
 
   const subtotal = storageCost - membershipDiscount
@@ -230,14 +269,14 @@ export async function generateMonthlyStorageInvoice(
     {
       description: `Monthly Storage (${booking.palletCount} pallets)`,
       quantity: booking.palletCount,
-      unitPrice: PRICING.storagePerPalletPerMonth,
+      unitPrice: storagePerPalletPerMonth,
       total: storageCost,
     },
   ]
 
   if (membershipDiscount > 0) {
     items.push({
-      description: `Membership Discount (${membershipDiscountInfo?.discountPercent}%)`,
+      description: `Membership Discount (${membershipDiscountPercent}%)`,
       quantity: 1,
       unitPrice: -membershipDiscount,
       total: -membershipDiscount,
@@ -289,8 +328,9 @@ export async function generateAnnualRentalInvoice(
   }
 
   // Calculate pricing
-  const pricingResult = calculateAreaRentalPricing({
+  const pricingResult = await calculateAreaRentalPricing({
     type: "area-rental",
+    warehouseId: booking.warehouseId,
     areaSqFt: booking.areaSqFt,
     membershipTier: input.membershipTier,
   })

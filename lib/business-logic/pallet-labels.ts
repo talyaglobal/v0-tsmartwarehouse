@@ -9,7 +9,13 @@
 
 import { getInventoryItemById } from '@/lib/db/inventory'
 import { getBookingById } from '@/lib/db/bookings'
-import { getWarehouseById, getWarehouseRegions } from '@/lib/db/warehouses'
+import {
+  getWarehouseById,
+  getWarehouseFloorById,
+  getWarehouseHallById,
+  getWarehouseZoneById,
+  getWarehouseRegionById,
+} from '@/lib/db/warehouses'
 import type { PalletLabelData } from '@/types'
 
 /**
@@ -27,18 +33,64 @@ export async function generatePalletLabelData(
   // Get warehouse information
   await getWarehouseById(item.warehouse_id)
 
-  // Get location hierarchy
-  if (item.region_id && item.floor_id) {
-    // Get region info (can be used for label generation if needed)
-    await getWarehouseRegions(item.floor_id)
+  // Fetch full location hierarchy
+  let floor = null
+  let region = null
+  let hall = null
+  let zone = null
+
+  if (item.floor_id) {
+    const floorData = await getWarehouseFloorById(item.floor_id)
+    if (floorData) {
+      floor = {
+        id: floorData.id,
+        floorNumber: floorData.floorNumber,
+        name: floorData.name,
+      }
+    }
+  }
+
+  if (item.region_id) {
+    const regionData = await getWarehouseRegionById(item.region_id)
+    if (regionData) {
+      region = {
+        id: regionData.id,
+        name: regionData.name,
+      }
+    }
+  }
+
+  if (item.hall_id) {
+    const hallData = await getWarehouseHallById(item.hall_id)
+    if (hallData) {
+      hall = {
+        id: hallData.id,
+        hallName: hallData.hallName,
+      }
+    }
+  }
+
+  if (item.zone_id) {
+    const zoneData = await getWarehouseZoneById(item.zone_id)
+    if (zoneData) {
+      zone = {
+        id: zoneData.id,
+        name: zoneData.name,
+        type: zoneData.type,
+      }
+    }
   }
 
   // Calculate storage duration
   const days = item.days_in_warehouse || 0
   const months = item.months_in_warehouse || 0
 
-  // Build location object
+  // Build location object with full hierarchy
   const location: PalletLabelData['location'] = {
+    floor: floor || undefined,
+    region: region || undefined,
+    hall: hall || undefined,
+    zone: zone || undefined,
     locationCode: item.location_code || undefined,
     rowNumber: item.row_number || undefined,
     levelNumber: item.level_number || undefined,

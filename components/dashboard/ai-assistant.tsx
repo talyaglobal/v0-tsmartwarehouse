@@ -95,7 +95,8 @@ const saveCollapseStateToStorage = (isCollapsed: boolean) => {
 export function AIAssistant() {
   const { user } = useUser()
   const [isOpen, setIsOpen] = useState(true) // Default to open on desktop
-  const [isCollapsed, setIsCollapsed] = useState(() => loadCollapseStateFromStorage()) // Load collapse state from localStorage
+  // Initialize with false to avoid hydration mismatch, then update from localStorage after mount
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMounted, setIsMounted] = useState(false) // Track if component is mounted (client-side)
   
   // Fetch user avatar for chat messages
@@ -157,9 +158,12 @@ export function AIAssistant() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Mark component as mounted (client-side only)
+  // Mark component as mounted (client-side only) and load collapse state from localStorage
   useEffect(() => {
     setIsMounted(true)
+    // Load collapse state from localStorage after mount to avoid hydration mismatch
+    const storedCollapseState = loadCollapseStateFromStorage()
+    setIsCollapsed(storedCollapseState)
   }, [])
 
   // Save messages to localStorage whenever messages change

@@ -57,14 +57,10 @@ export default function SettingsPage() {
                 <Label>Address</Label>
                 <Input defaultValue={WAREHOUSE_LAYOUT.address} />
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>City</Label>
                   <Input defaultValue={WAREHOUSE_LAYOUT.city} />
-                </div>
-                <div className="space-y-2">
-                  <Label>State</Label>
-                  <Input defaultValue={WAREHOUSE_LAYOUT.state} />
                 </div>
                 <div className="space-y-2">
                   <Label>ZIP Code</Label>

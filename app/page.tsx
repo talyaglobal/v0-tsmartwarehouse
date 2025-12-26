@@ -396,7 +396,7 @@ export default function HomePage() {
                   <p className="text-sm text-muted-foreground mt-2">
                     {WAREHOUSE_CONFIG.address}
                     <br />
-                    {WAREHOUSE_CONFIG.city}, {WAREHOUSE_CONFIG.state} {WAREHOUSE_CONFIG.zipCode}
+                    {WAREHOUSE_CONFIG.city} {WAREHOUSE_CONFIG.zipCode}
                   </p>
                 </CardContent>
               </Card>

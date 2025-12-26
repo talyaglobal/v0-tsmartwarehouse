@@ -51,9 +51,11 @@ export async function getBookings(filters?: GetBookingsOptions) {
   const supabase = createServerSupabaseClient()
   
   // Optimize: Only select needed fields instead of '*'
+  // Note: booking_status is business status, status is for soft delete
   let query = supabase
     .from('bookings')
-    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
+    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, booking_status, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
+    .eq('status', true) // Soft delete filter - only non-deleted bookings
 
   if (customerId) {
     query = query.eq('customer_id', customerId)
@@ -122,8 +124,9 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('bookings')
-    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
+    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, booking_status, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
     .eq('id', id)
+    .eq('status', true) // Soft delete filter
     .single()
 
   if (error) {

@@ -84,19 +84,21 @@ export async function createBookingWithAvailability(
     .filter((b) => b.type === "pallet")
     .reduce((sum, b) => sum + (b.palletCount || 0), 0)
 
-  // Step 3: Calculate pricing with discounts
+  // Step 3: Calculate pricing with discounts (using warehouse-specific pricing)
   let pricingResult
   if (input.type === "pallet") {
-    pricingResult = calculatePalletPricing({
+    pricingResult = await calculatePalletPricing({
       type: "pallet",
+      warehouseId: input.warehouseId,
       palletCount: input.palletCount,
       months: input.months || 1,
       membershipTier: input.membershipTier,
       existingPalletCount,
     })
   } else {
-    pricingResult = calculateAreaRentalPricing({
+    pricingResult = await calculateAreaRentalPricing({
       type: "area-rental",
+      warehouseId: input.warehouseId,
       areaSqFt: input.areaSqFt,
       membershipTier: input.membershipTier,
     })
@@ -144,14 +146,16 @@ export async function confirmBooking(bookingId: string): Promise<Booking> {
     .from("bookings")
     .select("*")
     .eq("id", bookingId)
+    .eq("status", true) // Soft delete filter
     .single()
 
   if (bookingError || !bookingData) {
     throw new Error(`Booking not found: ${bookingError?.message}`)
   }
 
-  if (bookingData.status !== "pending") {
-    throw new Error(`Booking is not in pending status`)
+  // Check booking_status (business status), not status (soft delete)
+  if (bookingData.booking_status !== "pending") {
+    throw new Error(`Booking is not in pending status. Current status: ${bookingData.booking_status}`)
   }
 
   // Reserve capacity

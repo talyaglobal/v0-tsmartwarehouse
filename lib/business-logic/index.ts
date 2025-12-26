@@ -22,11 +22,11 @@ export {
 
 // Membership
 export {
-  calculateMembershipTier,
-  getMembershipTierInfo,
-  checkTierUpgrade,
-  calculateMembershipTierFromBookings,
-  type MembershipCalculationInput,
+  calculateMembershipTierFromSpend,
+  getMembershipTierInfoFromSpend,
+  checkTierUpgradeFromSpend,
+  getMembershipTierDiscount,
+  isMembershipProgramEnabled,
   type MembershipTierInfo,
 } from "./membership"
 

@@ -49,3 +49,13 @@ next-env.d.ts
 
 # Supabase
 .supabase
+supabase/README.md
+
+# Documentation with sensitive information
+SMS_README.md
+
+# Other sensitive files
+*.secret
+*.key
+*.p12
+*.pfx

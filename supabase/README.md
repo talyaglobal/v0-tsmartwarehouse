@@ -12,9 +12,9 @@ This directory contains database migrations and setup files for the TSmart Wareh
 Add the following to your `.env.local` file:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_SUPABASE_URL=https://gyodzimmhtecocscyeip.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5b2R6aW1taHRlY29jc2N5ZWlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNDg0NTAsImV4cCI6MjA3OTkyNDQ1MH0.4DpwSeAjPA2QuB80EIajEm78pF_geDW9znPK9_FeQMU
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5b2R6aW1taHRlY29jc2N5ZWlwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDM0ODQ1MCwiZXhwIjoyMDc5OTI0NDUwfQ.Aru8NnkoMRVnbzXh6nFV-uvroCHCdALlAcXb3hEFRZM
 ```
 
 ## Running Migrations
@@ -38,23 +38,6 @@ supabase link --project-ref your-project-ref
 # Run migrations
 supabase db push
 ```
-
-## Database Schema Overview
-
-The initial schema includes:
-
-- **users** - User accounts with roles (admin, customer, worker)
-- **warehouses** - Warehouse information
-- **warehouse_floors** - Floor configuration
-- **warehouse_halls** - Hall configuration
-- **warehouse_zones** - Zone definitions
-- **bookings** - Customer bookings
-- **invoices** - Billing and invoicing
-- **tasks** - Worker task management
-- **incidents** - Incident tracking
-- **claims** - Customer claims
-- **notifications** - User notifications
-- **worker_shifts** - Worker shift tracking
 
 ## Row Level Security (RLS)
 

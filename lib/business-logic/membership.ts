@@ -1,66 +1,58 @@
-import { MEMBERSHIP_BENEFITS } from "@/lib/constants"
+import { getMembershipProgramStatus, getMembershipSettingByTier, calculateMembershipTierFromSpend as dbCalculateMembershipTierFromSpend } from "@/lib/db/membership"
 import type { MembershipTier } from "@/types"
 
 /**
  * Business Logic: Membership Tier Calculation
  * 
  * Determines membership tier based on:
- * - Total pallet count (active bookings)
- * - Historical pallet volume
- * - Account age/tenure (optional)
+ * - Total spend (paid invoices) - PRIMARY METHOD
+ * - Database-driven tier thresholds and discounts
+ * - Program can be enabled/disabled by root users
  */
-
-export interface MembershipCalculationInput {
-  currentPalletCount: number // Active pallets in storage
-  historicalPalletCount?: number // Total pallets ever stored
-  accountAgeMonths?: number // Account tenure in months
-}
 
 export interface MembershipTierInfo {
   tier: MembershipTier
   name: string
-  minPallets: number
+  minSpend: number // Changed from minPallets to minSpend
   discount: number
   benefits: string[]
   nextTier?: {
     tier: MembershipTier
     name: string
-    minPallets: number
-    palletsNeeded: number
+    minSpend: number
+    spendNeeded: number // Changed from palletsNeeded to spendNeeded
   }
 }
 
 /**
- * Calculate membership tier based on pallet count
- * Uses the highest tier threshold that the customer meets
+ * Calculate membership tier based on total spend (paid invoices)
+ * Uses database-driven tier thresholds
  */
-export function calculateMembershipTier(
-  input: MembershipCalculationInput
-): MembershipTier {
-  const palletCount = input.currentPalletCount
+export async function calculateMembershipTierFromSpend(
+  totalSpend: number
+): Promise<MembershipTier> {
+  return await dbCalculateMembershipTierFromSpend(totalSpend)
+}
 
-  // Check tiers in descending order (highest first)
-  const tierOrder: MembershipTier[] = ["platinum", "gold", "silver", "bronze"]
+/**
+ * Get membership tier information with next tier details (based on spend)
+ */
+export async function getMembershipTierInfoFromSpend(
+  totalSpend: number
+): Promise<MembershipTierInfo> {
+  const currentTier = await calculateMembershipTierFromSpend(totalSpend)
+  const currentSetting = await getMembershipSettingByTier(currentTier)
 
-  for (const tier of tierOrder) {
-    const benefits = MEMBERSHIP_BENEFITS[tier]
-    if (palletCount >= benefits.minPallets) {
-      return tier
+  if (!currentSetting) {
+    // Fallback to bronze if no setting found
+    return {
+      tier: 'bronze',
+      name: 'Bronze',
+      minSpend: 0,
+      discount: 0,
+      benefits: [],
     }
   }
-
-  // Default to bronze if no threshold met
-  return "bronze"
-}
-
-/**
- * Get membership tier information with next tier details
- */
-export function getMembershipTierInfo(
-  input: MembershipCalculationInput
-): MembershipTierInfo {
-  const currentTier = calculateMembershipTier(input)
-  const currentBenefits = MEMBERSHIP_BENEFITS[currentTier]
 
   // Find next tier
   const tierOrder: MembershipTier[] = ["bronze", "silver", "gold", "platinum"]
@@ -73,44 +65,41 @@ export function getMembershipTierInfo(
   let nextTierInfo: MembershipTierInfo["nextTier"] | undefined
 
   if (nextTier) {
-    const nextBenefits = MEMBERSHIP_BENEFITS[nextTier]
-    const palletsNeeded = Math.max(
-      0,
-      nextBenefits.minPallets - input.currentPalletCount
-    )
+    const nextSetting = await getMembershipSettingByTier(nextTier)
+    if (nextSetting) {
+      const spendNeeded = Math.max(0, nextSetting.minSpend - totalSpend)
 
-    nextTierInfo = {
-      tier: nextTier,
-      name: nextBenefits.name,
-      minPallets: nextBenefits.minPallets,
-      palletsNeeded,
+      nextTierInfo = {
+        tier: nextTier,
+        name: nextSetting.tierName.charAt(0).toUpperCase() + nextSetting.tierName.slice(1),
+        minSpend: nextSetting.minSpend,
+        spendNeeded,
+      }
     }
   }
 
   return {
     tier: currentTier,
-    name: currentBenefits.name,
-    minPallets: currentBenefits.minPallets,
-    discount: currentBenefits.discount,
-    benefits: currentBenefits.benefits,
+    name: currentSetting.tierName.charAt(0).toUpperCase() + currentSetting.tierName.slice(1),
+    minSpend: currentSetting.minSpend,
+    discount: currentSetting.discountPercent,
+    benefits: currentSetting.benefits,
     nextTier: nextTierInfo,
   }
 }
 
 /**
- * Check if customer qualifies for tier upgrade
+ * Check if customer qualifies for tier upgrade (based on new total spend)
  */
-export function checkTierUpgrade(
+export async function checkTierUpgradeFromSpend(
   currentTier: MembershipTier,
-  newPalletCount: number
-): {
+  newTotalSpend: number
+): Promise<{
   upgraded: boolean
   newTier: MembershipTier
   previousTier: MembershipTier
-} {
-  const newTier = calculateMembershipTier({
-    currentPalletCount: newPalletCount,
-  })
+}> {
+  const newTier = await calculateMembershipTierFromSpend(newTotalSpend)
 
   return {
     upgraded: newTier !== currentTier && tierLevel(newTier) > tierLevel(currentTier),
@@ -133,14 +122,19 @@ function tierLevel(tier: MembershipTier): number {
 }
 
 /**
- * Calculate membership tier from database pallet count
- * This would typically be called with data from active bookings
+ * Get membership tier discount from database
  */
-export async function calculateMembershipTierFromBookings(
-  customerId: string,
-  getActivePalletCount: (customerId: string) => Promise<number>
-): Promise<MembershipTier> {
-  const palletCount = await getActivePalletCount(customerId)
-  return calculateMembershipTier({ currentPalletCount: palletCount })
+export async function getMembershipTierDiscount(tier: MembershipTier): Promise<number> {
+  const setting = await getMembershipSettingByTier(tier)
+  return setting?.discountPercent || 0
 }
+
+/**
+ * Check if membership program is enabled
+ */
+export async function isMembershipProgramEnabled(): Promise<boolean> {
+  const programStatus = await getMembershipProgramStatus()
+  return programStatus.programEnabled
+}
+
 
