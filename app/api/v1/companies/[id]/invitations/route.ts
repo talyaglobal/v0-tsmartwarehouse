@@ -21,7 +21,7 @@ export async function GET(
     const { id: companyId } = await params
 
     // Check if user has permission
-    if (user.role !== 'super_admin') {
+    if (user.role !== 'root') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {
@@ -67,6 +67,7 @@ export async function GET(
         created_at
       `)
       .not('invitation_token', 'is', null) // Must have an active token
+      .not('invited_by', 'is', null) // Must have an inviter
       .gt('invitation_expires_at', new Date().toISOString()) // Must not be expired
       .is('company_id', null) // Must not have company_id set (not accepted yet)
       .order('created_at', { ascending: false })
@@ -84,9 +85,18 @@ export async function GET(
       return NextResponse.json(responseData)
     }
 
-    // Get unique inviter IDs
+    // Get unique inviter IDs (all should have invited_by since we filtered)
     const inviterIds = [...new Set(allPendingInvitations.map((inv: any) => inv.invited_by).filter(Boolean))]
     
+    if (inviterIds.length === 0) {
+      const responseData: ListResponse<any> = {
+        success: true,
+        data: [],
+        total: 0,
+      }
+      return NextResponse.json(responseData)
+    }
+
     // Fetch inviter profiles to get their company_id
     const { data: inviters, error: invitersError } = await supabaseAdmin
       .from('profiles')
@@ -178,17 +188,27 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    if (!['owner', 'admin', 'member'].includes(role)) {
+    // Map role names to database roles
+    const roleMap: Record<string, string> = {
+      'owner': 'owner',
+      'admin': 'company_admin',
+      'company_admin': 'company_admin',
+      'member': 'member',
+    }
+    
+    const dbRole = roleMap[role] || 'member'
+    
+    if (!['owner', 'admin', 'company_admin', 'member'].includes(role)) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Invalid role. Must be 'owner', 'admin', or 'member'",
+        error: "Invalid role. Must be 'owner', 'admin', 'company_admin', or 'member'",
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })
     }
 
     // Check if user has permission
-    if (user.role !== 'super_admin') {
+    if (user.role !== 'root') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {
@@ -213,10 +233,11 @@ export async function POST(
     const supabase = createServerSupabaseClient()
     const supabaseAdmin = createServerSupabaseClient()
     
-    // Check if user with this email exists in profiles table
-    const { data: existingProfile } = await supabase
+    // Check if user with this email exists in profiles table (including soft-deleted ones)
+    // Use supabaseAdmin to bypass RLS and see all profiles including soft-deleted ones
+    const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .select('id, company_id, invitation_token, invitation_expires_at, role')
+      .select('id, company_id, invitation_token, invitation_expires_at, role, status')
       .eq('email', email.toLowerCase().trim())
       .maybeSingle()
     
@@ -265,8 +286,8 @@ export async function POST(
       // If listing fails, we'll try to create user and handle the error if user already exists
     }
 
-    // Check if user is already a member (if profile exists)
-    if (existingProfile && existingProfile.company_id === companyId) {
+    // Check if user is already a member (if profile exists and is active)
+    if (existingProfile && existingProfile.company_id === companyId && existingProfile.status !== false) {
       const errorData: ErrorResponse = {
         success: false,
         error: "User is already a member of this company",
@@ -274,6 +295,9 @@ export async function POST(
       }
       return NextResponse.json(errorData, { status: 400 })
     }
+
+    // If profile exists but is soft-deleted (status = false), we'll reactivate it
+    const isReactivating = existingProfile && existingProfile.status === false
 
     // Check if there's already a pending invitation
     if (existingProfile && existingProfile.invitation_token && existingProfile.company_id === companyId) {
@@ -294,35 +318,74 @@ export async function POST(
     expiresAt.setDate(expiresAt.getDate() + 7) // 7 days from now
 
     // If user doesn't exist in Auth, create user with generated password
+    // OR if profile exists but is soft-deleted AND auth user doesn't exist, we need to recreate the auth user
     let generatedPassword: string | null = null
     let createdUserId: string | null = null
 
-    if (!existingAuthUser && !existingProfile) {
+    // Only create new auth user if:
+    // 1. No existing auth user AND no existing profile (completely new user)
+    // 2. Reactivating (status = false) BUT auth user doesn't exist (was hard deleted)
+    const shouldCreateAuthUser = (!existingAuthUser && !existingProfile) || (isReactivating && !existingAuthUser)
+
+    console.log(`🔍 User creation check:`)
+    console.log(`  - existingAuthUser: ${existingAuthUser ? `Yes (${existingAuthUser.id})` : 'No'}`)
+    console.log(`  - existingProfile: ${existingProfile ? `Yes (status: ${existingProfile.status})` : 'No'}`)
+    console.log(`  - isReactivating: ${isReactivating}`)
+    console.log(`  - shouldCreateAuthUser: ${shouldCreateAuthUser}`)
+
+    if (shouldCreateAuthUser) {
       // Generate a secure random password
       generatedPassword = randomBytes(16).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 12) + 'A1!'
 
-      // Create user with generated password
-      const { data: newUser, error: createUserError } = await supabaseAuthAdmin.auth.admin.createUser({
-        email: email.toLowerCase().trim(),
-        password: generatedPassword,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          name: fullName.trim(),
-          role: 'customer', // Default role
-        },
-      })
+      // If reactivating, use existing profile ID, otherwise create new user
+      if (isReactivating && existingProfile) {
+        createdUserId = existingProfile.id
+        // Create user with existing profile ID (auth user was deleted but profile still exists)
+        const { error: createUserError } = await supabaseAuthAdmin.auth.admin.createUser({
+          id: existingProfile.id, // Use existing profile ID
+          email: email.toLowerCase().trim(),
+          password: generatedPassword,
+          email_confirm: true, // Auto-confirm email
+          user_metadata: {
+            name: fullName.trim(),
+            role: 'customer', // Default role
+          },
+        })
 
-      if (createUserError) {
-        console.error('Error creating user:', createUserError)
-        const errorData: ErrorResponse = {
-          success: false,
-          error: `Failed to create user account: ${createUserError.message}`,
-          statusCode: 500,
+        if (createUserError) {
+          console.error('Error recreating user:', createUserError)
+          const errorData: ErrorResponse = {
+            success: false,
+            error: `Failed to recreate user account: ${createUserError.message}`,
+            statusCode: 500,
+          }
+          return NextResponse.json(errorData, { status: 500 })
         }
-        return NextResponse.json(errorData, { status: 500 })
-      }
+        console.log(`✅ Auth user recreated for soft-deleted profile ${existingProfile.id}`)
+      } else {
+        // Create new user (completely new, no existing profile or auth user)
+        const { data: newUser, error: createUserError } = await supabaseAuthAdmin.auth.admin.createUser({
+          email: email.toLowerCase().trim(),
+          password: generatedPassword,
+          email_confirm: true, // Auto-confirm email
+          user_metadata: {
+            name: fullName.trim(),
+            role: 'customer', // Default role
+          },
+        })
 
-      createdUserId = newUser.user.id
+        if (createUserError) {
+          console.error('Error creating user:', createUserError)
+          const errorData: ErrorResponse = {
+            success: false,
+            error: `Failed to create user account: ${createUserError.message}`,
+            statusCode: 500,
+          }
+          return NextResponse.json(errorData, { status: 500 })
+        }
+
+        createdUserId = newUser.user.id
+      }
 
       // Wait a moment for the trigger to create the profile
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -343,19 +406,26 @@ export async function POST(
         // Store role in profile (will be used when invitation is accepted)
         // Store password temporarily for auto-login (will be cleared when invitation is accepted)
         // DO NOT set company_id yet - it will be set when invitation is accepted
-        const profileRole = role === 'owner' ? 'owner' : role === 'company_admin' ? 'company_admin' : 'customer'
+        // If reactivating, set status = true
+        const updateData: any = { 
+          name: fullName.trim(), // Set name from invitation
+          email: email.toLowerCase().trim(),
+          role: dbRole, // Store role from invitation (will be used when accepted)
+          invitation_token: token,
+          invitation_expires_at: expiresAt.toISOString(),
+          invitation_password: generatedPassword, // Store password temporarily for auto-login
+          invited_by: user.id,
+          // Do NOT set company_id - it will be set when invitation is accepted
+        }
+        
+        // If reactivating, set status = true
+        if (isReactivating) {
+          updateData.status = true
+        }
+        
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
-          .update({ 
-            name: fullName.trim(), // Set name from invitation
-            email: email.toLowerCase().trim(),
-            role: profileRole, // Store role from invitation (will be used when accepted)
-            invitation_token: token,
-            invitation_expires_at: expiresAt.toISOString(),
-            invitation_password: generatedPassword, // Store password temporarily for auto-login
-            invited_by: user.id,
-            // Do NOT set company_id - it will be set when invitation is accepted
-          })
+          .update(updateData)
           .eq('id', createdUserId)
 
         if (profileUpdateError) {
@@ -370,20 +440,27 @@ export async function POST(
         console.log('✅ Profile updated with invitation token')
       } else {
         // Profile doesn't exist, create it with invitation token, role, and password (no company_id)
-        const profileRole = role === 'owner' ? 'owner' : role === 'company_admin' ? 'company_admin' : 'customer'
+        // If reactivating, set status = true
+        const insertData: any = {
+          id: createdUserId,
+          email: email.toLowerCase().trim(),
+          name: fullName.trim(),
+          role: dbRole, // Store role from invitation (will be used when accepted)
+          // DO NOT set company_id - it will be set when invitation is accepted
+          invitation_token: token,
+          invitation_expires_at: expiresAt.toISOString(),
+          invitation_password: generatedPassword, // Store password temporarily for auto-login
+          invited_by: user.id,
+        }
+        
+        // If reactivating, set status = true
+        if (isReactivating) {
+          insertData.status = true
+        }
+        
         const { error: profileCreateError } = await supabaseAdmin
           .from('profiles')
-          .insert({
-            id: createdUserId,
-            email: email.toLowerCase().trim(),
-            name: fullName.trim(),
-            role: profileRole, // Store role from invitation (will be used when accepted)
-            // DO NOT set company_id - it will be set when invitation is accepted
-            invitation_token: token,
-            invitation_expires_at: expiresAt.toISOString(),
-            invitation_password: generatedPassword, // Store password temporarily for auto-login
-            invited_by: user.id,
-          })
+          .insert(insertData)
 
         if (profileCreateError) {
           console.error('Error creating profile with invitation:', profileCreateError)
@@ -398,7 +475,6 @@ export async function POST(
       }
     } else if (existingAuthUser && !existingProfile) {
       // User exists in Auth but not in profiles - create profile with invitation token, role, and password
-      const profileRole = role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'customer'
       // Note: For existing Auth users, we don't have the generated password, so invitation_password will be NULL
       // They can still login with their existing password or use the invitation link
       const { error: profileCreateError } = await supabaseAdmin
@@ -407,7 +483,7 @@ export async function POST(
           id: existingAuthUser.id,
           email: email.toLowerCase().trim(),
           name: fullName.trim(),
-          role: profileRole, // Store role from invitation (will be used when accepted)
+          role: dbRole, // Store role from invitation (will be used when accepted)
           // DO NOT set company_id - it will be set when invitation is accepted
           invitation_token: token,
           invitation_expires_at: expiresAt.toISOString(),
@@ -426,14 +502,24 @@ export async function POST(
       }
       console.log('✅ Profile created for existing auth user with invitation token')
     } else if (existingProfile) {
-      // User exists in profiles, update with invitation token, role, and password (if new user was created)
-      const profileRole = role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'customer'
+      // User exists in profiles (either active or soft-deleted)
+      // Update with invitation token, role, and password (if new user was created)
+      // If reactivating (status = false), set status = true
       const updateData: any = {
-        role: profileRole, // Update role from invitation (will be used when accepted)
+        role: dbRole, // Update role from invitation (will be used when accepted)
         invitation_token: token,
         invitation_expires_at: expiresAt.toISOString(),
         invited_by: user.id,
         // Do NOT update company_id - it will be set when invitation is accepted
+      }
+      
+      // If reactivating (soft-deleted user), set status = true
+      if (isReactivating) {
+        updateData.status = true
+        console.log(`🔄 Reactivating soft-deleted profile ${existingProfile.id}`)
+        if (existingAuthUser) {
+          console.log(`✅ Auth user already exists for reactivated profile, skipping auth user creation`)
+        }
       }
       
       // If we generated a password for a new user, store it temporarily
@@ -479,13 +565,21 @@ export async function POST(
     const isNewUser = !existingProfile
     const templateName = isNewUser ? 'welcome-invitation' : 'team-invitation'
     
+    console.log(`📧 Email invitation details:`)
+    console.log(`  - Email: ${email.toLowerCase().trim()}`)
+    console.log(`  - Is new user: ${isNewUser}`)
+    console.log(`  - Template: ${templateName}`)
+    console.log(`  - Existing profile: ${existingProfile ? `Yes (status: ${existingProfile.status})` : 'No'}`)
+    
     // Import email template function
     const { getEmailTemplate } = await import('@/lib/notifications/templates/email')
     const template = getEmailTemplate(templateName)
 
     let emailResult: { success: boolean; error?: string } | null = null
 
-    if (template) {
+    if (!template) {
+      console.error(`❌ Email template '${templateName}' not found`)
+    } else {
       const invitedName = fullName.trim() || email.split('@')[0]
       const templateData = {
         invitedName,
@@ -506,17 +600,38 @@ export async function POST(
         : template.subject
 
       // Send email
-      emailResult = await sendEmail({
-        to: email.toLowerCase().trim(),
-        subject,
-        html,
-        text: template.text ? template.text(templateData) : html.replace(/<[^>]*>/g, ''),
-      })
+      console.log(`📤 Attempting to send ${templateName} email to:`, email.toLowerCase().trim())
+      console.log(`   Subject: ${subject}`)
+      console.log(`   Accept URL: ${acceptUrl}`)
+      
+      try {
+        emailResult = await sendEmail({
+          to: email.toLowerCase().trim(),
+          subject,
+          html,
+          text: template.text ? template.text(templateData) : html.replace(/<[^>]*>/g, ''),
+        })
 
-      if (!emailResult.success) {
-        console.error('Failed to send invitation email:', emailResult.error)
-      } else {
-        console.log('✅ Invitation email sent successfully')
+        if (!emailResult.success) {
+          console.error('❌ Failed to send invitation email:', emailResult.error)
+          console.error('SMTP configuration check:')
+          console.error('  SMTP_HOST:', process.env.SMTP_HOST ? '✓ Set' : '✗ Missing')
+          console.error('  SMTP_PORT:', process.env.SMTP_PORT ? `✓ Set (${process.env.SMTP_PORT})` : '✗ Missing')
+          console.error('  SMTP_SECURE:', process.env.SMTP_SECURE ? `✓ Set (${process.env.SMTP_SECURE})` : '✗ Missing')
+          console.error('  SMTP_USER:', process.env.SMTP_USER ? '✓ Set' : '✗ Missing')
+          console.error('  SMTP_PASSWORD:', process.env.SMTP_PASSWORD ? '✓ Set' : '✗ Missing')
+          console.error('  SMTP_FROM_EMAIL:', process.env.SMTP_FROM_EMAIL || 'Using default')
+          console.error('  SMTP_FROM_NAME:', process.env.SMTP_FROM_NAME || 'Using default')
+        } else {
+          console.log('✅ Invitation email sent successfully')
+          console.log(`   To: ${email.toLowerCase().trim()}`)
+        }
+      } catch (emailError) {
+        console.error('❌ Exception while sending email:', emailError)
+        emailResult = {
+          success: false,
+          error: emailError instanceof Error ? emailError.message : 'Unknown error',
+        }
       }
     }
 

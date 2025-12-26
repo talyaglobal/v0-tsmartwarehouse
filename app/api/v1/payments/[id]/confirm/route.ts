@@ -35,7 +35,7 @@ export async function POST(
     const payment = await confirmPayment(paymentId, paymentMethodId)
 
     // Verify user owns this payment
-    if (user?.role === "customer" && payment.customerId !== user.id) {
+    if (user?.role === "member" && payment.customerId !== user.id) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Payment not found",

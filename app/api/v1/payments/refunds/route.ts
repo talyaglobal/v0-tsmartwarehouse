@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // Customers can only see their own refunds
     // Admins can see all refunds
     const filters: any = {}
-    if (user?.role === "customer") {
+    if (user?.role === "member") {
       filters.customerId = user.id
     } else if (paymentId) {
       filters.paymentId = paymentId
@@ -78,11 +78,11 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult
 
-    // Only admins can create refunds
-    if (user?.role !== "super_admin") {
+    // Only root and company admins can create refunds
+    if (!['root', 'company_admin'].includes(user?.role || '')) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Only admins can create refunds",
+        error: "Only root and company admins can create refunds",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })

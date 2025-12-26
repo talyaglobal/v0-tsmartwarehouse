@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/types'
 
 export interface AuthUser {
@@ -13,29 +13,74 @@ export interface AuthUser {
  * Get the current authenticated user
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  try {
+    const supabase = await createAuthenticatedSupabaseClient()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-  if (error || !user) {
+    if (error || !user) {
+      return null
+    }
+
+    // Get role from profiles table for accurate role checking
+    let userRole: UserRole = 'member' // Default role
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, name')
+        .eq('id', user.id)
+        .maybeSingle()
+      
+      if (profile?.role) {
+        // Map legacy roles to new roles
+        if (profile.role === 'super_admin') userRole = 'root'
+        else if (profile.role === 'customer') userRole = 'member'
+        else if (profile.role === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(profile.role)) {
+          userRole = profile.role as UserRole
+        }
+      } else {
+        // Fallback to user_metadata if profile doesn't exist
+        const metadataRole = user.user_metadata?.role as string
+        if (metadataRole === 'super_admin') userRole = 'root'
+        else if (metadataRole === 'customer') userRole = 'member'
+        else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+          userRole = metadataRole as UserRole
+        }
+      }
+
+      return {
+        id: user.id,
+        email: user.email!,
+        name: profile?.name || user.user_metadata?.name || user.email?.split('@')[0],
+        role: userRole,
+        metadata: user.user_metadata,
+      }
+    } catch (profileError) {
+      console.error('Error fetching profile:', profileError)
+      // Fallback to user_metadata
+      const metadataRole = user.user_metadata?.role as string
+      if (metadataRole === 'super_admin') userRole = 'root'
+      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+        userRole = metadataRole as UserRole
+      }
+
+      return {
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || user.email?.split('@')[0],
+        role: userRole,
+        metadata: user.user_metadata,
+      }
+    }
+  } catch (error) {
+    console.error('Error getting current user:', error)
     return null
-  }
-
-  // Get user metadata (role, name, etc.)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  return {
-    id: user.id,
-    email: user.email!,
-    name: profile?.name || user.user_metadata?.name || user.email?.split('@')[0],
-    role: (profile?.role as UserRole) || user.user_metadata?.role || 'customer',
-    metadata: user.user_metadata,
   }
 }
 
@@ -44,10 +89,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  */
 export async function hasRole(requiredRole: UserRole | UserRole[]): Promise<boolean> {
   const user = await getCurrentUser()
-  if (!user) return false
+  if (!user || !user.role) return false
 
   const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
-  return roles.includes(user.role || 'customer')
+  return roles.includes(user.role)
 }
 
 /**

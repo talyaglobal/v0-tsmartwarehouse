@@ -175,10 +175,10 @@ export async function getUnreadCount(userId: string): Promise<number> {
  */
 export async function deleteNotification(notificationId: string): Promise<void> {
   const supabase = await createClient()
-
+  // Soft delete: set status = false
   const { error } = await supabase
     .from("notifications")
-    .delete()
+    .update({ status: false })
     .eq("id", notificationId)
 
   if (error) {

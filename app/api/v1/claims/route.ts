@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     } = {}
 
     // System admin users can see all claims (or filter by customerId if provided)
-    if (user.role === 'super_admin') {
+    if (user.role === 'root') {
       const customerId = searchParams.get("customerId")
       if (customerId) {
         filters.customerId = customerId

@@ -45,10 +45,49 @@ export async function getAuthUser(request: NextRequest) {
       return null
     }
 
+    // Get role from profiles table for accurate role checking
+    let userRole: UserRole = 'member' // Default role
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      
+      if (profile?.role) {
+        // Map legacy roles to new roles
+        if (profile.role === 'super_admin') userRole = 'root'
+        else if (profile.role === 'customer') userRole = 'member'
+        else if (profile.role === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(profile.role)) {
+          userRole = profile.role as UserRole
+        }
+      } else {
+        // Fallback to user_metadata if profile doesn't exist
+        const metadataRole = user.user_metadata?.role as string
+        if (metadataRole === 'super_admin') userRole = 'root'
+        else if (metadataRole === 'customer') userRole = 'member'
+        else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+          userRole = metadataRole as UserRole
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching profile role:', error)
+      // Fallback to user_metadata
+      const metadataRole = user.user_metadata?.role as string
+      if (metadataRole === 'super_admin') userRole = 'root'
+      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+        userRole = metadataRole as UserRole
+      }
+    }
+
     return {
       id: user.id,
       email: user.email!,
-      role: (user.user_metadata?.role as UserRole) || 'customer',
+      role: userRole,
     }
   } catch (error) {
     console.error('Error getting auth user:', error)

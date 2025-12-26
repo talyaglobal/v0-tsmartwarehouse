@@ -1,7 +1,7 @@
 // Core Types for TSmart Warehouse Management System
 
 // User Types
-export type UserRole = "super_admin" | "customer" | "worker"
+export type UserRole = "root" | "company_admin" | "member" | "warehouse_staff"
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
 export interface User {
@@ -21,6 +21,7 @@ export interface User {
 }
 
 // Warehouse Layout - 3 Floors, 2 Halls x 40,000 sq ft = 240,000 sq ft total
+// Hierarchy: Floor → Region → Hall → Zone
 export interface WarehouseFloor {
   id: string
   floorNumber: 1 | 2 | 3
@@ -29,9 +30,19 @@ export interface WarehouseFloor {
   totalSqFt: number // 80,000 sq ft per floor
 }
 
+export interface WarehouseRegion {
+  id: string
+  floorId: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface WarehouseHall {
   id: string
   floorId: string
+  regionId?: string
   hallName: "A" | "B"
   sqFt: number // 40,000 sq ft each
   availableSqFt: number
@@ -120,7 +131,8 @@ export type InvoiceStatus = "draft" | "pending" | "paid" | "overdue" | "cancelle
 
 export interface Invoice {
   id: string
-  bookingId: string
+  bookingId?: string
+  serviceOrderId?: string
   customerId: string
   customerName: string
   status: InvoiceStatus
@@ -306,4 +318,146 @@ export interface Refund {
   metadata?: Record<string, any>
   createdAt: string
   processedAt?: string
+}
+
+// Warehouse Management Enhancement Types
+export interface CapacityUtilization {
+  warehouseId?: string
+  zoneId?: string
+  customerId?: string
+  totalCapacity: number
+  usedCapacity: number
+  percentageUsed: number
+}
+
+export interface CustomerStockLevels {
+  customerId: string
+  warehouseId: string
+  totalPallets: number
+  activePallets: number
+  inTransitPallets: number
+  storedPallets: number
+  shippedPallets: number
+  damagedPallets: number
+  lastUpdated: string
+}
+
+export interface PaymentRemaining {
+  totalInvoiced: number
+  totalPaid: number
+  remainingBalance: number
+  pendingInvoicesCount: number
+  overdueInvoicesCount: number
+}
+
+export interface PalletLabelData {
+  // Identification
+  warehouseTrackingNumber: string
+  palletId: string
+  barcode?: string
+  qrCode?: string
+  
+  // Customer Information
+  customerName: string
+  customerEmail: string
+  customerLotNumber?: string
+  customerBatchNumber?: string
+  
+  // Dates
+  arrivalDate: string // received_date
+  expectedReleaseDate?: string
+  daysInWarehouse: number
+  monthsInWarehouse: number
+  
+  // Stock Information
+  stockDefinition?: string
+  numberOfCases?: number
+  numberOfUnits?: number
+  unitType?: string
+  hsCode?: string
+  
+  // Storage Requirements
+  storageRequirements?: string[]
+  
+  // Location
+  location: {
+    floor?: {
+      id: string
+      floorNumber: number
+      name: string
+    }
+    region?: {
+      id: string
+      name: string
+    }
+    hall?: {
+      id: string
+      hallName: string
+    }
+    zone?: {
+      id: string
+      name: string
+      type: string
+    }
+    locationCode?: string
+    rowNumber?: number
+    levelNumber?: number
+  }
+  
+  // Additional
+  status: string
+  itemType?: string
+  weightKg?: number
+  dimensions?: any
+  notes?: string
+}
+
+// Service Types
+export type {
+  ServiceCategory,
+  ServiceUnitType,
+  ServiceOrderStatus,
+  ServiceOrderPriority,
+  WarehouseService,
+  ServiceOrderItem,
+  ServiceOrder,
+} from './services'
+
+// Access Log Types
+export type AccessLogVisitorType = 'vehicle' | 'staff' | 'customer' | 'visitor' | 'family_friend' | 'delivery_driver' | 'other'
+export type AccessLogStatus = 'checked_in' | 'checked_out'
+export type VehicleType = 'car' | 'truck' | 'van' | 'motorcycle' | 'suv' | 'other'
+
+export interface AccessLog {
+  id: string
+  visitorType: AccessLogVisitorType
+  warehouseId: string
+  entryTime: string
+  exitTime?: string
+  status: AccessLogStatus
+  // Person Details
+  personName: string
+  personIdNumber?: string
+  personPhone?: string
+  personEmail?: string
+  companyName?: string
+  personId?: string // Link to user profile
+  // Vehicle Details
+  vehicleLicensePlate?: string
+  vehicleMake?: string
+  vehicleModel?: string
+  vehicleColor?: string
+  vehicleType?: VehicleType
+  // Visit Details
+  purpose?: string
+  authorizedBy?: string
+  authorizedById?: string
+  bookingId?: string
+  notes?: string
+  photoUrl?: string
+  // Metadata
+  checkedInBy?: string
+  checkedOutBy?: string
+  createdAt: string
+  updatedAt: string
 }

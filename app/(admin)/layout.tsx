@@ -1,8 +1,6 @@
 import type React from "react"
-import { redirect } from "next/navigation"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
-import { requireRole } from "@/lib/auth/utils"
 import { ErrorBoundary } from "@/components/error-boundary"
 
 // Force dynamic rendering - requires authentication
@@ -13,12 +11,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Require admin role
-  try {
-    await requireRole('admin')
-  } catch (error) {
-    redirect('/dashboard')
-  }
+  // Note: Role-based access control is handled by middleware
+  // Middleware will redirect users without root role before they reach this layout
+  // This prevents redirect loops between layout and middleware
 
   return (
     <ErrorBoundary>

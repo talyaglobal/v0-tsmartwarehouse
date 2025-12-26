@@ -48,7 +48,7 @@ export async function createClaimAction(
       description: validatedData.description,
       amount: validatedData.amount,
       status: 'submitted',
-      evidence: validatedData.evidence ?? null,
+      evidence: validatedData.evidenceFiles ? JSON.stringify(validatedData.evidenceFiles) : null,
     }
 
     const { data, error } = await supabase

@@ -25,11 +25,19 @@ export async function GET(request: NextRequest) {
     const invoiceId = searchParams.get("invoiceId")
     const status = searchParams.get("status")
 
-    // Customers can only see their own payments
-    // Admins can see all payments
+    // Members can only see their own payments
+    // Company Admins can see all payments in their company
     const filters: any = {}
-    if (user?.role === "customer") {
+    if (user?.role === "member") {
       filters.customerId = user.id
+    } else if (user?.role === "company_admin") {
+      // Company Admin can see all payments in their company
+      // This will be filtered by company_id in the getPayments function
+      const { getUserCompanyId } = await import('@/lib/auth/company-admin')
+      const companyId = await getUserCompanyId(user.id)
+      if (companyId) {
+        filters.companyId = companyId
+      }
     } else if (invoiceId) {
       filters.invoiceId = invoiceId
     }
@@ -74,11 +82,11 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult
 
-    // Only customers can create payments for their own invoices
-    if (user?.role !== "customer") {
+    // Only members can create payments for their own invoices
+    if (user?.role !== "member") {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Only customers can create payments",
+        error: "Only members can create payments",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })

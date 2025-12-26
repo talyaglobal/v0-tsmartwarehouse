@@ -152,16 +152,24 @@ export default function LoginPage() {
           }
         }
 
-        const role = profile?.role || data.user.user_metadata?.role || 'customer'
+        // Get role from profile and map legacy roles to new roles
+        let role = profile?.role || data.user.user_metadata?.role || 'member'
+        
+        // Map legacy roles to new roles
+        if (role === 'super_admin') role = 'root'
+        else if (role === 'customer') role = 'member'
+        else if (role === 'worker') role = 'warehouse_staff'
 
-        // Determine redirect path
+        // Determine redirect path based on new role system
         let redirectPath = '/dashboard'
         if (redirect) {
           redirectPath = redirect
-        } else if (role === 'super_admin') {
+        } else if (role === 'root') {
           redirectPath = '/admin'
-        } else if (role === 'worker') {
-          redirectPath = '/worker'
+        } else if (role === 'warehouse_staff') {
+          redirectPath = '/warehouse'
+        } else if (['company_admin', 'member', 'owner'].includes(role)) {
+          redirectPath = '/dashboard'
         }
 
         // Show success message
@@ -193,8 +201,10 @@ export default function LoginPage() {
         // Small additional delay to ensure cookies are fully set
         await new Promise(resolve => setTimeout(resolve, 300))
 
-        // Use window.location for hard redirect to ensure cookies are sent to server
-        window.location.href = redirectPath
+        // Use router.push instead of window.location to allow middleware to handle redirects
+        // This prevents redirect loops
+        router.push(redirectPath)
+        router.refresh()
       } else if (data.user && !data.session) {
         // User exists but no session - this shouldn't happen but handle it
         setError('Session could not be established. Please try again.')

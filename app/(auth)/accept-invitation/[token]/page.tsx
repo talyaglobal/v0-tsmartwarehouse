@@ -1,186 +1,304 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
-import { acceptInvitation } from '@/features/companies/actions'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Loader2, CheckCircle, XCircle, AlertCircle, Eye } from "@/components/icons"
+import { EyeOff } from "lucide-react"
+import { api } from "@/lib/api/client"
+import { createClient } from "@/lib/supabase/client"
+import Link from "next/link"
 
 export default function AcceptInvitationPage() {
-  const params = useParams()
   const router = useRouter()
-  const queryClient = useQueryClient()
-  const token = params.token as string
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
+  const params = useParams()
+  const token = params?.token as string
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'form'>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [invitation, setInvitation] = useState<any>(null)
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
 
   useEffect(() => {
-    if (token) {
-      handleAccept()
+    if (!token) {
+      setStatus('error')
+      setError('Invalid invitation link')
+      return
     }
+
+    // Fetch invitation details
+    fetchInvitation()
   }, [token])
 
-  async function handleAccept() {
+  const fetchInvitation = async () => {
     try {
-      const supabase = createClient()
+      // We need to find the invitation by token
+      // Since we don't have a direct API endpoint, we'll use a workaround
+      // First, try to get invitation info from a new API endpoint
+      const result = await api.get(`/api/v1/invitations/${token}`, { showToast: false })
       
-      // Get invitation details
-      const invitationResponse = await fetch(`/api/v1/invitations/${token}`)
-      const invitationData = await invitationResponse.json()
-
-      if (!invitationData.success) {
-        setStatus('error')
-        setError(invitationData.error || 'Invitation not found')
-        return
-      }
-
-      // Get company_id from invitation for cache invalidation
-      const companyId = invitationData.data?.companyId
-      const invitationEmail = invitationData.data?.email
-      const invitationPassword = invitationData.data?.password
-
-      // Check if user is already logged in
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-
-      if (!currentUser) {
-        // User is not logged in - try auto-login with password from invitation
-        if (invitationPassword && invitationEmail) {
-          console.log('🔐 Attempting auto-login with invitation password...')
-          try {
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: invitationEmail,
-              password: invitationPassword,
-            })
-
-            if (signInError) {
-              console.error('Auto-login error:', signInError)
-              // If auto-login fails, redirect to login page
-              window.location.href = `/login?invitation=${token}`
-              return
-            }
-
-            if (signInData.user && signInData.session) {
-              console.log('✅ Auto-login successful')
-              // Wait a moment for session to be established
-              await new Promise(resolve => setTimeout(resolve, 500))
-              // Continue with invitation acceptance below
-            } else {
-              // Auto-login didn't create session, redirect to login
-              window.location.href = `/login?invitation=${token}`
-              return
-            }
-          } catch (loginError) {
-            console.error('Error during auto-login:', loginError)
-            // If auto-login fails, redirect to login page
-            window.location.href = `/login?invitation=${token}`
-            return
-          }
-        } else {
-          // No password available, redirect to login/register
-          window.location.href = `/login?invitation=${token}`
-          return
-        }
-      }
-
-      // User is now logged in (either was already logged in or just auto-logged in)
-      // Verify the logged-in user's email matches the invitation email
-      const { data: { user: loggedInUser } } = await supabase.auth.getUser()
-      if (loggedInUser && invitationEmail && loggedInUser.email?.toLowerCase() !== invitationEmail.toLowerCase()) {
-        setStatus('error')
-        setError('Invitation email does not match your account. Please log in with the email address that received the invitation.')
-        return
-      }
-
-      // User is logged in, proceed with accepting invitation
-      const result = await acceptInvitation(token)
-
-      if (result.success) {
-        setStatus('success')
-        
-        // Invalidate queries to refresh team members and invitations lists
-        if (companyId) {
-          queryClient.invalidateQueries({ queryKey: ['company-members', companyId] })
-          queryClient.invalidateQueries({ queryKey: ['company-invitations', companyId] })
-        }
-        
-        // Wait a moment for profile to be created/updated
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Check if user has a name, if not redirect to settings/profile
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('id', user.id)
-            .maybeSingle()
-          
-          if (!profile?.name || profile.name.trim() === '') {
-            // Redirect to settings/profile to complete profile
-            setTimeout(() => {
-              window.location.href = '/dashboard/settings?tab=profile'
-            }, 1500)
-            return
-          }
-        }
-        
-        setTimeout(() => {
-          window.location.href = '/dashboard'
-        }, 2000)
-      } else if (result.requiresRegistration) {
-        // Redirect to register page with invitation token
-        router.push(`/register?invitation=${token}`)
+      if (result.success && result.data) {
+        setInvitation(result.data)
+        setStatus('form')
       } else {
         setStatus('error')
-        setError(result.error || 'Failed to accept invitation')
+        setError(result.error || 'Invitation not found or has expired')
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error('Error fetching invitation:', err)
       setStatus('error')
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err.message || 'Failed to load invitation')
     }
   }
 
+  const handleAccept = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const result = await api.post(`/api/v1/invitations/${token}/accept`, {
+        password,
+      }, { showToast: false })
+
+      if (result.success) {
+        setStatus('success')
+        setRedirecting(true)
+        
+        // Get email from result or invitation
+        const userEmail = result.data?.email || invitation?.email
+        
+        // Auto-login with the new password that user just set
+        if (userEmail && password) {
+          const supabase = createClient()
+          
+          // Wait a moment for password to be updated in Auth system
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          try {
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+              email: userEmail,
+              password: password, // Use the new password that user just set
+            })
+
+            if (!signInError && data.user) {
+              // Redirect to dashboard immediately after successful login
+              router.push('/dashboard')
+              return // Exit early to prevent double redirect
+            } else {
+              console.error('Auto-login failed:', signInError?.message)
+              // If auto-login fails, redirect to login page
+              router.push('/login?message=Invitation accepted. Please log in with your new password.')
+            }
+          } catch (loginError) {
+            console.error('Login error:', loginError)
+            // If login throws an error, redirect to login page
+            router.push('/login?message=Invitation accepted. Please log in with your new password.')
+          }
+        } else {
+          // If no email, redirect to login
+          router.push('/login?message=Invitation accepted. Please log in with your new password.')
+        }
+      } else {
+        setError(result.error || 'Failed to accept invitation')
+        setStatus('form')
+      }
+    } catch (err: any) {
+      console.error('Error accepting invitation:', err)
+      setError(err.message || 'Failed to accept invitation')
+      setStatus('form')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading invitation...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive" />
+              Invitation Error
+            </CardTitle>
+            <CardDescription>
+              {error || 'An error occurred while processing your invitation'}
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button asChild className="w-full">
+              <Link href="/login">Go to Login</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  if (status === 'success') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Invitation Accepted!
+            </CardTitle>
+            <CardDescription>
+              {redirecting 
+                ? 'Logging you in and redirecting to dashboard...'
+                : 'You have successfully accepted the invitation. Redirecting...'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
+    <div className="flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Accept Invitation</CardTitle>
+          <CardDescription>
+            {invitation?.companyName 
+              ? `You've been invited to join ${invitation.companyName} as ${invitation.role}`
+              : 'Set your password to accept the invitation'}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          {status === 'loading' && (
-            <div className="flex flex-col items-center gap-4 py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Processing invitation...
-              </p>
-            </div>
-          )}
+        <form onSubmit={handleAccept}>
+          <CardContent className="space-y-4">
+            {error && (
+              <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                <AlertCircle className="h-4 w-4" />
+                <span>{error}</span>
+              </div>
+            )}
 
-          {status === 'success' && (
-            <div className="flex flex-col items-center gap-4 py-8">
-              <CheckCircle className="h-8 w-8 text-green-500" />
-              <p className="text-sm text-center">
-                Invitation accepted successfully! Redirecting to dashboard...
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={invitation?.email || ''}
+                disabled
+                className="bg-muted"
+              />
             </div>
-          )}
 
-          {status === 'error' && (
-            <div className="flex flex-col items-center gap-4 py-8">
-              <XCircle className="h-8 w-8 text-red-500" />
-              <p className="text-sm text-center text-red-500">{error}</p>
-              <Button onClick={() => router.push('/dashboard')}>
-                Go to Dashboard
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
             </div>
-          )}
-        </CardContent>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2">
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Accepting...
+                </>
+              ) : (
+                'Accept Invitation'
+              )}
+            </Button>
+            <Button type="button" variant="ghost" asChild className="w-full">
+              <Link href="/login">Cancel</Link>
+            </Button>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   )
 }
-

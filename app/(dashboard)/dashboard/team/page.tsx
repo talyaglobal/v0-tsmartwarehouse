@@ -35,7 +35,7 @@ interface Invitation {
   id: string
   company_id: string
   email: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'owner' | 'company_admin' | 'member'
   invited_by?: string
   token: string
   expires_at: string
@@ -55,8 +55,8 @@ export default function TeamMembersPage() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<CompanyMember | null>(null)
-  const [inviteForm, setInviteForm] = useState({ email: "", fullName: "", role: "member" as 'owner' | 'admin' | 'member' })
-  const [editForm, setEditForm] = useState({ role: "member" as 'owner' | 'admin' | 'member' })
+  const [inviteForm, setInviteForm] = useState({ email: "", fullName: "", role: "member" as 'owner' | 'company_admin' | 'member' })
+  const [editForm, setEditForm] = useState({ role: "member" as 'owner' | 'company_admin' | 'member' })
 
   // Get user's company ID from profiles table
   const { data: companyData } = useQuery({
@@ -107,7 +107,7 @@ export default function TeamMembersPage() {
 
   // Invite member mutation
   const inviteMutation = useMutation({
-    mutationFn: async ({ email, fullName, role }: { email: string; fullName: string; role: 'owner' | 'admin' | 'member' }) => {
+    mutationFn: async ({ email, fullName, role }: { email: string; fullName: string; role: 'owner' | 'company_admin' | 'member' }) => {
       if (!companyId) throw new Error("No company ID")
       const result = await api.post(`/api/v1/companies/${companyId}/invitations`, { email, fullName, role }, { showToast: false })
       if (!result.success) {
@@ -115,15 +115,26 @@ export default function TeamMembersPage() {
       }
       return result.data
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['company-invitations', companyId] })
       setInviteDialogOpen(false)
       setInviteForm({ email: "", fullName: "", role: "member" })
-      addNotification({
-        type: 'success',
-        message: 'Invitation sent successfully',
-        duration: 5000,
-      })
+      
+      // Check if email was actually sent
+      const emailSent = data?.emailSent ?? false
+      if (emailSent) {
+        addNotification({
+          type: 'success',
+          message: 'Invitation sent successfully',
+          duration: 5000,
+        })
+      } else {
+        addNotification({
+          type: 'warning',
+          message: 'Invitation created but email could not be sent. Please check SMTP configuration in .env.local',
+          duration: 10000,
+        })
+      }
     },
     onError: (error: Error) => {
       addNotification({
@@ -289,7 +300,7 @@ export default function TeamMembersPage() {
         .select('role, company_id')
         .eq('id', user.id)
         .eq('company_id', companyId)
-        .in('role', ['owner', 'admin'])
+        .in('role', ['owner', 'company_admin'])
         .maybeSingle()
       
       return !error && !!data

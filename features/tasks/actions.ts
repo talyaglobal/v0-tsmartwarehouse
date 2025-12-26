@@ -35,7 +35,6 @@ export async function createTaskAction(
       status: 'pending',
       priority: validatedData.priority,
       assigned_to: validatedData.assignedTo ?? null,
-      assigned_to_name: validatedData.assignedToName ?? null,
       booking_id: validatedData.bookingId ?? null,
       warehouse_id: validatedData.warehouseId,
       zone: validatedData.zone ?? null,
@@ -100,12 +99,7 @@ export async function updateTaskAction(
     if (validatedData.status !== undefined) updateRow.status = validatedData.status
     if (validatedData.priority !== undefined) updateRow.priority = validatedData.priority
     if (validatedData.assignedTo !== undefined) updateRow.assigned_to = validatedData.assignedTo
-    if (validatedData.assignedToName !== undefined)
-      updateRow.assigned_to_name = validatedData.assignedToName
-    if (validatedData.zone !== undefined) updateRow.zone = validatedData.zone
-    if (validatedData.location !== undefined) updateRow.location = validatedData.location
     if (validatedData.dueDate !== undefined) updateRow.due_date = validatedData.dueDate
-    if (validatedData.completedAt !== undefined) updateRow.completed_at = validatedData.completedAt
 
     const { data, error } = await supabase
       .from('tasks')
@@ -325,8 +319,7 @@ export async function deleteTaskAction(
  * Cancel a task
  */
 export async function cancelTaskAction(
-  id: string,
-  reason?: string
+  id: string
 ): Promise<{ success: boolean; data?: Task; error?: string }> {
   try {
     const supabase = await createServerSupabaseClient()

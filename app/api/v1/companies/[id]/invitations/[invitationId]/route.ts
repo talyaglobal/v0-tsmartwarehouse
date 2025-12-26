@@ -18,7 +18,7 @@ export async function DELETE(
     const { id: companyId, invitationId } = await params
 
     // Check if user has permission
-    if (user.role !== 'super_admin') {
+    if (user.role !== 'root') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {
@@ -43,18 +43,35 @@ export async function DELETE(
     const supabaseAdmin = createServerSupabaseClient()
     
     // Verify invitation belongs to this company (invitationId is now profile ID)
+    // Check invitation by verifying that the inviter's company matches
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, invitation_company_id, invitation_token')
+      .select('id, invitation_token, invited_by')
       .eq('id', invitationId)
-      .eq('invitation_company_id', companyId)
       .not('invitation_token', 'is', null)
       .maybeSingle()
 
-    if (profileError || !profile) {
+    if (profileError || !profile || !profile.invited_by) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Invitation not found",
+        statusCode: 404,
+      }
+      return NextResponse.json(errorData, { status: 404 })
+    }
+
+    // Verify that the inviter belongs to the requested company
+    const { data: inviter, error: inviterError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, company_id')
+      .eq('id', profile.invited_by)
+      .eq('company_id', companyId)
+      .maybeSingle()
+
+    if (inviterError || !inviter) {
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Invitation not found or doesn't belong to this company",
         statusCode: 404,
       }
       return NextResponse.json(errorData, { status: 404 })
@@ -66,9 +83,8 @@ export async function DELETE(
       .update({
         invitation_token: null,
         invitation_expires_at: null,
-        invitation_company_id: null,
-        invitation_role: null,
         invitation_password: null,
+        invited_by: null,
       })
       .eq('id', invitationId)
 

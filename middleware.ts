@@ -88,92 +88,153 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Auth routes (login, register, admin-login) - redirect if already authenticated
+  // Auth routes (login, register, admin-login, accept-invitation) - redirect if already authenticated
   const authRoutes = ['/login', '/register', '/admin-login']
-  const isAuthRoute = authRoutes.includes(pathname)
+  const isAuthRoute = authRoutes.includes(pathname) || pathname.startsWith('/accept-invitation/')
   const isAdminLoginRoute = pathname === '/admin-login'
 
   // Protected routes that require authentication
   const isAdminRoute = pathname.startsWith('/admin')
   const isDashboardRoute = pathname.startsWith('/dashboard')
-  const isWorkerRoute = pathname.startsWith('/worker')
+  const isWarehouseRoute = pathname.startsWith('/warehouse')
 
   // If user is authenticated and tries to access auth pages, redirect to appropriate dashboard
-  if (user && isAuthRoute && supabaseUrl && supabaseAnonKey) {
+  // BUT: Only redirect if not already on accept-invitation route (that needs to complete first)
+  if (user && isAuthRoute && !pathname.startsWith('/accept-invitation/') && supabaseUrl && supabaseAnonKey) {
     // Get role from profile for more accurate role checking
-    let userRole = user.user_metadata?.role || 'customer'
+    let userRole = user.user_metadata?.role || 'member'
     try {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
       if (profile?.role) {
-        userRole = profile.role
+        // Map legacy roles to new roles
+        if (profile.role === 'super_admin') userRole = 'root'
+        else if (profile.role === 'customer') userRole = 'member'
+        else if (profile.role === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff', 'owner'].includes(profile.role)) {
+          userRole = profile.role
+        }
+      } else {
+        // Fallback: map metadata role
+        const metadataRole = user.user_metadata?.role as string
+        if (metadataRole === 'super_admin') userRole = 'root'
+        else if (metadataRole === 'customer') userRole = 'member'
+        else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+          userRole = metadataRole
+        }
       }
     } catch (error) {
-      // If profile fetch fails, use metadata role
-    }
-
-    // Admin login page - redirect admins to admin panel, others to their dashboard
-    if (isAdminLoginRoute) {
-      if (userRole === 'super_admin') {
-        return NextResponse.redirect(new URL('/admin', request.url))
-      } else {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+      // If profile fetch fails, use metadata role with mapping
+      const metadataRole = user.user_metadata?.role as string
+      if (metadataRole === 'super_admin') userRole = 'root'
+      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+        userRole = metadataRole
       }
     }
 
-    // Regular login/register pages
-    if (userRole === 'super_admin') {
-      return NextResponse.redirect(new URL('/admin', request.url))
-    } else if (userRole === 'worker') {
-      return NextResponse.redirect(new URL('/worker', request.url))
-    } else {
-      // owner and customer roles go to dashboard
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+    // Determine target route based on role
+    let targetRoute = '/dashboard'
+    if (userRole === 'root') {
+      targetRoute = '/admin'
+    } else if (userRole === 'warehouse_staff') {
+      targetRoute = '/warehouse'
+    } else if (['company_admin', 'member', 'owner'].includes(userRole)) {
+      targetRoute = '/dashboard'
+    }
+
+    // Only redirect if we're not already going to the target route
+    // This prevents redirect loops
+    if (pathname !== targetRoute && !pathname.startsWith(targetRoute + '/')) {
+      // Admin login page - redirect root to admin panel, others to their dashboard
+      if (isAdminLoginRoute) {
+        return NextResponse.redirect(new URL(targetRoute, request.url))
+      }
+
+      // Regular login/register pages - redirect to appropriate route
+      return NextResponse.redirect(new URL(targetRoute, request.url))
     }
   }
 
   // Protected routes - require authentication
-  if (!user && (isAdminRoute || isDashboardRoute || isWorkerRoute)) {
-    // Redirect admin routes to admin login, others to regular login
-    const loginPath = isAdminRoute ? '/admin-login' : '/login'
-    const redirectUrl = new URL(loginPath, request.url)
-    redirectUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(redirectUrl)
+  if (!user && (isAdminRoute || isDashboardRoute || isWarehouseRoute)) {
+    // Only redirect if not already on an auth route to prevent loops
+    if (!isAuthRoute) {
+      const loginPath = isAdminRoute ? '/admin-login' : '/login'
+      const redirectUrl = new URL(loginPath, request.url)
+      redirectUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   // Role-based access control
   if (user) {
     // Get role from profile for more accurate role checking
-    let userRole = user.user_metadata?.role || 'customer'
+    let userRole = user.user_metadata?.role || 'member'
     try {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
       if (profile?.role) {
-        userRole = profile.role
+        // Map legacy roles to new roles
+        if (profile.role === 'super_admin') userRole = 'root'
+        else if (profile.role === 'customer') userRole = 'member'
+        else if (profile.role === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(profile.role)) {
+          userRole = profile.role
+        }
+      } else {
+        // Fallback: map metadata role
+        const metadataRole = user.user_metadata?.role as string
+        if (metadataRole === 'super_admin') userRole = 'root'
+        else if (metadataRole === 'customer') userRole = 'member'
+        else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+          userRole = metadataRole
+        }
       }
     } catch (error) {
-      // If profile fetch fails, use metadata role
+      // If profile fetch fails, use metadata role with mapping
+      const metadataRole = user.user_metadata?.role as string
+      if (metadataRole === 'super_admin') userRole = 'root'
+      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'worker') userRole = 'warehouse_staff'
+      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+        userRole = metadataRole
+      }
     }
 
-    // Admin routes - only super admins can access
-    if (isAdminRoute && userRole !== 'super_admin') {
+    // Admin routes - only root can access
+    if (isAdminRoute && userRole !== 'root') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Worker routes - only workers can access
-    if (isWorkerRoute && userRole !== 'worker') {
+    // Warehouse routes - only warehouse_staff can access
+    if (isWarehouseRoute && userRole !== 'warehouse_staff') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Dashboard routes - customers, super admins, and owners can access
-    if (isDashboardRoute && !['customer', 'super_admin', 'owner'].includes(userRole)) {
-      return NextResponse.redirect(new URL('/worker', request.url))
+    // Dashboard routes - company_admin, member, and owner can access
+    if (isDashboardRoute && !['company_admin', 'member', 'owner'].includes(userRole)) {
+      if (userRole === 'warehouse_staff') {
+        return NextResponse.redirect(new URL('/warehouse', request.url))
+      } else if (userRole === 'root') {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      } else {
+        // Unknown role or no role - redirect to appropriate route based on role
+        // Don't redirect to /login as that would create a loop
+        // Instead, redirect to a safe default or show error
+        console.warn(`User ${user.id} with role "${userRole}" accessing dashboard route ${pathname}`)
+        // Allow access - let the layout handle the error display
+        // This prevents redirect loops
+      }
     }
   }
 

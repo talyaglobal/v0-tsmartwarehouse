@@ -9,15 +9,16 @@ import {
   Warehouse,
   LayoutDashboard,
   Package,
-  FileText,
   Bell,
   Settings,
-  LogOut,
-  User,
   CreditCard,
   AlertCircle,
   Plus,
-  Users,
+  Calendar,
+  Wrench,
+  ShoppingCart,
+  Receipt,
+  Building2,
 } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,8 +29,11 @@ import type { Booking, Claim, MembershipTier } from "@/types"
 
 const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Services", href: "/dashboard/services", icon: Wrench },
+  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
   { name: "Bookings", href: "/dashboard/bookings", icon: Package },
-  { name: "Invoices", href: "/dashboard/invoices", icon: FileText },
+  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
+  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt },
   { name: "Claims", href: "/dashboard/claims", icon: AlertCircle },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2 },
   { name: "Membership", href: "/dashboard/membership", icon: CreditCard },
@@ -75,8 +79,9 @@ export function DashboardSidebar() {
   })
 
   // Fetch user profile (name, membership tier, company, and logo)
+  // Use separate query key to avoid conflicts with settings page
   const { data: profile } = useQuery({
-    queryKey: ['profile', user?.id],
+    queryKey: ['sidebar-profile', user?.id],
     queryFn: async () => {
       if (!user) return null
       const supabase = createClient()
@@ -86,10 +91,14 @@ export function DashboardSidebar() {
         .from('profiles')
         .select('name, membership_tier, company_id')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
       
       if (profileError) {
-        console.error('Error fetching profile:', profileError)
+        console.error('Error fetching sidebar profile:', profileError)
+        return null
+      }
+      
+      if (!profileData) {
         return null
       }
       
@@ -103,7 +112,7 @@ export function DashboardSidebar() {
           .from('companies')
           .select('id, name, logo_url')
           .eq('id', companyId)
-          .single()
+          .maybeSingle()
         
         if (!companyError && companyData) {
           company = companyData
@@ -120,6 +129,8 @@ export function DashboardSidebar() {
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false, // Don't refetch on mount to avoid flickering
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   })
 
   // Check if user is company admin (using profiles.role and company_id)
@@ -145,8 +156,8 @@ export function DashboardSidebar() {
         return false
       }
       
-      // Check if user is owner or admin
-      if (!['owner', 'admin'].includes(profileData.role)) {
+      // Check if user is owner or company_admin
+      if (!['owner', 'company_admin'].includes(profileData.role)) {
         return false
       }
       
@@ -196,18 +207,7 @@ export function DashboardSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3">
-        {(() => {
-          // Add Team Members if user is company admin
-          const navigation = isCompanyAdmin
-            ? [
-                ...baseNavigation.slice(0, 5), // Dashboard, Bookings, Invoices, Claims, Notifications
-                { name: "Team Members", href: "/dashboard/team", icon: Users },
-                ...baseNavigation.slice(5), // Membership, Settings
-              ]
-            : baseNavigation
-          
-          return navigation
-        })().map((item) => {
+        {baseNavigation.map((item) => {
           // For Dashboard, only match exact path to avoid matching child routes
           // For other items, match exact path or child routes
           const isActive = item.href === "/dashboard"
@@ -249,28 +249,25 @@ export function DashboardSidebar() {
         })}
       </nav>
 
-      {/* User Section */}
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <User className="h-4 w-4" />
-          </div>
-          <div className="flex-1 truncate">
-            <p className="text-sm font-medium">
-              {profile?.name || user?.email?.split('@')[0] || 'User'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {profile?.membershipTier 
-                ? `${profile.membershipTier.charAt(0).toUpperCase() + profile.membershipTier.slice(1)} Member`
-                : 'Member'}
-            </p>
-          </div>
+      {/* My Company Section - Only for Company Admin */}
+      {isCompanyAdmin && (
+        <div className="border-t p-4">
+          <Link href="/dashboard/my-company">
+            <Button 
+              variant="ghost" 
+              className={cn(
+                "w-full justify-start gap-2",
+                pathname === "/dashboard/my-company" || pathname.startsWith("/dashboard/my-company/")
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Building2 className="h-4 w-4" />
+              My Company
+            </Button>
+          </Link>
         </div>
-        <Button variant="ghost" className="w-full justify-start gap-2 mt-2 text-muted-foreground">
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
-      </div>
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { PRICING } from "@/lib/constants"
 import { getBookingById } from "@/lib/db/bookings"
 import { createInvoice, getInvoices } from "@/lib/db/invoices"
+import { getServiceOrderById } from "@/lib/db/orders"
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
 import { getNotificationService } from "@/lib/notifications/service"
 import type { Invoice, InvoiceItem, MembershipTier } from "@/types"
@@ -387,5 +388,115 @@ export async function generateMonthlyInvoicesForActiveBookings(): Promise<{
   }
 
   return { generated, errors }
+}
+
+/**
+ * Generate invoice for a service order
+ */
+export interface GenerateServiceOrderInvoiceInput {
+  serviceOrderId: string
+  customerId: string
+  customerName: string
+  membershipTier?: MembershipTier
+}
+
+export async function generateServiceOrderInvoice(
+  input: GenerateServiceOrderInvoiceInput
+): Promise<GenerateInvoiceResult> {
+  // Fetch service order with items
+  const order = await getServiceOrderById(input.serviceOrderId, false)
+  
+  if (!order) {
+    throw new Error("Service order not found")
+  }
+
+  if (order.status !== 'completed') {
+    throw new Error("Can only generate invoice for completed service orders")
+  }
+
+  // Calculate totals from order items
+  const items: InvoiceItem[] = order.items.map(item => ({
+    description: item.serviceName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    total: item.totalPrice,
+  }))
+
+  const subtotal = order.totalAmount
+
+  // Apply membership discount if applicable
+  let discountAmount = 0
+  let discountPercent = 0
+  if (input.membershipTier) {
+    const membershipDiscount = PRICING.membershipDiscounts.find(
+      d => d.tier === input.membershipTier
+    )
+    if (membershipDiscount) {
+      discountPercent = membershipDiscount.discountPercent
+      discountAmount = (subtotal * discountPercent) / 100
+    }
+  }
+
+  const subtotalAfterDiscount = subtotal - discountAmount
+
+  // Add discount line item if applicable
+  if (discountAmount > 0) {
+    items.push({
+      description: `Membership Discount (${input.membershipTier} - ${discountPercent}%)`,
+      quantity: 1,
+      unitPrice: -discountAmount,
+      total: -discountAmount,
+    })
+  }
+
+  // Calculate tax and total
+  const tax = subtotalAfterDiscount * TAX_RATE
+  const total = subtotalAfterDiscount + tax
+
+  // Calculate due date (30 days from now)
+  const dueDate = new Date()
+  dueDate.setDate(dueDate.getDate() + 30)
+
+  // Create invoice
+  const invoice = await createInvoice({
+    bookingId: order.bookingId || undefined,
+    serviceOrderId: input.serviceOrderId,
+    customerId: input.customerId,
+    customerName: input.customerName,
+    status: "pending",
+    items,
+    subtotal: subtotalAfterDiscount,
+    tax,
+    total,
+    dueDate: dueDate.toISOString().split("T")[0],
+  })
+
+  // Send notification to customer
+  try {
+    const notificationService = getNotificationService()
+    await notificationService.sendNotification({
+      userId: input.customerId,
+      type: "invoice",
+      channels: ["email", "push"],
+      title: "New Invoice",
+      message: `A new invoice #${invoice.id.slice(0, 8)} has been generated for $${total.toFixed(2)}. Due date: ${dueDate.toLocaleDateString()}.`,
+      template: "invoice-created",
+      templateData: {
+        invoiceId: invoice.id.slice(0, 8),
+        amount: `$${total.toFixed(2)}`,
+        dueDate: dueDate.toLocaleDateString(),
+        status: "Pending",
+        customerName: input.customerName,
+      },
+    })
+  } catch (error) {
+    console.error("Failed to send invoice notification:", error)
+  }
+
+  return {
+    invoice,
+    items,
+    message: "Service order invoice generated successfully",
+  }
 }
 

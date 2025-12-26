@@ -155,7 +155,6 @@ export const getInvoiceStatsQuery = cache(async (filters?: InvoiceFilters) => {
     pendingAmount: 0,
   }
 
-  const now = new Date()
 
   data?.forEach((invoice) => {
     const total = parseFloat(invoice.total)

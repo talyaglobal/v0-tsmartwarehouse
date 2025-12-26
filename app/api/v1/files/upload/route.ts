@@ -36,8 +36,9 @@ export async function POST(request: NextRequest) {
 
     // Determine validation rules based on bucket and folder
     const isLogoUpload = bucket === 'docs' && folder === 'logo'
-    const maxSizeBytes = isLogoUpload ? 2 * 1024 * 1024 : FILE_SIZE_LIMITS.DEFAULT // 2MB for logos
-    const allowedMimeTypes = isLogoUpload 
+    const isAvatarUpload = bucket === 'docs' && folder === 'avatar'
+    const maxSizeBytes = (isLogoUpload || isAvatarUpload) ? 2 * 1024 * 1024 : FILE_SIZE_LIMITS.DEFAULT // 2MB for logos and avatars
+    const allowedMimeTypes = (isLogoUpload || isAvatarUpload)
       ? ['image/jpeg', 'image/jpg', 'image/png'] 
       : [...ALLOWED_MIME_TYPES.ALL]
 
@@ -61,17 +62,45 @@ export async function POST(request: NextRequest) {
 
     // Generate file path
     // For logo uploads, use logo folder without user ID prefix
+    // For avatar uploads, use avatar folder with user ID prefix
     const filePath = isLogoUpload
       ? `logo/${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      : isAvatarUpload
+      ? `avatar/${user.id}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
       : generateFilePath(file.name, folder, user.id)
 
     // Convert File to ArrayBuffer for upload
     const arrayBuffer = await file.arrayBuffer()
     const fileBuffer = Buffer.from(arrayBuffer)
 
-    // Upload file
+    // Determine content type from file extension if file.type is not reliable
+    // Some browsers may send incorrect MIME types, so we'll use file extension as fallback
+    let contentType = file.type
+    
+    // If MIME type is not reliable (e.g., text/plain), determine from file extension
+    if (!contentType || contentType === 'text/plain' || contentType.includes('text/plain')) {
+      const fileExtension = file.name.split('.').pop()?.toLowerCase()
+      const mimeTypeMap: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'pdf': 'application/pdf',
+      }
+      if (fileExtension && mimeTypeMap[fileExtension]) {
+        contentType = mimeTypeMap[fileExtension]
+      }
+    }
+    
+    // Normalize image/jpeg to image/jpg for Supabase compatibility
+    if (contentType === 'image/jpeg') {
+      contentType = 'image/jpg'
+    }
+
+    // Upload file with explicit content type
     const { error } = await supabase.storage.from(bucket).upload(filePath, fileBuffer, {
-      contentType: file.type,
+      contentType: contentType,
       upsert: false,
     })
 

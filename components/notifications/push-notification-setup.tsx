@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Bell, BellOff, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/components/ui/use-toast'
+import { useUIStore } from '@/stores/ui.store'
 import {
   requestNotificationPermission,
   onForegroundMessage,
@@ -16,7 +16,7 @@ import {
 export function PushNotificationSetup() {
   const [permission, setPermission] = useState<NotificationPermission | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
+  const { addNotification } = useUIStore()
 
   useEffect(() => {
     // Check initial permission status
@@ -26,13 +26,13 @@ export function PushNotificationSetup() {
     // Listen for foreground messages
     if (currentPermission === 'granted') {
       onForegroundMessage((payload) => {
-        toast({
-          title: payload.notification?.title || 'New Notification',
-          description: payload.notification?.body || 'You have a new notification',
+        addNotification({
+          type: 'info',
+          message: `${payload.notification?.title || 'New Notification'}: ${payload.notification?.body || 'You have a new notification'}`,
         })
       })
     }
-  }, [toast])
+    }, [addNotification])
 
   const handleEnableNotifications = async () => {
     setIsLoading(true)
@@ -46,31 +46,28 @@ export function PushNotificationSetup() {
 
         if (saved) {
           setPermission('granted')
-          toast({
-            title: 'Notifications Enabled',
-            description: 'You will now receive push notifications',
+          addNotification({
+            type: 'success',
+            message: 'Notifications Enabled: You will now receive push notifications',
           })
         } else {
-          toast({
-            title: 'Error',
-            description: 'Failed to save notification settings',
-            variant: 'destructive',
+          addNotification({
+            type: 'error',
+            message: 'Error: Failed to save notification settings',
           })
         }
       } else {
         setPermission('denied')
-        toast({
-          title: 'Permission Denied',
-          description: 'Please enable notifications in your browser settings',
-          variant: 'destructive',
+        addNotification({
+          type: 'error',
+          message: 'Permission Denied: Please enable notifications in your browser settings',
         })
       }
     } catch (error) {
       console.error('Error enabling notifications:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to enable notifications',
-        variant: 'destructive',
+      addNotification({
+        type: 'error',
+        message: 'Error: Failed to enable notifications',
       })
     } finally {
       setIsLoading(false)

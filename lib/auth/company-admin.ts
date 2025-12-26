@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
  * Check if user is a company admin or owner (using profiles.role)
+ * Note: 'owner' is legacy, should use 'company_admin'
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
   const supabase = createServerSupabaseClient()
@@ -10,7 +11,7 @@ export async function isCompanyAdmin(userId: string, companyId?: string): Promis
     .from('profiles')
     .select('role, company_id')
     .eq('id', userId)
-    .in('role', ['owner', 'company_admin'])
+    .in('role', ['owner', 'company_admin']) // Keep 'owner' for backward compatibility
   
   if (companyId) {
     query = query.eq('company_id', companyId)
@@ -62,9 +63,9 @@ export async function getUserCompanyRole(userId: string, companyId: string): Pro
   }
   
   // Map profile role to company role
-  if (profile.role === 'owner') return 'owner'
+  if (profile.role === 'owner') return 'owner' // Legacy
   if (profile.role === 'company_admin') return 'company_admin'
-  if (profile.role === 'customer') return 'member'
+  if (profile.role === 'member') return 'member'
   return null
 }
 
@@ -78,7 +79,7 @@ export async function getUserAdminCompanies(userId: string): Promise<string[]> {
     .from('profiles')
     .select('company_id')
     .eq('id', userId)
-    .in('role', ['owner', 'company_admin'])
+    .in('role', ['owner', 'company_admin']) // Keep 'owner' for backward compatibility
     .not('company_id', 'is', null)
   
   if (error || !profiles) {

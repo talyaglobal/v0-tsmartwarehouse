@@ -26,7 +26,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'customer'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'member'),
     NEW.raw_user_meta_data->>'company',
     NEW.raw_user_meta_data->>'phone',
     NEW.raw_user_meta_data->>'storage_interest'

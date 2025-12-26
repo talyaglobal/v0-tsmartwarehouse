@@ -122,10 +122,10 @@ export async function updateTask(
 
 export async function deleteTask(id: string): Promise<void> {
   const supabase = createServerSupabaseClient()
-  
+  // Soft delete: set status = false
   const { error } = await supabase
     .from('tasks')
-    .delete()
+    .update({ status: false })
     .eq('id', id)
 
   if (error) {

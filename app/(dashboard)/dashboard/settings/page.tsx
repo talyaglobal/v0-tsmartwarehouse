@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { PageHeader } from "@/components/ui/page-header"
@@ -11,29 +11,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { User, Building2, Shield, Bell, Save, Loader2, Upload, X } from "@/components/icons"
+import { User, Shield, Bell, Save, Loader2, Upload, X } from "@/components/icons"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { useUIStore } from "@/stores/ui.store"
 import { api } from "@/lib/api/client"
+import { PhoneInput } from 'react-international-phone'
+import 'react-international-phone/style.css'
 
-interface Company {
-  id: string
-  name: string | null
-  logo_url: string | null
-  vat: string | null
-  address: string | null
-  postal_code: string | null
-  city: string | null
-  country: string | null
-}
 
 export default function SettingsPage() {
   const { user } = useUser()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Get tab from URL search params
   const defaultTab = searchParams?.get('tab') || 'profile'
@@ -41,18 +32,11 @@ export default function SettingsPage() {
     name: "",
     phone: "",
     email: "",
+    avatarUrl: "",
   })
-  const [companyForm, setCompanyForm] = useState({
-    name: "",
-    vat: "",
-    address: "",
-    postalCode: "",
-    city: "",
-    country: "",
-    logoUrl: "",
-  })
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -67,16 +51,91 @@ export default function SettingsPage() {
       if (!user) return null
       const supabase = createClient()
       
-      // First get profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('name, phone, company_id, email')
-        .eq('id', user.id)
-        .single()
+      // First get profile - try with avatar_url first, then fallback to avatar only
+      let profileData = null
       
-      if (profileError) {
-        console.error('Error fetching profile:', profileError)
-        return null
+      // Try to fetch with avatar_url first
+      const { data: dataWithAvatar, error: errorWithAvatar } = await supabase
+        .from('profiles')
+        .select('name, phone, company_id, email, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle()
+      
+      if (errorWithAvatar) {
+        // Log the error for debugging (only if error object has content)
+        const hasErrorContent = errorWithAvatar && (
+          errorWithAvatar.code || 
+          errorWithAvatar.message || 
+          errorWithAvatar.details || 
+          errorWithAvatar.hint
+        )
+        
+        // Log the error for debugging (only if error object has content)
+        if (hasErrorContent) {
+          console.warn('Error fetching profile with avatar_url, trying fallback:', {
+            code: errorWithAvatar.code,
+            message: errorWithAvatar.message,
+            details: errorWithAvatar.details,
+            hint: errorWithAvatar.hint,
+            errorObject: errorWithAvatar,
+          })
+        } else {
+          // If error object is empty, silently try fallback
+          console.warn('Empty error object when fetching profile with avatar_url, trying fallback')
+        }
+        
+        // If error is about missing column or schema cache, try without avatar_url
+        const isColumnError = errorWithAvatar.code === 'PGRST116' || 
+                             errorWithAvatar.message?.includes('column') || 
+                             errorWithAvatar.message?.includes('does not exist') ||
+                             errorWithAvatar.message?.includes('schema cache') ||
+                             !hasErrorContent // If error object is empty, likely a column issue
+        
+        if (isColumnError) {
+          // Try without avatar_url
+          const { data: dataWithoutAvatar, error: errorWithoutAvatar } = await supabase
+            .from('profiles')
+            .select('name, phone, company_id, email, avatar_url')
+            .eq('id', user.id)
+            .maybeSingle()
+          
+          if (errorWithoutAvatar) {
+            // If still error, try with only basic fields
+            const { data: dataBasic, error: errorBasic } = await supabase
+              .from('profiles')
+              .select('name, phone, company_id, email')
+              .eq('id', user.id)
+              .maybeSingle()
+            
+            if (errorBasic) {
+              const hasBasicErrorContent = errorBasic && (
+                errorBasic.code || 
+                errorBasic.message || 
+                errorBasic.details || 
+                errorBasic.hint
+              )
+              
+              if (hasBasicErrorContent) {
+                console.error('Error fetching profile (all attempts failed):', {
+                  code: errorBasic.code,
+                  message: errorBasic.message,
+                  details: errorBasic.details,
+                  hint: errorBasic.hint,
+                })
+              }
+              return null
+            }
+            
+            profileData = dataBasic
+          } else {
+            profileData = dataWithoutAvatar
+          }
+        } else {
+          // For other errors, return null
+          return null
+        }
+      } else {
+        profileData = dataWithAvatar
       }
       
       if (!profileData) {
@@ -127,48 +186,46 @@ export default function SettingsPage() {
     enabled: !!user,
     staleTime: 0, // Always refetch to get latest data
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // Refetch when window gains focus to get latest avatar
   })
+
+  // Memoize phone change handler to prevent re-renders
+  const handlePhoneChange = useCallback((value: string) => {
+    setProfileForm((prev) => ({ ...prev, phone: value }))
+  }, [])
 
   // Update form when profile loads
   useEffect(() => {
     if (profile) {
-      setProfileForm({
-        name: profile.name || "",
-        phone: profile.phone || "",
-        email: profile.email || user?.email || "",
-      })
+      const avatarUrl = (profile as any).avatar_url || ""
+      const newPhone = profile.phone || ""
+      const newName = profile.name || ""
+      const newEmail = profile.email || user?.email || ""
       
-      // Set company form if company exists
-      if (profile.companies) {
-        const company = profile.companies
-        setCompanyForm({
-          name: company.name || "",
-          vat: company.vat || "",
-          address: company.address || "",
-          postalCode: company.postal_code || "",
-          city: company.city || "",
-          country: company.country || "",
-          logoUrl: company.logo_url || "",
-        })
-      } else {
-        // Reset company form if no company
-        setCompanyForm({
-          name: "",
-          vat: "",
-          address: "",
-          postalCode: "",
-          city: "",
-          country: "",
-          logoUrl: "",
-        })
-      }
+      setProfileForm((prev) => {
+        // Only update if values actually changed to prevent unnecessary re-renders
+        if (
+          prev.name === newName &&
+          prev.phone === newPhone &&
+          prev.email === newEmail &&
+          prev.avatarUrl === avatarUrl
+        ) {
+          return prev
+        }
+        
+        return {
+          name: newName,
+          phone: newPhone,
+          email: newEmail,
+          avatarUrl: avatarUrl,
+        }
+      })
     }
-  }, [profile])
+  }, [profile, user?.email])
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: async (updates: { name?: string | null; phone?: string | null; email?: string | null }) => {
+    mutationFn: async (updates: { name?: string | null; phone?: string | null; email?: string | null; avatar_url?: string | null }) => {
       if (!user) throw new Error('User not found')
       
       const supabase = createClient()
@@ -189,11 +246,17 @@ export default function SettingsPage() {
           throw new Error(result.error || 'Failed to update email')
         }
 
-        // Update name and phone separately
-        if (updates.name || updates.phone) {
+        // Update name, phone, and avatar_url separately
+        if (updates.name || updates.phone || updates.avatar_url !== undefined) {
+          // Build update object, only including defined fields
+          const updateData: Record<string, any> = {}
+          if (updates.name !== undefined) updateData.name = updates.name
+          if (updates.phone !== undefined) updateData.phone = updates.phone
+          if (updates.avatar_url !== undefined) updateData.avatar_url = updates.avatar_url
+          
           const { data, error } = await supabase
             .from('profiles')
-            .update({ name: updates.name, phone: updates.phone })
+            .update(updateData)
             .eq('id', user.id)
             .select()
             .single()
@@ -207,10 +270,16 @@ export default function SettingsPage() {
 
         return result.data?.profile || { email: updates.email }
       } else {
-        // Just update profile (name, phone)
+        // Just update profile (name, phone, avatar_url)
+        // Build update object, only including defined fields to avoid schema cache issues
+        const updateData: Record<string, any> = {}
+        if (updates.name !== undefined) updateData.name = updates.name
+        if (updates.phone !== undefined) updateData.phone = updates.phone
+        if (updates.avatar_url !== undefined) updateData.avatar_url = updates.avatar_url
+        
         const { data, error } = await supabase
           .from('profiles')
-          .update(updates)
+          .update(updateData)
           .eq('id', user.id)
           .select()
           .single()
@@ -222,9 +291,14 @@ export default function SettingsPage() {
         return data
       }
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
-      queryClient.invalidateQueries({ queryKey: ['profile'] })
+    onSuccess: async (_data, variables) => {
+      // Invalidate and refetch profile data
+      await queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
+      await queryClient.invalidateQueries({ queryKey: ['profile'] })
+      await queryClient.invalidateQueries({ queryKey: ['header-profile', user?.id] })
+      
+      // Refetch profile to get updated data
+      await queryClient.refetchQueries({ queryKey: ['profile', user?.id] })
       
       // If email was updated, show special message
       if (variables.email) {
@@ -254,43 +328,16 @@ export default function SettingsPage() {
     },
   })
 
-  // Update company mutation
-  const updateCompanyMutation = useMutation({
-    mutationFn: async ({ companyId, updates }: { companyId: string; updates: Partial<Company> }) => {
-      const result = await api.patch<Company>(`/api/v1/companies/${companyId}`, updates, {
-        showToast: false, // We'll handle notification in onSuccess/onError
-      })
-      if (!result.success || !result.data) {
-        throw new Error(result.error || 'Failed to update company')
-      }
-      return result.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['companies'] })
-      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] })
-      addNotification({
-        type: 'success',
-        message: 'Company updated successfully',
-        duration: 5000,
-      })
-    },
-    onError: (error: Error) => {
-      addNotification({
-        type: 'error',
-        message: error.message || 'Failed to update company',
-        duration: 5000,
-      })
-    },
-  })
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
     
     try {
-      const updates: { name?: string | null; phone?: string | null; email?: string | null } = {
+      const updates: { name?: string | null; phone?: string | null; email?: string | null; avatar_url?: string | null } = {
         name: profileForm.name || undefined,
         phone: profileForm.phone || undefined,
+        avatar_url: profileForm.avatarUrl || undefined,
       }
       
       // Only include email if user can change it and it's different
@@ -301,40 +348,6 @@ export default function SettingsPage() {
       await updateProfileMutation.mutateAsync(updates)
     } catch (error) {
       console.error('Error updating profile:', error)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleCompanySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const companyId = profile?.company_id || profile?.companies?.id
-    if (!companyId) {
-      addNotification({
-        type: 'error',
-        message: 'No company associated with your profile',
-        duration: 5000,
-      })
-      return
-    }
-
-    setIsSaving(true)
-    
-    try {
-      await updateCompanyMutation.mutateAsync({
-        companyId: companyId,
-        updates: {
-          name: companyForm.name || undefined,
-          vat: companyForm.vat || undefined,
-          address: companyForm.address || undefined,
-          postal_code: companyForm.postalCode || undefined,
-          city: companyForm.city || undefined,
-          country: companyForm.country || undefined,
-          logo_url: companyForm.logoUrl || undefined,
-        },
-      })
-    } catch (error) {
-      console.error('Error updating company:', error)
     } finally {
       setIsSaving(false)
     }
@@ -405,7 +418,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -429,34 +442,45 @@ export default function SettingsPage() {
       return
     }
 
-    setIsUploadingLogo(true)
+    setIsUploadingAvatar(true)
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('bucket', 'docs')
-      formData.append('folder', 'logo')
+      const formDataUpload = new FormData()
+      formDataUpload.append('file', file)
+      formDataUpload.append('bucket', 'docs')
+      formDataUpload.append('folder', 'avatar')
 
-      const result = await api.post('/api/v1/files/upload', formData, {
-        showToast: true,
-        successMessage: 'Logo uploaded successfully',
-        errorMessage: 'Failed to upload logo',
+      const result = await api.post('/api/v1/files/upload', formDataUpload, {
+        showToast: false, // Don't show toast, we'll show notification instead
       })
 
       if (result.success && result.data?.url) {
-        setCompanyForm({ ...companyForm, logoUrl: result.data.url })
+        // Update form state with the new avatar URL
+        const newAvatarUrl = result.data.url
+        setProfileForm((prev) => ({ ...prev, avatarUrl: newAvatarUrl }))
         addNotification({
           type: 'success',
-          message: 'Logo uploaded successfully. Click "Save Changes" to update the company.',
+          message: 'Avatar uploaded successfully. Click "Save Changes" to update your profile.',
+          duration: 5000,
+        })
+      } else {
+        addNotification({
+          type: 'error',
+          message: result.error || 'Failed to upload avatar',
           duration: 5000,
         })
       }
     } catch (error) {
-      console.error('Error uploading logo:', error)
+      console.error('Error uploading avatar:', error)
+      addNotification({
+        type: 'error',
+        message: 'Failed to upload avatar',
+        duration: 5000,
+      })
     } finally {
-      setIsUploadingLogo(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+      setIsUploadingAvatar(false)
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = ''
       }
     }
   }
@@ -469,8 +493,6 @@ export default function SettingsPage() {
     )
   }
 
-  const company = profile?.companies || null
-
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage your account preferences" />
@@ -478,7 +500,6 @@ export default function SettingsPage() {
       <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="company">Company</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
@@ -494,6 +515,79 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleProfileSubmit} className="space-y-4">
+                {/* Avatar Upload Section */}
+                <div className="space-y-2">
+                  <Label>Profile Avatar</Label>
+                  <div className="flex items-center gap-4">
+                    {profileForm.avatarUrl && profileForm.avatarUrl.trim() !== "" ? (
+                      <div className="relative">
+                        <img
+                          src={profileForm.avatarUrl}
+                          alt="Profile avatar"
+                          className="h-20 w-20 object-cover border rounded-full"
+                          onError={(e) => {
+                            const img = e.currentTarget
+                            img.style.display = 'none'
+                            const fallback = img.nextElementSibling as HTMLElement
+                            if (fallback) {
+                              fallback.style.display = 'flex'
+                            }
+                          }}
+                        />
+                        <div className="hidden h-20 w-20 rounded-full bg-muted flex items-center justify-center border">
+                          <User className="h-10 w-10 text-muted-foreground" />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                          onClick={() => setProfileForm((prev) => ({ ...prev, avatarUrl: "" }))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center border">
+                        <User className="h-10 w-10 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <Input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png"
+                        onChange={handleAvatarUpload}
+                        disabled={isUploadingAvatar}
+                        className="hidden"
+                        id="avatar-upload"
+                      />
+                      <Label htmlFor="avatar-upload" className="cursor-pointer">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isUploadingAvatar}
+                          onClick={() => avatarInputRef.current?.click()}
+                        >
+                          {isUploadingAvatar ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload Avatar
+                            </>
+                          )}
+                        </Button>
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        JPEG or PNG, max 2MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name</Label>
@@ -522,13 +616,26 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={profileForm.phone}
-                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      placeholder="+1 555-0101"
-                    />
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+                      <PhoneInput
+                        defaultCountry="us"
+                        value={profileForm.phone || ""}
+                        onChange={handlePhoneChange}
+                        disabled={isSaving}
+                        inputProps={{
+                          name: 'phone',
+                          id: 'phone',
+                          required: false,
+                          autoFocus: false,
+                          autoComplete: 'tel',
+                          className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                        }}
+                        countrySelectorStyleProps={{
+                          buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
                 <Button type="submit" disabled={isSaving || updateProfileMutation.isPending}>
@@ -545,160 +652,6 @@ export default function SettingsPage() {
                   )}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="company">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                <CardTitle>Company Details</CardTitle>
-              </div>
-              <CardDescription>Your business information</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!company ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No company associated with your profile.</p>
-                </div>
-              ) : (
-                <form onSubmit={handleCompanySubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company-name">Company Name</Label>
-                    <Input
-                      id="company-name"
-                      value={companyForm.name}
-                      onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
-                      placeholder="Enter your company name"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="vat">VAT Number</Label>
-                      <Input
-                        id="vat"
-                        value={companyForm.vat}
-                        onChange={(e) => setCompanyForm({ ...companyForm, vat: e.target.value })}
-                        placeholder="VAT/Tax ID"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="postal-code">Postal Code</Label>
-                      <Input
-                        id="postal-code"
-                        value={companyForm.postalCode}
-                        onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })}
-                        placeholder="Postal Code"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      value={companyForm.address}
-                      onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-                      placeholder="Street address"
-                    />
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={companyForm.city}
-                        onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })}
-                        placeholder="City"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="country">Country</Label>
-                      <Input
-                        id="country"
-                        value={companyForm.country}
-                        onChange={(e) => setCompanyForm({ ...companyForm, country: e.target.value })}
-                        placeholder="Country"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="logo">Company Logo</Label>
-                    <div className="flex items-center gap-4">
-                      {companyForm.logoUrl && (
-                        <div className="relative">
-                          <img
-                            src={companyForm.logoUrl}
-                            alt="Company logo"
-                            className="h-20 w-20 object-contain border rounded"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none'
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                            onClick={() => setCompanyForm({ ...companyForm, logoUrl: "" })}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <Input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/jpeg,image/jpg,image/png"
-                          onChange={handleLogoUpload}
-                          disabled={isUploadingLogo}
-                          className="hidden"
-                          id="logo-upload"
-                        />
-                        <Label htmlFor="logo-upload" className="cursor-pointer">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={isUploadingLogo}
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            {isUploadingLogo ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Uploading...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Upload Logo
-                              </>
-                            )}
-                          </Button>
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          JPEG or PNG, max 2MB
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <Button type="submit" disabled={isSaving || updateCompanyMutation.isPending}>
-                    {isSaving || updateCompanyMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </form>
-              )}
             </CardContent>
           </Card>
         </TabsContent>

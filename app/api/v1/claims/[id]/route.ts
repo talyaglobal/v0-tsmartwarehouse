@@ -31,7 +31,7 @@ export async function GET(
 
     // Check if user has access to this claim
     // Admin can see all claims, regular users can only see their own
-    if (user.role !== 'super_admin' && claim.customerId !== user.id) {
+    if (user.role !== 'root' && claim.customerId !== user.id) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Forbidden: You don't have access to this claim",
@@ -82,7 +82,7 @@ export async function PATCH(
     }
 
     // Check access: Admin can update all claims, regular users can only update their own
-    if (user.role !== 'super_admin' && existingClaim.customerId !== user.id) {
+    if (user.role !== 'root' && existingClaim.customerId !== user.id) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Forbidden: You don't have access to this claim",
@@ -150,7 +150,7 @@ export async function DELETE(
     }
 
     // Check access: Only admin can delete claims (based on RLS policy)
-    if (user.role !== 'super_admin') {
+    if (user.role !== 'root') {
       const errorData: ErrorResponse = {
         success: false,
         error: "Forbidden: Only admins can delete claims",

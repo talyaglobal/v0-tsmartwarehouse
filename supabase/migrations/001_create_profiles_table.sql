@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   name TEXT,
   company TEXT,
   phone TEXT,
-  role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('admin', 'customer', 'worker')),
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('root', 'company_admin', 'member', 'warehouse_staff', 'owner')),
   membership_tier TEXT CHECK (membership_tier IN ('bronze', 'silver', 'gold', 'platinum')),
   credit_balance DECIMAL(10, 2) DEFAULT 0,
   avatar TEXT,
@@ -38,7 +38,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'customer')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'member')
   );
   RETURN NEW;
 END;

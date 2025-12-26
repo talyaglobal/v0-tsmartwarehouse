@@ -148,9 +148,15 @@ END $$;
 DO $$
 DECLARE
   user_count INTEGER;
+  table_exists BOOLEAN;
 BEGIN
   -- Check if users table exists
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'users'
+  ) INTO table_exists;
+  
+  IF table_exists THEN
     -- Count rows in users table
     EXECUTE 'SELECT COUNT(*) FROM users' INTO user_count;
     
@@ -170,6 +176,8 @@ BEGIN
     ELSE
       RAISE WARNING 'Users table has % rows. Please review before dropping.', user_count;
     END IF;
+  ELSE
+    RAISE NOTICE 'Users table does not exist, skipping drop operation';
   END IF;
 END $$;
 

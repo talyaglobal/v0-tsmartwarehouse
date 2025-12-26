@@ -13,9 +13,9 @@ export default async function WorkerLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Require worker role
+  // Require warehouse_staff role
   try {
-    await requireRole('worker')
+    await requireRole('warehouse_staff')
   } catch (error) {
     redirect('/dashboard')
   }

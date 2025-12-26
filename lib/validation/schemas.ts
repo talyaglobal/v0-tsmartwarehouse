@@ -135,3 +135,66 @@ export const updateNotificationPreferencesSchema = z.object({
   ).optional(),
 })
 
+// Access Log schemas
+export const createAccessLogSchema = z.object({
+  visitorType: z.enum(["vehicle", "staff", "customer", "visitor", "family_friend", "delivery_driver", "other"]),
+  warehouseId: z.string().uuid(),
+  entryTime: z.string().datetime().optional(), // ISO 8601 datetime string
+  status: z.enum(["checked_in", "checked_out"]).default("checked_in"),
+  // Person Details
+  personName: z.string().min(1).max(200),
+  personIdNumber: z.string().max(100).optional(),
+  personPhone: z.string().max(50).optional(),
+  personEmail: z.string().email().max(200).optional(),
+  companyName: z.string().max(200).optional(),
+  personId: z.string().uuid().optional(),
+  // Vehicle Details
+  vehicleLicensePlate: z.string().max(50).optional(),
+  vehicleMake: z.string().max(100).optional(),
+  vehicleModel: z.string().max(100).optional(),
+  vehicleColor: z.string().max(50).optional(),
+  vehicleType: z.enum(["car", "truck", "van", "motorcycle", "suv", "other"]).optional(),
+  // Visit Details
+  purpose: z.string().max(500).optional(),
+  authorizedBy: z.string().max(200).optional(),
+  authorizedById: z.string().uuid().optional(),
+  bookingId: z.string().uuid().optional(),
+  notes: z.string().max(2000).optional(),
+  photoUrl: z.string().url().max(500).optional(),
+  checkedInBy: z.string().uuid().optional(),
+})
+
+export const updateAccessLogSchema = z.object({
+  exitTime: z.string().datetime().optional(),
+  status: z.enum(["checked_in", "checked_out"]).optional(),
+  personName: z.string().min(1).max(200).optional(),
+  personIdNumber: z.string().max(100).optional(),
+  personPhone: z.string().max(50).optional(),
+  personEmail: z.string().email().max(200).optional(),
+  companyName: z.string().max(200).optional(),
+  vehicleLicensePlate: z.string().max(50).optional(),
+  vehicleMake: z.string().max(100).optional(),
+  vehicleModel: z.string().max(100).optional(),
+  vehicleColor: z.string().max(50).optional(),
+  vehicleType: z.enum(["car", "truck", "van", "motorcycle", "suv", "other"]).optional(),
+  purpose: z.string().max(500).optional(),
+  authorizedBy: z.string().max(200).optional(),
+  bookingId: z.string().uuid().optional(),
+  notes: z.string().max(2000).optional(),
+  photoUrl: z.string().url().max(500).optional(),
+  checkedOutBy: z.string().uuid().optional(),
+})
+
+export const accessLogsQuerySchema = z.object({
+  visitorType: z.enum(["vehicle", "staff", "customer", "visitor", "family_friend", "delivery_driver", "other"]).optional(),
+  warehouseId: z.string().uuid().optional(),
+  status: z.enum(["checked_in", "checked_out"]).optional(),
+  personId: z.string().uuid().optional(),
+  bookingId: z.string().uuid().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  search: z.string().max(200).optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().nonnegative().optional(),
+})
+

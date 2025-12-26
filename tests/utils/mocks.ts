@@ -5,7 +5,7 @@ export const mockUser: User = {
   id: 'user-123',
   email: 'test@example.com',
   name: 'Test User',
-  role: 'customer',
+  role: 'member',
   companyName: 'Test Company',
   phone: '+1234567890',
   avatar: undefined,
@@ -20,7 +20,7 @@ export const mockAdminUser: User = {
   id: 'admin-123',
   email: 'admin@example.com',
   name: 'Admin User',
-  role: 'admin',
+  role: 'root',
 }
 
 export const mockWorkerUser: User = {
@@ -28,7 +28,7 @@ export const mockWorkerUser: User = {
   id: 'worker-123',
   email: 'worker@example.com',
   name: 'Worker User',
-  role: 'worker',
+  role: 'warehouse_staff',
 }
 
 // Mock booking data

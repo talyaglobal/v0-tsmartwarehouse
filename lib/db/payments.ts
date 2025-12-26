@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Payment, PaymentTransaction, Refund, PaymentStatus, RefundStatus } from "@/types"
+import type { Payment, PaymentTransaction, Refund, PaymentStatus, RefundStatus, PaymentRemaining } from "@/types"
 
 /**
  * Database operations for Payments
@@ -60,7 +60,7 @@ export async function createPayment(
     customer_id: payment.customerId,
     amount: payment.amount,
     currency: payment.currency || "USD",
-    status: payment.status,
+    payment_status: payment.status,
     payment_method: payment.paymentMethod,
     stripe_payment_intent_id: payment.stripePaymentIntentId ?? null,
     stripe_charge_id: payment.stripeChargeId ?? null,
@@ -318,7 +318,7 @@ function transformPaymentRow(row: any): Payment {
     customerId: row.customer_id,
     amount: parseFloat(row.amount),
     currency: row.currency || "USD",
-    status: row.status as PaymentStatus,
+    status: row.payment_status as PaymentStatus,
     paymentMethod: row.payment_method,
     stripePaymentIntentId: row.stripe_payment_intent_id ?? undefined,
     stripeChargeId: row.stripe_charge_id ?? undefined,
@@ -337,7 +337,7 @@ function transformTransactionRow(row: any): PaymentTransaction {
     type: row.type,
     amount: parseFloat(row.amount),
     currency: row.currency || "USD",
-    status: row.status as PaymentStatus,
+    status: row.payment_status as PaymentStatus,
     description: row.description,
     metadata: row.metadata ?? undefined,
     createdAt: row.created_at,
@@ -358,6 +358,57 @@ function transformRefundRow(row: any): Refund {
     metadata: row.metadata ?? undefined,
     createdAt: row.created_at,
     processedAt: row.processed_at ?? undefined,
+  }
+}
+
+/**
+ * Get customer payment remaining (unpaid invoice amounts)
+ */
+export async function getCustomerPaymentRemaining(customerId: string): Promise<number> {
+  const supabase = createServerSupabaseClient()
+  
+  const { data, error } = await supabase.rpc('get_customer_payment_remaining', {
+    p_customer_id: customerId,
+  })
+
+  if (error) {
+    throw new Error(`Failed to get customer payment remaining: ${error.message}`)
+  }
+
+  return parseFloat(data || '0')
+}
+
+/**
+ * Get customer payment summary
+ */
+export async function getCustomerPaymentSummary(customerId: string): Promise<PaymentRemaining> {
+  const supabase = createServerSupabaseClient()
+  
+  const { data, error } = await supabase.rpc('get_customer_payment_summary', {
+    p_customer_id: customerId,
+  })
+
+  if (error) {
+    throw new Error(`Failed to get customer payment summary: ${error.message}`)
+  }
+
+  if (!data || data.length === 0) {
+    return {
+      totalInvoiced: 0,
+      totalPaid: 0,
+      remainingBalance: 0,
+      pendingInvoicesCount: 0,
+      overdueInvoicesCount: 0,
+    }
+  }
+
+  const row = data[0]
+  return {
+    totalInvoiced: parseFloat(row.total_invoiced || '0'),
+    totalPaid: parseFloat(row.total_paid || '0'),
+    remainingBalance: parseFloat(row.remaining_balance || '0'),
+    pendingInvoicesCount: row.pending_invoices_count || 0,
+    overdueInvoicesCount: row.overdue_invoices_count || 0,
   }
 }
 

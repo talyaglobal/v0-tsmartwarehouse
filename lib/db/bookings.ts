@@ -76,7 +76,7 @@ export async function getBookings(filters?: GetBookingsOptions) {
     }
   }
   if (status) {
-    query = query.eq('status', status)
+    query = query.eq('booking_status', status)
   }
   if (type) {
     query = query.eq('type', type)
@@ -153,7 +153,7 @@ export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 
     customer_email: booking.customerEmail,
     warehouse_id: booking.warehouseId,
     type: booking.type,
-    status: booking.status,
+    booking_status: booking.status,
     pallet_count: booking.palletCount ?? null,
     area_sq_ft: booking.areaSqFt ?? null,
     floor_number: booking.floorNumber ?? null,
@@ -190,7 +190,7 @@ export async function updateBooking(
   
   const updateRow: Record<string, any> = {}
   if (updates.type !== undefined) updateRow.type = updates.type
-  if (updates.status !== undefined) updateRow.status = updates.status
+  if (updates.status !== undefined) updateRow.booking_status = updates.status
   if (updates.palletCount !== undefined) updateRow.pallet_count = updates.palletCount
   if (updates.areaSqFt !== undefined) updateRow.area_sq_ft = updates.areaSqFt
   if (updates.floorNumber !== undefined) updateRow.floor_number = updates.floorNumber
@@ -221,7 +221,11 @@ export async function updateBooking(
 
 export async function deleteBooking(id: string): Promise<void> {
   const supabase = createServerSupabaseClient()
-  const { error } = await supabase.from('bookings').delete().eq('id', id)
+  // Soft delete: set status = false
+  const { error } = await supabase
+    .from('bookings')
+    .update({ status: false })
+    .eq('id', id)
 
   if (error) {
     throw new Error(`Failed to delete booking: ${error.message}`)
@@ -242,7 +246,7 @@ function transformBookingRow(row: any): Booking {
     customerEmail: row.customer_email,
     warehouseId: row.warehouse_id,
     type: row.type,
-    status: row.status,
+    status: row.booking_status,
     palletCount: row.pallet_count ?? undefined,
     areaSqFt: row.area_sq_ft ?? undefined,
     floorNumber: row.floor_number ?? undefined,

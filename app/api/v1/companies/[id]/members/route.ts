@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -18,7 +17,8 @@ export async function GET(
     const { id: companyId } = await params
 
     // Check if user has permission to view company members
-    if (user.role !== 'super_admin') {
+    // Root users can view any company's members
+    if (user.role !== 'root') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== companyId) {
         const errorData: ErrorResponse = {
@@ -40,10 +40,27 @@ export async function GET(
       }
     }
 
-    const supabase = createServerSupabaseClient()
+    // Use admin client to bypass RLS for company admin operations
+    const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    )
+    
+    console.log(`[GET /api/v1/companies/${companyId}/members] Fetching members for company:`, companyId)
+    console.log(`[GET /api/v1/companies/${companyId}/members] User role:`, user.role)
+    console.log(`[GET /api/v1/companies/${companyId}/members] User ID:`, user.id)
     
     // Get members from profiles table (company_members removed)
-    const { data: members, error } = await supabase
+    // Include all roles except warehouse_staff (they have their own management)
+    // Use admin client to bypass RLS since we've already verified permissions
+    const { data: members, error } = await supabaseAdmin
       .from('profiles')
       .select(`
         id,
@@ -51,18 +68,35 @@ export async function GET(
         email,
         name,
         role,
-        avatar,
+        avatar_url,
         phone,
         invited_by,
+        membership_tier,
+        credit_balance,
         created_at,
         updated_at
       `)
       .eq('company_id', companyId)
-      .not('role', 'eq', 'worker') // Exclude workers from team members list
+      .eq('status', true) // Only show active (non-deleted) members
+      .not('role', 'eq', 'warehouse_staff') // Exclude warehouse_staff from team members list
+      .not('role', 'is', null) // Exclude profiles without role
       .order('created_at', { ascending: false })
 
     if (error) {
+      console.error(`[GET /api/v1/companies/${companyId}/members] Error:`, error)
       throw new Error(`Failed to fetch company members: ${error.message}`)
+    }
+
+    console.log(`[GET /api/v1/companies/${companyId}/members] Found ${members?.length || 0} members`)
+    if (members && members.length > 0) {
+      console.log(`[GET /api/v1/companies/${companyId}/members] Sample member:`, {
+        id: members[0].id,
+        email: members[0].email,
+        name: members[0].name,
+        role: members[0].role,
+        company_id: members[0].company_id,
+        status: (members[0] as any).status,
+      })
     }
 
     const responseData: ListResponse<any> = {

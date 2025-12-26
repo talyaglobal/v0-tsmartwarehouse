@@ -36,7 +36,7 @@ export async function getClaims(filters?: {
   }
 
   if (filters?.status) {
-    query = query.eq('status', filters.status)
+    query = query.eq('claim_status', filters.status)
   }
   if (filters?.bookingId) {
     query = query.eq('booking_id', filters.bookingId)
@@ -132,10 +132,10 @@ export async function updateClaim(
 
 export async function deleteClaim(id: string): Promise<void> {
   const supabase = createServerSupabaseClient()
-  
+  // Soft delete: set status = false
   const { error } = await supabase
     .from('claims')
-    .delete()
+    .update({ status: false })
     .eq('id', id)
 
   if (error) {

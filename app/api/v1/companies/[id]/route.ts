@@ -22,9 +22,9 @@ export async function PATCH(
     const { name, logo_url, vat, address, postal_code, city, country } = body
 
     // Check if user has permission to update this company
-    // System admin can update any company
+    // Root can update any company
     // Company admin/owner can only update their own company
-    if (user.role !== 'super_admin') {
+    if (user.role !== 'root') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId !== id) {
         const errorData: ErrorResponse = {

@@ -2,7 +2,7 @@
  * Typed API Response interfaces
  */
 
-import type { Booking, Task, Invoice, Incident, Claim, Notification, Payment, PaymentTransaction, Refund } from "./index"
+import type { Booking, Task, Invoice, Incident, Claim, Notification, Payment, PaymentTransaction, Refund, AccessLog } from "./index"
 
 // Base API Response
 export interface ApiResponse<T = unknown> {
@@ -55,6 +55,10 @@ export type PaymentsListResponse = ListResponse<Payment>
 export type PaymentHistoryResponse = ListResponse<PaymentTransaction>
 export type RefundResponse = ApiResponse<Refund>
 export type RefundsListResponse = ListResponse<Refund>
+
+// Access Log API Responses
+export type AccessLogResponse = ApiResponse<AccessLog>
+export type AccessLogsListResponse = ListResponse<AccessLog>
 
 // Generic/Other API Responses
 export type HealthResponse = ApiResponse<{

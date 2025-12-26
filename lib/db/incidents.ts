@@ -19,7 +19,7 @@ export async function getIncidents(filters?: {
     query = query.eq('reported_by', filters.reportedBy)
   }
   if (filters?.status) {
-    query = query.eq('status', filters.status)
+    query = query.eq('incident_status', filters.status)
   }
   if (filters?.severity) {
     query = query.eq('severity', filters.severity)
@@ -117,10 +117,10 @@ export async function updateIncident(
 
 export async function deleteIncident(id: string): Promise<void> {
   const supabase = createServerSupabaseClient()
-  
+  // Soft delete: set status = false
   const { error } = await supabase
     .from('incidents')
-    .delete()
+    .update({ status: false })
     .eq('id', id)
 
   if (error) {

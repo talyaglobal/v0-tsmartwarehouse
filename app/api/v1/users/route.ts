@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
 
     const { searchParams } = new URL(request.url)
-    const role = searchParams.get("role") as "super_admin" | "customer" | "worker" | null
+    const role = searchParams.get("role") as "root" | "member" | "warehouse_staff" | "company_admin" | null
     const companyId = searchParams.get("companyId")
 
     const supabase = createServerSupabaseClient()
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         name,
         role,
         phone,
-        avatar,
+        avatar_url,
         membership_tier,
         credit_balance,
         company_id,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Company admin can only see users from their company
     // System admin can see all users
-    if (user.role !== 'super_admin') {
+    if (user.role !== 'root') {
       const userCompanyId = await getUserCompanyId(user.id)
       if (userCompanyId) {
         const isAdmin = await isCompanyAdmin(user.id, userCompanyId)
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         companyId: profile.company_id || undefined,
         companyName: company?.name || undefined,
         phone: profile.phone || undefined,
-        avatar: profile.avatar || undefined,
+        avatar: profile.avatar_url || undefined,
         membershipTier: profile.membership_tier as User['membershipTier'] || undefined,
         creditBalance: profile.credit_balance ? parseFloat(profile.credit_balance) : undefined,
         createdAt: profile.created_at,

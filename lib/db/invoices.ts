@@ -11,6 +11,7 @@ interface GetInvoicesOptions {
   companyId?: string
   status?: InvoiceStatus
   bookingId?: string
+  serviceOrderId?: string
   limit?: number
   offset?: number
   useCache?: boolean
@@ -22,6 +23,7 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
     companyId,
     status,
     bookingId,
+    serviceOrderId,
     limit,
     offset = 0,
     useCache = true,
@@ -32,7 +34,7 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
     CACHE_PREFIXES.INVOICES,
     customerId || companyId || 'all',
     status || 'all',
-    bookingId || 'all',
+    bookingId || serviceOrderId || 'all',
     limit || 'all',
     offset
   )
@@ -50,7 +52,7 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
   // Optimize: Only select needed fields instead of '*'
   let query = supabase
     .from('invoices')
-    .select('id, booking_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+    .select('id, booking_id, service_order_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
 
   if (customerId) {
     query = query.eq('customer_id', customerId)
@@ -76,6 +78,9 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
   }
   if (bookingId) {
     query = query.eq('booking_id', bookingId)
+  }
+  if (serviceOrderId) {
+    query = query.eq('service_order_id', serviceOrderId)
   }
 
   // Add pagination if limit is provided
@@ -113,7 +118,7 @@ export async function getInvoiceById(id: string, useCache: boolean = true): Prom
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, booking_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+    .select('id, booking_id, service_order_id, customer_id, customer_name, status, items, subtotal, tax, total, due_date, paid_date, created_at')
     .eq('id', id)
     .single()
 
@@ -138,7 +143,8 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>):
   const supabase = createServerSupabaseClient()
   
   const invoiceRow = {
-    booking_id: invoice.bookingId,
+    booking_id: invoice.bookingId || null,
+    service_order_id: invoice.serviceOrderId || null,
     customer_id: invoice.customerId,
     customer_name: invoice.customerName,
     status: invoice.status,
@@ -203,7 +209,8 @@ export async function updateInvoice(
 function transformInvoiceRow(row: any): Invoice {
   return {
     id: row.id,
-    bookingId: row.booking_id,
+    bookingId: row.booking_id || undefined,
+    serviceOrderId: row.service_order_id || undefined,
     customerId: row.customer_id,
     customerName: row.customer_name,
     status: row.status as InvoiceStatus,

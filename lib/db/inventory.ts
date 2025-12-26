@@ -11,6 +11,7 @@ export interface InventoryItem {
   customer_id: string
   warehouse_id: string
   floor_id?: string | null
+  region_id?: string | null
   hall_id?: string | null
   zone_id?: string | null
   pallet_id: string
@@ -23,12 +24,27 @@ export interface InventoryItem {
   location_code?: string | null
   row_number?: number | null
   level_number?: number | null
-  status: 'in-transit' | 'received' | 'stored' | 'moved' | 'shipped' | 'damaged' | 'lost'
+  status: 'in-transit' | 'received' | 'stored' | 'moved' | 'shipped' | 'damaged' | 'lost' // This is inventory_item_status column
   received_at?: string | null
   stored_at?: string | null
   last_moved_at?: string | null
   shipped_at?: string | null
   notes?: string | null
+  // Enhanced tracking fields
+  warehouse_tracking_number?: string | null
+  customer_lot_number?: string | null
+  customer_batch_number?: string | null
+  received_date?: string | null // DATE format
+  expected_release_date?: string | null // DATE format
+  days_in_warehouse?: number | null
+  months_in_warehouse?: number | null
+  // Label fields
+  stock_definition?: string | null
+  number_of_cases?: number | null
+  number_of_units?: number | null
+  unit_type?: string | null
+  hs_code?: string | null
+  storage_requirements?: string[] | null
   created_at: string
   updated_at: string
 }
@@ -177,11 +193,11 @@ export async function getInventoryItemById(id: string) {
 export async function searchInventoryByCode(code: string) {
   const supabase = createServerSupabaseClient()
   
-  // Search by pallet_id, barcode, or qr_code
+  // Search by pallet_id, barcode, qr_code, or warehouse_tracking_number
   const { data, error } = await supabase
     .from('inventory_items')
     .select('*')
-    .or(`pallet_id.eq.${code},barcode.eq.${code},qr_code.eq.${code}`)
+    .or(`pallet_id.eq.${code},barcode.eq.${code},qr_code.eq.${code},warehouse_tracking_number.eq.${code}`)
     .limit(1)
     .single()
 
@@ -346,5 +362,103 @@ export async function getInventoryStats(warehouseId?: string, hallId?: string) {
   })
 
   return stats
+}
+
+/**
+ * Get inventory items with full tracking information
+ */
+export async function getInventoryWithTracking(filters?: GetInventoryOptions) {
+  const items = await getInventoryItems(filters)
+  // Items already include tracking fields from database
+  return items
+}
+
+/**
+ * Search inventory by customer lot or batch number
+ */
+export async function getInventoryByCustomerLot(
+  lotNumber?: string,
+  batchNumber?: string,
+  customerId?: string
+) {
+  const supabase = createServerSupabaseClient()
+  let query = supabase
+    .from('inventory_items')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (lotNumber) {
+    query = query.eq('customer_lot_number', lotNumber)
+  }
+  if (batchNumber) {
+    query = query.eq('customer_batch_number', batchNumber)
+  }
+  if (customerId) {
+    query = query.eq('customer_id', customerId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(`Failed to fetch inventory by lot/batch: ${error.message}`)
+  }
+
+  return (data || []) as InventoryItem[]
+}
+
+/**
+ * Calculate storage duration for an inventory item
+ */
+export async function calculateStorageDuration(itemId: string) {
+  const item = await getInventoryItemById(itemId)
+  
+  if (!item.received_date) {
+    return { days: 0, months: 0 }
+  }
+
+  const receivedDate = new Date(item.received_date)
+  const today = new Date()
+  const diffTime = today.getTime() - receivedDate.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  const diffMonths = parseFloat((diffDays / 30.0).toFixed(2))
+
+  return {
+    days: diffDays,
+    months: diffMonths,
+  }
+}
+
+/**
+ * Get customer stock levels
+ */
+export async function getCustomerStockLevels(customerId: string, warehouseId?: string) {
+  const supabase = createServerSupabaseClient()
+  
+  let query = supabase
+    .from('customer_stock_levels')
+    .select('*')
+    .eq('customer_id', customerId)
+
+  if (warehouseId) {
+    query = query.eq('warehouse_id', warehouseId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(`Failed to fetch customer stock levels: ${error.message}`)
+  }
+
+  return (data || []).map((row: any) => ({
+    customerId: row.customer_id,
+    warehouseId: row.warehouse_id,
+    totalPallets: row.total_pallets,
+    activePallets: row.active_pallets,
+    inTransitPallets: row.in_transit_pallets,
+    storedPallets: row.stored_pallets,
+    shippedPallets: row.shipped_pallets,
+    damagedPallets: row.damaged_pallets,
+    lastUpdated: row.last_updated,
+  }))
 }
 
