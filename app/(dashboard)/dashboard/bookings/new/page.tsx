@@ -383,12 +383,17 @@ export default function NewBookingPage() {
                           No cities found for this country. Please try again later or contact support.
                         </div>
                       )}
-                      {cities.map((cityOption) => {
+                      {cities.map((cityOption, index) => {
                         const cityDisplayName = cityOption.state
                           ? `${cityOption.name}, ${cityOption.state}`
                           : cityOption.name
+                        // Create unique key by combining city name, state (if available), and index
+                        // This ensures uniqueness even if same city+state combination exists multiple times
+                        const uniqueKey = cityOption.state 
+                          ? `${cityOption.name}_${cityOption.state}_${index}` 
+                          : `${cityOption.name}_${index}`
                         return (
-                          <SelectItem key={cityOption.name} value={cityOption.name}>
+                          <SelectItem key={uniqueKey} value={cityOption.name}>
                             {cityDisplayName}
                           </SelectItem>
                         )

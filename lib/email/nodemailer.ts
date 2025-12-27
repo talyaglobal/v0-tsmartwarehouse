@@ -47,31 +47,59 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
         user: smtpUser,
         pass: smtpPassword,
       },
+      connectionTimeout: 10000, // 10 seconds timeout for connection
+      greetingTimeout: 10000, // 10 seconds timeout for greeting
+      socketTimeout: 10000, // 10 seconds timeout for socket
     })
 
-    // Verify connection
+    // Verify connection with timeout
     try {
-      await transporter.verify()
+      const verifyPromise = transporter.verify()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP verification timeout')), 5000)
+      )
+      await Promise.race([verifyPromise, timeoutPromise])
       console.log('SMTP connection verified successfully')
     } catch (verifyError) {
       console.error('SMTP connection verification failed:', verifyError)
-      return {
-        success: false,
-        error: `SMTP connection failed: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`,
-      }
+      // Don't fail completely, try to send anyway
+      console.warn('Continuing with email send despite verification failure...')
     }
 
-    // Send email
+    // Send email with timeout
     console.log('Attempting to send email to:', options.to)
     console.log('Email subject:', options.subject)
     
-    const info = await transporter.sendMail({
+    // Generate Message-ID
+    const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 9)}@${smtpFromEmail.split('@')[1] || 'tsmartwarehouse.com'}>`
+    
+    const sendPromise = transporter.sendMail({
       from: `"${smtpFromName}" <${smtpFromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+      // Headers to prevent spam
+      headers: {
+        'Message-ID': messageId,
+        'List-Unsubscribe': `<mailto:${smtpFromEmail}?subject=Unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Priority': '3',
+        'X-MSMail-Priority': 'Normal',
+        'Importance': 'normal',
+        'X-Mailer': 'tsmartWarehouse',
+      },
+      // Add reply-to
+      replyTo: smtpFromEmail,
+      // Priority
+      priority: 'normal',
     })
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Email send timeout after 15 seconds')), 15000)
+    )
+    
+    const info = await Promise.race([sendPromise, timeoutPromise])
 
     console.log('Email sent successfully!')
     console.log('  Message ID:', info.messageId)

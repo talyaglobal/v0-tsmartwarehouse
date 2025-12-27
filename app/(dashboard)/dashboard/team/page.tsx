@@ -23,7 +23,7 @@ interface CompanyMember {
   company_id: string
   email: string
   name: string | null
-  role: 'owner' | 'admin' | 'customer' | 'worker'
+  role: 'company_owner' | 'company_admin' | 'warehouse_staff' | 'customer'
   avatar: string | null
   phone: string | null
   invited_by: string | null
@@ -35,7 +35,7 @@ interface Invitation {
   id: string
   company_id: string
   email: string
-  role: 'owner' | 'company_admin' | 'member'
+  role: 'company_owner' | 'company_admin' | 'member'
   invited_by?: string
   token: string
   expires_at: string
@@ -55,8 +55,8 @@ export default function TeamMembersPage() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<CompanyMember | null>(null)
-  const [inviteForm, setInviteForm] = useState({ email: "", fullName: "", role: "member" as 'owner' | 'company_admin' | 'member' })
-  const [editForm, setEditForm] = useState({ role: "member" as 'owner' | 'company_admin' | 'member' })
+  const [inviteForm, setInviteForm] = useState({ email: "", fullName: "", role: "company_admin" as 'company_admin' | 'warehouse_staff' })
+  const [editForm, setEditForm] = useState({ role: "company_admin" as 'company_admin' | 'warehouse_staff' })
 
   // Get user's company ID from profiles table
   const { data: companyData } = useQuery({
@@ -107,7 +107,7 @@ export default function TeamMembersPage() {
 
   // Invite member mutation
   const inviteMutation = useMutation({
-    mutationFn: async ({ email, fullName, role }: { email: string; fullName: string; role: 'owner' | 'company_admin' | 'member' }) => {
+    mutationFn: async ({ email, fullName, role }: { email: string; fullName: string; role: 'company_admin' | 'warehouse_staff' }) => {
       if (!companyId) throw new Error("No company ID")
       const result = await api.post(`/api/v1/companies/${companyId}/invitations`, { email, fullName, role }, { showToast: false })
       if (!result.success) {
@@ -118,7 +118,7 @@ export default function TeamMembersPage() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['company-invitations', companyId] })
       setInviteDialogOpen(false)
-      setInviteForm({ email: "", fullName: "", role: "member" })
+      setInviteForm({ email: "", fullName: "", role: "company_admin" })
       
       // Check if email was actually sent
       const emailSent = data?.emailSent ?? false
@@ -233,7 +233,14 @@ export default function TeamMembersPage() {
 
   const handleEdit = (member: CompanyMember) => {
     setSelectedMember(member)
-    setEditForm({ role: member.role === 'customer' ? 'member' : member.role as 'owner' | 'company_admin' | 'member' })
+    // Map roles: company_owner stays as is, company_admin -> company_admin, warehouse_staff -> warehouse_staff, customer -> company_admin (default)
+    let editRole: 'company_admin' | 'warehouse_staff' = 'company_admin'
+    if (member.role === 'warehouse_staff') {
+      editRole = 'warehouse_staff'
+    } else if (member.role === 'company_admin') {
+      editRole = 'company_admin'
+    }
+    setEditForm({ role: editRole })
     setEditDialogOpen(true)
   }
 
@@ -254,12 +261,16 @@ export default function TeamMembersPage() {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'owner':
-        return 'bg-purple-100 text-purple-800'
+      case 'company_owner':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
       case 'company_admin':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+      case 'warehouse_staff':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+      case 'customer':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400'
     }
   }
 
@@ -300,7 +311,7 @@ export default function TeamMembersPage() {
         .select('role, company_id')
         .eq('id', user.id)
         .eq('company_id', companyId)
-        .in('role', ['owner', 'company_admin'])
+        .in('role', ['company_owner', 'company_admin'])
         .maybeSingle()
       
       return !error && !!data
@@ -393,15 +404,14 @@ export default function TeamMembersPage() {
                 <Label htmlFor="role">Role</Label>
                 <Select
                   value={inviteForm.role}
-                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as 'owner' | 'company_admin' | 'member' })}
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as 'company_owner' | 'company_admin' | 'member' })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="company_admin">Company Admin</SelectItem>
-                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -525,7 +535,7 @@ export default function TeamMembersPage() {
                     </TableCell>
                     <TableCell>
                       <Badge className={getRoleBadgeColor(member.role)}>
-                        {member.role === 'customer' ? 'member' : member.role}
+                        {member.role === 'customer' ? 'Customer' : member.role === 'company_admin' ? 'Company Admin' : member.role === 'warehouse_staff' ? 'Warehouse Staff' : member.role === 'company_owner' ? 'Company Owner' : member.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -553,7 +563,7 @@ export default function TeamMembersPage() {
                           <DropdownMenuItem
                             onClick={() => handleDelete(member)}
                             className="text-destructive"
-                            disabled={member.role === 'owner'}
+                            disabled={member.role === 'company_owner'}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Remove
@@ -583,16 +593,15 @@ export default function TeamMembersPage() {
               <Label htmlFor="edit-role">Role</Label>
               <Select
                 value={editForm.role}
-                onValueChange={(value) => setEditForm({ ...editForm, role: value as 'owner' | 'company_admin' | 'member' })}
-                disabled={selectedMember?.role === 'owner'}
+                onValueChange={(value) => setEditForm({ ...editForm, role: value as 'company_admin' | 'warehouse_staff' })}
+                disabled={selectedMember?.role === 'company_owner'}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
                   <SelectItem value="company_admin">Company Admin</SelectItem>
-                  <SelectItem value="owner" disabled={selectedMember?.role !== 'owner'}>Owner</SelectItem>
+                  <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>

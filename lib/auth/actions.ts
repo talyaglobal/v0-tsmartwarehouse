@@ -14,14 +14,25 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   phone: z.string().optional(),
-  companyName: z.string().min(2, 'Company name must be at least 2 characters'),
-  role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'owner']).optional(),
+  companyName: z.string().min(2, 'Company name must be at least 2 characters').optional(),
+  role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'company_owner']).optional(),
   storageType: z.string().optional(),
+  userType: z.enum(['owner', 'customer']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
+}).refine((data) => {
+  // For owners, name and companyName are required
+  if (data.userType === 'owner') {
+    return data.name && data.name.length >= 2 && data.companyName && data.companyName.length >= 2
+  }
+  // For customers, name and companyName are not required
+  return true
+}, {
+  message: "Name and company name are required for warehouse owners",
+  path: ['name'],
 })
 
 export interface AuthError {
@@ -107,20 +118,22 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const email = formData.get('email') as string
     const password = formData.get('password') as string
     const confirmPassword = formData.get('confirmPassword') as string
-    const name = formData.get('name') as string
+    const name = formData.get('name') as string | null
     const phone = formData.get('phone') as string | null
     const companyName = formData.get('companyName') as string | null
     const storageType = formData.get('storageType') as string | null
+    const userType = formData.get('userType') as 'owner' | 'customer' | null
 
     // Validate input
     const validation = registerSchema.safeParse({
       email,
       password,
       confirmPassword,
-      name,
+      name: name || undefined,
       phone: phone || undefined,
       companyName: companyName || undefined,
       storageType: storageType || undefined,
+      userType: userType || 'owner', // Default to owner for backward compatibility
     })
 
     if (!validation.success) {
@@ -168,16 +181,20 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
+    // Determine user role based on userType
+    const isCustomer = validation.data.userType === 'customer'
+    const defaultRole = isCustomer ? 'customer' : 'member'
+
     // Create user directly with admin API (no email sent)
-    console.log('Creating user with email:', validation.data.email)
+    console.log('Creating user with email:', validation.data.email, 'User type:', validation.data.userType || 'owner')
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: validation.data.email,
       password: validation.data.password,
       email_confirm: true, // Auto-confirm email (no verification needed)
       user_metadata: {
-        name: validation.data.name,
+        name: isCustomer ? null : (validation.data.name || null),
         phone: validation.data.phone || null,
-        role: 'member', // Default role for new users
+        role: defaultRole,
         storage_interest: validation.data.storageType || null,
       },
     })
@@ -225,6 +242,43 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       // Profile doesn't exist, create it manually
       console.log('Profile not found, creating manually...')
       
+      // For customers, skip company creation
+      if (isCustomer) {
+        // Create profile for customer (no company)
+        const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            email: validation.data.email,
+            name: null, // Customers don't have name initially
+            role: 'customer',
+            phone: validation.data.phone || null,
+            company_id: null, // Customers don't have company_id
+          }, {
+            onConflict: 'id'
+          })
+          .select()
+          .single()
+
+        if (profileCreateError) {
+          console.error('Profile creation error:', profileCreateError)
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            console.log('User deleted after profile creation failure')
+          } catch (deleteError) {
+            console.error('Failed to cleanup after profile creation error:', deleteError)
+          }
+          return {
+            error: {
+              message: `Account creation failed: ${profileCreateError.message}. Please try again.`,
+            },
+          }
+        }
+        console.log('Customer profile created:', insertedProfile?.id)
+        return { error: undefined }
+      }
+
+      // For warehouse owners, continue with company creation logic
       // Get company name from form data
       const companyName = formData.get('companyName') as string | null
       
@@ -258,30 +312,29 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         (c) => c.name.toLowerCase() === trimmedCompanyName.toLowerCase()
       ) || null
       
-      const isExactMatch = !!existingCompany
-
       let companyId: string
+      let finalRole: 'company_owner' | 'company_admin' = 'company_owner'
 
-      if (isExactMatch && existingCompany) {
-        // Exact match found - use existing company
+      if (existingCompany) {
+        // Exact match found - but this should not happen in normal flow
+        // User should have selected from suggestions, but handle it anyway
         companyId = existingCompany.id
         console.log('Using existing company:', existingCompany.name)
+        finalRole = 'company_admin' // Use company_admin for existing company
         
         // Update profile with company_id and role
-        // company_members table no longer exists, company_id and role are in profiles table
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
           .update({
             company_id: companyId,
-            role: 'member', // Default role for new members
+            role: finalRole,
           })
           .eq('id', data.user.id)
         
         if (profileUpdateError) {
           console.error('Profile update error:', profileUpdateError)
-          // Don't fail registration if profile update fails, but log it
         } else {
-          console.log('User profile updated with company_id')
+          console.log('User profile updated with company_id and company_admin role')
         }
       } else {
         // No exact match - create new company
@@ -337,33 +390,32 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         }
         companyId = newCompany.id
         console.log('Created new company:', newCompany.name)
+        finalRole = 'company_owner' // New company owner gets company_owner role
         
-        // Update profile with company_id and owner role
-        // company_members table no longer exists, company_id and role are in profiles table
+        // Update profile with company_id and company_owner role
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
           .update({
             company_id: companyId,
-            role: 'owner', // Company creator is owner
+            role: finalRole,
           })
           .eq('id', data.user.id)
         
         if (profileUpdateError) {
           console.error('Profile update error:', profileUpdateError)
-          // Don't fail registration if profile update fails, but log it
         } else {
-          console.log('User profile updated with company_id and owner role')
+          console.log('User profile updated with company_id and company_owner role')
         }
       }
 
-      // Now create profile with company_id
+      // Now create/update profile with company_id and correct role
       const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
         .from('profiles')
         .upsert({
           id: data.user.id,
           email: validation.data.email,
           name: validation.data.name,
-          role: 'member',
+          role: finalRole,
           phone: validation.data.phone || null,
           storage_interest: validation.data.storageType || null,
           company_id: companyId,
@@ -450,19 +502,35 @@ export async function requestPasswordReset(formData: FormData): Promise<{ error?
     }
 
     // Use API endpoint that uses nodemailer
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
+    // Server actions run on server, need absolute URL
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const apiUrl = `${siteUrl}/api/v1/auth/request-password-reset`
 
     console.log('Requesting password reset via API:', email)
 
+    // Add timeout to fetch request (30 seconds)
+    const controller = new AbortController()
+    let timeoutId: NodeJS.Timeout | null = null
+
     try {
+      timeoutId = setTimeout(() => controller.abort(), 30000)
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email }),
+        signal: controller.signal,
       })
+
+      if (timeoutId) clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        console.error('Password reset API error:', response.status, response.statusText)
+        // Return success anyway to prevent email enumeration
+        return {}
+      }
 
       const result = await response.json()
 
@@ -480,7 +548,18 @@ export async function requestPasswordReset(formData: FormData): Promise<{ error?
       // Always return success (don't reveal if email exists)
       return {}
     } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId)
       console.error('Password reset API error:', error)
+      
+      // Check if it's a timeout error
+      if (error instanceof Error && error.name === 'AbortError') {
+        return {
+          error: {
+            message: 'Request timed out. Please check your connection and try again.',
+          },
+        }
+      }
+      
       // Return success anyway to prevent email enumeration
       return {}
     }
@@ -517,7 +596,19 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
       }
     }
 
-    const supabase = await createAuthenticatedSupabaseClient()
+    const supabase = await createClient()
+    
+    // Get current user to check role for redirect
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return {
+        error: {
+          message: 'User session not found. Please use the reset link from your email.',
+        },
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({
       password: password,
     })
@@ -530,8 +621,33 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
       }
     }
 
+    // Get user profile to determine role and redirect path
+    const supabaseAdmin = await createServerSupabaseClient()
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    // Map legacy roles to new roles
+    let role = profile?.role || user.user_metadata?.role || 'customer'
+    if (role === 'super_admin') role = 'root'
+    else if (role === 'customer') role = 'customer'
+    else if (role === 'worker') role = 'warehouse_staff'
+    else if (role === 'member') role = 'customer'
+
+    // Determine redirect path based on role
+    let redirectPath = '/dashboard'
+    if (role === 'root') {
+      redirectPath = '/admin'
+    } else if (role === 'warehouse_staff') {
+      redirectPath = '/warehouse'
+    } else if (['company_admin', 'customer', 'company_owner'].includes(role)) {
+      redirectPath = '/dashboard'
+    }
+
     revalidatePath('/')
-    redirect('/login?message=Password reset successful. Please sign in with your new password.')
+    redirect(redirectPath)
   } catch (error) {
     console.error('Password reset error:', error)
     return {

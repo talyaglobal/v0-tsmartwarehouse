@@ -17,7 +17,7 @@ interface RBCEvent extends Event {
   start: Date
   end: Date
   resource?: {
-    originalType: 'booking' | 'task' | 'request'
+    originalType: 'booking' | 'task' | 'request' | 'appointment'
     data: any
     filterKeys: string[]
   }
@@ -49,11 +49,14 @@ const eventStyleGetter = (event: RBCEvent) => {
     'pickup-request': '#f97316', // orange
     'incoming-request': '#22c55e', // green
     'site-visit-request': '#a855f7', // purple
+    appointment: '#8b5cf6', // purple/violet for appointments
   }
 
   // Get type from resource or use event type
   const eventType = event.resource?.originalType === 'booking' 
     ? 'booking' 
+    : event.resource?.originalType === 'appointment'
+    ? 'appointment'
     : event.resource?.originalType === 'task'
     ? (event.resource.data?.type === 'picking' || event.resource.data?.type === 'shipping'
         ? 'pickup-request'

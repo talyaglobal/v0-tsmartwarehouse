@@ -20,6 +20,7 @@ import {
 import { PRICING, WAREHOUSE_CONFIG } from "@/lib/constants"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { useUser } from "@/lib/hooks/use-user"
+import { BookingSearchForm } from "@/components/home/booking-search-form"
 
 export default function HomePage() {
   const { user } = useUser()
@@ -67,8 +68,17 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1">
+                {/* Booking Search Section */}
+                <section className="relative bg-gradient-to-br from-primary/10 via-background to-background py-8 md:py-12">
+                  <div className="container mx-auto relative w-full">
+                    <div className="mx-auto max-w-5xl px-4">
+                      <BookingSearchForm compact={true} />
+                    </div>
+                  </div>
+                </section>
+
         {/* Hero Section */}
-        <section className="relative py-20 md:py-32 overflow-hidden min-h-[calc(100vh-4rem)] flex items-center">
+        <section className="relative py-20 md:py-32 overflow-hidden flex items-center">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
           <div className="container mx-auto relative w-full">
             <div className="mx-auto max-w-4xl text-center">

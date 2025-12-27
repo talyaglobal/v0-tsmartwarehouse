@@ -24,7 +24,7 @@ interface CompanyMember {
   company_id: string
   email: string
   name: string | null
-  role: 'root' | 'company_admin' | 'member' | 'warehouse_staff' | 'owner'
+  role: 'root' | 'company_admin' | 'member' | 'warehouse_staff' | 'company_owner'
   avatar_url: string | null
   avatar: string | null
   phone: string | null
@@ -39,7 +39,7 @@ interface Invitation {
   id: string
   company_id: string
   email: string
-  role: 'owner' | 'company_admin' | 'member'
+  role: 'company_owner' | 'company_admin' | 'member'
   invited_by?: string
   token: string
   expires_at: string
@@ -78,7 +78,7 @@ export function TeamMembersTab() {
     name: "",
     email: "",
     phone: "",
-    role: "member" as "root" | "company_admin" | "member" | "warehouse_staff" | "owner",
+    role: "member" as "root" | "company_admin" | "member" | "warehouse_staff" | "company_owner",
     avatarUrl: "",
     password: "",
   })
@@ -304,7 +304,7 @@ export function TeamMembersTab() {
   const getRoleBadge = (role: string) => {
     const roleMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
       root: { label: "System Admin", variant: "default" },
-      owner: { label: "Owner", variant: "default" },
+      company_owner: { label: "Company Owner", variant: "default" },
       company_admin: { label: "Company Admin", variant: "secondary" },
       member: { label: "Member", variant: "outline" },
       warehouse_staff: { label: "Warehouse Staff", variant: "outline" },
@@ -879,7 +879,7 @@ export function TeamMembersTab() {
                 <Label htmlFor="edit-role">Role</Label>
                 <Select
                   value={editForm.role}
-                  onValueChange={(value: "root" | "company_admin" | "member" | "warehouse_staff" | "owner") =>
+                  onValueChange={(value: "root" | "company_admin" | "member" | "warehouse_staff" | "company_owner") =>
                     setEditForm({ ...editForm, role: value })
                   }
                 >
@@ -890,7 +890,7 @@ export function TeamMembersTab() {
                     <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="company_admin">Company Admin</SelectItem>
                     <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
-                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="company_owner">Company Owner</SelectItem>
                     {selectedMember?.role === 'root' && (
                       <SelectItem value="root">System Admin</SelectItem>
                     )}

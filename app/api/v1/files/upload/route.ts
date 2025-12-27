@@ -37,7 +37,12 @@ export async function POST(request: NextRequest) {
     // Determine validation rules based on bucket and folder
     const isLogoUpload = bucket === 'docs' && folder === 'logo'
     const isAvatarUpload = bucket === 'docs' && folder === 'avatar'
-    const maxSizeBytes = (isLogoUpload || isAvatarUpload) ? 2 * 1024 * 1024 : FILE_SIZE_LIMITS.DEFAULT // 2MB for logos and avatars
+    const isVideoFile = file.type.startsWith('video/')
+    const maxSizeBytes = (isLogoUpload || isAvatarUpload) 
+      ? 2 * 1024 * 1024 // 2MB for logos and avatars
+      : isVideoFile
+      ? FILE_SIZE_LIMITS.VIDEO // 100MB for videos
+      : FILE_SIZE_LIMITS.DEFAULT // 10MB default
     const allowedMimeTypes = (isLogoUpload || isAvatarUpload)
       ? ['image/jpeg', 'image/jpg', 'image/png'] 
       : [...ALLOWED_MIME_TYPES.ALL]
@@ -87,6 +92,10 @@ export async function POST(request: NextRequest) {
         'gif': 'image/gif',
         'webp': 'image/webp',
         'pdf': 'application/pdf',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime',
+        'avi': 'video/x-msvideo',
       }
       if (fileExtension && mimeTypeMap[fileExtension]) {
         contentType = mimeTypeMap[fileExtension]

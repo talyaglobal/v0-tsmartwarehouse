@@ -4,26 +4,31 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "@/components/icons"
+import { Loader2, Eye, EyeOff } from "@/components/icons"
 import { resetPassword } from "@/lib/auth/actions"
 import { createClient } from "@/lib/supabase/client"
+import { useUIStore } from "@/stores/ui.store"
 
 export default function ResetPasswordPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const addNotification = useUIStore((state) => state.addNotification)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     // Check if we have a valid reset token in the URL
     const checkToken = async () => {
-      const supabase = createClient()
-      
       // Check for token in URL hash (Supabase sends it here)
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = hashParams.get('access_token')
@@ -47,19 +52,29 @@ export default function ResetPasswordPage() {
             if (!sessionError) {
               setIsValidToken(true)
               return
+            } else {
+              console.error('Session error:', sessionError)
+              setIsValidToken(false)
+              return
             }
           }
         } catch (error) {
           console.error('Error setting session:', error)
+          setIsValidToken(false)
+          return
         }
       }
 
       // Fallback: check if we already have a valid session
       const { data: { session } } = await supabase.auth.getSession()
-      setIsValidToken(!!session)
+      if (session) {
+        setIsValidToken(true)
+      } else {
+        setIsValidToken(false)
+      }
     }
     checkToken()
-  }, [])
+  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,7 +103,13 @@ export default function ResetPasswordPage() {
       setError(result.error.message)
       setIsLoading(false)
     } else {
-      // Redirect will happen in the server action
+      // Password reset successful, user is now logged in
+      // The server action will redirect to appropriate dashboard
+      addNotification({
+        type: 'success',
+        message: 'Password reset successful! Redirecting...',
+        duration: 2000,
+      })
     }
   }
 
@@ -152,31 +173,61 @@ export default function ResetPasswordPage() {
           )}
           <div className="space-y-2">
             <Label htmlFor="password">New Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter new password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              disabled={isLoading}
-              minLength={6}
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter new password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                disabled={isLoading}
+                minLength={6}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                disabled={isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              disabled={isLoading}
-              minLength={6}
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                disabled={isLoading}
+                minLength={6}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                disabled={isLoading}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

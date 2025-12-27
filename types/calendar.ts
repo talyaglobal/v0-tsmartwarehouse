@@ -12,6 +12,7 @@ export type CalendarEventType =
   | 'pickup-request'
   | 'incoming-request'
   | 'site-visit-request'
+  | 'appointment'
 
 export type CalendarFilter = 
   | 'new-booking'
@@ -33,8 +34,8 @@ export interface CalendarEvent {
   end: Date
   type: CalendarEventType
   resource: {
-    originalType: 'booking' | 'task' | 'request'
-    data: Booking | Task | null
+    originalType: 'booking' | 'task' | 'request' | 'appointment'
+    data: Booking | Task | import('./index').Appointment | null
     filterKeys: CalendarFilter[]
   }
   color?: string

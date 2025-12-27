@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Wrench, DollarSign, Plus } from '@/components/icons'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Wrench, DollarSign, Plus, Grid, List, FileText, Download } from '@/components/icons'
 import Link from 'next/link'
+import { exportServicesToPDF, exportServicesToExcel } from '@/lib/utils/services-export'
 import type { WarehouseService, ServiceCategory } from '@/types'
 
 interface ServicesListProps {
@@ -38,8 +40,11 @@ const unitTypeLabels: Record<string, string> = {
   'flat-rate': 'flat rate',
 }
 
+type ViewMode = 'grid' | 'list'
+
 export function ServicesList({ services }: ServicesListProps) {
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | 'all'>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
 
   const categories: ServiceCategory[] = [
     'receiving',
@@ -59,37 +64,83 @@ export function ServicesList({ services }: ServicesListProps) {
       ? services
       : services.filter((service) => service.category === selectedCategory)
 
+  const handleExportPDF = () => {
+    exportServicesToPDF(services)
+  }
+
+  const handleExportExcel = () => {
+    exportServicesToExcel(services)
+  }
+
   return (
     <div className="space-y-6">
-      {/* Category Filter */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={selectedCategory === 'all' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSelectedCategory('all')}
-        >
-          All Services
-        </Button>
-        {categories.map((category) => (
-          <Button
-            key={category}
-            variant={selectedCategory === category ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedCategory(category)}
-          >
-            {categoryLabels[category]}
-          </Button>
-        ))}
+      {/* Category Filter, View Switcher, and Export Buttons */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={selectedCategory === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedCategory('all')}
+            >
+              All Services
+            </Button>
+            {categories.map((category) => (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(category)}
+              >
+                {categoryLabels[category]}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-2 border rounded-lg p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="gap-2"
+              >
+                <Grid className="h-4 w-4" />
+                Grid
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="gap-2"
+              >
+                <List className="h-4 w-4" />
+                List
+              </Button>
+            </div>
+
+            {/* Export Buttons */}
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <FileText className="h-4 w-4 mr-2" />
+              Print Price List PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportExcel}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Excel
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Services Grid */}
+      {/* Services Display */}
       {filteredServices.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">No services found</p>
           </CardContent>
         </Card>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredServices.map((service) => (
             <Card key={service.id}>
@@ -130,6 +181,59 @@ export function ServicesList({ services }: ServicesListProps) {
             </Card>
           ))}
         </div>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Service Name</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Unit Type</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead>Min Quantity</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredServices.map((service) => (
+                <TableRow key={service.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Wrench className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">{service.name}</p>
+                        {service.description && (
+                          <p className="text-sm text-muted-foreground">{service.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{categoryLabels[service.category]}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {unitTypeLabels[service.unitType]}
+                  </TableCell>
+                  <TableCell className="text-right font-bold">
+                    <div className="flex items-center justify-end gap-1">
+                      <DollarSign className="h-4 w-4" />
+                      {service.basePrice.toFixed(2)}
+                    </div>
+                  </TableCell>
+                  <TableCell>{service.minQuantity > 1 ? service.minQuantity : '-'}</TableCell>
+                  <TableCell className="text-right">
+                    <Link href={`/dashboard/orders/new?serviceId=${service.id}`}>
+                      <Button size="sm" variant="outline">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add to Order
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   )

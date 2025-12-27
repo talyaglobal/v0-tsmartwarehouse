@@ -48,7 +48,7 @@ export default function MyCompanyPage() {
         .maybeSingle()
       
       if (!profile || !profile.company_id) return false
-      return ['owner', 'company_admin'].includes(profile.role)
+      return ['company_owner', 'company_admin'].includes(profile.role)
     },
     enabled: !!user,
   })

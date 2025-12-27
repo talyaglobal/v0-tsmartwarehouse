@@ -17,4 +17,6 @@ export * from './analytics'
 export * from './audit'
 export * from './companies'
 export * from './warehouses'
+export * from './appointments'
+export * from './appointment-types'
 

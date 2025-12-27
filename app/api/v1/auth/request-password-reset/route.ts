@@ -31,11 +31,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabaseClient()
     
-    // Check if user exists
-    const { data: users, error: listError } = await supabase.auth.admin.listUsers()
-    
-    if (listError) {
-      console.error('Error listing users:', listError)
+    // First check profiles table (much faster than listing all users)
+    // This is more efficient as it uses indexed email column
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, status, email, name')
+      .eq('email', email.toLowerCase())
+      .single()
+
+    if (profileError || !profile) {
+      console.error('Profile not found or error:', profileError)
       // Don't reveal if email exists or not for security
       // Return success anyway
       const responseData: ApiResponse = {
@@ -45,9 +50,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseData)
     }
 
-    const user = users.users.find(u => u.email === email)
-    
-    if (!user) {
+    // Check if status is true
+    if (profile.status !== true) {
+      console.log('Profile status is not active for user:', profile.id)
       // Don't reveal if email exists or not for security
       // Return success anyway
       const responseData: ApiResponse = {
@@ -56,9 +61,22 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json(responseData)
     }
+
+    // No need to verify user in auth - if profile exists, user exists
+    // Generate link directly using email
 
     // Generate password reset token using Supabase Admin API
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
+    // Get site URL from environment or request headers (works in both local and Vercel)
+    let siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL
+    if (!siteUrl) {
+      // In Vercel, use VERCEL_URL environment variable
+      if (process.env.VERCEL_URL) {
+        siteUrl = `https://${process.env.VERCEL_URL}`
+      } else {
+        // Default to localhost for development
+        siteUrl = 'http://localhost:3000'
+      }
+    }
     const redirectUrl = `${siteUrl}/reset-password`
 
     // Generate recovery token using Supabase Admin API
@@ -82,33 +100,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseData)
     }
 
-    // Get user profile for name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('name')
-      .eq('id', user.id)
-      .single()
+    // Profile already fetched above, extract name from it
+    const profileName = profile.name || undefined
 
     // Extract the recovery URL from the generated link
     // The recoveryData.properties.action_link contains the full URL with token
     const resetUrl = recoveryData.properties.action_link
 
     // Send email using nodemailer
-    const emailTemplate = getPasswordResetEmailTemplate(resetUrl, profile?.name || undefined)
+    const emailTemplate = getPasswordResetEmailTemplate(resetUrl, profileName)
     
-    const emailResult = await sendEmail({
+    // Send email asynchronously (don't wait for it to complete)
+    // This prevents the API from hanging if email sending is slow
+    sendEmail({
       to: email,
       subject: emailTemplate.subject,
       html: emailTemplate.html,
       text: emailTemplate.text,
+    }).catch((error) => {
+      console.error('Error sending email via nodemailer (async):', error)
     })
 
-    if (!emailResult.success) {
-      console.error('Error sending email via nodemailer:', emailResult.error)
-      // For security, don't reveal the error
-      // Return success anyway
-    }
-
+    // Return success immediately without waiting for email
     const responseData: ApiResponse = {
       success: true,
       message: "If an account with this email exists, you will receive a password reset link.",

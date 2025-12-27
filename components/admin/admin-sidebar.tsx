@@ -112,6 +112,7 @@ const navSections: NavSection[] = [
     title: "Configuration",
     items: [
       { name: "Pricing", href: "/admin/pricing", icon: DollarSign },
+      { name: "Appointment Types", href: "/admin/appointment-types", icon: Calendar },
       { name: "Settings", href: "/admin/settings", icon: Settings },
       { name: "Notifications", href: "/admin/notifications", icon: Bell },
       { name: "Send SMS", href: "/admin/notifications/send-sms", icon: Bell },

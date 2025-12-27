@@ -199,3 +199,92 @@ export const accessLogsQuerySchema = z.object({
   offset: z.coerce.number().int().nonnegative().optional(),
 })
 
+// Appointment Type schemas
+export const createAppointmentTypeSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, "Slug must contain only lowercase letters, numbers, and hyphens"),
+  description: z.string().max(500).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex color"),
+  icon: z.string().max(50).optional(),
+  durationMinutes: z.number().int().positive().max(1440).default(60), // Max 24 hours
+  requiresWarehouseStaff: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+})
+
+export const updateAppointmentTypeSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, "Slug must contain only lowercase letters, numbers, and hyphens").optional(),
+  description: z.string().max(500).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex color").optional(),
+  icon: z.string().max(50).optional(),
+  durationMinutes: z.number().int().positive().max(1440).optional(),
+  requiresWarehouseStaff: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+})
+
+// Appointment schemas
+export const createAppointmentSchema = z.object({
+  warehouseId: z.string().uuid(),
+  appointmentTypeId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime(),
+  location: z.string().max(200).optional(),
+  meetingLink: z.string().url().max(500).optional(),
+  phoneNumber: z.string().max(50).optional(),
+  notes: z.string().max(2000).optional(),
+  participantIds: z.array(z.string().uuid()).optional(), // Array of user IDs to add as participants
+}).refine(
+  (data) => {
+    const start = new Date(data.startTime)
+    const end = new Date(data.endTime)
+    return end > start
+  },
+  {
+    message: "End time must be after start time",
+    path: ["endTime"],
+  }
+)
+
+export const updateAppointmentSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional(),
+  status: z.enum(["pending", "confirmed", "cancelled", "completed"]).optional(),
+  location: z.string().max(200).optional(),
+  meetingLink: z.string().url().max(500).optional(),
+  phoneNumber: z.string().max(50).optional(),
+  notes: z.string().max(2000).optional(),
+}).refine(
+  (data) => {
+    if (data.startTime && data.endTime) {
+      const start = new Date(data.startTime)
+      const end = new Date(data.endTime)
+      return end > start
+    }
+    return true
+  },
+  {
+    message: "End time must be after start time",
+    path: ["endTime"],
+  }
+)
+
+export const appointmentsQuerySchema = z.object({
+  warehouseId: z.string().uuid().optional(),
+  appointmentTypeId: z.string().uuid().optional(),
+  status: z.enum(["pending", "confirmed", "cancelled", "completed"]).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  createdBy: z.string().uuid().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().nonnegative().optional(),
+})
+
+export const addParticipantSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(["requester", "attendee", "staff_assignee"]).default("attendee"),
+})
+

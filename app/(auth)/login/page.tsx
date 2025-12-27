@@ -213,7 +213,7 @@ export default function LoginPage() {
           redirectPath = '/admin'
         } else if (role === 'warehouse_staff') {
           redirectPath = '/warehouse'
-        } else if (['company_admin', 'member', 'owner'].includes(role)) {
+        } else if (['company_admin', 'customer', 'company_owner'].includes(role)) {
           redirectPath = '/dashboard'
         }
 

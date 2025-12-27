@@ -3,11 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, ClipboardList, ScanLine, Package, User } from "@/components/icons"
+import { Home, ClipboardList, ScanLine, Package, User, Calendar } from "@/components/icons"
 
 const navItems = [
   { name: "Home", href: "/warehouse", icon: Home },
   { name: "Tasks", href: "/warehouse/tasks", icon: ClipboardList },
+  { name: "Appointments", href: "/warehouse/appointments", icon: Calendar },
   { name: "Scan", href: "/warehouse/scan", icon: ScanLine },
   { name: "Inventory", href: "/warehouse/inventory", icon: Package },
   { name: "Profile", href: "/warehouse/profile", icon: User },

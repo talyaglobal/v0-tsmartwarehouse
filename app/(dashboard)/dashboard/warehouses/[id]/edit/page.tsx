@@ -1,35 +1,111 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
-import { useQueryClient, useQuery } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Loader2, Warehouse, ArrowLeft, MapPin } from "@/components/icons"
+import { Loader2, Warehouse, ArrowLeft } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
-import { LocationPicker } from "@/components/maps/location-picker"
-import { useCountries, useCities } from "@/lib/hooks/use-countries-cities"
+import { BookingSearch } from "@/components/home/booking-search"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
+import { FileUpload, UploadedFile } from "@/components/ui/file-upload"
+import { MapLocationPicker } from "@/components/ui/map-location-picker"
+import { formatNumber } from "@/lib/utils/format"
+import { createClient } from "@/lib/supabase/client"
+import type { Warehouse } from "@/types"
 
-export default function EditWarehousePage() {
+const WAREHOUSE_TYPES = [
+  { value: "general-dry-ambient", label: "General (Dry/Ambient)" },
+  { value: "food-beverage-fda", label: "Food & Beverage (FDA Registered)" },
+  { value: "pharmaceutical-fda-cgmp", label: "Pharmaceutical (FDA/cGMP)" },
+  { value: "medical-devices-fda", label: "Medical Devices (FDA Registered)" },
+  { value: "nutraceuticals-supplements-fda", label: "Nutraceuticals & Supplements (FDA)" },
+  { value: "cosmetics-fda", label: "Cosmetics (FDA)" },
+  { value: "hazardous-materials-hazmat", label: "Hazardous Materials (Hazmat Certified)" },
+  { value: "cold-storage", label: "Cold Storage (Refrigerated/Frozen)" },
+  { value: "alcohol-tobacco-ttb", label: "Alcohol & Tobacco (TTB Licensed)" },
+  { value: "consumer-electronics", label: "Consumer Electronics" },
+  { value: "automotive-parts", label: "Automotive Parts" },
+  { value: "ecommerce-high-velocity", label: "E-commerce / High-velocity Fulfillment" },
+] as const
+
+const STORAGE_TYPES = [
+  "bulk-space",
+  "rack-space",
+  "individual-unit",
+  "lockable-unit",
+  "cage",
+  "open-yard",
+  "closed-yard",
+] as const
+
+const TEMPERATURE_OPTIONS = [
+  { value: "ambient-with-ac", label: "Ambient (with A/C)" },
+  { value: "ambient-without-ac", label: "Ambient (without A/C)" },
+  { value: "chilled", label: "Chilled (+40°F)" },
+  { value: "frozen", label: "Frozen (0°F)" },
+  { value: "open-area-with-tent", label: "Open Area (with tent)" },
+  { value: "open-area", label: "Open Area" },
+] as const
+
+const RENT_METHODS = [
+  { value: "pallet", label: "Pallet" },
+  { value: "sq_ft", label: "Square Feet" },
+] as const
+
+const SECURITY_OPTIONS = [
+  "24/7 Security",
+  "CCTV",
+  "Access Control",
+  "Alarm System",
+  "Guarded",
+  "Fenced",
+] as const
+
+const formatLabel = (value: string): string => {
+  return value
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+export default function EditWarehousePage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
-  const params = useParams()
-  const warehouseId = params?.id as string
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
+  const [warehouseId, setWarehouseId] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
-  const [country, setCountry] = useState("US")
-  const [city, setCity] = useState("")
-  const [showLocationPicker, setShowLocationPicker] = useState(false)
+  const [isFetching, setIsFetching] = useState(true)
+  const [state, setState] = useState("")
+  const [cityLocation, setCityLocation] = useState("")
+  const [warehousePhotos, setWarehousePhotos] = useState<UploadedFile[]>([])
+  const [warehouseVideo, setWarehouseVideo] = useState<UploadedFile[]>([])
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  
+  // Helper function to format number with thousands separator
+  const formatNumberInput = (value: string): string => {
+    const numericValue = value.replace(/\D/g, '')
+    if (!numericValue) return ''
+    const num = parseInt(numericValue, 10)
+    if (isNaN(num)) return ''
+    return formatNumber(num)
+  }
+  
+  // Helper function to parse formatted number back to numeric string
+  const parseNumberInput = (value: string): string => {
+    return value.replace(/\D/g, '')
+  }
+  
   const [formData, setFormData] = useState({
-    name: "",
     address: "",
     city: "",
     zipCode: "",
@@ -38,44 +114,168 @@ export default function EditWarehousePage() {
     latitude: "",
     longitude: "",
     amenities: "",
+    warehouseType: [] as string[],
+    storageTypes: [] as string[],
+    temperatureTypes: [] as string[],
+    customStatus: "",
+    atCapacitySqFt: false,
+    atCapacityPallet: false,
+    minPallet: "",
+    maxPallet: "",
+    minSqFt: "",
+    maxSqFt: "",
+    rentMethods: [] as string[],
+    security: [] as string[],
+    accessType: "",
+    appointmentRequired: false,
+    accessControl: "",
+    productAcceptanceStartTime: "",
+    productAcceptanceEndTime: "",
+    workingDays: [] as string[],
   })
 
-  // Fetch countries and cities from API
-  const { data: countries = [] } = useCountries()
-  const { data: cities = [], isLoading: citiesLoading, error: citiesError } = useCities(country)
+  // Resolve params
+  useEffect(() => {
+    const resolveParams = async () => {
+      const resolvedParams = params instanceof Promise ? await params : params
+      setWarehouseId(resolvedParams.id)
+    }
+    resolveParams()
+  }, [params])
 
   // Fetch warehouse data
-  const { data: warehouse, isLoading: isLoadingWarehouse } = useQuery({
-    queryKey: ['warehouse', warehouseId],
-    queryFn: async () => {
-      const response = await fetch(`/api/v1/warehouses/${warehouseId}`)
-      if (!response.ok) throw new Error('Failed to fetch warehouse')
-      const result = await response.json()
-      return result.data
-    },
-    enabled: !!warehouseId,
-  })
-
-  // Populate form when warehouse data is loaded
   useEffect(() => {
-    if (warehouse) {
-      // Try to detect country code from existing data if available
-      // For now, default to US - in a real app you might store country in the warehouse data
-      setCountry("US") // TODO: Get country from warehouse data if available
-      setCity(warehouse.city || "")
-      setFormData({
-        name: warehouse.name || "",
-        address: warehouse.address || "",
-        city: warehouse.city || "",
-        zipCode: warehouse.zipCode || "",
-        totalSqFt: warehouse.totalSqFt?.toString() || "",
-        totalPalletStorage: warehouse.totalPalletStorage?.toString() || "",
-        latitude: warehouse.latitude?.toString() || "",
-        longitude: warehouse.longitude?.toString() || "",
-        amenities: Array.isArray(warehouse.amenities) ? warehouse.amenities.join(", ") : "",
-      })
+    if (!warehouseId) return
+    
+    const fetchWarehouse = async () => {
+      try {
+        setIsFetching(true)
+        const result = await api.get<Warehouse>(`/api/v1/warehouses/${warehouseId}`, { showToast: false })
+        
+        if (result.success && result.data) {
+          const warehouse = result.data
+          
+          // Convert Supabase storage paths to full URLs for existing photos
+          const supabase = createClient()
+          const photoFiles: UploadedFile[] = []
+          
+          if (warehouse.photos && Array.isArray(warehouse.photos) && warehouse.photos.length > 0) {
+            for (const photoPath of warehouse.photos) {
+              try {
+                const { data } = supabase.storage.from('docs').getPublicUrl(photoPath)
+                const fileName = photoPath.split('/').pop() || 'photo'
+                const fileExt = fileName.split('.').pop()?.toLowerCase() || ''
+                // Determine MIME type from extension
+                const mimeTypeMap: Record<string, string> = {
+                  'jpg': 'image/jpeg',
+                  'jpeg': 'image/jpeg',
+                  'png': 'image/png',
+                  'webp': 'image/webp',
+                  'gif': 'image/gif',
+                  'bmp': 'image/bmp',
+                  'avif': 'image/avif',
+                }
+                const mimeType = mimeTypeMap[fileExt] || 'image/jpeg'
+                // Create a dummy File object for existing photos
+                const dummyFile = new File([], fileName, { type: mimeType })
+                photoFiles.push({
+                  id: Date.now().toString() + Math.random().toString(36).substring(7),
+                  file: dummyFile,
+                  status: 'success',
+                  path: photoPath,
+                  url: data.publicUrl,
+                })
+              } catch (error) {
+                console.error('Error processing photo:', error)
+              }
+            }
+          }
+          
+          // Convert video URL if exists
+          const videoFiles: UploadedFile[] = []
+          if (warehouse.videoUrl) {
+            try {
+              const { data } = supabase.storage.from('docs').getPublicUrl(warehouse.videoUrl)
+              const fileName = warehouse.videoUrl.split('/').pop() || 'video'
+              const fileExt = fileName.split('.').pop()?.toLowerCase() || ''
+              // Determine MIME type from extension
+              const mimeTypeMap: Record<string, string> = {
+                'mp4': 'video/mp4',
+                'webm': 'video/webm',
+                'mov': 'video/quicktime',
+                'avi': 'video/x-msvideo',
+              }
+              const mimeType = mimeTypeMap[fileExt] || 'video/mp4'
+              // Create a dummy File object for existing video
+              const dummyFile = new File([], fileName, { type: mimeType })
+              videoFiles.push({
+                id: Date.now().toString() + Math.random().toString(36).substring(7),
+                file: dummyFile,
+                status: 'success',
+                path: warehouse.videoUrl,
+                url: data.publicUrl,
+              })
+            } catch (error) {
+              console.error('Error processing video:', error)
+            }
+          }
+          
+          setWarehousePhotos(photoFiles)
+          setWarehouseVideo(videoFiles)
+          setCityLocation(warehouse.city || "")
+          
+          // Set form data
+          setFormData({
+            address: warehouse.address || "",
+            city: warehouse.city || "",
+            zipCode: warehouse.zipCode || "",
+            totalSqFt: warehouse.totalSqFt ? formatNumber(warehouse.totalSqFt) : "",
+            totalPalletStorage: warehouse.totalPalletStorage != null ? formatNumber(warehouse.totalPalletStorage) : "",
+            latitude: warehouse.latitude?.toString() || "",
+            longitude: warehouse.longitude?.toString() || "",
+            amenities: Array.isArray(warehouse.amenities) ? warehouse.amenities.join(", ") : (warehouse.amenities || ""),
+            warehouseType: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : (warehouse.warehouseType ? [warehouse.warehouseType] : []),
+            storageTypes: Array.isArray(warehouse.storageTypes) ? warehouse.storageTypes : (warehouse.storageTypes ? [warehouse.storageTypes] : []),
+            temperatureTypes: Array.isArray(warehouse.temperatureTypes) ? warehouse.temperatureTypes : (warehouse.temperatureTypes ? [warehouse.temperatureTypes] : []),
+            customStatus: warehouse.customStatus || "",
+            atCapacitySqFt: warehouse.atCapacitySqFt || false,
+            atCapacityPallet: warehouse.atCapacityPallet || false,
+            minPallet: warehouse.minPallet != null ? formatNumber(warehouse.minPallet) : "",
+            maxPallet: warehouse.maxPallet != null ? formatNumber(warehouse.maxPallet) : "",
+            minSqFt: warehouse.minSqFt != null ? formatNumber(warehouse.minSqFt) : "",
+            maxSqFt: warehouse.maxSqFt != null ? formatNumber(warehouse.maxSqFt) : "",
+            rentMethods: Array.isArray(warehouse.rentMethods) ? warehouse.rentMethods : (warehouse.rentMethods ? [warehouse.rentMethods] : []),
+            security: Array.isArray(warehouse.security) ? warehouse.security : (warehouse.security ? [warehouse.security] : []),
+            accessType: warehouse.accessInfo?.accessType || "",
+            appointmentRequired: warehouse.accessInfo?.appointmentRequired || false,
+            accessControl: warehouse.accessInfo?.accessControl || "",
+            productAcceptanceStartTime: warehouse.productAcceptanceStartTime || "",
+            productAcceptanceEndTime: warehouse.productAcceptanceEndTime || "",
+            workingDays: Array.isArray(warehouse.workingDays) ? warehouse.workingDays : [],
+          })
+        } else {
+          addNotification({
+            type: 'error',
+            message: 'Warehouse not found',
+            duration: 5000,
+          })
+          router.push("/dashboard/my-company?tab=warehouses")
+        }
+      } catch (error) {
+        console.error('Error fetching warehouse:', error)
+        addNotification({
+          type: 'error',
+          message: 'Failed to load warehouse data',
+          duration: 5000,
+        })
+        router.push("/dashboard/my-company?tab=warehouses")
+      } finally {
+        setIsFetching(false)
+      }
     }
-  }, [warehouse])
+    
+    fetchWarehouse()
+  }, [warehouseId, router, addNotification])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,49 +289,157 @@ export default function EditWarehousePage() {
         .filter(a => a.length > 0)
 
       // Validate required fields
-      if (!formData.name || !formData.address || !formData.city) {
+      if (!formData.address || !formData.city || formData.warehouseType.length === 0) {
         addNotification({
           type: 'error',
-          message: 'Please fill in all required fields',
+          message: 'Please fill in all required fields (location, address, and warehouse type)',
           duration: 5000,
         })
         setIsLoading(false)
         return
       }
 
-      const updates: any = {
-        name: formData.name,
+      if (formData.storageTypes.length === 0) {
+        addNotification({
+          type: 'error',
+          message: 'Please select at least one storage type',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (formData.temperatureTypes.length === 0) {
+        addNotification({
+          type: 'error',
+          message: 'Please select at least one temperature option',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Validate warehouse photos (minimum 2 required)
+      const successPhotos = warehousePhotos.filter(f => 
+        f.status === 'success' && 
+        f.path && 
+        f.path.trim().length > 0
+      )
+      if (successPhotos.length < 2) {
+        addNotification({
+          type: 'error',
+          message: `Please upload at least 2 warehouse photos. Currently uploaded: ${successPhotos.length}`,
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Validate totalSqFt (required)
+      const totalSqFtValue = parseNumberInput(formData.totalSqFt)
+      if (!totalSqFtValue || totalSqFtValue.trim() === '') {
+        addNotification({
+          type: 'error',
+          message: 'Total square feet is required',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      const totalSqFt = parseInt(totalSqFtValue)
+      if (isNaN(totalSqFt) || totalSqFt <= 0) {
+        addNotification({
+          type: 'error',
+          message: 'Total square feet must be a positive number',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Validate totalPalletStorage (required)
+      const totalPalletStorageValue = parseNumberInput(formData.totalPalletStorage)
+      if (!totalPalletStorageValue || totalPalletStorageValue.trim() === '') {
+        addNotification({
+          type: 'error',
+          message: 'Total pallet storage is required',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      const totalPalletStorage = parseInt(totalPalletStorageValue)
+      if (isNaN(totalPalletStorage) || totalPalletStorage <= 0) {
+        addNotification({
+          type: 'error',
+          message: 'Total pallet storage must be a positive number',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Prepare photo paths
+      const photoPaths = successPhotos.map(f => f.path).filter(Boolean) as string[]
+
+      // Prepare video path (optional, single file)
+      const videoPath = warehouseVideo.length > 0 && warehouseVideo[0].status === 'success' && warehouseVideo[0].path
+        ? warehouseVideo[0].path
+        : undefined
+
+      // Prepare access info
+      const accessInfo = formData.accessType || formData.appointmentRequired || formData.accessControl
+        ? {
+            accessType: formData.accessType || undefined,
+            appointmentRequired: formData.appointmentRequired || false,
+            accessControl: formData.accessControl || undefined,
+          }
+        : undefined
+
+      const requestBody: any = {
         address: formData.address,
         city: formData.city,
+        state: state,
+        warehouseType: formData.warehouseType,
+        storageTypes: formData.storageTypes,
+        temperatureTypes: formData.temperatureTypes,
         amenities: amenitiesArray,
+        photos: photoPaths,
+        totalSqFt: totalSqFt,
+        totalPalletStorage: totalPalletStorage,
+        customStatus: formData.customStatus || undefined,
+        atCapacitySqFt: formData.atCapacitySqFt,
+        atCapacityPallet: formData.atCapacityPallet,
+        minPallet: formData.minPallet ? parseInt(parseNumberInput(formData.minPallet)) : undefined,
+        maxPallet: formData.maxPallet ? parseInt(parseNumberInput(formData.maxPallet)) : undefined,
+        minSqFt: formData.minSqFt ? parseInt(parseNumberInput(formData.minSqFt)) : undefined,
+        maxSqFt: formData.maxSqFt ? parseInt(parseNumberInput(formData.maxSqFt)) : undefined,
+        rentMethods: formData.rentMethods,
+        security: formData.security,
+        videoUrl: videoPath,
+        accessInfo: accessInfo,
+        productAcceptanceStartTime: formData.productAcceptanceStartTime || undefined,
+        productAcceptanceEndTime: formData.productAcceptanceEndTime || undefined,
+        workingDays: formData.workingDays.length > 0 ? formData.workingDays : undefined,
       }
 
       if (formData.zipCode) {
-        updates.zipCode = formData.zipCode
+        requestBody.zipCode = formData.zipCode
       }
-      if (formData.totalSqFt) {
-        updates.totalSqFt = parseInt(formData.totalSqFt, 10)
-      }
-      if (formData.totalPalletStorage) {
-        updates.totalPalletStorage = parseInt(formData.totalPalletStorage, 10)
-      }
-      if (formData.latitude) {
-        updates.latitude = parseFloat(formData.latitude)
-      }
-      if (formData.longitude) {
-        updates.longitude = parseFloat(formData.longitude)
+      if (formData.latitude && formData.longitude) {
+        requestBody.latitude = parseFloat(formData.latitude)
+        requestBody.longitude = parseFloat(formData.longitude)
       }
 
-      const result = await api.patch(`/api/v1/warehouses/${warehouseId}`, updates, {
+      const result = await api.patch(`/api/v1/warehouses/${warehouseId}`, requestBody, {
         successMessage: 'Warehouse updated successfully!',
         errorMessage: 'Failed to update warehouse. Please try again.',
       })
 
       if (result.success) {
-        // Invalidate warehouses cache
         queryClient.invalidateQueries({ queryKey: ['company-warehouses'] })
-        queryClient.invalidateQueries({ queryKey: ['warehouse', warehouseId] })
-        // Redirect to my-company page
         router.push("/dashboard/my-company?tab=warehouses")
       } else {
         setIsLoading(false)
@@ -147,27 +455,10 @@ export default function EditWarehousePage() {
     }
   }
 
-  if (isLoadingWarehouse) {
+  if (isFetching) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (!warehouse) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Warehouse Not Found"
-          description="The warehouse you're looking for doesn't exist"
-        />
-        <Button asChild>
-          <Link href="/dashboard/my-company?tab=warehouses">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Warehouses
-          </Link>
-        </Button>
       </div>
     )
   }
@@ -176,7 +467,7 @@ export default function EditWarehousePage() {
     <div className="space-y-6">
       <PageHeader
         title="Edit Warehouse"
-        description="Update warehouse information"
+        description="Update warehouse details"
       />
 
       <div className="flex items-center gap-4 mb-6">
@@ -190,107 +481,122 @@ export default function EditWarehousePage() {
 
       <Card>
         <form onSubmit={handleSubmit}>
-          <CardHeader>
-            <CardTitle>Warehouse Information</CardTitle>
-            <CardDescription>
-              Update the details for your warehouse
-            </CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="mb-2">Enter the details for your warehouse</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 pt-0">
             <div className="grid gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  Warehouse Name <span className="text-destructive">*</span>
+              {/* Warehouse Type */}
+              <div className="space-y-3">
+                <Label>
+                  Warehouse Type as per Product Content <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="name"
-                  placeholder="Main Warehouse"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                <div className="grid grid-cols-2 gap-2">
+                  {WAREHOUSE_TYPES.map((type) => (
+                    <div key={type.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`warehouse-type-${type.value}`}
+                        checked={formData.warehouseType.includes(type.value)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            warehouseType: checked
+                              ? [...prev.warehouseType, type.value]
+                              : prev.warehouseType.filter((t) => t !== type.value),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`warehouse-type-${type.value}`} className="text-sm font-normal cursor-pointer">
+                        {type.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Storage Types */}
+              <div className="space-y-3">
+                <Label>
+                  Storage Types <span className="text-destructive">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {STORAGE_TYPES.map((type) => (
+                    <div key={type} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`storage-type-${type}`}
+                        checked={formData.storageTypes.includes(type)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            storageTypes: checked
+                              ? [...prev.storageTypes, type]
+                              : prev.storageTypes.filter((t) => t !== type),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`storage-type-${type}`} className="text-sm font-normal cursor-pointer">
+                        {formatLabel(type)}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Temperature Types */}
+              <div className="space-y-3">
+                <Label>
+                  Temperature Options <span className="text-destructive">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {TEMPERATURE_OPTIONS.map((temp) => (
+                    <div key={temp.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`temperature-${temp.value}`}
+                        checked={formData.temperatureTypes.includes(temp.value)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            temperatureTypes: checked
+                              ? [...prev.temperatureTypes, temp.value]
+                              : prev.temperatureTypes.filter((t) => t !== temp.value),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`temperature-${temp.value}`} className="text-sm font-normal cursor-pointer">
+                        {temp.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* City/Location */}
+              <div className="space-y-2">
+                <Label>
+                  City or Location <span className="text-destructive">*</span>
+                </Label>
+                <BookingSearch
+                  value={cityLocation}
+                  onChange={(value, place) => {
+                    setCityLocation(value)
+                    if (place && place.name) {
+                      setFormData({ ...formData, city: place.name })
+                    } else if (value) {
+                      setFormData({ ...formData, city: value })
+                    }
+                  }}
+                  placeholder="Enter city or location"
                   required
                 />
               </div>
 
-              {/* Country Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
-                <Select
-                  value={country}
-                  onValueChange={(value) => {
-                    setCountry(value)
-                    setCity("")
-                    setFormData({ ...formData, city: "" })
-                  }}
-                >
-                  <SelectTrigger id="country">
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* City Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="city">
-                  City <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={city}
-                  onValueChange={(value) => {
-                    setCity(value)
-                    setFormData({ ...formData, city: value })
-                  }}
-                  disabled={!country || citiesLoading}
-                >
-                  <SelectTrigger id="city">
-                    <SelectValue placeholder={citiesLoading ? "Loading cities..." : country ? "Select a city" : "Select a country first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {citiesError && (
-                      <div className="px-2 py-1.5 text-sm text-red-600 dark:text-red-400 space-y-1">
-                        <div className="font-medium">Error loading cities</div>
-                        <div className="text-xs">{citiesError.message}</div>
-                        {citiesError.message.includes('not enabled') && (
-                          <div className="text-xs mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                            GeoNames account needs to be enabled for webservice. Please enable it at{' '}
-                            <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer" className="underline">
-                              https://www.geonames.org/manageaccount
-                            </a>
-                          </div>
-                        )}
-                        {citiesError.message.includes('rate limit') && (
-                          <div className="text-xs mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                            Please contact the administrator to configure GeoNames API username in .env.local
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {cities.length === 0 && !citiesLoading && !citiesError && (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        No cities found for this country. Please try again later or contact support.
-                      </div>
-                    )}
-                    {cities.map((cityOption) => {
-                      const cityDisplayName = cityOption.state
-                        ? `${cityOption.name}, ${cityOption.state}`
-                        : cityOption.name
-                      return (
-                        <SelectItem key={cityOption.name} value={cityOption.name}>
-                          {cityDisplayName}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Address with Google Maps Places Autocomplete */}
+              {/* Address */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="address">
@@ -300,22 +606,18 @@ export default function EditWarehousePage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowLocationPicker(true)}
+                    onClick={() => setShowMapPicker(true)}
                   >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Haritadan Seç
+                    Select on Map
                   </Button>
                 </div>
                 <PlacesAutocomplete
                   value={formData.address}
                   onChange={(address, place) => {
                     setFormData({ ...formData, address })
-                    
-                    // Extract address components from Google Places result
                     if (place?.address_components) {
                       let cityName = ""
                       let zipCode = ""
-                      
                       for (const component of place.address_components) {
                         const types = component.types
                         if (types.includes("locality") || types.includes("administrative_area_level_2")) {
@@ -324,8 +626,10 @@ export default function EditWarehousePage() {
                         if (types.includes("postal_code")) {
                           zipCode = component.long_name
                         }
+                        if (types.includes("administrative_area_level_1")) {
+                          setState(component.short_name || component.long_name)
+                        }
                       }
-                      
                       if (cityName) setFormData(prev => ({ ...prev, city: cityName, address }))
                       if (zipCode) setFormData(prev => ({ ...prev, zipCode, address }))
                     }
@@ -334,9 +638,24 @@ export default function EditWarehousePage() {
                     setFormData({ ...formData, latitude: location.lat.toString(), longitude: location.lng.toString() })
                   }}
                   placeholder="Enter address"
-                  country={country}
                 />
               </div>
+
+              {/* Map Location Picker */}
+              <MapLocationPicker
+                open={showMapPicker}
+                onOpenChange={setShowMapPicker}
+                initialLat={formData.latitude ? parseFloat(formData.latitude) : undefined}
+                initialLng={formData.longitude ? parseFloat(formData.longitude) : undefined}
+                onLocationSelect={(location) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    latitude: location.lat.toString(),
+                    longitude: location.lng.toString(),
+                    address: location.address || prev.address,
+                  }))
+                }}
+              />
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -349,42 +668,332 @@ export default function EditWarehousePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="totalSqFt">Total Sq Ft</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="totalSqFt">
+                      Total Sq Ft <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="atCapacitySqFt"
+                        checked={formData.atCapacitySqFt}
+                        onCheckedChange={(checked) => setFormData({ ...formData, atCapacitySqFt: checked as boolean })}
+                      />
+                      <Label htmlFor="atCapacitySqFt" className="text-xs font-normal cursor-pointer">
+                        At Capacity
+                      </Label>
+                    </div>
+                  </div>
                   <Input
                     id="totalSqFt"
-                    type="number"
+                    type="text"
                     value={formData.totalSqFt}
-                    onChange={(e) => setFormData({ ...formData, totalSqFt: e.target.value })}
-                    placeholder="240000"
-                    min="1"
+                    onChange={(e) => {
+                      const formatted = formatNumberInput(e.target.value)
+                      setFormData({ ...formData, totalSqFt: formatted })
+                    }}
+                    placeholder="240,000"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="totalPalletStorage">Total Pallet Storage</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="totalPalletStorage">
+                      Total Pallet Storage <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="atCapacityPallet"
+                        checked={formData.atCapacityPallet}
+                        onCheckedChange={(checked) => setFormData({ ...formData, atCapacityPallet: checked as boolean })}
+                      />
+                      <Label htmlFor="atCapacityPallet" className="text-xs font-normal cursor-pointer">
+                        At Capacity
+                      </Label>
+                    </div>
+                  </div>
                   <Input
                     id="totalPalletStorage"
-                    type="number"
+                    type="text"
                     value={formData.totalPalletStorage}
-                    onChange={(e) => setFormData({ ...formData, totalPalletStorage: e.target.value })}
-                    placeholder="1000"
-                    min="0"
+                    onChange={(e) => {
+                      const formatted = formatNumberInput(e.target.value)
+                      setFormData({ ...formData, totalPalletStorage: formatted })
+                    }}
+                    placeholder="1,000"
+                    required
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="amenities">
-                  Amenities (comma-separated)
+              <Separator />
+
+              {/* Order Requirements */}
+              <div className="space-y-3">
+                <Label>Order Requirements</Label>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="minPallet">Min Pallet</Label>
+                    <Input
+                      id="minPallet"
+                      type="text"
+                      value={formData.minPallet}
+                      onChange={(e) => {
+                        const formatted = formatNumberInput(e.target.value)
+                        setFormData({ ...formData, minPallet: formatted })
+                      }}
+                      placeholder="10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxPallet">Max Pallet</Label>
+                    <Input
+                      id="maxPallet"
+                      type="text"
+                      value={formData.maxPallet}
+                      onChange={(e) => {
+                        const formatted = formatNumberInput(e.target.value)
+                        setFormData({ ...formData, maxPallet: formatted })
+                      }}
+                      placeholder="1,000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="minSqFt">Min Sq Ft</Label>
+                    <Input
+                      id="minSqFt"
+                      type="text"
+                      value={formData.minSqFt}
+                      onChange={(e) => {
+                        const formatted = formatNumberInput(e.target.value)
+                        setFormData({ ...formData, minSqFt: formatted })
+                      }}
+                      placeholder="100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxSqFt">Max Sq Ft</Label>
+                    <Input
+                      id="maxSqFt"
+                      type="text"
+                      value={formData.maxSqFt}
+                      onChange={(e) => {
+                        const formatted = formatNumberInput(e.target.value)
+                        setFormData({ ...formData, maxSqFt: formatted })
+                      }}
+                      placeholder="100,000"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Customer Rent Method */}
+              <div className="space-y-3">
+                <Label>Customer Rent Method</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {RENT_METHODS.map((method) => (
+                    <div key={method.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`rent-method-${method.value}`}
+                        checked={formData.rentMethods.includes(method.value)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            rentMethods: checked
+                              ? [...prev.rentMethods, method.value]
+                              : prev.rentMethods.filter((m) => m !== method.value),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`rent-method-${method.value}`} className="text-sm font-normal cursor-pointer">
+                        {method.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Security */}
+              <div className="space-y-3">
+                <Label>Security</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SECURITY_OPTIONS.map((option) => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`security-${option}`}
+                        checked={formData.security.includes(option)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            security: checked
+                              ? [...prev.security, option]
+                              : prev.security.filter((s) => s !== option),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`security-${option}`} className="text-sm font-normal cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Warehouse Photos */}
+              <div className="space-y-3">
+                <Label>
+                  Warehouse Photos <span className="text-destructive">*</span>
                 </Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload at least 2 photos of your warehouse. Supported formats: JPEG, PNG, WebP, GIF, BMP, AVIF (Max 5MB per file)
+                </p>
+                <FileUpload
+                  value={warehousePhotos}
+                  onChange={setWarehousePhotos}
+                  bucket="docs"
+                  folder="warehouse"
+                  maxFiles={10}
+                  maxSize={5 * 1024 * 1024}
+                  acceptedFileTypes={['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Warehouse Video */}
+              <div className="space-y-3">
+                <Label>Warehouse Video (Optional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload a video showcasing your warehouse. Supported formats: MP4, WebM, MOV, AVI (Max 100MB)
+                </p>
+                <FileUpload
+                  value={warehouseVideo}
+                  onChange={setWarehouseVideo}
+                  bucket="docs"
+                  folder="warehouse"
+                  maxFiles={1}
+                  maxSize={100 * 1024 * 1024}
+                  acceptedFileTypes={['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo']}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Access to Warehouse */}
+              <div className="space-y-4">
+                <Label>Access to Warehouse</Label>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="accessType">Access Type</Label>
+                    <Select
+                      value={formData.accessType}
+                      onValueChange={(value) => setFormData({ ...formData, accessType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select access type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="24/7">24/7 Access</SelectItem>
+                        <SelectItem value="business-hours">Business Hours</SelectItem>
+                        <SelectItem value="by-appointment">By Appointment Only</SelectItem>
+                        <SelectItem value="restricted">Restricted Access</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="appointmentRequired"
+                      checked={formData.appointmentRequired}
+                      onCheckedChange={(checked) => setFormData({ ...formData, appointmentRequired: checked as boolean })}
+                    />
+                    <Label htmlFor="appointmentRequired" className="text-sm font-normal cursor-pointer">
+                      Appointment Required
+                    </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accessControl">Access Control Method</Label>
+                    <Input
+                      id="accessControl"
+                      placeholder="e.g., Key card, Biometric, Security code"
+                      value={formData.accessControl}
+                      onChange={(e) => setFormData({ ...formData, accessControl: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Product Acceptance Hours */}
+              <div className="space-y-3">
+                <Label>Product Acceptance Hours</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="productAcceptanceStartTime">Start Time</Label>
+                    <Input
+                      id="productAcceptanceStartTime"
+                      type="time"
+                      value={formData.productAcceptanceStartTime}
+                      onChange={(e) => setFormData({ ...formData, productAcceptanceStartTime: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="productAcceptanceEndTime">End Time</Label>
+                    <Input
+                      id="productAcceptanceEndTime"
+                      type="time"
+                      value={formData.productAcceptanceEndTime}
+                      onChange={(e) => setFormData({ ...formData, productAcceptanceEndTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Working Days */}
+              <div className="space-y-3">
+                <Label>Working Days</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                    <div key={day} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`working-day-${day}`}
+                        checked={formData.workingDays.includes(day)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            workingDays: checked
+                              ? [...prev.workingDays, day]
+                              : prev.workingDays.filter((d) => d !== day),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`working-day-${day}`} className="text-sm font-normal cursor-pointer">
+                        {day}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="amenities">Amenities (comma-separated)</Label>
                 <Input
                   id="amenities"
                   placeholder="24/7 Access, Security, Climate Control"
                   value={formData.amenities}
                   onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Separate multiple amenities with commas
-                </p>
               </div>
             </div>
           </CardContent>
@@ -413,42 +1022,6 @@ export default function EditWarehousePage() {
           </CardFooter>
         </form>
       </Card>
-
-      {/* Location Picker Dialog */}
-      <Dialog open={showLocationPicker} onOpenChange={setShowLocationPicker}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>Konum Seç</DialogTitle>
-            <DialogDescription>
-              Haritaya tıklayarak veya mevcut marker'ı sürükleyerek konumu seçin
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-6 pb-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-            <LocationPicker
-              initialLat={formData.latitude ? parseFloat(formData.latitude) : undefined}
-              initialLng={formData.longitude ? parseFloat(formData.longitude) : undefined}
-              onLocationSelect={(location) => {
-                const updates: any = {
-                  latitude: location.lat.toString(),
-                  longitude: location.lng.toString(),
-                }
-                
-                // Update address if provided by reverse geocoding
-                if (location.address) {
-                  updates.address = location.address
-                }
-                
-                setFormData({
-                  ...formData,
-                  ...updates,
-                })
-                setShowLocationPicker(false)
-              }}
-              onClose={() => setShowLocationPicker(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

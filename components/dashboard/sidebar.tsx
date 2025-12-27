@@ -28,6 +28,7 @@ import type { Booking, Claim, MembershipTier } from "@/types"
 
 const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse },
   { name: "Services", href: "/dashboard/services", icon: Wrench },
   { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
   { name: "Bookings", href: "/dashboard/bookings", icon: Package },
@@ -155,8 +156,8 @@ export function DashboardSidebar() {
         return false
       }
       
-      // Check if user is owner or company_admin
-      if (!['owner', 'company_admin'].includes(profileData.role)) {
+      // Check if user is company owner or company_admin
+      if (!['company_owner', 'company_admin'].includes(profileData.role)) {
         return false
       }
       

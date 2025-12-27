@@ -7,19 +7,14 @@ import type { ErrorResponse } from "@/types/api"
 
 /**
  * GET /api/v1/warehouses/[id]
- * Get warehouse by ID
+ * Get warehouse by ID (public endpoint - no authentication required)
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Require authentication
-    const authResult = await requireAuth(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
+    // Public endpoint - no authentication required
     const { id } = await params
     const warehouse = await getWarehouseById(id)
 
@@ -131,12 +126,17 @@ export async function PATCH(
     if (body.name !== undefined) updates.name = body.name
     if (body.address !== undefined) updates.address = body.address
     if (body.city !== undefined) updates.city = body.city
+    if (body.state !== undefined) updates.state = body.state
     if (body.zipCode !== undefined) updates.zipCode = body.zipCode
     if (body.totalSqFt !== undefined) updates.totalSqFt = body.totalSqFt
     if (body.totalPalletStorage !== undefined) updates.totalPalletStorage = body.totalPalletStorage
     if (body.latitude !== undefined) updates.latitude = body.latitude
     if (body.longitude !== undefined) updates.longitude = body.longitude
+    if (body.warehouseType !== undefined) updates.warehouseType = body.warehouseType
+    if (body.storageTypes !== undefined) updates.storageTypes = body.storageTypes
+    if (body.temperatureTypes !== undefined) updates.temperatureTypes = body.temperatureTypes
     if (body.amenities !== undefined) updates.amenities = body.amenities
+    if (body.photos !== undefined) updates.photos = body.photos
     if (body.operatingHours !== undefined) updates.operatingHours = body.operatingHours
 
     const updatedWarehouse = await updateWarehouse(id, updates)

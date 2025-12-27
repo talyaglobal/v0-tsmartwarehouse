@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       if (companyId && companyId !== 'all') {
         filters.companyId = companyId
       }
-    } else if (profile.role === 'owner' || profile.role === 'company_admin') {
+    } else if (profile.role === 'company_owner' || profile.role === 'company_admin') {
       // Company admins can only see their own company's logs
       if (profile.company_id) {
         filters.companyId = profile.company_id

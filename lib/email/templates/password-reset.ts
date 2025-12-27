@@ -1,5 +1,6 @@
 export function getPasswordResetEmailTemplate(resetUrl: string, userName?: string): { subject: string; html: string; text: string } {
-  const subject = 'Reset Your tsmartWarehouse Password'
+  // Use a more professional subject line that's less likely to be marked as spam
+  const subject = 'Password Reset Request - tsmartWarehouse'
   
   const html = `
 <!DOCTYPE html>

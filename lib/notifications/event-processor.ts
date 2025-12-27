@@ -273,7 +273,7 @@ async function determineRecipients(
           .from('profiles')
           .select('id')
           .eq('company_id', payload.companyId)
-          .in('role', ['owner', 'admin'])
+          .in('role', ['company_owner', 'admin'])
 
         if (admins) {
           for (const admin of admins) {

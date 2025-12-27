@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'owner') {
+    if (!profile || profile.role !== 'company_owner') {
       const errorData: ErrorResponse = {
         success: false,
         error: "Forbidden: Only company owners can change email addresses.",

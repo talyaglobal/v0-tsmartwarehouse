@@ -68,11 +68,11 @@ export async function PATCH(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Prevent changing owner role (only one owner should exist)
-    if (role && role !== 'owner' && member.role === 'owner') {
+    // Prevent changing company owner role (only one owner should exist)
+    if (role && role !== 'company_owner' && member.role === 'company_owner') {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Cannot change owner role. Transfer ownership first.",
+        error: "Cannot change company owner role. Transfer ownership first.",
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })
@@ -93,8 +93,8 @@ export async function PATCH(
     
     // Update role (map to new role system)
     if (role !== undefined) {
-      // Map to new role system
-      const validRoles = ['root', 'company_admin', 'member', 'warehouse_staff', 'owner']
+      // Only allow company_admin and warehouse_staff for team members
+      const validRoles = ['company_admin', 'warehouse_staff']
       if (!validRoles.includes(role)) {
         const errorData: ErrorResponse = {
           success: false,
@@ -315,18 +315,18 @@ export async function DELETE(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Prevent deleting the last owner
-    if (member.role === 'owner') {
+    // Prevent deleting the last company owner
+    if (member.role === 'company_owner') {
       const { data: owners } = await supabase
         .from('profiles')
         .select('id')
         .eq('company_id', companyId)
-        .eq('role', 'owner')
+        .eq('role', 'company_owner')
 
       if (owners && owners.length <= 1) {
         const errorData: ErrorResponse = {
           success: false,
-          error: "Cannot delete the last owner. Transfer ownership first.",
+          error: "Cannot delete the last company owner. Transfer ownership first.",
           statusCode: 400,
         }
         return NextResponse.json(errorData, { status: 400 })

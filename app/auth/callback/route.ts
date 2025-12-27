@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
         } else if (role === 'warehouse_staff' || role === 'worker') {
           redirectPath = '/warehouse'
         } else {
-          // All other roles (member, company_admin, owner) go to dashboard
+          // All other roles (customer, company_admin, company_owner) go to dashboard
           redirectPath = '/dashboard'
         }
       }

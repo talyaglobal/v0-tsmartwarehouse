@@ -189,7 +189,7 @@ export interface TeamMemberInvitedPayload extends BaseEventPayload {
   companyId: string
   invitedEmail: string
   invitedBy: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'company_owner' | 'admin' | 'member'
 }
 
 export interface TeamMemberJoinedPayload extends BaseEventPayload {
@@ -198,7 +198,7 @@ export interface TeamMemberJoinedPayload extends BaseEventPayload {
   memberId: string
   companyId: string
   userId: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'company_owner' | 'admin' | 'member'
 }
 
 /**

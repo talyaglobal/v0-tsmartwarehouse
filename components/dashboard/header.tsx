@@ -1,15 +1,19 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, Search, Menu, LogOut, User, ChevronDown, Home } from "@/components/icons"
+import { Bell, Search, Menu, LogOut, User, ChevronDown, Home, Settings } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useUser } from "@/lib/hooks/use-user"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import type { UserRole } from "@/types"
+
+const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void
@@ -19,6 +23,17 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const router = useRouter()
   const { signOut } = useAuth()
   const { user } = useUser()
+  const [selectedTestRole, setSelectedTestRole] = useState<UserRole | null>(null)
+
+  // Load selected test role from localStorage (only for root users)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
+      if (savedRole && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+        setSelectedTestRole(savedRole)
+      }
+    }
+  }, [])
 
   // Fetch user profile for display
   const { data: profile } = useQuery({
@@ -28,7 +43,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       const supabase = createClient()
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('name, avatar_url')
+        .select('name, avatar_url, role')
         .eq('id', user.id)
         .maybeSingle()
       
@@ -36,6 +51,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         return {
           name: user.email?.split('@')[0] || 'User',
           avatarUrl: null,
+          role: null,
         }
       }
 
@@ -60,6 +76,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       return {
         name: fullName,
         avatarUrl: avatarUrl,
+        role: profileData.role || null,
       }
     },
     enabled: !!user,
@@ -68,10 +85,91 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     refetchOnWindowFocus: true,
   })
 
+  // Get role badge configuration
+  const getRoleBadge = (role: string | null) => {
+    if (!role) return null
+    
+    const roleConfig: Record<string, { label: string; className: string }> = {
+      root: {
+        label: 'Root',
+        className: 'bg-red-500 text-white hover:bg-red-600',
+      },
+      company_owner: {
+        label: 'Company Owner',
+        className: 'bg-green-500 text-white hover:bg-green-600',
+      },
+      company_admin: {
+        label: 'Company Admin',
+        className: 'bg-blue-500 text-white hover:bg-blue-600',
+      },
+      customer: {
+        label: 'Customer',
+        className: 'bg-purple-500 text-white hover:bg-purple-600',
+      },
+      warehouse_staff: {
+        label: 'Warehouse Staff',
+        className: 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50',
+      },
+    }
+
+    const config = roleConfig[role]
+    if (!config) return null
+
+    return (
+      <Badge className={config.className}>
+        {config.label}
+      </Badge>
+    )
+  }
+
   const handleSignOut = async () => {
+    // Clear test role selector on sign out
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(ROOT_ROLE_SELECTOR_KEY)
+      // Clear cookie
+      document.cookie = 'root-test-role=; path=/; max-age=0'
+    }
     await signOut()
     router.push("/login")
     router.refresh()
+  }
+
+  const handleRoleChange = async (newRole: UserRole) => {
+    if (typeof window !== 'undefined') {
+      // Save to localStorage for client-side use
+      localStorage.setItem(ROOT_ROLE_SELECTOR_KEY, newRole)
+      setSelectedTestRole(newRole)
+      
+      // Set cookie for middleware to read (24 hours expiry)
+      document.cookie = `root-test-role=${newRole}; path=/; max-age=${60 * 60 * 24}`
+      
+      // Navigate to appropriate dashboard based on role
+      if (newRole === 'root') {
+        router.push('/admin')
+      } else if (newRole === 'warehouse_staff') {
+        router.push('/warehouse')
+      } else {
+        router.push('/dashboard')
+      }
+      
+      // Refresh to apply new role in middleware
+      router.refresh()
+    }
+  }
+
+  const isRootUser = profile?.role === 'root'
+  const availableRoles: UserRole[] = ['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const currentTestRole = selectedTestRole || profile?.role || 'root'
+
+  const getRoleLabel = (role: UserRole) => {
+    const labels: Record<UserRole, string> = {
+      root: 'Root',
+      company_owner: 'Company Owner',
+      company_admin: 'Company Admin',
+      customer: 'Customer',
+      warehouse_staff: 'Warehouse Staff',
+    }
+    return labels[role] || role
   }
 
   return (
@@ -94,7 +192,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 h-9 px-3">
+            <Button variant="ghost" className="flex items-center gap-2 h-auto px-3 py-2">
               {profile?.avatarUrl ? (
                 <>
                   <img
@@ -119,9 +217,16 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                   <User className="h-4 w-4" />
                 </div>
               )}
-              <span className="hidden md:block text-sm font-medium">
-                {profile?.name || user?.email?.split('@')[0] || 'User'}
-              </span>
+              <div className="hidden md:flex flex-col items-start gap-1">
+                <span className="text-sm font-medium">
+                  {profile?.name || user?.email?.split('@')[0] || 'User'}
+                </span>
+                {profile?.role && (
+                  <div className="flex items-center">
+                    {getRoleBadge(profile.role)}
+                  </div>
+                )}
+              </div>
               <ChevronDown className="h-4 w-4 hidden md:block" />
             </Button>
           </DropdownMenuTrigger>
@@ -132,6 +237,11 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
             >
               <p className="text-sm font-medium">{profile?.name || 'User'}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              {profile?.role && (
+                <div className="mt-1.5 flex items-center">
+                  {getRoleBadge(profile.role)}
+                </div>
+              )}
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
@@ -148,6 +258,25 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
               <User className="h-4 w-4 mr-2" />
               My Profile
             </DropdownMenuItem>
+            {isRootUser && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Test Role (Root Only)</DropdownMenuLabel>
+                {availableRoles.map((role) => (
+                  <DropdownMenuItem
+                    key={role}
+                    onClick={() => handleRoleChange(role)}
+                    className={`cursor-pointer ${currentTestRole === role ? 'bg-accent' : ''}`}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    {getRoleLabel(role)}
+                    {currentTestRole === role && (
+                      <span className="ml-auto text-xs text-muted-foreground">(Active)</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
               <LogOut className="h-4 w-4 mr-2" />

@@ -1,7 +1,7 @@
 // Core Types for TSmart Warehouse Management System
 
 // User Types
-export type UserRole = "root" | "company_admin" | "member" | "warehouse_staff"
+export type UserRole = "root" | "company_owner" | "company_admin" | "customer" | "warehouse_staff"
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
 export interface User {
@@ -11,7 +11,7 @@ export interface User {
   role: UserRole
   companyId?: string
   companyName?: string
-  companyRole?: 'owner' | 'company_admin' | 'member' | null // Role in company (from company_members table)
+  companyRole?: 'company_owner' | 'company_admin' | 'warehouse_staff' | null // Role in company (from profiles table)
   phone?: string
   avatar?: string
   membershipTier?: MembershipTier
@@ -71,6 +71,10 @@ export interface Warehouse {
   totalPalletStorage?: number // Total pallet storage capacity
   latitude?: number // Google Maps latitude
   longitude?: number // Google Maps longitude
+  warehouseType?: string[] // Array of: general, food-and-beverages, dangerous-goods, chemicals, medical, pharma
+  storageTypes?: string[] // bulk-space, rack-space, individual-unit, lockable-unit, cage, open-yard, closed-yard
+  temperatureTypes?: string[] // ambient-with-ac, ambient-without-ac, chilled, frozen, open-area-with-tent, open-area
+  photos?: string[] // Array of photo paths in storage
   floors: WarehouseFloor[]
   amenities: string[]
   operatingHours: {
@@ -78,6 +82,25 @@ export interface Warehouse {
     close: string
     days: string[]
   }
+  // New fields
+  customStatus?: 'antrepolu' | 'regular' // Custom status: antrepolu (bonded warehouse) or regular
+  atCapacitySqFt?: boolean // Whether the warehouse is at capacity for square feet
+  atCapacityPallet?: boolean // Whether the warehouse is at capacity for pallet storage
+  minPallet?: number // Minimum pallet order requirement
+  maxPallet?: number // Maximum pallet order requirement
+  minSqFt?: number // Minimum square feet order requirement
+  maxSqFt?: number // Maximum square feet order requirement
+  rentMethods?: string[] // Array of rent methods: pallet, sq_ft
+  security?: string[] // Array of security options
+  videoUrl?: string // URL or path to warehouse video (optional)
+  accessInfo?: {
+    accessType?: string // 24/7, business-hours, by-appointment, restricted
+    appointmentRequired?: boolean
+    accessControl?: string // e.g., Key card, Biometric, Security code
+  }
+  productAcceptanceStartTime?: string // Start time for product acceptance (e.g., 08:00)
+  productAcceptanceEndTime?: string // End time for product acceptance (e.g., 18:00)
+  workingDays?: string[] // Array of working days (e.g., Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
 }
 
 // Booking Types
@@ -429,6 +452,62 @@ export type {
 export type AccessLogVisitorType = 'vehicle' | 'staff' | 'customer' | 'visitor' | 'family_friend' | 'delivery_driver' | 'other'
 export type AccessLogStatus = 'checked_in' | 'checked_out'
 export type VehicleType = 'car' | 'truck' | 'van' | 'motorcycle' | 'suv' | 'other'
+
+// Appointment Types
+export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed'
+export type ParticipantRole = 'requester' | 'attendee' | 'staff_assignee'
+export type ParticipantStatus = 'pending' | 'accepted' | 'declined'
+
+export interface AppointmentType {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  color: string
+  icon?: string
+  durationMinutes: number
+  requiresWarehouseStaff: boolean
+  isActive: boolean
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AppointmentParticipant {
+  id: string
+  appointmentId: string
+  userId: string
+  role: ParticipantRole
+  status: ParticipantStatus
+  createdAt: string
+  // Joined fields
+  userName?: string
+  userEmail?: string
+}
+
+export interface Appointment {
+  id: string
+  warehouseId: string
+  appointmentTypeId: string
+  title: string
+  description?: string
+  startTime: string
+  endTime: string
+  status: AppointmentStatus
+  createdBy: string
+  location?: string
+  meetingLink?: string
+  phoneNumber?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  // Joined fields
+  appointmentType?: AppointmentType
+  warehouse?: Warehouse
+  participants?: AppointmentParticipant[]
+  createdByName?: string
+  createdByEmail?: string
+}
 
 export interface AccessLog {
   id: string

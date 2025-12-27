@@ -24,7 +24,9 @@ export async function middleware(request: NextRequest) {
     // For public routes, allow access during build
     const pathname = request.nextUrl.pathname
     const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/auth/callback']
-    const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
+    // Public warehouse detail pages (e.g., /warehouse/[id])
+    const isPublicWarehouseDetailRoute = pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)
+    const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/')) || isPublicWarehouseDetailRoute
     
     if (isPublicRoute || pathname.startsWith('/api')) {
       return response
@@ -96,13 +98,20 @@ export async function middleware(request: NextRequest) {
   // Protected routes that require authentication
   const isAdminRoute = pathname.startsWith('/admin')
   const isDashboardRoute = pathname.startsWith('/dashboard')
-  const isWarehouseRoute = pathname.startsWith('/warehouse')
+  // Public warehouse detail pages (e.g., /warehouse/[id]) - accessible to everyone
+  // Protected warehouse staff routes are under /warehouse (without ID) - handled separately
+  const isPublicWarehouseDetailRoute = pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)
+  const isWarehouseRoute = pathname.startsWith('/warehouse') && !isPublicWarehouseDetailRoute
 
   // If user is authenticated and tries to access auth pages, redirect to appropriate dashboard
   // BUT: Only redirect if not already on accept-invitation route (that needs to complete first)
   if (user && isAuthRoute && !pathname.startsWith('/accept-invitation/') && supabaseUrl && supabaseAnonKey) {
     // Get role from profile for more accurate role checking
-    let userRole = user.user_metadata?.role || 'member'
+    let userRole = user.user_metadata?.role || 'customer'
+    
+    // Check for root user test role selector (cookie)
+    const testRoleCookie = request.cookies.get('root-test-role')?.value
+    
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -112,39 +121,52 @@ export async function middleware(request: NextRequest) {
       if (profile?.role) {
         // Map legacy roles to new roles
         if (profile.role === 'super_admin') userRole = 'root'
-        else if (profile.role === 'customer') userRole = 'member'
+        else if (profile.role === 'customer') userRole = 'customer'
+        else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'member', 'warehouse_staff', 'owner'].includes(profile.role)) {
+        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
           userRole = profile.role
         }
       } else {
         // Fallback: map metadata role
         const metadataRole = user.user_metadata?.role as string
         if (metadataRole === 'super_admin') userRole = 'root'
-        else if (metadataRole === 'customer') userRole = 'member'
+        else if (metadataRole === 'customer') userRole = 'customer'
+        else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
           userRole = metadataRole
+        }
+        
+        // If root user and test role is set, use test role instead
+        if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+          userRole = testRoleCookie as typeof userRole
         }
       }
     } catch (error) {
       // If profile fetch fails, use metadata role with mapping
       const metadataRole = user.user_metadata?.role as string
       if (metadataRole === 'super_admin') userRole = 'root'
-      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'customer') userRole = 'customer'
+      else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'company_admin', 'customer', 'warehouse_staff'].includes(metadataRole)) {
         userRole = metadataRole
       }
     }
 
+    // If root user and test role is set, use test role instead
+    if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+      userRole = testRoleCookie as typeof userRole
+    }
+    
     // Determine target route based on role
     let targetRoute = '/dashboard'
     if (userRole === 'root') {
       targetRoute = '/admin'
     } else if (userRole === 'warehouse_staff') {
       targetRoute = '/warehouse'
-    } else if (['company_admin', 'member', 'owner'].includes(userRole)) {
+    } else if (['company_admin', 'customer', 'company_owner'].includes(userRole)) {
       targetRoute = '/dashboard'
     }
 
@@ -181,7 +203,11 @@ export async function middleware(request: NextRequest) {
   // Role-based access control
   if (user) {
     // Get role from profile for more accurate role checking
-    let userRole = user.user_metadata?.role || 'member'
+    let userRole = user.user_metadata?.role || 'customer'
+    
+    // Check for root user test role selector (cookie)
+    const testRoleCookie = request.cookies.get('root-test-role')?.value
+    
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -191,33 +217,52 @@ export async function middleware(request: NextRequest) {
       if (profile?.role) {
         // Map legacy roles to new roles
         if (profile.role === 'super_admin') userRole = 'root'
-        else if (profile.role === 'customer') userRole = 'member'
+        else if (profile.role === 'customer') userRole = 'customer'
+        else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(profile.role)) {
+        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
           userRole = profile.role
+        }
+        
+        // If root user and test role is set, use test role instead
+        if (profile.role === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+          userRole = testRoleCookie as typeof userRole
         }
       } else {
         // Fallback: map metadata role
         const metadataRole = user.user_metadata?.role as string
         if (metadataRole === 'super_admin') userRole = 'root'
-        else if (metadataRole === 'customer') userRole = 'member'
+        else if (metadataRole === 'customer') userRole = 'customer'
+        else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
           userRole = metadataRole
+        }
+        
+        // If root user and test role is set, use test role instead
+        if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+          userRole = testRoleCookie as typeof userRole
         }
       }
     } catch (error) {
       // If profile fetch fails, use metadata role with mapping
       const metadataRole = user.user_metadata?.role as string
       if (metadataRole === 'super_admin') userRole = 'root'
-      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'customer') userRole = 'customer'
+      else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
         userRole = metadataRole
+      }
+      
+      // If root user and test role is set, use test role instead
+      if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+        userRole = testRoleCookie as typeof userRole
       }
     }
 
-    // Admin routes - only root can access
+
+    // Admin routes - only root can access (unless testing as root)
     if (isAdminRoute && userRole !== 'root') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
@@ -227,8 +272,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Dashboard routes - company_admin, member, and owner can access
-    if (isDashboardRoute && !['company_admin', 'member', 'owner'].includes(userRole)) {
+    // Dashboard routes - company_admin, customer, and company_owner can access
+    if (isDashboardRoute && !['company_admin', 'customer', 'company_owner'].includes(userRole)) {
       if (userRole === 'warehouse_staff') {
         return NextResponse.redirect(new URL('/warehouse', request.url))
       } else if (userRole === 'root') {

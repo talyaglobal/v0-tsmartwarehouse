@@ -15,11 +15,12 @@ export interface SecurityHeadersConfig {
 
 const defaultCSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-eval' and 'unsafe-inline' needed for Next.js in dev
-  "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind CSS
-  "img-src 'self' data: https: blob:",
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com", // Google Maps support
+  "script-src-elem 'self' 'unsafe-inline' https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com", // Google Maps support
+  "style-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com", // Google Maps styles
+  "img-src 'self' data: https: blob: https://maps.googleapis.com https://maps.gstatic.com", // Google Maps images
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com",
   "frame-src 'self' https://js.stripe.com",
   "object-src 'none'",
   "base-uri 'self'",

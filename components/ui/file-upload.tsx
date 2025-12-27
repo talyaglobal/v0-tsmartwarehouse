@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { Upload, X, FileText, ImageIcon, Loader2, AlertCircle } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { formatFileSize, isImageFile } from "@/lib/storage/utils"
@@ -45,6 +45,21 @@ export function FileUpload({
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync internal state with value prop when it changes externally
+  useEffect(() => {
+    if (value) {
+      // Only update if value is actually different (by comparing IDs and statuses)
+      const valueIds = value.map(v => v.id).sort().join(',')
+      const filesIds = files.map(f => f.id).sort().join(',')
+      const valueStatuses = value.map(v => `${v.id}:${v.status}`).sort().join(',')
+      const filesStatuses = files.map(f => `${f.id}:${f.status}`).sort().join(',')
+      
+      if (valueIds !== filesIds || valueStatuses !== filesStatuses) {
+        setFiles(value)
+      }
+    }
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateFiles = useCallback((newFiles: UploadedFile[]) => {
     setFiles(newFiles)
@@ -99,13 +114,23 @@ export function FileUpload({
   }, [files, maxFiles, maxSize, updateFiles])
 
   const uploadFileItem = useCallback(async (fileItem: UploadedFile) => {
-    const fileIndex = files.findIndex((f) => f.id === fileItem.id)
-    if (fileIndex === -1) return
+    // Use functional update to get current state
+    let uploadingFiles: UploadedFile[] = []
+    setFiles((currentFiles) => {
+      const fileIndex = currentFiles.findIndex((f) => f.id === fileItem.id)
+      if (fileIndex === -1) return currentFiles
 
-    // Update status to uploading
-    const updatedFiles = [...files]
-    updatedFiles[fileIndex] = { ...fileItem, status: 'uploading' }
-    updateFiles(updatedFiles)
+      // Update status to uploading
+      const updatedFiles = [...currentFiles]
+      updatedFiles[fileIndex] = { ...fileItem, status: 'uploading' }
+      uploadingFiles = updatedFiles
+      return updatedFiles
+    })
+    
+    // Call onChange after state update (using setTimeout to avoid render phase update)
+    if (uploadingFiles.length > 0) {
+      setTimeout(() => onChange?.(uploadingFiles), 0)
+    }
 
     // Create FormData for upload
     const formData = new FormData()
@@ -121,40 +146,58 @@ export function FileUpload({
         errorMessage: 'File upload failed',
       })
 
-      // Update with result
-      const finalFiles = [...files]
-      const finalIndex = finalFiles.findIndex((f) => f.id === fileItem.id)
-      if (finalIndex !== -1) {
-        if (result.success && result.data) {
-          finalFiles[finalIndex] = {
-            ...fileItem,
-            url: result.data.url,
-            path: result.data.path,
-            status: 'success',
+      // Update with result using functional update
+      let successFiles: UploadedFile[] = []
+      setFiles((currentFiles) => {
+        const finalFiles = [...currentFiles]
+        const finalIndex = finalFiles.findIndex((f) => f.id === fileItem.id)
+        if (finalIndex !== -1) {
+          if (result.success && result.data) {
+            finalFiles[finalIndex] = {
+              ...fileItem,
+              url: result.data.url,
+              path: result.data.path,
+              status: 'success',
+            }
+          } else {
+            finalFiles[finalIndex] = {
+              ...fileItem,
+              status: 'error',
+              error: result.error || 'Upload failed',
+            }
           }
-        } else {
+          successFiles = finalFiles
+        }
+        return finalFiles
+      })
+      
+      // Call onChange after state update (using setTimeout to avoid render phase update)
+      if (successFiles.length > 0) {
+        setTimeout(() => onChange?.(successFiles), 0)
+      }
+    } catch (error) {
+      // Update with error using functional update
+      let errorFiles: UploadedFile[] = []
+      setFiles((currentFiles) => {
+        const finalFiles = [...currentFiles]
+        const finalIndex = finalFiles.findIndex((f) => f.id === fileItem.id)
+        if (finalIndex !== -1) {
           finalFiles[finalIndex] = {
             ...fileItem,
             status: 'error',
-            error: result.error || 'Upload failed',
+            error: error instanceof Error ? error.message : 'Upload failed',
           }
+          errorFiles = finalFiles
         }
-        updateFiles(finalFiles)
-      }
-    } catch (error) {
-      // Update with error
-      const finalFiles = [...files]
-      const finalIndex = finalFiles.findIndex((f) => f.id === fileItem.id)
-      if (finalIndex !== -1) {
-        finalFiles[finalIndex] = {
-          ...fileItem,
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Upload failed',
-        }
-        updateFiles(finalFiles)
+        return finalFiles
+      })
+      
+      // Call onChange after state update (using setTimeout to avoid render phase update)
+      if (errorFiles.length > 0) {
+        setTimeout(() => onChange?.(errorFiles), 0)
       }
     }
-  }, [files, bucket, folder, updateFiles])
+  }, [bucket, folder, onChange])
 
   const removeFile = useCallback((id: string) => {
     const fileToRemove = files.find((f) => f.id === id)
@@ -277,15 +320,17 @@ function FileItem({
   disabled?: boolean
 }) {
   const Icon = isImageFile(file.file.type) ? ImageIcon : FileText
+  // Use preview first, then url, for image display
+  const imageSrc = file.preview || file.url
 
   return (
     <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
       {/* Preview/Icon */}
       <div className="flex-shrink-0">
-        {file.preview ? (
+        {imageSrc ? (
           <div className="relative w-12 h-12 rounded overflow-hidden bg-muted">
             <Image
-              src={file.preview}
+              src={imageSrc}
               alt={file.file.name}
               fill
               className="object-cover"
@@ -301,29 +346,63 @@ function FileItem({
       {/* File Info */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{file.file.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatFileSize(file.file.size)}
-        </p>
+        {file.file.size > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {formatFileSize(file.file.size)}
+          </p>
+        )}
+        {file.status === 'success' && file.url && file.file.size === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Uploaded
+          </p>
+        )}
       </div>
 
       {/* Status */}
       <div className="flex items-center gap-2">
         {file.status === 'uploading' && (
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <>
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            {!disabled && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onRemove}
+                className="h-8 w-8"
+                title="Cancel upload"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </>
         )}
         {file.status === 'error' && (
           <div className="flex items-center gap-1 text-destructive">
             <AlertCircle className="h-4 w-4" />
             <span className="text-xs">{file.error}</span>
+            {!disabled && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onRemove}
+                className="h-8 w-8 ml-1"
+                title="Remove file"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
-        {file.status === 'success' && !disabled && (
+        {(file.status === 'success' || file.status === 'pending') && !disabled && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={onRemove}
             className="h-8 w-8"
+            title={file.status === 'pending' ? 'Remove file' : 'Remove file'}
           >
             <X className="h-4 w-4" />
           </Button>

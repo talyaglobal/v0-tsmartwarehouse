@@ -51,6 +51,13 @@ export async function fetchCountries(): Promise<Country[]> {
  * Fetch cities for a country
  * Uses GeoNames API (free, requires registration for better rate limits)
  * 
+ * For Turkey (TR): Returns only province centers (il merkezleri) using PPLA feature code
+ * For other countries: Uses PPL feature code for all populated places
+ * 
+ * GeoNames feature codes:
+ * - PPLA: seat of a first-order administrative division (il merkezleri for Turkey)
+ * - PPL: populated place (cities, towns, villages)
+ * 
  * Setup instructions:
  * 1. Register at https://www.geonames.org/login (free)
  * 2. Activate your account via email
@@ -72,10 +79,14 @@ export async function fetchCitiesByCountry(countryCode: string): Promise<City[]>
       )
     }
     
-    // GeoNames API endpoint - using PPL feature code for populated places (cities)
-    // PPL = populated place (cities, towns, villages)
+    // For Turkey, use PPLA (province centers/il merkezleri) instead of PPL (all populated places)
+    // PPLA = seat of a first-order administrative division = il merkezleri
+    // For other countries, use PPL to get all cities
+    const featureCode = countryCode.toUpperCase() === 'TR' ? 'PPLA' : 'PPL'
+    
+    // GeoNames API endpoint
     // orderby=population sorts by population (most populous first)
-    const url = `https://secure.geonames.org/searchJSON?country=${countryCode}&featureCode=PPL&maxRows=1000&orderby=population&username=${username}`
+    const url = `https://secure.geonames.org/searchJSON?country=${countryCode}&featureCode=${featureCode}&maxRows=1000&orderby=population&username=${username}`
     
     // Create AbortController for timeout (more compatible than AbortSignal.timeout)
     const controller = new AbortController()
@@ -134,7 +145,7 @@ export async function fetchCitiesByCountry(countryCode: string): Promise<City[]>
       return []
     }
 
-    // Extract unique city names, group by name to handle duplicates
+    // Extract unique city names, group by name and state to handle duplicates
     const cityMap = new Map<string, City>()
     
     data.geonames.forEach((city: any) => {
@@ -148,6 +159,7 @@ export async function fetchCitiesByCountry(countryCode: string): Promise<City[]>
       // Create unique key combining city name and state (if available)
       const cityKey = state ? `${cityName}_${state}` : cityName
       
+      // Only add if we don't have this exact combination already
       if (!cityMap.has(cityKey)) {
         cityMap.set(cityKey, {
           name: cityName,

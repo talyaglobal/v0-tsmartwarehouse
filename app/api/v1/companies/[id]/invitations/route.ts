@@ -127,7 +127,7 @@ export async function GET(
       id: profile.id,
       company_id: companyId, // Use the requested companyId (from inviter)
       email: profile.email,
-      role: profile.role || 'member', // Use profile role (will be set when invitation is accepted)
+      role: profile.role || 'company_admin', // Use profile role (will be set when invitation is accepted)
       token: profile.invitation_token,
       expires_at: profile.invitation_expires_at,
       created_at: profile.created_at,
@@ -168,7 +168,7 @@ export async function POST(
     const { user } = authResult
     const { id: companyId } = await params
     const body = await request.json()
-    const { email, fullName, role = 'member' } = body
+    const { email, fullName, role = 'company_admin' } = body
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       const errorData: ErrorResponse = {
@@ -188,25 +188,17 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Map role names to database roles
-    const roleMap: Record<string, string> = {
-      'owner': 'owner',
-      'admin': 'company_admin',
-      'company_admin': 'company_admin',
-      'member': 'member',
-      'warehouse_staff': 'warehouse_staff',
-    }
-    
-    const dbRole = roleMap[role] || 'member'
-    
-    if (!['admin', 'company_admin', 'member', 'warehouse_staff'].includes(role)) {
+    // Validate role - only company_admin and warehouse_staff are allowed for team members
+    if (!['company_admin', 'warehouse_staff'].includes(role)) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Invalid role. Must be 'admin', 'company_admin', 'member', or 'warehouse_staff'",
+        error: "Invalid role. Must be 'company_admin' or 'warehouse_staff'",
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })
     }
+    
+    const dbRole = role // Use role directly (no mapping needed)
 
     // Check if user has permission
     if (user.role !== 'root') {

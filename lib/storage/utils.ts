@@ -25,6 +25,7 @@ export interface FileValidationError {
 // File size limits (in bytes)
 export const FILE_SIZE_LIMITS = {
   IMAGE: 10 * 1024 * 1024, // 10MB
+  VIDEO: 100 * 1024 * 1024, // 100MB
   PDF: 10 * 1024 * 1024, // 10MB
   DOCUMENT: 10 * 1024 * 1024, // 10MB
   DEFAULT: 10 * 1024 * 1024, // 10MB
@@ -34,6 +35,12 @@ export const FILE_SIZE_LIMITS = {
 export const ALLOWED_MIME_TYPES = {
   IMAGES: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'],
   PDF: ['application/pdf'],
+  VIDEOS: [
+    'video/mp4',
+    'video/webm',
+    'video/quicktime', // .mov
+    'video/x-msvideo', // .avi
+  ],
   DOCUMENTS: [
     'application/pdf',
     'application/msword',
@@ -48,6 +55,10 @@ export const ALLOWED_MIME_TYPES = {
     'image/png',
     'image/webp',
     'image/gif',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+    'video/x-msvideo',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -140,6 +151,10 @@ export function getFileExtension(mimeType: string): string {
     'image/png': 'png',
     'image/webp': 'webp',
     'image/gif': 'gif',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/quicktime': 'mov',
+    'video/x-msvideo': 'avi',
     'application/pdf': 'pdf',
     'application/msword': 'doc',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',

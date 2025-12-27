@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, amenities, operating_hours, status, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_types, temperature_types, photos, amenities, operating_hours, status, custom_status, at_capacity_sq_ft, at_capacity_pallet, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -57,7 +57,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
 
   const { data, error } = await supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, amenities, operating_hours, status, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_types, temperature_types, photos, amenities, operating_hours, status, custom_status, at_capacity_sq_ft, at_capacity_pallet, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, created_at, updated_at')
     .eq('id', id)
     .eq('status', true) // Soft delete filter
     .single()
@@ -93,9 +93,27 @@ export async function createWarehouse(
       total_pallet_storage: warehouse.totalPalletStorage,
       latitude: warehouse.latitude,
       longitude: warehouse.longitude,
+      warehouse_type: warehouse.warehouseType,
+      storage_types: warehouse.storageTypes,
+      temperature_types: warehouse.temperatureTypes,
+      photos: warehouse.photos,
       amenities: warehouse.amenities,
       operating_hours: warehouse.operatingHours,
       owner_company_id: warehouse.ownerCompanyId,
+      custom_status: warehouse.customStatus,
+      at_capacity_sq_ft: warehouse.atCapacitySqFt || false,
+      at_capacity_pallet: warehouse.atCapacityPallet || false,
+      min_pallet: warehouse.minPallet,
+      max_pallet: warehouse.maxPallet,
+      min_sq_ft: warehouse.minSqFt,
+      max_sq_ft: warehouse.maxSqFt,
+      rent_methods: warehouse.rentMethods || [],
+      security: warehouse.security || [],
+      video_url: (warehouse as any).videoUrl,
+      access_info: (warehouse as any).accessInfo,
+      product_acceptance_start_time: (warehouse as any).productAcceptanceStartTime,
+      product_acceptance_end_time: (warehouse as any).productAcceptanceEndTime,
+      working_days: (warehouse as any).workingDays,
     })
     .select()
     .single()
@@ -128,9 +146,27 @@ export async function updateWarehouse(
   if (updates.totalPalletStorage !== undefined) updateData.total_pallet_storage = updates.totalPalletStorage
   if (updates.latitude !== undefined) updateData.latitude = updates.latitude
   if (updates.longitude !== undefined) updateData.longitude = updates.longitude
+  if (updates.warehouseType !== undefined) updateData.warehouse_type = updates.warehouseType
+  if (updates.storageTypes !== undefined) updateData.storage_types = updates.storageTypes
+  if (updates.temperatureTypes !== undefined) updateData.temperature_types = updates.temperatureTypes
+  if (updates.photos !== undefined) updateData.photos = updates.photos
   if (updates.amenities !== undefined) updateData.amenities = updates.amenities
   if (updates.operatingHours !== undefined)
     updateData.operating_hours = updates.operatingHours
+  if (updates.customStatus !== undefined) updateData.custom_status = updates.customStatus
+  if (updates.atCapacitySqFt !== undefined) updateData.at_capacity_sq_ft = updates.atCapacitySqFt
+  if (updates.atCapacityPallet !== undefined) updateData.at_capacity_pallet = updates.atCapacityPallet
+  if (updates.minPallet !== undefined) updateData.min_pallet = updates.minPallet
+  if (updates.maxPallet !== undefined) updateData.max_pallet = updates.maxPallet
+  if (updates.minSqFt !== undefined) updateData.min_sq_ft = updates.minSqFt
+  if (updates.maxSqFt !== undefined) updateData.max_sq_ft = updates.maxSqFt
+  if (updates.rentMethods !== undefined) updateData.rent_methods = updates.rentMethods
+  if (updates.security !== undefined) updateData.security = updates.security
+  if ((updates as any).videoUrl !== undefined) updateData.video_url = (updates as any).videoUrl
+  if ((updates as any).accessInfo !== undefined) updateData.access_info = (updates as any).accessInfo
+  if ((updates as any).productAcceptanceStartTime !== undefined) updateData.product_acceptance_start_time = (updates as any).productAcceptanceStartTime
+  if ((updates as any).productAcceptanceEndTime !== undefined) updateData.product_acceptance_end_time = (updates as any).productAcceptanceEndTime
+  if ((updates as any).workingDays !== undefined) updateData.working_days = (updates as any).workingDays
 
   const { data, error } = await supabase
     .from('warehouses')
@@ -183,15 +219,33 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     totalPalletStorage: row.total_pallet_storage || undefined,
     latitude: row.latitude ? parseFloat(row.latitude) : undefined,
     longitude: row.longitude ? parseFloat(row.longitude) : undefined,
-    amenities: row.amenities || [],
+    warehouseType: Array.isArray(row.warehouse_type) ? row.warehouse_type : (row.warehouse_type ? [row.warehouse_type] : []),
+    storageTypes: Array.isArray(row.storage_types) ? row.storage_types : (row.storage_types ? [row.storage_types] : []),
+    temperatureTypes: Array.isArray(row.temperature_types) ? row.temperature_types : (row.temperature_types ? [row.temperature_types] : []),
+    photos: Array.isArray(row.photos) ? row.photos : [],
+    amenities: Array.isArray(row.amenities) ? row.amenities : [],
     operatingHours: row.operating_hours || {
       open: '08:00',
       close: '18:00',
       days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     },
     floors: [], // Floors should be loaded separately
+    customStatus: row.custom_status || undefined,
+    atCapacitySqFt: row.at_capacity_sq_ft || false,
+    atCapacityPallet: row.at_capacity_pallet || false,
+    minPallet: row.min_pallet || undefined,
+    maxPallet: row.max_pallet || undefined,
+    minSqFt: row.min_sq_ft || undefined,
+    maxSqFt: row.max_sq_ft || undefined,
+    rentMethods: Array.isArray(row.rent_methods) ? row.rent_methods : [],
+    security: Array.isArray(row.security) ? row.security : [],
+    videoUrl: row.video_url || undefined,
+    accessInfo: row.access_info || undefined,
+    productAcceptanceStartTime: row.product_acceptance_start_time || undefined,
+    productAcceptanceEndTime: row.product_acceptance_end_time || undefined,
+    workingDays: Array.isArray(row.working_days) ? row.working_days : [],
   }
-  // Add ownerCompanyId as an additional property
+  // Add ownerCompanyId as additional property (state column was removed in migration 073)
   return { ...warehouse, ownerCompanyId: row.owner_company_id || null }
 }
 
