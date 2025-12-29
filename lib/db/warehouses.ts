@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_types, temperature_types, photos, amenities, operating_hours, status, custom_status, at_capacity_sq_ft, at_capacity_pallet, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_types, temperature_types, photos, amenities, operating_hours, status, custom_status, at_capacity_sq_ft, at_capacity_pallet, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -57,7 +57,44 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
 
   const { data, error } = await supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_types, temperature_types, photos, amenities, operating_hours, status, custom_status, at_capacity_sq_ft, at_capacity_pallet, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, created_at, updated_at')
+    .select(`
+      id,
+      name,
+      address,
+      city,
+      zip_code,
+      total_sq_ft,
+      total_pallet_storage,
+      available_sq_ft,
+      available_pallet_storage,
+      latitude,
+      longitude,
+      owner_company_id,
+      warehouse_type,
+      storage_types,
+      temperature_types,
+      photos,
+      amenities,
+      operating_hours,
+      status,
+      custom_status,
+      at_capacity_sq_ft,
+      at_capacity_pallet,
+      min_pallet,
+      max_pallet,
+      min_sq_ft,
+      max_sq_ft,
+      rent_methods,
+      security,
+      video_url,
+      access_info,
+      product_acceptance_start_time,
+      product_acceptance_end_time,
+      working_days,
+      created_at,
+      updated_at,
+      warehouse_pricing(pricing_type, base_price, unit)
+    `)
     .eq('id', id)
     .eq('status', true) // Soft delete filter
     .single()
@@ -91,6 +128,8 @@ export async function createWarehouse(
       zip_code: warehouse.zipCode,
       total_sq_ft: warehouse.totalSqFt,
       total_pallet_storage: warehouse.totalPalletStorage,
+      available_sq_ft: warehouse.totalSqFt, // Initialize available with total
+      available_pallet_storage: warehouse.totalPalletStorage, // Initialize available with total
       latitude: warehouse.latitude,
       longitude: warehouse.longitude,
       warehouse_type: warehouse.warehouseType,
@@ -209,6 +248,24 @@ export async function deleteWarehouse(id: string): Promise<void> {
  * Transform database row to Warehouse type
  */
 function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string | null } {
+  // Transform pricing data if present
+  const pricing: any = {}
+  if (row.warehouse_pricing && Array.isArray(row.warehouse_pricing)) {
+    row.warehouse_pricing.forEach((p: any) => {
+      if (p.pricing_type === 'pallet') {
+        pricing.pallet = {
+          basePrice: p.base_price,
+          unit: p.unit
+        }
+      } else if (p.pricing_type === 'area' || p.pricing_type === 'area-rental') {
+        pricing.areaRental = {
+          basePrice: p.base_price,
+          unit: p.unit
+        }
+      }
+    })
+  }
+
   const warehouse: Warehouse = {
     id: row.id,
     name: row.name,
@@ -217,6 +274,8 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     zipCode: row.zip_code,
     totalSqFt: row.total_sq_ft,
     totalPalletStorage: row.total_pallet_storage || undefined,
+    availableSqFt: row.available_sq_ft || undefined,
+    availablePalletStorage: row.available_pallet_storage || undefined,
     latitude: row.latitude ? parseFloat(row.latitude) : undefined,
     longitude: row.longitude ? parseFloat(row.longitude) : undefined,
     warehouseType: Array.isArray(row.warehouse_type) ? row.warehouse_type : (row.warehouse_type ? [row.warehouse_type] : []),
@@ -245,8 +304,12 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     productAcceptanceEndTime: row.product_acceptance_end_time || undefined,
     workingDays: Array.isArray(row.working_days) ? row.working_days : [],
   }
-  // Add ownerCompanyId as additional property (state column was removed in migration 073)
-  return { ...warehouse, ownerCompanyId: row.owner_company_id || null }
+  // Add ownerCompanyId and pricing as additional properties
+  return {
+    ...warehouse,
+    ownerCompanyId: row.owner_company_id || null,
+    pricing: Object.keys(pricing).length > 0 ? pricing : undefined
+  }
 }
 
 /**

@@ -11,12 +11,26 @@ interface PublicWarehouseSearchResult {
   state?: string
   zipCode: string
   totalSqFt?: number
+  totalPalletStorage?: number
+  availableSqFt?: number
+  availablePalletStorage?: number
   warehouseType?: string
   storageTypes?: string[]
   temperatureTypes?: string[]
   amenities?: string[]
   latitude?: number
   longitude?: number
+  photos?: string[]
+  pricing?: {
+    pallet?: {
+      basePrice: number
+      unit: string
+    }
+    areaRental?: {
+      basePrice: number
+      unit: string
+    }
+  }
 }
 
 /**
@@ -36,7 +50,25 @@ export async function GET(request: NextRequest) {
     // Note: Service role key bypasses RLS, so we can query warehouses without authentication
             let query = supabase
               .from("warehouses")
-              .select("id, name, address, city, zip_code, total_sq_ft, warehouse_type, storage_types, temperature_types, amenities, latitude, longitude")
+              .select(`
+                id,
+                name,
+                address,
+                city,
+                zip_code,
+                total_sq_ft,
+                total_pallet_storage,
+                available_sq_ft,
+                available_pallet_storage,
+                warehouse_type,
+                storage_types,
+                temperature_types,
+                amenities,
+                latitude,
+                longitude,
+                photos,
+                warehouse_pricing(pricing_type, base_price, unit)
+              `)
               .eq("status", true) // Only active warehouses (status is BOOLEAN DEFAULT true NOT NULL)
 
     if (city) {
@@ -69,18 +101,46 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform results to match PublicWarehouseSearchResult interface
-    const results: PublicWarehouseSearchResult[] = (data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      address: row.address,
-      city: row.city,
-      state: undefined, // State column doesn't exist in warehouses table
-      zipCode: row.zip_code,
-      totalSqFt: row.total_sq_ft,
-      amenities: row.amenities || [],
-      latitude: row.latitude ? parseFloat(row.latitude) : undefined,
-      longitude: row.longitude ? parseFloat(row.longitude) : undefined,
-    }))
+    const results: PublicWarehouseSearchResult[] = (data || []).map((row: any) => {
+      // Transform pricing data
+      const pricingData = row.warehouse_pricing || []
+      const pricing: any = {}
+
+      pricingData.forEach((p: any) => {
+        if (p.pricing_type === 'pallet') {
+          pricing.pallet = {
+            basePrice: p.base_price,
+            unit: p.unit
+          }
+        } else if (p.pricing_type === 'area' || p.pricing_type === 'area-rental') {
+          pricing.areaRental = {
+            basePrice: p.base_price,
+            unit: p.unit
+          }
+        }
+      })
+
+      return {
+        id: row.id,
+        name: row.name,
+        address: row.address,
+        city: row.city,
+        state: undefined, // State column doesn't exist in warehouses table
+        zipCode: row.zip_code,
+        totalSqFt: row.total_sq_ft,
+        totalPalletStorage: row.total_pallet_storage,
+        availableSqFt: row.available_sq_ft,
+        availablePalletStorage: row.available_pallet_storage,
+        amenities: row.amenities || [],
+        latitude: row.latitude ? parseFloat(row.latitude) : undefined,
+        longitude: row.longitude ? parseFloat(row.longitude) : undefined,
+        warehouseType: row.warehouse_type,
+        storageTypes: row.storage_types || [],
+        temperatureTypes: row.temperature_types || [],
+        photos: row.photos || [],
+        pricing: Object.keys(pricing).length > 0 ? pricing : undefined,
+      }
+    })
 
     // Remove duplicates by city name and format for autocomplete
     const uniqueCities = Array.from(

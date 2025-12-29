@@ -69,6 +69,8 @@ export interface Warehouse {
   zipCode: string
   totalSqFt: number // 240,000 sq ft
   totalPalletStorage?: number // Total pallet storage capacity
+  availableSqFt?: number // Currently available square feet for booking
+  availablePalletStorage?: number // Currently available pallet storage for booking
   latitude?: number // Google Maps latitude
   longitude?: number // Google Maps longitude
   warehouseType?: string[] // Array of: general, food-and-beverages, dangerous-goods, chemicals, medical, pharma
@@ -104,7 +106,7 @@ export interface Warehouse {
 }
 
 // Booking Types
-export type BookingStatus = "pending" | "confirmed" | "active" | "completed" | "cancelled"
+export type BookingStatus = "pending" | "payment_pending" | "confirmed" | "active" | "completed" | "cancelled"
 export type BookingType = "pallet" | "area-rental"
 export type ServiceType = "pallet-in" | "storage" | "pallet-out" | "area-rental"
 

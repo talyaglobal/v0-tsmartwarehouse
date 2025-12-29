@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus, Loader2, Warehouse, Trash2, MoreVertical, Edit } from "@/components/icons"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { api } from "@/lib/api/client"
@@ -32,6 +35,10 @@ export function WarehousesTab() {
   const { user } = useUser()
   const queryClient = useQueryClient()
   const [deleteConfirmWarehouse, setDeleteConfirmWarehouse] = useState<WarehouseData | null>(null)
+  const [pricingWarehouse, setPricingWarehouse] = useState<WarehouseData | null>(null)
+  const [pricingType, setPricingType] = useState<'pallet' | 'area'>('pallet')
+  const [basePrice, setBasePrice] = useState<string>('')
+  const [isSavingPrice, setIsSavingPrice] = useState(false)
 
   // Get user's company ID
   const { data: companyId, isLoading: isLoadingCompanyId } = useQuery({
@@ -179,6 +186,26 @@ export function WarehousesTab() {
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            onClick={() => {
+                              setPricingWarehouse(warehouse)
+                              setPricingType('pallet')
+                              setBasePrice('')
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Set Pallet Price
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setPricingWarehouse(warehouse)
+                              setPricingType('area')
+                              setBasePrice('')
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Set Area Price
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => setDeleteConfirmWarehouse(warehouse)}
                             className="text-destructive"
                           >
@@ -218,6 +245,65 @@ export function WarehousesTab() {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pricing Dialog */}
+      <Dialog open={!!pricingWarehouse} onOpenChange={(open) => !open && setPricingWarehouse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Pricing for {pricingWarehouse?.name}</DialogTitle>
+            <DialogDescription>
+              Configure per-day pricing for this warehouse.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Pricing Type</Label>
+              <Select onValueChange={(v) => setPricingType(v as any)} value={pricingType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pallet">Pallet (per-pallet per day)</SelectItem>
+                  <SelectItem value="area">Area (per-sqft per day)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Base Price (USD)</Label>
+              <Input type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} />
+            </div>
+
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button variant="outline" onClick={() => setPricingWarehouse(null)}>Cancel</Button>
+              <Button
+                onClick={async () => {
+                  if (!pricingWarehouse) return
+                  setIsSavingPrice(true)
+                  try {
+                    await api.post(`/api/v1/warehouses/${pricingWarehouse.id}/pricing`, {
+                      pricingType,
+                      basePrice: parseFloat(basePrice),
+                      unit: pricingType === 'pallet' ? 'per_pallet_per_day' : 'per_sqft_per_day',
+                    })
+                    // refresh
+                    queryClient.invalidateQueries({ queryKey: ['company-warehouses', companyId] })
+                    setPricingWarehouse(null)
+                  } catch (err) {
+                    console.error(err)
+                  } finally {
+                    setIsSavingPrice(false)
+                  }
+                }}
+                disabled={isSavingPrice || !basePrice}
+              >
+                {isSavingPrice ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : 'Save'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

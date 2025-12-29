@@ -11,6 +11,8 @@ interface AuthContextType {
   loading: boolean
   refresh: () => Promise<void>
   signOut: () => Promise<void>
+  isRoot?: boolean
+  setRoleOverride?: (role: UserRole | null) => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [supabase, setSupabase] = useState<any>(null)
+  const [isRoot, setIsRoot] = useState<boolean>(false)
 
   // Lazy initialize Supabase client only in useEffect (client-side only)
   // This prevents it from being called during static generation
@@ -73,7 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser()
-      setUser(mapSupabaseUser(supabaseUser))
+      // Apply possible override only for root users (override stored in localStorage)
+      const mapped = mapSupabaseUser(supabaseUser)
+      const override = typeof window !== 'undefined' ? localStorage.getItem('roleOverride') : null
+      if (override && isRoot && mapped) {
+        setUser({ ...mapped, role: override as UserRole })
+      } else {
+        setUser(mapped)
+      }
     } catch (error) {
       console.error('Error refreshing auth:', error)
       setUser(null)
@@ -87,6 +97,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  const setRoleOverride = (role: UserRole | null) => {
+    if (typeof window === 'undefined') return
+    if (!isRoot) return
+    if (role) {
+      localStorage.setItem('roleOverride', role)
+      setUser((prev) => (prev ? { ...prev, role } : prev))
+    } else {
+      localStorage.removeItem('roleOverride')
+      // refresh to restore real role
+      refresh()
+    }
+  }
+
   useEffect(() => {
     if (!supabase) {
       setLoading(false)
@@ -95,6 +118,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Get initial session
     refresh()
+
+    // Check whether this user is root (server-verified)
+    ;(async () => {
+      try {
+        const res = await fetch('/api/auth/is-root')
+        if (res.ok) {
+          const data = await res.json()
+          setIsRoot(!!data?.isRoot)
+          // If root and override exists, apply it
+          if (data?.isRoot && typeof window !== 'undefined') {
+            const override = localStorage.getItem('roleOverride')
+            if (override) {
+              setUser((prev) => (prev ? { ...prev, role: override as UserRole } : prev))
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    })()
 
     // Listen for auth changes
     const {
@@ -110,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]) // Run when supabase is initialized
 
   return (
-    <AuthContext.Provider value={{ user, loading, refresh, signOut }}>
+    <AuthContext.Provider value={{ user, loading, refresh, signOut, isRoot, setRoleOverride }}>
       {children}
     </AuthContext.Provider>
   )

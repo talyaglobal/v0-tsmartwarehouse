@@ -27,17 +27,17 @@ import { createClient } from "@/lib/supabase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
 
 const baseNavigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse },
-  { name: "Services", href: "/dashboard/services", icon: Wrench },
-  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
-  { name: "Bookings", href: "/dashboard/bookings", icon: Package },
-  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
-  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt },
-  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle },
-  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2 },
-  { name: "Membership", href: "/dashboard/membership", icon: CreditCard },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Services", href: "/dashboard/services", icon: Wrench, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Bookings", href: "/dashboard/bookings", icon: Package, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Membership", href: "/dashboard/membership", icon: CreditCard, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
 ]
 
 export function DashboardSidebar() {
@@ -58,8 +58,9 @@ export function DashboardSidebar() {
       return 0
     },
     enabled: !!user,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
+    staleTime: 0, // Always fresh
+    refetchInterval: 10 * 1000, // Refetch every 10 seconds
+    refetchOnWindowFocus: true,
   })
 
   // Fetch under-review claims count
@@ -74,37 +75,38 @@ export function DashboardSidebar() {
       return 0
     },
     enabled: !!user,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
+    staleTime: 0, // Always fresh
+    refetchInterval: 10 * 1000, // Refetch every 10 seconds
+    refetchOnWindowFocus: true,
   })
 
-  // Fetch user profile (name, membership tier, company, and logo)
+  // Fetch user profile (name, membership tier, company, role, and logo)
   // Use separate query key to avoid conflicts with settings page
   const { data: profile } = useQuery({
     queryKey: ['sidebar-profile', user?.id],
     queryFn: async () => {
       if (!user) return null
       const supabase = createClient()
-      
-      // First get profile data
+
+      // First get profile data including role
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('name, membership_tier, company_id')
+        .select('name, membership_tier, company_id, role')
         .eq('id', user.id)
         .maybeSingle()
-      
+
       if (profileError) {
         console.error('Error fetching sidebar profile:', profileError)
         return null
       }
-      
+
       if (!profileData) {
         return null
       }
-      
+
       // Get company_id from profiles table
       const companyId = profileData?.company_id || null
-      
+
       // Fetch company data if we have a company_id
       let company = null
       if (companyId) {
@@ -113,18 +115,19 @@ export function DashboardSidebar() {
           .select('id, name, logo_url')
           .eq('id', companyId)
           .maybeSingle()
-        
+
         if (!companyError && companyData) {
           company = companyData
         }
       }
-      
+
       return {
         name: profileData?.name || user.email?.split('@')[0] || 'User',
         membershipTier: (profileData?.membership_tier as MembershipTier) || 'bronze',
         company: company?.name || null,
         companyLogo: company?.logo_url || null,
         companyId: companyId,
+        role: profileData?.role || 'customer',
       }
     },
     enabled: !!user,
@@ -197,46 +200,52 @@ export function DashboardSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 mt-4">
-        {baseNavigation.map((item) => {
-          // For Dashboard, only match exact path to avoid matching child routes
-          // For other items, match exact path or child routes
-          const isActive = item.href === "/dashboard"
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(item.href + "/")
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.name}
-              {/* Show badge for Bookings if there are pending bookings */}
-              {item.name === "Bookings" && pendingCount > 0 && (
-                <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                  {pendingCount}
-                </Badge>
-              )}
-              {/* Show badge for Claims if there are under-review claims */}
-              {item.name === "Claims" && underReviewCount > 0 && (
-                <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                  {underReviewCount}
-                </Badge>
-              )}
-              {/* Show badge for other items if badge is defined */}
-              {item.name !== "Bookings" && item.name !== "Claims" && item.badge && (
-                <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                  {item.badge}
-                </Badge>
-              )}
-            </Link>
-          )
-        })}
+        {baseNavigation
+          .filter((item) => {
+            // Filter navigation items based on user role
+            const userRole = profile?.role || 'customer'
+            return item.roles.includes(userRole)
+          })
+          .map((item) => {
+            // For Dashboard, only match exact path to avoid matching child routes
+            // For other items, match exact path or child routes
+            const isActive = item.href === "/dashboard"
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/")
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.name}
+                {/* Show badge for Bookings if there are pending bookings */}
+                {item.name === "Bookings" && pendingCount > 0 && (
+                  <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                    {pendingCount}
+                  </Badge>
+                )}
+                {/* Show badge for Claims if there are under-review claims */}
+                {item.name === "Claims" && underReviewCount > 0 && (
+                  <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                    {underReviewCount}
+                  </Badge>
+                )}
+                {/* Show badge for other items if badge is defined */}
+                {item.name !== "Bookings" && item.name !== "Claims" && item.badge && (
+                  <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                    {item.badge}
+                  </Badge>
+                )}
+              </Link>
+            )
+          })}
       </nav>
 
       {/* My Company Section - Only for Company Admin */}

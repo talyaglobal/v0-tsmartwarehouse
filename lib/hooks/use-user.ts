@@ -13,10 +13,18 @@ export function useUser() {
 
     // Get initial user
     supabase.auth.getUser().then(({ data: { user }, error }: { data: { user: User | null }, error: any }) => {
-      if (error) {
+      // Ignore AuthSessionMissingError for public pages
+      if (error && error.message !== 'Auth session missing!' && error.name !== 'AuthSessionMissingError') {
         console.error("Error getting user:", error)
       }
       setUser(user)
+      setIsLoading(false)
+    }).catch((err) => {
+      // Silently handle session missing errors on public pages
+      if (err.message !== 'Auth session missing!' && err.name !== 'AuthSessionMissingError') {
+        console.error("Error getting user:", err)
+      }
+      setUser(null)
       setIsLoading(false)
     })
 

@@ -61,6 +61,9 @@ const TEMPERATURE_OPTIONS = [
 ] as const
 
 const formatLabel = (value: string): string => {
+  if (typeof value !== "string") {
+    return ""
+  }
   return value
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -190,17 +193,17 @@ export function WarehouseSearchFilters({
           <Label>Warehouse Type</Label>
           <div className="space-y-2">
             {WAREHOUSE_TYPES.map((type) => (
-              <div key={type} className="flex items-center space-x-2">
+              <div key={type.value} className="flex items-center space-x-2">
                 <Checkbox
-                  id={`warehouse-type-${type}`}
-                  checked={warehouseType.includes(type)}
-                  onCheckedChange={(checked) => handleWarehouseTypeToggle(type, checked as boolean)}
+                  id={`warehouse-type-${type.value}`}
+                  checked={warehouseType.includes(type.value)}
+                  onCheckedChange={(checked) => handleWarehouseTypeToggle(type.value, checked as boolean)}
                 />
                 <Label
-                  htmlFor={`warehouse-type-${type}`}
+                  htmlFor={`warehouse-type-${type.value}`}
                   className="text-sm font-normal cursor-pointer"
                 >
-                  {formatLabel(type)}
+                  {type.label}
                 </Label>
               </div>
             ))}

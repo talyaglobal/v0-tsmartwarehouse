@@ -17,14 +17,16 @@ export async function GET(request: NextRequest) {
     // Try to get authenticated user (optional for GET - allows public access with customerId param)
     const authResult = await requireAuth(request)
     let authenticatedUserId: string | undefined = undefined
-    
+
     if (!(authResult instanceof NextResponse)) {
       // User is authenticated, use their ID as default filter
       authenticatedUserId = authResult.user.id
+    } else {
+      return authResult
     }
 
     const { searchParams } = new URL(request.url)
-    
+
     // Validate query parameters
     const queryParams: Record<string, string | undefined> = {}
     searchParams.forEach((value, key) => {
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
           .select('company_id')
           .eq('id', validatedParams.customerId)
           .single()
-        
+
         if (customerProfile?.company_id === userCompanyId) {
           filters.customerId = validatedParams.customerId
         } else {
@@ -93,12 +95,15 @@ export async function GET(request: NextRequest) {
       } else {
         filters.customerId = validatedParams.customerId
       }
-    } else if (authenticatedUserId) {
+    } else if (authenticatedUserId && !validatedParams.warehouseCompanyId) {
+      // Only set companyId filter if warehouseCompanyId is NOT being used
+      // warehouseCompanyId filter is for viewing bookings TO company warehouses (from any customer)
+      // companyId filter is for viewing bookings BY company users (to any warehouse)
       if (isAdmin && userCompanyId) {
-        // Company admin - show all bookings from their company
+        // Company admin - show all bookings from their company users
         filters.companyId = userCompanyId
       } else {
-        // Regular user - show only their bookings
+        // Regular user - show only their own bookings
         filters.customerId = authenticatedUserId
       }
     }

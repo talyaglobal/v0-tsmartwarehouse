@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { Input } from "@/components/ui/input"
-import { Building2, MapPin, Package, Search, Loader2, Plus, ArrowRight, Grid, List } from "@/components/icons"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical } from "@/components/icons"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { api } from "@/lib/api/client"
-import { formatNumber } from "@/lib/utils/format"
+import { formatNumber, formatCurrency } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 import type { Warehouse } from "@/types"
+import { createClient } from "@/lib/supabase/client"
 
 type ViewMode = "grid" | "list"
 
@@ -19,6 +27,13 @@ export default function WarehousesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  const [currentPhotoIndexes, setCurrentPhotoIndexes] = useState<Record<string, number>>({})
+  const [pricingWarehouse, setPricingWarehouse] = useState<Warehouse | null>(null)
+  const [pricingType, setPricingType] = useState<'pallet' | 'area'>('pallet')
+  const [basePrice, setBasePrice] = useState<string>('')
+  const [isSavingPrice, setIsSavingPrice] = useState(false)
+  const [deleteConfirmWarehouse, setDeleteConfirmWarehouse] = useState<Warehouse | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     fetchWarehouses()
@@ -29,7 +44,47 @@ export default function WarehousesPage() {
       setLoading(true)
       const result = await api.get<Warehouse[]>("/api/v1/warehouses", { showToast: false })
       if (result.success) {
-        setWarehouses(result.data || [])
+        const warehouseData = result.data || []
+
+        // Convert photo paths to full URLs if they're stored in Supabase Storage
+        const supabase = createClient()
+        const warehousesWithUrls = await Promise.all(
+          warehouseData.map(async warehouse => {
+            let photoUrls = warehouse.photos || []
+            if (warehouse.photos && warehouse.photos.length > 0) {
+              photoUrls = warehouse.photos.map(photo => {
+                // If already a full URL, return as is
+                if (photo.startsWith('http://') || photo.startsWith('https://')) {
+                  return photo
+                }
+                // Otherwise, get public URL from Supabase Storage
+                const { data } = supabase.storage.from('docs').getPublicUrl(photo)
+                return data.publicUrl
+              })
+            }
+
+            // Fetch pricing for this warehouse
+            let pricing = null
+            try {
+              const pricingResult = await api.get<any[]>(`/api/v1/warehouses/${warehouse.id}/pricing`, { showToast: false })
+              if (pricingResult.success && pricingResult.data && pricingResult.data.length > 0) {
+                pricing = pricingResult.data
+              }
+            } catch (err) {
+              console.error('Failed to fetch pricing for warehouse:', warehouse.id, err)
+            }
+
+            return { ...warehouse, photos: photoUrls, pricing }
+          })
+        )
+
+        setWarehouses(warehousesWithUrls)
+        // Initialize photo indexes for each warehouse
+        const indexes: Record<string, number> = {}
+        warehousesWithUrls.forEach(w => {
+          indexes[w.id] = 0
+        })
+        setCurrentPhotoIndexes(indexes)
       }
     } catch (error) {
       console.error("Failed to fetch warehouses:", error)
@@ -44,6 +99,59 @@ export default function WarehousesPage() {
     }
     return true
   })
+
+  const handlePreviousPhoto = (warehouseId: string, photos: string[]) => {
+    setCurrentPhotoIndexes(prev => ({
+      ...prev,
+      [warehouseId]: prev[warehouseId] > 0 ? prev[warehouseId] - 1 : photos.length - 1
+    }))
+  }
+
+  const handleNextPhoto = (warehouseId: string, photos: string[]) => {
+    setCurrentPhotoIndexes(prev => ({
+      ...prev,
+      [warehouseId]: prev[warehouseId] < photos.length - 1 ? prev[warehouseId] + 1 : 0
+    }))
+  }
+
+  const handleSavePricing = async () => {
+    if (!pricingWarehouse) return
+    setIsSavingPrice(true)
+    try {
+      await api.post(`/api/v1/warehouses/${pricingWarehouse.id}/pricing`, {
+        pricingType,
+        basePrice: parseFloat(basePrice),
+        unit: pricingType === 'pallet' ? 'per_pallet_per_day' : 'per_sqft_per_month',
+      }, {
+        successMessage: 'Pricing updated successfully',
+        errorMessage: 'Failed to update pricing'
+      })
+      setPricingWarehouse(null)
+      setBasePrice('')
+      fetchWarehouses() // Refresh the list
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSavingPrice(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteConfirmWarehouse) return
+    setIsDeleting(true)
+    try {
+      await api.delete(`/api/v1/warehouses/${deleteConfirmWarehouse.id}`, {
+        successMessage: 'Warehouse deleted successfully',
+        errorMessage: 'Failed to delete warehouse'
+      })
+      setDeleteConfirmWarehouse(null)
+      fetchWarehouses() // Refresh the list
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -122,116 +230,395 @@ export default function WarehousesPage() {
         </Card>
       ) : viewMode === "grid" ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredWarehouses.map((warehouse) => (
-            <Card key={warehouse.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg mb-1">{warehouse.name}</CardTitle>
-                    <CardDescription className="flex items-center gap-1 mt-1">
-                      <MapPin className="h-3 w-3" />
-                      {warehouse.city}, {warehouse.zipCode}
-                    </CardDescription>
+          {filteredWarehouses.map((warehouse) => {
+            const photos = warehouse.photos || []
+            const currentIndex = currentPhotoIndexes[warehouse.id] || 0
+            const hasPhotos = photos.length > 0
+
+            return (
+              <Card key={warehouse.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+                {/* Photo Slider */}
+                {hasPhotos && (
+                  <div className="relative w-full h-48 bg-muted">
+                    <Image
+                      src={photos[currentIndex]}
+                      alt={warehouse.name}
+                      fill
+                      className="object-cover"
+                    />
+                    {photos.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handlePreviousPhoto(warehouse.id, photos)
+                          }}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                          aria-label="Previous photo"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handleNextPhoto(warehouse.id, photos)
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                          aria-label="Next photo"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                        <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                          {currentIndex + 1} / {photos.length}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Capacity:</span>
-                    <span className="font-medium">{formatNumber(warehouse.totalSqFt)} sq ft</span>
+                )}
+                {!hasPhotos && (
+                  <div className="w-full h-48 bg-muted flex items-center justify-center">
+                    <Building2 className="h-12 w-12 text-muted-foreground" />
                   </div>
-                  {warehouse.totalPalletStorage && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Pallet Storage:</span>
-                      <span className="font-medium">{formatNumber(warehouse.totalPalletStorage)} pallets</span>
+                )}
+
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg mb-1">{warehouse.name}</CardTitle>
+                      <CardDescription className="flex items-center gap-1 mt-1">
+                        <MapPin className="h-3 w-3" />
+                        {warehouse.city}, {warehouse.zipCode}
+                      </CardDescription>
                     </div>
-                  )}
-                  {warehouse.address && (
-                    <div className="text-sm text-muted-foreground pt-2 border-t">
-                      {warehouse.address}
-                    </div>
-                  )}
-                  <div className="pt-2 flex gap-2">
-                    <Link href={`/dashboard/warehouses/${warehouse.id}/capacity`} className="flex-1">
-                      <Button variant="outline" className="w-full">
-                        View Details
-                      </Button>
-                    </Link>
-                    <Link href={`/warehouses/${warehouse.id}/book`} className="flex-1">
-                      <Button className="w-full">
-                        Book Space
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </Link>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredWarehouses.map((warehouse) => (
-            <Card key={warehouse.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-6">
-                  <div className="flex-shrink-0">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                      <Building2 className="h-6 w-6 text-primary" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg mb-1">{warehouse.name}</CardTitle>
-                        <CardDescription className="flex items-center gap-1 mt-1">
-                          <MapPin className="h-3 w-3" />
-                          {warehouse.city}, {warehouse.zipCode}
-                        </CardDescription>
-                        {warehouse.address && (
-                          <p className="text-sm text-muted-foreground mt-1">{warehouse.address}</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Area Capacity:</span>
+                      </div>
+                      <div className="ml-6 space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total:</span>
+                          <span className="font-medium">{formatNumber(warehouse.totalSqFt)} sq ft</span>
+                        </div>
+                        {warehouse.availableSqFt !== undefined && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Rented:</span>
+                              <span className="font-medium text-orange-600">
+                                {formatNumber(warehouse.totalSqFt - warehouse.availableSqFt)} sq ft
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Available:</span>
+                              <span className="font-medium text-green-600">
+                                {formatNumber(warehouse.availableSqFt)} sq ft
+                              </span>
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-6 mt-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Capacity:</span>
-                        <span className="font-medium">{formatNumber(warehouse.totalSqFt)} sq ft</span>
-                      </div>
-                      {warehouse.totalPalletStorage && (
+                    {warehouse.totalPalletStorage && (
+                      <div className="space-y-2 pt-2 border-t">
                         <div className="flex items-center gap-2 text-sm">
                           <Package className="h-4 w-4 text-muted-foreground" />
                           <span className="text-muted-foreground">Pallet Storage:</span>
-                          <span className="font-medium">{formatNumber(warehouse.totalPalletStorage)} pallets</span>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <Link href={`/dashboard/warehouses/${warehouse.id}/capacity`}>
-                        <Button variant="outline" size="sm">
-                          View Details
+                        <div className="ml-6 space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total:</span>
+                            <span className="font-medium">{formatNumber(warehouse.totalPalletStorage)} pallets</span>
+                          </div>
+                          {warehouse.availablePalletStorage !== undefined && (
+                            <>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Rented:</span>
+                                <span className="font-medium text-orange-600">
+                                  {formatNumber(warehouse.totalPalletStorage - warehouse.availablePalletStorage)} pallets
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Available:</span>
+                                <span className="font-medium text-green-600">
+                                  {formatNumber(warehouse.availablePalletStorage)} pallets
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {warehouse.address && (
+                      <div className="text-sm text-muted-foreground pt-2 border-t">
+                        {warehouse.address}
+                      </div>
+                    )}
+                    {(warehouse as any).pricing && (warehouse as any).pricing.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <div className="text-xs font-semibold text-muted-foreground mb-1">Pricing:</div>
+                        {(warehouse as any).pricing.map((price: any, idx: number) => (
+                          <div key={idx} className="text-sm flex items-center justify-between">
+                            <span className="text-muted-foreground">
+                              {price.pricing_type === 'pallet' ? 'Pallet' : 'Area'}:
+                            </span>
+                            <span className="font-semibold text-primary">
+                              {formatCurrency(price.base_price)}/{price.pricing_type === 'pallet' ? 'pallet/day' : 'sq ft/month'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="pt-2 space-y-2">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setPricingWarehouse(warehouse)
+                            // If pricing exists, pre-fill the form with existing values
+                            const existingPricing = (warehouse as any).pricing
+                            if (existingPricing && existingPricing.length > 0) {
+                              const firstPrice = existingPricing[0]
+                              setPricingType(firstPrice.pricing_type)
+                              setBasePrice(firstPrice.base_price.toString())
+                            } else {
+                              setPricingType('pallet')
+                              setBasePrice('')
+                            }
+                          }}
+                        >
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          Set Price
                         </Button>
-                      </Link>
-                      <Link href={`/warehouses/${warehouse.id}/book`}>
-                        <Button size="sm">
-                          Book Space
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                      </Link>
+                        <Link href={`/dashboard/warehouses/${warehouse.id}/edit`} className="flex-1">
+                          <Button variant="default" className="w-full">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                        </Link>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full text-destructive hover:text-destructive"
+                        onClick={() => setDeleteConfirmWarehouse(warehouse)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Size</TableHead>
+                  <TableHead>Pricing</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[180px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredWarehouses.map((warehouse) => (
+                  <TableRow key={warehouse.id}>
+                    <TableCell className="font-medium">{warehouse.name}</TableCell>
+                    <TableCell>
+                      {warehouse.address}, {warehouse.city} {warehouse.zipCode}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-2">
+                        <div>
+                          <div className="font-medium text-sm">Area</div>
+                          <div className="text-xs text-muted-foreground">
+                            Total: {formatNumber(warehouse.totalSqFt)} sq ft
+                          </div>
+                          {warehouse.availableSqFt !== undefined && (
+                            <div className="text-xs space-x-2">
+                              <span className="text-orange-600">
+                                Rented: {formatNumber(warehouse.totalSqFt - warehouse.availableSqFt)}
+                              </span>
+                              <span className="text-green-600">
+                                Available: {formatNumber(warehouse.availableSqFt)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {warehouse.totalPalletStorage && (
+                          <div className="pt-2 border-t">
+                            <div className="font-medium text-sm">Pallets</div>
+                            <div className="text-xs text-muted-foreground">
+                              Total: {formatNumber(warehouse.totalPalletStorage)} pallets
+                            </div>
+                            {warehouse.availablePalletStorage !== undefined && (
+                              <div className="text-xs space-x-2">
+                                <span className="text-orange-600">
+                                  Rented: {formatNumber(warehouse.totalPalletStorage - warehouse.availablePalletStorage)}
+                                </span>
+                                <span className="text-green-600">
+                                  Available: {formatNumber(warehouse.availablePalletStorage)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {(warehouse as any).pricing && (warehouse as any).pricing.length > 0 ? (
+                        <div className="space-y-1">
+                          {(warehouse as any).pricing.map((price: any, idx: number) => (
+                            <div key={idx} className="text-sm">
+                              <span className="font-semibold text-primary">
+                                {formatCurrency(price.base_price)}
+                              </span>
+                              <span className="text-muted-foreground text-xs ml-1">
+                                /{price.pricing_type === 'pallet' ? 'pallet/day' : 'sq ft/month'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Not set</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Active</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/warehouses/${warehouse.id}/edit`}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setPricingWarehouse(warehouse)
+                              const existingPricing = (warehouse as any).pricing
+                              if (existingPricing && existingPricing.length > 0) {
+                                const firstPrice = existingPricing[0]
+                                setPricingType(firstPrice.pricing_type)
+                                setBasePrice(firstPrice.base_price.toString())
+                              } else {
+                                setPricingType('pallet')
+                                setBasePrice('')
+                              }
+                            }}
+                          >
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Set Price
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDeleteConfirmWarehouse(warehouse)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmWarehouse} onOpenChange={(open) => !open && setDeleteConfirmWarehouse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Warehouse</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteConfirmWarehouse?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmWarehouse(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pricing Dialog */}
+      <Dialog open={!!pricingWarehouse} onOpenChange={(open) => !open && setPricingWarehouse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Pricing for {pricingWarehouse?.name}</DialogTitle>
+            <DialogDescription>
+              Configure per-day pricing for this warehouse.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Pricing Type</Label>
+              <Select onValueChange={(v) => setPricingType(v as any)} value={pricingType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pallet">Pallet (per pallet per day)</SelectItem>
+                  <SelectItem value="area">Area (per sq ft per month)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Base Price (USD)</Label>
+              <Input
+                type="number"
+                value={basePrice}
+                onChange={(e) => setBasePrice(e.target.value)}
+                placeholder="Enter price"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPricingWarehouse(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePricing}
+              disabled={isSavingPrice || !basePrice}
+            >
+              {isSavingPrice && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-

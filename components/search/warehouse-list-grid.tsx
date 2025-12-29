@@ -1,14 +1,16 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MapPin, Building2, Package } from "@/components/icons"
+import { MapPin, Building2, Package, ChevronLeft, ChevronRight } from "@/components/icons"
 import { Star } from "lucide-react"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import Link from "next/link"
 import Image from "next/image"
+import { createClient } from "@/lib/supabase/client"
 
 interface Warehouse {
   id: string
@@ -18,6 +20,9 @@ interface Warehouse {
   state?: string
   zipCode: string
   totalSqFt: number
+  totalPalletStorage?: number
+  availableSqFt?: number
+  availablePalletStorage?: number
   amenities?: string[]
   latitude?: number
   longitude?: number
@@ -27,6 +32,7 @@ interface Warehouse {
   storageTypes?: string[]
   temperature?: string
   temperatureTypes?: string[]
+  photos?: string[]
   pricing?: {
     pallet?: {
       basePrice: number
@@ -81,19 +87,128 @@ const formatLabel = (value: string): string => {
 }
 
 export function WarehouseListGrid({ warehouses, viewMode, searchParams }: WarehouseListGridProps) {
+  const [currentPhotoIndexes, setCurrentPhotoIndexes] = useState<Record<string, number>>({})
+  const supabase = createClient()
+
+  const handlePreviousPhoto = (warehouseId: string, photos: string[]) => {
+    setCurrentPhotoIndexes(prev => ({
+      ...prev,
+      [warehouseId]: (prev[warehouseId] || 0) > 0 ? (prev[warehouseId] || 0) - 1 : photos.length - 1
+    }))
+  }
+
+  const handleNextPhoto = (warehouseId: string, photos: string[]) => {
+    setCurrentPhotoIndexes(prev => ({
+      ...prev,
+      [warehouseId]: (prev[warehouseId] || 0) < photos.length - 1 ? (prev[warehouseId] || 0) + 1 : 0
+    }))
+  }
+
+  const getPhotoUrl = (photo: string) => {
+    if (photo.startsWith('http://') || photo.startsWith('https://')) {
+      return photo
+    }
+    const { data } = supabase.storage.from('docs').getPublicUrl(photo)
+    return data.publicUrl
+  }
+
+  // Calculate total price based on search params
+  const calculateTotalPrice = (warehouse: Warehouse) => {
+    if (!searchParams?.startDate || !searchParams?.endDate) {
+      return null
+    }
+
+    const startDate = new Date(searchParams.startDate)
+    const endDate = new Date(searchParams.endDate)
+    const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (days <= 0) {
+      return null
+    }
+
+    // Check if warehouse has pricing for the requested type
+    if (searchParams.type === 'pallet' && warehouse.pricing?.pallet) {
+      const quantity = searchParams.palletCount ? parseInt(searchParams.palletCount) : 0
+      const dailyRate = warehouse.pricing.pallet.basePrice
+      return {
+        total: dailyRate * days * quantity,
+        days,
+        quantity,
+        unit: 'pallet',
+        rate: dailyRate,
+        period: 'daily'
+      }
+    } else if (searchParams.type === 'area-rental' && warehouse.pricing?.areaRental) {
+      const quantity = searchParams.areaSqFt ? parseInt(searchParams.areaSqFt) : 0
+      const monthlyRate = warehouse.pricing.areaRental.basePrice
+      // Calculate months (rounded up to nearest month)
+      const months = Math.ceil(days / 30)
+      return {
+        total: monthlyRate * months * quantity,
+        months, // Changed from days to months
+        quantity,
+        unit: 'sq ft',
+        rate: monthlyRate,
+        period: 'monthly'
+      }
+    }
+
+    return null
+  }
+
   if (viewMode === "grid") {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {warehouses.map((warehouse) => (
+        {warehouses.map((warehouse) => {
+          const photos = warehouse.photos || []
+          const currentIndex = currentPhotoIndexes[warehouse.id] || 0
+          const hasPhotos = photos.length > 0
+
+          return (
           <Card key={warehouse.id} className="overflow-hidden hover:shadow-lg transition-shadow">
             <div className="relative aspect-video bg-muted">
-              <Image
-                src="/warehouse-aerial.png"
-                alt={warehouse.name}
-                fill
-                className="object-cover"
-              />
-              <div className="absolute top-3 right-3">
+              {hasPhotos ? (
+                <>
+                  <Image
+                    src={getPhotoUrl(photos[currentIndex])}
+                    alt={warehouse.name}
+                    fill
+                    className="object-cover"
+                  />
+                  {photos.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handlePreviousPhoto(warehouse.id, photos)
+                        }}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors z-10"
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleNextPhoto(warehouse.id, photos)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors z-10"
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded z-10">
+                        {currentIndex + 1} / {photos.length}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Building2 className="h-12 w-12 text-muted-foreground" />
+                </div>
+              )}
+              <div className="absolute top-3 right-3 z-10">
                 {warehouse.rating && (
                   <Badge className="bg-background/80 backdrop-blur">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 mr-1" />
@@ -124,39 +239,71 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
                     </span>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    {formatNumber(warehouse.totalSqFt)} sq ft
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      {formatNumber(warehouse.totalSqFt)} sq ft total
+                    </span>
+                  </div>
+                  {searchParams?.type === 'pallet' && warehouse.availablePalletStorage !== undefined && (
+                    <div className="flex items-center gap-2 ml-6">
+                      <span className="text-sm text-muted-foreground">
+                        {formatNumber(warehouse.availablePalletStorage)} of {formatNumber(warehouse.totalPalletStorage || 0)} pallets available
+                      </span>
+                    </div>
+                  )}
+                  {searchParams?.type === 'area-rental' && warehouse.availableSqFt !== undefined && (
+                    <div className="flex items-center gap-2 ml-6">
+                      <span className="text-sm text-muted-foreground">
+                        {formatNumber(warehouse.availableSqFt)} sq ft available
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Pricing */}
               <div className="space-y-2 pt-2 border-t">
-                {warehouse.pricing?.pallet && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Pallet Storage</span>
-                    <span className="text-sm font-semibold">
-                      {formatCurrency(warehouse.pricing.pallet.basePrice)}
-                      {warehouse.pricing.pallet.unit.includes("month") && "/month"}
-                    </span>
-                  </div>
-                )}
-                {warehouse.pricing?.areaRental && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Area Rental</span>
-                    <span className="text-sm font-semibold">
-                      {formatCurrency(warehouse.pricing.areaRental.basePrice)}
-                      {warehouse.pricing.areaRental.unit.includes("year") && "/year"}
-                    </span>
-                  </div>
-                )}
-                {!warehouse.pricing?.pallet && !warehouse.pricing?.areaRental && (
-                  <div className="text-sm text-muted-foreground">
-                    Contact for pricing
-                  </div>
-                )}
+                {(() => {
+                  const priceCalculation = calculateTotalPrice(warehouse)
+
+                  if (priceCalculation) {
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>Base Rate</span>
+                          <span>{formatCurrency(priceCalculation.rate)}/{priceCalculation.period === 'monthly' ? 'month' : 'day'}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>Duration</span>
+                          <span>
+                            {priceCalculation.period === 'monthly'
+                              ? `${priceCalculation.months} month${priceCalculation.months !== 1 ? 's' : ''}`
+                              : `${priceCalculation.days} day${priceCalculation.days !== 1 ? 's' : ''}`
+                            }
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>Quantity</span>
+                          <span>{formatNumber(priceCalculation.quantity)} {priceCalculation.unit}{priceCalculation.quantity !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t">
+                          <span className="text-sm font-medium">Total Cost</span>
+                          <span className="text-lg font-bold text-primary">
+                            {formatCurrency(priceCalculation.total)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  } else {
+                    return (
+                      <div className="text-sm text-muted-foreground text-center py-2">
+                        Contact for pricing
+                      </div>
+                    )
+                  }
+                })()}
               </div>
 
               {(() => {
@@ -194,7 +341,8 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
               })()}
             </CardContent>
           </Card>
-        ))}
+          )
+        })}
       </div>
     )
   }
@@ -202,18 +350,58 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
   // List View
   return (
     <div className="space-y-4">
-      {warehouses.map((warehouse) => (
+      {warehouses.map((warehouse) => {
+        const photos = warehouse.photos || []
+        const currentIndex = currentPhotoIndexes[warehouse.id] || 0
+        const hasPhotos = photos.length > 0
+
+        return (
         <Card key={warehouse.id} className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="grid gap-4 md:grid-cols-[200px_1fr_200px]">
               {/* Image */}
               <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
-                <Image
-                  src="/warehouse-aerial.png"
-                  alt={warehouse.name}
-                  fill
-                  className="object-cover"
-                />
+                {hasPhotos ? (
+                  <>
+                    <Image
+                      src={getPhotoUrl(photos[currentIndex])}
+                      alt={warehouse.name}
+                      fill
+                      className="object-cover"
+                    />
+                    {photos.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handlePreviousPhoto(warehouse.id, photos)
+                          }}
+                          className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-colors z-10"
+                          aria-label="Previous photo"
+                        >
+                          <ChevronLeft className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handleNextPhoto(warehouse.id, photos)
+                          }}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-colors z-10"
+                          aria-label="Next photo"
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                        <div className="absolute bottom-1 right-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded z-10">
+                          {currentIndex + 1}/{photos.length}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Building2 className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
               </div>
 
               {/* Details */}
@@ -250,9 +438,21 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatNumber(warehouse.totalSqFt)} sq ft</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <span>{formatNumber(warehouse.totalSqFt)} sq ft total</span>
+                    </div>
+                    {searchParams?.type === 'pallet' && warehouse.availablePalletStorage !== undefined && (
+                      <div className="flex items-center gap-1 ml-5 text-sm text-muted-foreground">
+                        <span>{formatNumber(warehouse.availablePalletStorage)}/{formatNumber(warehouse.totalPalletStorage || 0)} pallets available</span>
+                      </div>
+                    )}
+                    {searchParams?.type === 'area-rental' && warehouse.availableSqFt !== undefined && (
+                      <div className="flex items-center gap-1 ml-5 text-sm text-muted-foreground">
+                        <span>{formatNumber(warehouse.availableSqFt)} sq ft available</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -276,31 +476,43 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
               {/* Pricing and Action */}
               <div className="flex flex-col justify-between">
                 <div className="space-y-2">
-                  {warehouse.pricing?.pallet && (
-                    <div>
-                      <div className="text-xs text-muted-foreground">Pallet Storage</div>
-                      <div className="text-lg font-semibold">
-                        {formatCurrency(warehouse.pricing.pallet.basePrice)}
-                        {warehouse.pricing.pallet.unit.includes("month") && (
-                          <span className="text-sm font-normal text-muted-foreground">/month</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {warehouse.pricing?.areaRental && (
-                    <div>
-                      <div className="text-xs text-muted-foreground">Area Rental</div>
-                      <div className="text-lg font-semibold">
-                        {formatCurrency(warehouse.pricing.areaRental.basePrice)}
-                        {warehouse.pricing.areaRental.unit.includes("year") && (
-                          <span className="text-sm font-normal text-muted-foreground">/year</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {!warehouse.pricing?.pallet && !warehouse.pricing?.areaRental && (
-                    <div className="text-sm text-muted-foreground">Contact for pricing</div>
-                  )}
+                  {(() => {
+                    const priceCalculation = calculateTotalPrice(warehouse)
+
+                    if (priceCalculation) {
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Base Rate:</span>
+                            <span>{formatCurrency(priceCalculation.rate)}/{priceCalculation.period === 'monthly' ? 'month' : 'day'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Duration:</span>
+                            <span>
+                              {priceCalculation.period === 'monthly'
+                                ? `${priceCalculation.months} month${priceCalculation.months !== 1 ? 's' : ''}`
+                                : `${priceCalculation.days} day${priceCalculation.days !== 1 ? 's' : ''}`
+                              }
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Quantity:</span>
+                            <span>{formatNumber(priceCalculation.quantity)} {priceCalculation.unit}{priceCalculation.quantity !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="pt-1.5 border-t">
+                            <div className="text-xs text-muted-foreground mb-1">Total Cost</div>
+                            <div className="text-2xl font-bold text-primary">
+                              {formatCurrency(priceCalculation.total)}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    } else {
+                      return (
+                        <div className="text-sm text-muted-foreground">Contact for pricing</div>
+                      )
+                    }
+                  })()}
                 </div>
                 {(() => {
                   // Build URL with search parameters
@@ -337,7 +549,8 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
             </div>
           </CardContent>
         </Card>
-      ))}
+        )
+      })}
     </div>
   )
 }

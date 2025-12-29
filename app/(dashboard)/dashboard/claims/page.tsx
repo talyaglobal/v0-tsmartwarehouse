@@ -27,6 +27,7 @@ export default function ClaimsPage() {
     data: claims = [],
     isLoading: loading,
     error,
+    refetch: refetchClaims,
   } = useQuery({
     queryKey: ['claims', user?.id],
     queryFn: async () => {
@@ -35,7 +36,10 @@ export default function ClaimsPage() {
       return result.success ? (result.data || []) : []
     },
     enabled: !!user && !userLoading,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
   })
 
   // React Query: Update claim status mutation
@@ -50,33 +54,23 @@ export default function ClaimsPage() {
       if (!result.success) {
         throw new Error(result.error || 'Failed to update status')
       }
-      return result.data
+      return { claimId, newStatus, data: result.data }
     },
-    onMutate: async ({ claimId, newStatus }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['claims', user?.id] })
-
-      // Snapshot the previous value
-      const previousClaims = queryClient.getQueryData<Claim[]>(['claims', user?.id])
-
-      // Optimistically update to the new value
+    onSuccess: ({ claimId, newStatus }) => {
+      // Immediately update the cache with new status
       queryClient.setQueryData<Claim[]>(['claims', user?.id], (old = []) =>
         old.map(claim =>
           claim.id === claimId ? { ...claim, status: newStatus } : claim
         )
       )
 
-      // Return a context object with the snapshotted value
-      return { previousClaims }
+      // Close the dropdown
+      setOpenStatusDropdown(null)
+      setDropdownPosition(null)
     },
-    onError: (_err, _variables, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
-      if (context?.previousClaims) {
-        queryClient.setQueryData(['claims', user?.id], context.previousClaims)
-      }
-    },
-    onSettled: () => {
-      // Always refetch after error or success to ensure consistency
+    onError: (error) => {
+      console.error('Claim status update error:', error)
+      // Refetch to get the correct state from server
       queryClient.invalidateQueries({ queryKey: ['claims', user?.id] })
     },
   })
@@ -94,10 +88,15 @@ export default function ClaimsPage() {
       return claimId
     },
     onSuccess: (claimId) => {
-      // Remove from cache
+      // Immediately remove from cache
       queryClient.setQueryData<Claim[]>(['claims', user?.id], (old = []) =>
-        old.filter(c => c.id !== claimId)
+        old ? old.filter(c => c.id !== claimId) : []
       )
+    },
+    onError: (error) => {
+      console.error('Claim delete error:', error)
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['claims', user?.id] })
     },
   })
 

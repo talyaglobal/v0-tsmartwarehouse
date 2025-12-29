@@ -83,12 +83,13 @@ export async function getBookings(filters?: GetBookingsOptions) {
   if (warehouseCompanyId) {
     // Filter by warehouse company: get all warehouse_ids that belong to this company
     // Then filter bookings by those warehouse_ids
+    // Note: We don't filter by warehouse status here - company admins should see
+    // all bookings to their warehouses (active or inactive)
     const { data: companyWarehouses } = await supabase
       .from('warehouses')
       .select('id')
       .eq('owner_company_id', warehouseCompanyId)
-      .eq('status', true) // Only active warehouses
-    
+
     if (companyWarehouses && companyWarehouses.length > 0) {
       const warehouseIds = companyWarehouses.map(w => w.id)
       query = query.in('warehouse_id', warehouseIds)
@@ -144,7 +145,27 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('bookings')
-    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, booking_status, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, notes, created_at, updated_at')
+    .select(`
+      id,
+      customer_id,
+      customer_name,
+      customer_email,
+      warehouse_id,
+      type,
+      booking_status,
+      status,
+      pallet_count,
+      area_sq_ft,
+      floor_number,
+      hall_id,
+      start_date,
+      end_date,
+      total_amount,
+      notes,
+      created_at,
+      updated_at,
+      warehouses(name, address, city)
+    `)
     .eq('id', id)
     .eq('status', true) // Soft delete filter
     .single()
@@ -261,8 +282,8 @@ export async function deleteBooking(id: string): Promise<void> {
 /**
  * Transform database row to Booking type
  */
-function transformBookingRow(row: any): Booking {
-  return {
+function transformBookingRow(row: any): Booking & { warehouse_name?: string; warehouse_address?: string; warehouse_city?: string } {
+  const booking: any = {
     id: row.id,
     customerId: row.customer_id,
     customerName: row.customer_name,
@@ -281,5 +302,14 @@ function transformBookingRow(row: any): Booking {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+
+  // Add warehouse details if available (from JOIN)
+  if (row.warehouses) {
+    booking.warehouse_name = row.warehouses.name
+    booking.warehouse_address = row.warehouses.address
+    booking.warehouse_city = row.warehouses.city
+  }
+
+  return booking
 }
 

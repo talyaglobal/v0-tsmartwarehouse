@@ -20,6 +20,9 @@ interface Warehouse {
   state?: string
   zipCode: string
   totalSqFt: number
+  totalPalletStorage?: number
+  availableSqFt?: number
+  availablePalletStorage?: number
   amenities?: string[]
   latitude?: number
   longitude?: number
@@ -95,6 +98,9 @@ export default function FindWarehousesPage() {
                     state: wh.state,
                     zipCode: wh.zipCode,
                     totalSqFt: wh.totalSqFt || 0,
+                    totalPalletStorage: wh.totalPalletStorage,
+                    availableSqFt: wh.availableSqFt,
+                    availablePalletStorage: wh.availablePalletStorage,
                     amenities: wh.amenities || [],
                     latitude: wh.latitude,
                     longitude: wh.longitude,
@@ -104,8 +110,11 @@ export default function FindWarehousesPage() {
                     temperature: wh.temperatureTypes?.[0] || "ambient", // Use first temperature type for display
                     storageTypes: wh.storageTypes || [],
                     temperatureTypes: wh.temperatureTypes || [],
-                    pricing: wh.pricing || {},
+                    photos: wh.photos || [],
+                    pricing: wh.pricing,
                   }))
+
+          console.log("[find-warehouses] First warehouse pricing:", transformedWarehouses[0]?.pricing)
 
           console.log("[find-warehouses] Transformed warehouses:", transformedWarehouses.length)
           setWarehouses(transformedWarehouses)
@@ -124,26 +133,61 @@ export default function FindWarehousesPage() {
     fetchWarehouses()
   }, [location])
 
-  // Filter warehouses based on selected filters
+  // Filter warehouses based on selected filters and available capacity
   const filteredWarehouses = useMemo(() => {
+    console.log('[find-warehouses] Filtering with:', { warehouseType, storageType, temperature, rating })
+
+    // Get search criteria from URL
+    const searchType = searchParams.get("type") || "pallet"
+    const requestedPalletCount = searchParams.get("palletCount") ? parseInt(searchParams.get("palletCount")!) : 0
+    const requestedAreaSqFt = searchParams.get("areaSqFt") ? parseInt(searchParams.get("areaSqFt")!) : 0
+
     return warehouses.filter((wh) => {
+      // Capacity filter - exclude warehouses that don't have enough available capacity
+      if (searchType === "pallet" && requestedPalletCount > 0) {
+        const availablePallets = wh.availablePalletStorage || 0
+        if (requestedPalletCount > availablePallets) {
+          console.log('[find-warehouses] Warehouse', wh.name, 'insufficient pallet capacity. Requested:', requestedPalletCount, 'Available:', availablePallets)
+          return false
+        }
+      }
+
+      if (searchType === "area-rental" && requestedAreaSqFt > 0) {
+        const availableArea = wh.availableSqFt || 0
+        if (requestedAreaSqFt > availableArea) {
+          console.log('[find-warehouses] Warehouse', wh.name, 'insufficient area capacity. Requested:', requestedAreaSqFt, 'Available:', availableArea)
+          return false
+        }
+      }
+
       // Warehouse Type filter (check if any selected type matches any warehouse type)
       if (warehouseType.length > 0) {
         const whTypes = Array.isArray(wh.warehouseType) ? wh.warehouseType : (wh.warehouseType ? [wh.warehouseType] : [])
         const hasMatchingType = warehouseType.some(selectedType => whTypes.includes(selectedType))
+        console.log('[find-warehouses] Warehouse', wh.name, 'types:', whTypes, 'matches:', hasMatchingType)
         if (!hasMatchingType) {
           return false
         }
       }
 
-      // Storage Type filter
-      if (storageType.length > 0 && !storageType.includes(wh.storageType || "")) {
-        return false
+      // Storage Type filter - check if warehouse has ANY of the selected storage types
+      if (storageType.length > 0) {
+        const whStorageTypes = (wh as any).storageTypes || []
+        const hasMatchingStorageType = storageType.some(selectedType => whStorageTypes.includes(selectedType))
+        console.log('[find-warehouses] Warehouse', wh.name, 'storage types:', whStorageTypes, 'matches:', hasMatchingStorageType)
+        if (!hasMatchingStorageType) {
+          return false
+        }
       }
 
-      // Temperature filter
-      if (temperature.length > 0 && !temperature.includes(wh.temperature || "")) {
-        return false
+      // Temperature filter - check if warehouse has ANY of the selected temperature types
+      if (temperature.length > 0) {
+        const whTempTypes = (wh as any).temperatureTypes || []
+        const hasMatchingTemperature = temperature.some(selectedTemp => whTempTypes.includes(selectedTemp))
+        console.log('[find-warehouses] Warehouse', wh.name, 'temp types:', whTempTypes, 'matches:', hasMatchingTemperature)
+        if (!hasMatchingTemperature) {
+          return false
+        }
       }
 
       // Rating filter
@@ -153,7 +197,7 @@ export default function FindWarehousesPage() {
 
       return true
     })
-  }, [warehouses, warehouseType, storageType, temperature, rating])
+  }, [warehouses, warehouseType, storageType, temperature, rating, searchParams])
 
   return (
     <div className="flex min-h-screen flex-col">

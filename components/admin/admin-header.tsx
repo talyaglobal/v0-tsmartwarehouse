@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useState } from 'react'
 import { Bell, Search, Menu, Moon, Sun, LogOut } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,7 +16,8 @@ interface AdminHeaderProps {
 export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
-  const { signOut } = useAuth()
+  const { signOut, isRoot, setRoleOverride, user } = useAuth()
+  const [showRoleMenu, setShowRoleMenu] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
@@ -48,6 +50,25 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
         <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign out">
           <LogOut className="h-5 w-5" />
         </Button>
+        {isRoot && (
+          <div className="relative">
+            <Button variant="ghost" size="sm" onClick={() => setShowRoleMenu((s) => !s)} className="ml-2">
+              Impersonate
+            </Button>
+            {showRoleMenu && (
+              <div className="absolute right-0 z-50 mt-2 w-48 rounded-md border bg-card p-2 shadow-lg">
+                <div className="flex flex-col gap-1">
+                  <button className="text-left p-2 hover:bg-muted" onClick={() => { setRoleOverride && setRoleOverride('customer'); setShowRoleMenu(false) }}>Customer</button>
+                  <button className="text-left p-2 hover:bg-muted" onClick={() => { setRoleOverride && setRoleOverride('company_owner'); setShowRoleMenu(false) }}>Company Owner</button>
+                  <button className="text-left p-2 hover:bg-muted" onClick={() => { setRoleOverride && setRoleOverride('company_admin'); setShowRoleMenu(false) }}>Company Admin</button>
+                  <button className="text-left p-2 hover:bg-muted" onClick={() => { setRoleOverride && setRoleOverride('warehouse_staff'); setShowRoleMenu(false) }}>Warehouse Staff</button>
+                  <hr className="my-1" />
+                  <button className="text-left p-2 text-destructive hover:bg-muted" onClick={() => { setRoleOverride && setRoleOverride(null); setShowRoleMenu(false) }}>Clear Override</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )

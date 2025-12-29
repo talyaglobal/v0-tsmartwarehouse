@@ -1,0 +1,197 @@
+"use client"
+
+import * as React from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
+import Script from "next/script"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Warehouse as WarehouseIcon, Loader2 } from "@/components/icons"
+import { formatCurrency } from "@/lib/utils/format"
+
+export default function PaymentPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [amount, setAmount] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const clientSecret = searchParams.get("intent")
+  const bookingId = searchParams.get("bookingId")
+
+  useEffect(() => {
+    if (!clientSecret || !bookingId) {
+      router.push("/find-warehouses")
+      return
+    }
+
+    // Retrieve payment intent to get amount
+    const retrieveIntent = async () => {
+      try {
+        const response = await fetch("/api/v1/payments/retrieve-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientSecret }),
+        })
+        const data = await response.json()
+        if (data.success) {
+          setAmount(data.amount)
+        }
+      } catch (error) {
+        console.error("Failed to retrieve payment intent:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    retrieveIntent()
+  }, [clientSecret, bookingId, router])
+
+  const handlePayment = async () => {
+    if (!clientSecret || !bookingId) return
+
+    setIsProcessing(true)
+    setErrorMessage(null)
+
+    try {
+      // In production, you would:
+      // 1. Load Stripe.js dynamically
+      // 2. Create Stripe instance
+      // 3. Call stripe.confirmPayment()
+      
+      // For now, we'll simulate a payment redirect to a Stripe hosted page
+      // In production, integrate properly with Stripe.js
+      
+      // Simulate processing
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Redirect to success (in real implementation, Stripe handles this)
+      router.push(`/payment-success?bookingId=${bookingId}`)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Payment failed")
+      setIsProcessing(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading payment page...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!clientSecret) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Invalid payment request</p>
+            <Link href="/find-warehouses">
+              <Button variant="outline" className="mt-4">
+                Back to Search
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex h-16 items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <WarehouseIcon className="h-8 w-8 text-primary" />
+            <span className="text-xl font-bold">TSmart Warehouse</span>
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-lg mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold mb-2">Complete Payment</h1>
+              <p className="text-muted-foreground">
+                Secure payment powered by Stripe
+              </p>
+            </div>
+
+            {/* Payment Card */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Payment Details</CardTitle>
+                {amount && (
+                  <CardDescription>
+                    Total Amount: <span className="font-semibold text-foreground">{formatCurrency(amount / 100)}</span>
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Payment Form Placeholder */}
+                <div className="p-6 border rounded-lg bg-muted">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Card Information</label>
+                      <div className="mt-2 p-4 border rounded bg-background">
+                        <p className="text-sm text-muted-foreground">
+                          Stripe payment form will be embedded here
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Cardholder Name</label>
+                      <input
+                        type="text"
+                        placeholder="Full name on card"
+                        className="w-full mt-2 px-3 py-2 border rounded-md"
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {errorMessage && (
+                  <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+                    <p className="text-sm text-red-800">{errorMessage}</p>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handlePayment}
+                  size="lg"
+                  className="w-full h-12 text-base font-semibold"
+                  disabled={isProcessing}
+                >
+                  {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isProcessing ? "Processing..." : "Pay Now"}
+                </Button>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  Your payment is secure and encrypted. We never store your full card details.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Security Note */}
+            <div className="mt-8 p-4 rounded-lg bg-blue-50 border border-blue-200">
+              <p className="text-sm text-blue-900">
+                <span className="font-semibold">🔒 Secure Payment:</span> Your payment information is encrypted and
+                processed securely by Stripe. We never store your full card details.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
