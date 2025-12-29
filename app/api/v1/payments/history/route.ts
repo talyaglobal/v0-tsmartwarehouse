@@ -21,11 +21,11 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult
 
-    // Only members can view their own payment history
-    if (user?.role !== "member") {
+    // Only customers can view their own payment history
+    if (user?.role !== "customer") {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Only members can view payment history",
+        error: "Only customers can view payment history",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })

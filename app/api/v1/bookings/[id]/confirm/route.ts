@@ -7,7 +7,7 @@ import type { ErrorResponse, ApiResponse } from "@/types/api"
  * Confirm a booking after successful payment (for local development without webhook)
  */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {

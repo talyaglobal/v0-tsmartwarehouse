@@ -139,10 +139,13 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       // Save to localStorage for client-side use
       localStorage.setItem(ROOT_ROLE_SELECTOR_KEY, newRole)
       setSelectedTestRole(newRole)
-      
+
       // Set cookie for middleware to read (24 hours expiry)
       document.cookie = `root-test-role=${newRole}; path=/; max-age=${60 * 60 * 24}`
-      
+
+      // Dispatch custom event for sidebar to listen
+      window.dispatchEvent(new Event('role-changed'))
+
       // Navigate to appropriate dashboard based on role
       if (newRole === 'root') {
         router.push('/admin')
@@ -151,7 +154,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       } else {
         router.push('/dashboard')
       }
-      
+
       // Refresh to apply new role in middleware
       router.refresh()
     }
@@ -163,11 +166,11 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
-      root: 'Root',
-      company_owner: 'Company Owner',
-      company_admin: 'Company Admin',
-      customer: 'Customer',
-      warehouse_staff: 'Warehouse Staff',
+      root: '🔴 Root Admin',
+      company_owner: '🟢 Company Owner',
+      company_admin: '🔵 Company Admin',
+      customer: '🟣 Customer',
+      warehouse_staff: '⚪ Warehouse Staff',
     }
     return labels[role] || role
   }
@@ -221,7 +224,13 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                 <span className="text-sm font-medium">
                   {profile?.name || user?.email?.split('@')[0] || 'User'}
                 </span>
-                {profile?.role && (
+                {profile?.role === 'root' && selectedTestRole && selectedTestRole !== 'root' ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">
+                      Root → {getRoleLabel(selectedTestRole as UserRole).replace(/^[🔴🟢🔵🟣⚪]\s/, '')}
+                    </span>
+                  </div>
+                ) : profile?.role && (
                   <div className="flex items-center">
                     {getRoleBadge(profile.role)}
                   </div>
@@ -231,13 +240,19 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <div 
+            <div
               className="px-2 py-1.5 cursor-pointer hover:bg-accent rounded-sm"
               onClick={() => router.push('/dashboard/settings?tab=profile')}
             >
               <p className="text-sm font-medium">{profile?.name || 'User'}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              {profile?.role && (
+              {profile?.role === 'root' && selectedTestRole && selectedTestRole !== 'root' ? (
+                <div className="mt-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    Root → {getRoleLabel(selectedTestRole as UserRole).replace(/^[🔴🟢🔵🟣⚪]\s/, '')}
+                  </span>
+                </div>
+              ) : profile?.role && (
                 <div className="mt-1.5 flex items-center">
                   {getRoleBadge(profile.role)}
                 </div>

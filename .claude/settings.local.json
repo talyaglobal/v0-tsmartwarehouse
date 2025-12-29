@@ -17,7 +17,8 @@
       "Bash(node scripts/check-bookings-data.js:*)",
       "Bash(node scripts/check-company-bookings.js:*)",
       "Bash(node scripts/test-api-bookings.js:*)",
-      "Bash(node scripts/test-getUserCompanyId.js:*)"
+      "Bash(node scripts/test-getUserCompanyId.js:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +14,6 @@ import { createClient } from "@/lib/supabase/client"
 import { useUIStore } from "@/stores/ui.store"
 
 export default function ResetPasswordPage() {
-  const router = useRouter()
   const supabase = createClient()
   const addNotification = useUIStore((state) => state.addNotification)
   const [isLoading, setIsLoading] = useState(false)

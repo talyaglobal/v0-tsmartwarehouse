@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import { useState, useEffect } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -10,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { MapPin, Building2, Package, Warehouse as WarehouseIcon, ArrowLeft, Calendar, AlertCircle } from "@/components/icons"
+import { MapPin, Building2, Warehouse as WarehouseIcon, ArrowLeft, AlertCircle } from "@/components/icons"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { createClient } from "@/lib/supabase/client"
 
@@ -61,7 +60,6 @@ export default function BookingReviewPage() {
   // Get booking details from URL params
   useEffect(() => {
     const productinfo = searchParams.get("productinfo")
-    const uom = searchParams.get("uom")
     const uomQty = searchParams.get("uom_qty")
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")

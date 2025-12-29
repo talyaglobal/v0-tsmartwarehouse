@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { X, UserPlus } from "@/components/icons"
+import { UserPlus, X } from "@/components/icons"
 import type { User } from "@/types"
 
 interface ParticipantSelectorProps {
@@ -33,7 +32,7 @@ export function ParticipantSelector({ selectedUserIds, onChange, excludeUserIds 
         .limit(10)
       
       if (error) throw error
-      return (data || []).map(p => ({
+      return (data || []).map((p: any) => ({
         id: p.id,
         name: p.name || p.email,
         email: p.email,
@@ -59,7 +58,7 @@ export function ParticipantSelector({ selectedUserIds, onChange, excludeUserIds 
         .in('id', selectedUserIds)
       
       if (error) throw error
-      return (data || []).map(p => ({
+      return (data || []).map((p: any) => ({
         id: p.id,
         name: p.name || p.email,
         email: p.email,

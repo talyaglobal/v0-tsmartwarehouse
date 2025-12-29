@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
     const invoiceId = searchParams.get("invoiceId")
     const status = searchParams.get("status")
 
-    // Members can only see their own payments
+    // Customers can only see their own payments
     // Company Admins can see all payments in their company
     const filters: any = {}
-    if (user?.role === "member") {
+    if (user?.role === "customer") {
       filters.customerId = user.id
     } else if (user?.role === "company_admin") {
       // Company Admin can see all payments in their company
@@ -82,11 +82,11 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult
 
-    // Only members can create payments for their own invoices
-    if (user?.role !== "member") {
+    // Only customers can create payments for their own invoices
+    if (user?.role !== "customer") {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Only members can create payments",
+        error: "Only customers can create payments",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })

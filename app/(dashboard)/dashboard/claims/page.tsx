@@ -27,7 +27,6 @@ export default function ClaimsPage() {
     data: claims = [],
     isLoading: loading,
     error,
-    refetch: refetchClaims,
   } = useQuery({
     queryKey: ['claims', user?.id],
     queryFn: async () => {

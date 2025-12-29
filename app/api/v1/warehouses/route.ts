@@ -5,7 +5,6 @@ import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ListResponse, ApiResponse } from "@/types/api"
 import { createWarehouse, getWarehouses } from "@/lib/db/warehouses"
 import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
 const createWarehouseSchema = z.object({
@@ -186,21 +185,7 @@ export async function POST(request: NextRequest) {
       validated.state
     )
 
-    // Get company name for folder structure
-    const supabase = createServerSupabaseClient()
-    const { data: company } = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', userCompanyId)
-      .single()
-
-    const companyName = company?.name || 'unknown'
-    // Sanitize company name and warehouse name for folder paths (remove special chars, spaces to hyphens)
-    const sanitizedCompanyName = companyName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-    const sanitizedWarehouseName = warehouseName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-
-    // Move photos to correct folder structure: warehouse/{company_name}/{warehouse_name}/
-    // Photos are already uploaded to temporary location, we'll move them in the API
+    // TODO: Implement photo organization by company/warehouse folder structure
     // For now, we'll store the paths as-is and move them server-side if needed
     // The file upload API should handle the correct folder structure
 

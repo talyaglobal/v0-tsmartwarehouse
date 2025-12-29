@@ -4,7 +4,6 @@ import * as React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { BookingSearch } from "./booking-search"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -12,7 +11,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Search } from "@/components/icons"
 import { cn } from "@/lib/utils"
-import { useUser } from "@/lib/hooks/use-user"
 
 type StorageType = "pallet" | "area-rental"
 
@@ -42,10 +40,9 @@ export function BookingSearchForm({
   compact = false,
 }: BookingSearchFormProps) {
   const router = useRouter()
-  const { user } = useUser()
 
   const [location, setLocation] = useState(initialValues?.location || "")
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>(initialValues?.warehouseId)
+  const [selectedWarehouseId, _setSelectedWarehouseId] = useState<string | undefined>(initialValues?.warehouseId)
   const [storageType, setStorageType] = useState<StorageType>(initialValues?.storageType || "pallet")
   const [palletCount, setPalletCount] = useState<string>(initialValues?.palletCount?.toString() || "1")
   const [areaSqFt, setAreaSqFt] = useState<string>(initialValues?.areaSqFt?.toString() || "40000")

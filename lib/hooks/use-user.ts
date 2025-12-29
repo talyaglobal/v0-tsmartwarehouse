@@ -19,7 +19,7 @@ export function useUser() {
       }
       setUser(user)
       setIsLoading(false)
-    }).catch((err) => {
+    }).catch((err: any) => {
       // Silently handle session missing errors on public pages
       if (err.message !== 'Auth session missing!' && err.name !== 'AuthSessionMissingError') {
         console.error("Error getting user:", err)

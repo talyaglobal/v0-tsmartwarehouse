@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Warehouse, ArrowLeft } from "@/components/icons"
+import { Loader2, ArrowLeft, Warehouse as WarehouseIcon } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
@@ -1014,7 +1014,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                 </>
               ) : (
                 <>
-                  <Warehouse className="h-4 w-4 mr-2" />
+                  <WarehouseIcon className="h-4 w-4 mr-2" />
                   Update Warehouse
                 </>
               )}

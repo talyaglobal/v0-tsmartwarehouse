@@ -404,7 +404,7 @@ export default function TeamMembersPage() {
                 <Label htmlFor="role">Role</Label>
                 <Select
                   value={inviteForm.role}
-                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as 'company_owner' | 'company_admin' | 'member' })}
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as 'company_admin' | 'warehouse_staff' })}
                 >
                   <SelectTrigger>
                     <SelectValue />

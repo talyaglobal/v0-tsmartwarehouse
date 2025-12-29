@@ -40,11 +40,43 @@ const baseNavigation = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
 ]
 
+const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
+
 export function DashboardSidebar() {
   const pathname = usePathname()
   const { user } = useUser()
   const [logoError, setLogoError] = useState(false)
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
+  const [selectedTestRole, setSelectedTestRole] = useState<string | null>(null)
+
+  // Load selected test role from localStorage (only for root users)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY)
+      setSelectedTestRole(savedRole)
+
+      // Listen for storage changes (when role is changed in header)
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === ROOT_ROLE_SELECTOR_KEY) {
+          setSelectedTestRole(e.newValue)
+        }
+      }
+
+      // Listen for custom event (for same-tab updates)
+      const handleRoleChange = () => {
+        const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY)
+        setSelectedTestRole(savedRole)
+      }
+
+      window.addEventListener('storage', handleStorageChange)
+      window.addEventListener('role-changed', handleRoleChange)
+
+      return () => {
+        window.removeEventListener('storage', handleStorageChange)
+        window.removeEventListener('role-changed', handleRoleChange)
+      }
+    }
+  }, [])
 
   // Fetch pending bookings count
   const { data: pendingCount = 0 } = useQuery({
@@ -203,7 +235,11 @@ export function DashboardSidebar() {
         {baseNavigation
           .filter((item) => {
             // Filter navigation items based on user role
-            const userRole = profile?.role || 'customer'
+            // If root user has test role selected, use test role; otherwise use actual role
+            let userRole = profile?.role || 'customer'
+            if (profile?.role === 'root' && selectedTestRole) {
+              userRole = selectedTestRole
+            }
             return item.roles.includes(userRole)
           })
           .map((item) => {
@@ -249,24 +285,33 @@ export function DashboardSidebar() {
       </nav>
 
       {/* My Company Section - Only for Company Admin */}
-      {isCompanyAdmin && (
-        <div className="border-t p-4">
-          <Link href="/dashboard/my-company">
-            <Button 
-              variant="ghost" 
-              className={cn(
-                "w-full justify-start gap-2",
-                pathname === "/dashboard/my-company" || pathname.startsWith("/dashboard/my-company/")
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Building2 className="h-4 w-4" />
-              My Company
-            </Button>
-          </Link>
-        </div>
-      )}
+      {(() => {
+        // Determine if My Company should be shown based on role
+        let userRole = profile?.role || 'customer'
+        if (profile?.role === 'root' && selectedTestRole) {
+          userRole = selectedTestRole
+        }
+        const showMyCompany = isCompanyAdmin || ['company_owner', 'company_admin'].includes(userRole)
+
+        return showMyCompany && (
+          <div className="border-t p-4">
+            <Link href="/dashboard/my-company">
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start gap-2",
+                  pathname === "/dashboard/my-company" || pathname.startsWith("/dashboard/my-company/")
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Building2 className="h-4 w-4" />
+                My Company
+              </Button>
+            </Link>
+          </div>
+        )
+      })()}
     </div>
   )
 }

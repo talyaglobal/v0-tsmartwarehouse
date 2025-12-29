@@ -47,7 +47,6 @@ export default function BookingsPage() {
     data: bookings = [],
     isLoading: bookingsLoading,
     error: bookingsError,
-    refetch: refetchBookings,
   } = useQuery({
     queryKey: ['bookings', user?.id, userCompanyId, isCustomer],
     queryFn: async () => {
@@ -123,9 +122,6 @@ export default function BookingsPage() {
       queryClient.setQueryData<Booking[]>(['bookings', user?.id, userCompanyId, isCustomer], (old = []) =>
         old ? old.filter(b => b.id !== bookingId) : []
       )
-
-      // Close the dropdown
-      setOpenActionDropdown(null)
     },
     onError: (error) => {
       console.error('Delete error:', error)

@@ -73,14 +73,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform profiles to User type with company role information
-    const users: (User & { companyRole?: 'company_owner' | 'company_admin' | 'member' | null })[] = (profiles || []).map((profile: any) => {
+    const users: (User & { companyRole?: 'company_owner' | 'company_admin' | 'warehouse_staff' | null })[] = (profiles || []).map((profile: any) => {
       const company = Array.isArray(profile.companies) ? profile.companies[0] : profile.companies
 
-      // Map profile role to company role: 'company_owner' -> 'company_owner', 'company_admin' -> 'company_admin', 'customer' -> 'member'
-      const companyRole: 'company_owner' | 'company_admin' | 'member' | null = 
+      // Map profile role to company role: 'company_owner' -> 'company_owner', 'company_admin' -> 'company_admin', 'warehouse_staff' -> 'warehouse_staff'
+      const companyRole: 'company_owner' | 'company_admin' | 'warehouse_staff' | null =
         profile.role === 'company_owner' ? 'company_owner' :
         profile.role === 'company_admin' ? 'company_admin' :
-        profile.company_id ? 'member' : null
+        profile.role === 'warehouse_staff' ? 'warehouse_staff' : null
 
       return {
         id: profile.id,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const responseData: ListResponse<User & { companyRole?: 'company_owner' | 'company_admin' | 'member' | null }> = {
+    const responseData: ListResponse<User & { companyRole?: 'company_owner' | 'company_admin' | 'warehouse_staff' | null }> = {
       success: true,
       data: users,
       total: users.length,

@@ -6,7 +6,7 @@ import { updateAppointmentTypeSchema } from "@/lib/validation/schemas"
 import type { ErrorResponse } from "@/types/api"
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {

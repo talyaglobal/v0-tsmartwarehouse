@@ -304,11 +304,10 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     productAcceptanceEndTime: row.product_acceptance_end_time || undefined,
     workingDays: Array.isArray(row.working_days) ? row.working_days : [],
   }
-  // Add ownerCompanyId and pricing as additional properties
+  // Add ownerCompanyId as additional property
   return {
     ...warehouse,
     ownerCompanyId: row.owner_company_id || null,
-    pricing: Object.keys(pricing).length > 0 ? pricing : undefined
   }
 }
 

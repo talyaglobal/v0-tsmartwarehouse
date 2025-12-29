@@ -1,10 +1,8 @@
 "use client"
 
-import * as React from "react"
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import Script from "next/script"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Warehouse as WarehouseIcon, Loader2 } from "@/components/icons"

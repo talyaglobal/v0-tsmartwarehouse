@@ -178,12 +178,6 @@ export function MapLocationPicker({
 
         mapInstanceRef.current = map
 
-        // Helper function to geocode location
-        const geocodeLocation = (lat: number, lng: number) => {
-          if (!window.google?.maps?.Geocoder) return
-          // Geocoding is done when user confirms, not during selection
-        }
-
         // Add initial marker if coordinates provided
         if (initialLat && initialLng) {
           const marker = new window.google.maps.Marker({

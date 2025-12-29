@@ -1,4 +1,5 @@
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import type { UserRole } from '@/types'
 
 export interface AuthUser {
@@ -28,33 +29,56 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     // Get role from profiles table for accurate role checking
     let userRole: UserRole = 'customer' // Default role
+    let actualRole: UserRole = 'customer' // Store actual role from profile
     try {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, name')
         .eq('id', user.id)
         .maybeSingle()
-      
+
       if (profile?.role) {
         // Map legacy roles to new roles
-        if (profile.role === 'super_admin') userRole = 'root'
-        else if (profile.role === 'customer') userRole = 'customer'
-        else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
-        else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (profile.role === 'owner') userRole = 'company_owner' // Map legacy 'owner' to 'company_owner'
+        if (profile.role === 'super_admin') actualRole = 'root'
+        else if (profile.role === 'customer') actualRole = 'customer'
+        else if (profile.role === 'member') actualRole = 'customer' // Map legacy 'member' to 'customer'
+        else if (profile.role === 'worker') actualRole = 'warehouse_staff'
+        else if (profile.role === 'owner') actualRole = 'company_owner' // Map legacy 'owner' to 'company_owner'
         else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
-          userRole = profile.role as UserRole
+          actualRole = profile.role as UserRole
+        }
+
+        userRole = actualRole
+
+        // If user is root, check for test role override cookie
+        if (actualRole === 'root') {
+          const cookieStore = await cookies()
+          const testRoleCookie = cookieStore.get('root-test-role')?.value
+          if (testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+            userRole = testRoleCookie as UserRole
+          }
         }
       } else {
         // Fallback to user_metadata if profile doesn't exist
         const metadataRole = user.user_metadata?.role as string
-        if (metadataRole === 'super_admin') userRole = 'root'
-        else if (metadataRole === 'customer') userRole = 'customer'
-        else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
-        else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (metadataRole === 'owner') userRole = 'company_owner' // Map legacy 'owner' to 'company_owner'
+        if (metadataRole === 'super_admin') actualRole = 'root'
+        else if (metadataRole === 'customer') actualRole = 'customer'
+        else if (metadataRole === 'member') actualRole = 'customer' // Map legacy 'member' to 'customer'
+        else if (metadataRole === 'worker') actualRole = 'warehouse_staff'
+        else if (metadataRole === 'owner') actualRole = 'company_owner' // Map legacy 'owner' to 'company_owner'
         else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
-          userRole = metadataRole as UserRole
+          actualRole = metadataRole as UserRole
+        }
+
+        userRole = actualRole
+
+        // If user is root, check for test role override cookie
+        if (actualRole === 'root') {
+          const cookieStore = await cookies()
+          const testRoleCookie = cookieStore.get('root-test-role')?.value
+          if (testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+            userRole = testRoleCookie as UserRole
+          }
         }
       }
 
@@ -71,11 +95,26 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       console.error('Error fetching profile:', profileError)
       // Fallback to user_metadata with mapping
       const metadataRole = user.user_metadata?.role as string
-      if (metadataRole === 'super_admin') userRole = 'root'
-      else if (metadataRole === 'customer') userRole = 'member'
-      else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
-        userRole = metadataRole as UserRole
+      if (metadataRole === 'super_admin') actualRole = 'root'
+      else if (metadataRole === 'customer') actualRole = 'customer'
+      else if (metadataRole === 'worker') actualRole = 'warehouse_staff'
+      else if (['root', 'company_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
+        actualRole = metadataRole as UserRole
+      }
+
+      userRole = actualRole
+
+      // If user is root, check for test role override cookie
+      if (actualRole === 'root') {
+        try {
+          const cookieStore = await cookies()
+          const testRoleCookie = cookieStore.get('root-test-role')?.value
+          if (testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+            userRole = testRoleCookie as UserRole
+          }
+        } catch {
+          // Ignore cookie errors
+        }
       }
 
       return {

@@ -99,7 +99,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       setTimeout(() => reject(new Error('Email send timeout after 15 seconds')), 15000)
     )
     
-    const info = await Promise.race([sendPromise, timeoutPromise])
+    const info = await Promise.race([sendPromise, timeoutPromise]) as any
 
     console.log('Email sent successfully!')
     console.log('  Message ID:', info.messageId)

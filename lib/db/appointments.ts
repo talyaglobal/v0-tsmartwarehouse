@@ -185,12 +185,12 @@ export async function createAppointment(data: {
       status: 'pending' as const,
     }))
 
-    // Add creator as requester
+    // Add creator as attendee
     participants.push({
       appointment_id: mappedAppointment.id,
       user_id: data.createdBy,
-      role: 'requester' as const,
-      status: 'accepted' as const,
+      role: 'attendee' as const,
+      status: 'pending' as const,
     })
 
     const { error: participantsError } = await supabase

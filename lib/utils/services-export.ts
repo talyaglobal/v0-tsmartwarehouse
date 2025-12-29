@@ -80,7 +80,6 @@ export function exportServicesToPDF(services: WarehouseService[]): void {
     // Check if we need a new page
     if (currentY > pageHeight - 30) {
       doc.addPage()
-      pageNumber++
       currentY = startY
     }
 

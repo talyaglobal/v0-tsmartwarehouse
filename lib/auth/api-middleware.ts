@@ -79,9 +79,9 @@ export async function getAuthUser(request: NextRequest) {
       // Fallback to user_metadata
       const metadataRole = user.user_metadata?.role as string
       if (metadataRole === 'super_admin') userRole = 'root'
-      else if (metadataRole === 'customer') userRole = 'member'
+      else if (metadataRole === 'customer') userRole = 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_admin', 'member', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'company_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
         userRole = metadataRole as UserRole
       }
     }
