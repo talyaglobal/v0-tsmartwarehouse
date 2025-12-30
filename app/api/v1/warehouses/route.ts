@@ -12,26 +12,13 @@ const createWarehouseSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.string().optional(), // State for name generation
   zipCode: z.string().optional(),
-  totalSqFt: z.number().positive("Total square feet must be positive"),
-  totalPalletStorage: z.number().positive("Total pallet storage must be positive"),
+  totalSqFt: z.number().positive("Total square feet must be positive").optional(),
+  totalPalletStorage: z.number().positive("Total pallet storage must be positive").optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
-  warehouseType: z.array(z.enum([
-    "general-dry-ambient",
-    "food-beverage-fda",
-    "pharmaceutical-fda-cgmp",
-    "medical-devices-fda",
-    "nutraceuticals-supplements-fda",
-    "cosmetics-fda",
-    "hazardous-materials-hazmat",
-    "cold-storage",
-    "alcohol-tobacco-ttb",
-    "consumer-electronics",
-    "automotive-parts",
-    "ecommerce-high-velocity",
-  ])).min(1, "At least one warehouse type is required"),
-  storageTypes: z.array(z.enum(["bulk-space", "rack-space", "individual-unit", "lockable-unit", "cage", "open-yard", "closed-yard"])).min(1, "At least one storage type is required"),
-  temperatureTypes: z.array(z.enum(["ambient-with-ac", "ambient-without-ac", "chilled", "frozen", "open-area-with-tent", "open-area"])).min(1, "At least one temperature option is required"),
+  warehouseType: z.string().min(1, "Warehouse type is required"),
+  storageType: z.string().min(1, "Storage type is required"),
+  temperatureTypes: z.array(z.enum(["ambient-with-ac", "ambient-without-ac", "ambient-with-heater", "ambient-without-heater", "chilled", "frozen", "open-area-with-tent", "open-area"])).min(1, "At least one temperature option is required"),
   amenities: z.array(z.string()).optional(),
   photos: z.array(z.string()).min(2, "At least 2 warehouse photos are required"),
   operatingHours: z.object({
@@ -41,8 +28,6 @@ const createWarehouseSchema = z.object({
   }).optional(),
   // New fields
   customStatus: z.enum(["antrepolu", "regular"]).optional(),
-  atCapacitySqFt: z.boolean().optional(),
-  atCapacityPallet: z.boolean().optional(),
   minPallet: z.number().int().positive().optional(),
   maxPallet: z.number().int().positive().optional(),
   minSqFt: z.number().int().positive().optional(),
@@ -59,6 +44,12 @@ const createWarehouseSchema = z.object({
   productAcceptanceStartTime: z.string().optional(),
   productAcceptanceEndTime: z.string().optional(),
   workingDays: z.array(z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])).optional(),
+}).refine((data) => {
+  // At least one of totalSqFt or totalPalletStorage must be provided
+  return data.totalSqFt !== undefined || data.totalPalletStorage !== undefined;
+}, {
+  message: "At least one of totalSqFt or totalPalletStorage is required",
+  path: ["totalSqFt"],
 })
 
 export async function GET(request: NextRequest) {
@@ -178,10 +169,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Generate warehouse name automatically (use first warehouse type for name generation)
+    // Generate warehouse name automatically
     const warehouseName = generateWarehouseName(
       validated.city,
-      validated.warehouseType[0] || 'general',
+      validated.warehouseType || 'general',
       validated.state
     )
 
@@ -196,11 +187,11 @@ export async function POST(request: NextRequest) {
       city: validated.city,
       zipCode: validated.zipCode || "",
       totalSqFt: validated.totalSqFt || 0,
-      totalPalletStorage: validated.totalPalletStorage,
+      totalPalletStorage: validated.totalPalletStorage || 0,
       latitude: validated.latitude,
       longitude: validated.longitude,
       warehouseType: validated.warehouseType,
-      storageTypes: validated.storageTypes,
+      storageTypes: [validated.storageType],
       temperatureTypes: validated.temperatureTypes,
       amenities: validated.amenities || [],
       photos: validated.photos, // Store photo paths
@@ -212,8 +203,6 @@ export async function POST(request: NextRequest) {
       ownerCompanyId: userCompanyId,
       // New fields
       customStatus: validated.customStatus,
-      atCapacitySqFt: validated.atCapacitySqFt || false,
-      atCapacityPallet: validated.atCapacityPallet || false,
       minPallet: validated.minPallet,
       maxPallet: validated.maxPallet,
       minSqFt: validated.minSqFt,

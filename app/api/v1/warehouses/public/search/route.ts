@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
                 available_sq_ft,
                 available_pallet_storage,
                 warehouse_type,
-                storage_types,
+                storage_type,
                 temperature_types,
                 amenities,
                 latitude,
@@ -112,6 +112,11 @@ export async function GET(request: NextRequest) {
             basePrice: p.base_price,
             unit: p.unit
           }
+        } else if (p.pricing_type === 'pallet-monthly') {
+          pricing.palletMonthly = {
+            basePrice: p.base_price,
+            unit: p.unit
+          }
         } else if (p.pricing_type === 'area' || p.pricing_type === 'area-rental') {
           pricing.areaRental = {
             basePrice: p.base_price,
@@ -135,8 +140,8 @@ export async function GET(request: NextRequest) {
         latitude: row.latitude ? parseFloat(row.latitude) : undefined,
         longitude: row.longitude ? parseFloat(row.longitude) : undefined,
         warehouseType: row.warehouse_type,
-        storageTypes: row.storage_types || [],
-        temperatureTypes: row.temperature_types || [],
+        storageTypes: row.storage_type ? [row.storage_type] : [], // Convert single value to array
+        temperatureTypes: row.temperature_types || [], // Already an array
         photos: row.photos || [],
         pricing: Object.keys(pricing).length > 0 ? pricing : undefined,
       }

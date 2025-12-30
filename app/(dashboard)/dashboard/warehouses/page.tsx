@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical } from "@/components/icons"
+import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical, Settings } from "@/components/icons"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { api } from "@/lib/api/client"
 import { formatNumber, formatCurrency } from "@/lib/utils/format"
@@ -29,7 +29,7 @@ export default function WarehousesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [currentPhotoIndexes, setCurrentPhotoIndexes] = useState<Record<string, number>>({})
   const [pricingWarehouse, setPricingWarehouse] = useState<Warehouse | null>(null)
-  const [pricingType, setPricingType] = useState<'pallet' | 'area'>('pallet')
+  const [pricingType, setPricingType] = useState<'pallet' | 'pallet-monthly' | 'area'>('pallet')
   const [basePrice, setBasePrice] = useState<string>('')
   const [isSavingPrice, setIsSavingPrice] = useState(false)
   const [deleteConfirmWarehouse, setDeleteConfirmWarehouse] = useState<Warehouse | null>(null)
@@ -118,10 +118,17 @@ export default function WarehousesPage() {
     if (!pricingWarehouse) return
     setIsSavingPrice(true)
     try {
+      let unit = 'per_sqft_per_month'
+      if (pricingType === 'pallet') {
+        unit = 'per_pallet_per_day'
+      } else if (pricingType === 'pallet-monthly') {
+        unit = 'per_pallet_per_month'
+      }
+
       await api.post(`/api/v1/warehouses/${pricingWarehouse.id}/pricing`, {
         pricingType,
         basePrice: parseFloat(basePrice),
-        unit: pricingType === 'pallet' ? 'per_pallet_per_day' : 'per_sqft_per_month',
+        unit,
       }, {
         successMessage: 'Pricing updated successfully',
         errorMessage: 'Failed to update pricing'
@@ -363,10 +370,10 @@ export default function WarehousesPage() {
                         {(warehouse as any).pricing.map((price: any, idx: number) => (
                           <div key={idx} className="text-sm flex items-center justify-between">
                             <span className="text-muted-foreground">
-                              {price.pricing_type === 'pallet' ? 'Pallet' : 'Area'}:
+                              {price.pricing_type === 'pallet' ? 'Pallet' : price.pricing_type === 'pallet-monthly' ? 'Pallet (Monthly)' : 'Area'}:
                             </span>
                             <span className="font-semibold text-primary">
-                              {formatCurrency(price.base_price)}/{price.pricing_type === 'pallet' ? 'pallet/day' : 'sq ft/month'}
+                              {formatCurrency(price.base_price)}/{price.pricing_type === 'pallet' ? 'pallet/day' : price.pricing_type === 'pallet-monthly' ? 'pallet/month' : 'sq ft/month'}
                             </span>
                           </div>
                         ))}
@@ -401,14 +408,22 @@ export default function WarehousesPage() {
                           </Button>
                         </Link>
                       </div>
-                      <Button
-                        variant="outline"
-                        className="w-full text-destructive hover:text-destructive"
-                        onClick={() => setDeleteConfirmWarehouse(warehouse)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
+                      <div className="flex gap-2 mb-2">
+                        <Link href={`/dashboard/warehouses/${warehouse.id}/services`} className="flex-1">
+                          <Button variant="outline" className="w-full">
+                            <Settings className="h-4 w-4 mr-2" />
+                            Services
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          className="flex-1 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmWarehouse(warehouse)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -484,7 +499,7 @@ export default function WarehousesPage() {
                                 {formatCurrency(price.base_price)}
                               </span>
                               <span className="text-muted-foreground text-xs ml-1">
-                                /{price.pricing_type === 'pallet' ? 'pallet/day' : 'sq ft/month'}
+                                /{price.pricing_type === 'pallet' ? 'pallet/day' : price.pricing_type === 'pallet-monthly' ? 'pallet/month' : 'sq ft/month'}
                               </span>
                             </div>
                           ))}
@@ -526,6 +541,12 @@ export default function WarehousesPage() {
                           >
                             <DollarSign className="h-4 w-4 mr-2" />
                             Set Price
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/warehouses/${warehouse.id}/services`}>
+                              <Settings className="h-4 w-4 mr-2" />
+                              Services
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setDeleteConfirmWarehouse(warehouse)}
@@ -576,7 +597,7 @@ export default function WarehousesPage() {
           <DialogHeader>
             <DialogTitle>Set Pricing for {pricingWarehouse?.name}</DialogTitle>
             <DialogDescription>
-              Configure per-day pricing for this warehouse.
+              Configure pricing for this warehouse. For pallet bookings, daily pricing is used for bookings under 30 days, monthly pricing for bookings 30+ days.
             </DialogDescription>
           </DialogHeader>
 
@@ -589,6 +610,7 @@ export default function WarehousesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pallet">Pallet (per pallet per day)</SelectItem>
+                  <SelectItem value="pallet-monthly">Pallet (per pallet per month)</SelectItem>
                   <SelectItem value="area">Area (per sq ft per month)</SelectItem>
                 </SelectContent>
               </Select>

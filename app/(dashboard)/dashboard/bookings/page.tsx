@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Package, Building2, Eye, Loader2, Edit, Trash } from "@/components/icons"
+import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
@@ -169,6 +169,14 @@ export default function BookingsPage() {
         setDeletingId(null)
       },
     })
+  }
+
+  const handleCancel = async (bookingId: string) => {
+    if (!confirm('Are you sure you want to cancel this booking?')) {
+      return
+    }
+
+    statusMutation.mutate({ bookingId, newStatus: 'cancelled' })
   }
 
   if (bookingsLoading || userLoading) {
@@ -350,24 +358,46 @@ export default function BookingsPage() {
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
-                      <Link href={`/dashboard/bookings/${booking.id}/edit`}>
-                        <Button variant="ghost" size="sm" title="Edit booking">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Delete booking"
-                        onClick={() => handleDelete(booking.id)}
-                        disabled={deletingId === booking.id || deleteMutation.isPending}
-                      >
-                        {deletingId === booking.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash className="h-4 w-4 text-destructive" />
-                        )}
-                      </Button>
+                      {isCustomer ? (
+                        // Customer can only cancel bookings (not edit or delete)
+                        booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Cancel booking"
+                            onClick={() => handleCancel(booking.id)}
+                            disabled={statusMutation.isPending}
+                          >
+                            {statusMutation.isPending && statusMutation.variables?.bookingId === booking.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-orange-500" />
+                            )}
+                          </Button>
+                        )
+                      ) : (
+                        // Company staff can edit and delete
+                        <>
+                          <Link href={`/dashboard/bookings/${booking.id}/edit`}>
+                            <Button variant="ghost" size="sm" title="Edit booking">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Delete booking"
+                            onClick={() => handleDelete(booking.id)}
+                            disabled={deletingId === booking.id || deleteMutation.isPending}
+                          >
+                            {deletingId === booking.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash className="h-4 w-4 text-destructive" />
+                            )}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

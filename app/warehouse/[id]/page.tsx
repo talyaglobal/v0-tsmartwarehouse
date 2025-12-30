@@ -59,6 +59,10 @@ interface Warehouse {
       basePrice: number
       unit: string
     }
+    palletMonthly?: {
+      basePrice: number
+      unit: string
+    }
     areaRental?: {
       basePrice: number
       unit: string
@@ -144,6 +148,9 @@ export default function WarehouseDetailPage() {
             workingDays: wh.workingDays || [],
             pricing: wh.pricing || {},
           })
+
+          console.log('[warehouse-detail] Loaded warehouse:', wh.name)
+          console.log('[warehouse-detail] Pricing:', wh.pricing)
         } else {
           console.error("Failed to fetch warehouse:", data.error)
         }
@@ -162,6 +169,7 @@ export default function WarehouseDetailPage() {
   // Calculate total price based on warehouse pricing
   const calculateTotalPrice = () => {
     if (!startDate || !endDate || !uomQty || !warehouse) {
+      console.log('[calculateTotalPrice] Missing required data:', { startDate, endDate, uomQty, hasWarehouse: !!warehouse })
       return null
     }
 
@@ -170,22 +178,51 @@ export default function WarehouseDetailPage() {
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 
     if (days <= 0) {
+      console.log('[calculateTotalPrice] Invalid date range:', { days })
       return null
     }
 
     const quantity = parseInt(uomQty)
+    console.log('[calculateTotalPrice] Calculation params:', { productinfo, days, quantity, pricing: warehouse.pricing })
 
     // Check pricing based on product type
-    if (productinfo === "4490" && warehouse.pricing?.pallet) {
-      // Pallet storage - daily pricing
-      const dailyRate = warehouse.pricing.pallet.basePrice
-      return {
-        total: dailyRate * days * quantity,
-        days,
-        quantity,
-        unit: 'pallet',
-        rate: dailyRate,
-        period: 'daily'
+    if (productinfo === "4490") {
+      // Pallet storage - smart pricing
+      // < 30 days = daily pricing, >= 30 days = monthly pricing
+      if (days < 30 && warehouse.pricing?.pallet) {
+        const dailyRate = warehouse.pricing.pallet.basePrice
+        return {
+          total: dailyRate * days * quantity,
+          days,
+          quantity,
+          unit: 'pallet',
+          rate: dailyRate,
+          period: 'daily'
+        }
+      } else if (days >= 30 && warehouse.pricing?.palletMonthly) {
+        // Use monthly pricing for bookings >= 30 days
+        const monthlyRate = warehouse.pricing.palletMonthly.basePrice
+        const months = days / 30
+        return {
+          total: monthlyRate * months * quantity,
+          days,
+          months,
+          quantity,
+          unit: 'pallet',
+          rate: monthlyRate,
+          period: 'monthly'
+        }
+      } else if (warehouse.pricing?.pallet) {
+        // Fallback to daily if monthly not available
+        const dailyRate = warehouse.pricing.pallet.basePrice
+        return {
+          total: dailyRate * days * quantity,
+          days,
+          quantity,
+          unit: 'pallet',
+          rate: dailyRate,
+          period: 'daily'
+        }
       }
     } else if (productinfo === "4491" && warehouse.pricing?.areaRental) {
       // Area rental - monthly pricing

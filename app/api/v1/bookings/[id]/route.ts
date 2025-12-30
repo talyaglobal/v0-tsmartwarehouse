@@ -3,6 +3,7 @@ import { getBookingById, updateBooking, deleteBooking } from "@/lib/db/bookings"
 import { handleApiError } from "@/lib/utils/logger"
 import type { BookingResponse, ErrorResponse, ApiResponse } from "@/types/api"
 import { updateBookingSchema } from "@/lib/validation/schemas"
+import { getCurrentUser } from "@/lib/auth/utils"
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -91,6 +92,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   try {
     const { id } = await params
 
+    // Get current user
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
     // Check if booking exists
     const existingBooking = await getBookingById(id)
     if (!existingBooking) {
@@ -100,6 +110,25 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
         statusCode: 404,
       }
       return NextResponse.json(errorData, { status: 404 })
+    }
+
+    // Customers cannot delete bookings - they can only cancel
+    if (currentUser.role === 'customer') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Customers cannot delete bookings. Please cancel the booking instead."
+        },
+        { status: 403 }
+      )
+    }
+
+    // Only company staff (company_owner, company_admin, warehouse_staff) can delete
+    if (!['company_owner', 'company_admin', 'warehouse_staff', 'root'].includes(currentUser.role)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Insufficient permissions" },
+        { status: 403 }
+      )
     }
 
     // Delete booking using database function

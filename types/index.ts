@@ -73,8 +73,9 @@ export interface Warehouse {
   availablePalletStorage?: number // Currently available pallet storage for booking
   latitude?: number // Google Maps latitude
   longitude?: number // Google Maps longitude
-  warehouseType?: string[] // Array of: general, food-and-beverages, dangerous-goods, chemicals, medical, pharma
-  storageTypes?: string[] // bulk-space, rack-space, individual-unit, lockable-unit, cage, open-yard, closed-yard
+  warehouseType?: string[] | string // Single or array of: general, food-and-beverages, dangerous-goods, chemicals, medical, pharma (stored as string in DB)
+  storageTypes?: string[] // For compatibility - read from storage_type column (single value stored as array)
+  storageType?: string // Single storage type: bulk-space, rack-space, individual-unit, lockable-unit, cage, open-yard, closed-yard
   temperatureTypes?: string[] // ambient-with-ac, ambient-without-ac, chilled, frozen, open-area-with-tent, open-area
   photos?: string[] // Array of photo paths in storage
   floors: WarehouseFloor[]
@@ -86,8 +87,6 @@ export interface Warehouse {
   }
   // New fields
   customStatus?: 'antrepolu' | 'regular' // Custom status: antrepolu (bonded warehouse) or regular
-  atCapacitySqFt?: boolean // Whether the warehouse is at capacity for square feet
-  atCapacityPallet?: boolean // Whether the warehouse is at capacity for pallet storage
   minPallet?: number // Minimum pallet order requirement
   maxPallet?: number // Maximum pallet order requirement
   minSqFt?: number // Minimum square feet order requirement
@@ -103,6 +102,20 @@ export interface Warehouse {
   productAcceptanceStartTime?: string // Start time for product acceptance (e.g., 08:00)
   productAcceptanceEndTime?: string // End time for product acceptance (e.g., 18:00)
   workingDays?: string[] // Array of working days (e.g., Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
+  pricing?: {
+    pallet?: {
+      basePrice: number
+      unit: string
+    }
+    palletMonthly?: {
+      basePrice: number
+      unit: string
+    }
+    areaRental?: {
+      basePrice: number
+      unit: string
+    }
+  }
 }
 
 // Booking Types

@@ -18,7 +18,14 @@
       "Bash(node scripts/check-company-bookings.js:*)",
       "Bash(node scripts/test-api-bookings.js:*)",
       "Bash(node scripts/test-getUserCompanyId.js:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(node scripts/apply-warehouse-migration.js:*)",
+      "Bash(node scripts/check-warehouse-schema.js:*)",
+      "Bash(node scripts/apply-pallet-monthly-pricing.js:*)",
+      "Bash(node scripts/check-pricing-type-enum.js:*)",
+      "Bash(node scripts/fix-pricing-enum.js:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)"
     ]
   }
 }

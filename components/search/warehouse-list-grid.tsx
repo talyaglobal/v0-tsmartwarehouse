@@ -37,6 +37,10 @@ interface Warehouse {
       basePrice: number
       unit: string
     }
+    palletMonthly?: {
+      basePrice: number
+      unit: string
+    }
     areaRental?: {
       basePrice: number
       unit: string
@@ -126,16 +130,45 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
     }
 
     // Check if warehouse has pricing for the requested type
-    if (searchParams.type === 'pallet' && warehouse.pricing?.pallet) {
+    if (searchParams.type === 'pallet') {
       const quantity = searchParams.palletCount ? parseInt(searchParams.palletCount) : 0
-      const dailyRate = warehouse.pricing.pallet.basePrice
-      return {
-        total: dailyRate * days * quantity,
-        days,
-        quantity,
-        unit: 'pallet',
-        rate: dailyRate,
-        period: 'daily'
+
+      // Determine if we should use daily or monthly pricing
+      // < 30 days = daily pricing, >= 30 days = monthly pricing
+      if (days < 30 && warehouse.pricing?.pallet) {
+        const dailyRate = warehouse.pricing.pallet.basePrice
+        return {
+          total: dailyRate * days * quantity,
+          days,
+          quantity,
+          unit: 'pallet',
+          rate: dailyRate,
+          period: 'daily'
+        }
+      } else if (days >= 30 && (warehouse.pricing as any)?.palletMonthly) {
+        // Use monthly pricing for bookings >= 30 days
+        const monthlyRate = (warehouse.pricing as any).palletMonthly.basePrice
+        const months = days / 30
+        return {
+          total: monthlyRate * months * quantity,
+          days,
+          months,
+          quantity,
+          unit: 'pallet',
+          rate: monthlyRate,
+          period: 'monthly'
+        }
+      } else if (warehouse.pricing?.pallet) {
+        // Fallback to daily if monthly not available
+        const dailyRate = warehouse.pricing.pallet.basePrice
+        return {
+          total: dailyRate * days * quantity,
+          days,
+          quantity,
+          unit: 'pallet',
+          rate: dailyRate,
+          period: 'daily'
+        }
       }
     } else if (searchParams.type === 'area-rental' && warehouse.pricing?.areaRental) {
       const quantity = searchParams.areaSqFt ? parseInt(searchParams.areaSqFt) : 0

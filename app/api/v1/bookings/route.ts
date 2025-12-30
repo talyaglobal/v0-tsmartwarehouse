@@ -204,25 +204,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Calculate pricing
-    let totalAmount = 0
-    if (type === "pallet" && palletCount) {
-      const handlingIn = palletCount * PRICING.palletIn
-      const storage = palletCount * PRICING.storagePerPalletPerMonth
-      totalAmount = handlingIn + storage
-    } else if (type === "area-rental" && areaSqFt) {
-      if (areaSqFt < PRICING.areaRentalMinSqFt) {
-        const errorData: ErrorResponse = {
-          success: false,
-          error: `Minimum area rental is ${PRICING.areaRentalMinSqFt} sq ft`,
-          statusCode: 400,
-        }
-        return NextResponse.json(errorData, { status: 400 })
-      }
-      totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
-    }
-
-    // Get default warehouse ID from database or environment
+    // Get warehouse ID first
     let warehouseId = body.warehouseId || process.env.DEFAULT_WAREHOUSE_ID
     
     if (!warehouseId) {
@@ -261,6 +243,92 @@ export async function POST(request: NextRequest) {
         warehouseId = newWarehouse.id
       } else {
         warehouseId = warehouses.id
+      }
+    }
+
+    // Calculate pricing based on warehouse pricing table and date range
+    let totalAmount = 0
+
+    // Fetch warehouse pricing
+    const { data: pricingData, error: pricingError } = await supabase
+      .from('warehouse_pricing')
+      .select('pricing_type, base_price, unit')
+      .eq('warehouse_id', warehouseId)
+      .eq('status', true)
+
+    if (pricingError) {
+      console.error('Failed to fetch warehouse pricing:', pricingError)
+    }
+
+    if (type === "pallet" && palletCount && startDate && endDate) {
+      // Calculate days between start and end date
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const diffTime = Math.abs(end.getTime() - start.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const diffMonths = diffDays / 30 // Approximate months
+
+      // Determine if we should use daily or monthly pricing
+      // If booking is >= 30 days, use monthly pricing if available
+      let pricePerUnit = 0
+      let useMonthly = diffDays >= 30
+
+      if (pricingData && pricingData.length > 0) {
+        if (useMonthly) {
+          // Try to find monthly pricing first
+          const monthlyPricing = pricingData.find(p => p.pricing_type === 'pallet-monthly')
+          if (monthlyPricing) {
+            pricePerUnit = monthlyPricing.base_price
+            totalAmount = palletCount * pricePerUnit * diffMonths
+          } else {
+            // Fall back to daily pricing if monthly not available
+            const dailyPricing = pricingData.find(p => p.pricing_type === 'pallet')
+            if (dailyPricing) {
+              pricePerUnit = dailyPricing.base_price
+              totalAmount = palletCount * pricePerUnit * diffDays
+            }
+          }
+        } else {
+          // Use daily pricing for short term
+          const dailyPricing = pricingData.find(p => p.pricing_type === 'pallet')
+          if (dailyPricing) {
+            pricePerUnit = dailyPricing.base_price
+            totalAmount = palletCount * pricePerUnit * diffDays
+          }
+        }
+      }
+
+      // Fallback to old PRICING constant if no pricing found
+      if (totalAmount === 0) {
+        const handlingIn = palletCount * PRICING.palletIn
+        const storage = palletCount * PRICING.storagePerPalletPerMonth
+        totalAmount = handlingIn + storage
+      }
+    } else if (type === "area-rental" && areaSqFt) {
+      if (areaSqFt < PRICING.areaRentalMinSqFt) {
+        const errorData: ErrorResponse = {
+          success: false,
+          error: `Minimum area rental is ${PRICING.areaRentalMinSqFt} sq ft`,
+          statusCode: 400,
+        }
+        return NextResponse.json(errorData, { status: 400 })
+      }
+
+      // Use area pricing from warehouse_pricing table
+      if (pricingData && pricingData.length > 0) {
+        const areaPricing = pricingData.find(p => p.pricing_type === 'area')
+        if (areaPricing && startDate && endDate) {
+          const start = new Date(startDate)
+          const end = new Date(endDate)
+          const diffTime = Math.abs(end.getTime() - start.getTime())
+          const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30))
+          totalAmount = areaSqFt * areaPricing.base_price * diffMonths
+        } else {
+          // Fallback to old pricing
+          totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
+        }
+      } else {
+        totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
       }
     }
 

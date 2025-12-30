@@ -14,13 +14,13 @@ import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
-import { BookingSearch } from "@/components/home/booking-search"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload"
 import { MapLocationPicker } from "@/components/ui/map-location-picker"
 import { formatNumber } from "@/lib/utils/format"
 import { createClient } from "@/lib/supabase/client"
+import { TemperatureSelect } from "@/components/warehouse/temperature-select"
 import type { Warehouse } from "@/types"
 
 const WAREHOUSE_TYPES = [
@@ -39,18 +39,20 @@ const WAREHOUSE_TYPES = [
 ] as const
 
 const STORAGE_TYPES = [
-  "bulk-space",
-  "rack-space",
-  "individual-unit",
-  "lockable-unit",
-  "cage",
-  "open-yard",
-  "closed-yard",
+  { value: "bulk-space", label: "Bulk Space" },
+  { value: "rack-space", label: "Rack Space" },
+  { value: "individual-unit", label: "Individual Unit" },
+  { value: "lockable-unit", label: "Lockable Unit" },
+  { value: "cage", label: "Cage" },
+  { value: "open-yard", label: "Open Yard" },
+  { value: "closed-yard", label: "Closed Yard" },
 ] as const
 
 const TEMPERATURE_OPTIONS = [
   { value: "ambient-with-ac", label: "Ambient (with A/C)" },
   { value: "ambient-without-ac", label: "Ambient (without A/C)" },
+  { value: "ambient-with-heater", label: "Ambient (with heater)" },
+  { value: "ambient-without-heater", label: "Ambient (without heater)" },
   { value: "chilled", label: "Chilled (+40°F)" },
   { value: "frozen", label: "Frozen (0°F)" },
   { value: "open-area-with-tent", label: "Open Area (with tent)" },
@@ -71,13 +73,6 @@ const SECURITY_OPTIONS = [
   "Fenced",
 ] as const
 
-const formatLabel = (value: string): string => {
-  return value
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
 export default function EditWarehousePage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -86,7 +81,6 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
   const [state, setState] = useState("")
-  const [cityLocation, setCityLocation] = useState("")
   const [warehousePhotos, setWarehousePhotos] = useState<UploadedFile[]>([])
   const [warehouseVideo, setWarehouseVideo] = useState<UploadedFile[]>([])
   const [showMapPicker, setShowMapPicker] = useState(false)
@@ -114,12 +108,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
     latitude: "",
     longitude: "",
     amenities: "",
-    warehouseType: [] as string[],
-    storageTypes: [] as string[],
+    warehouseType: "",
+    storageType: "",
     temperatureTypes: [] as string[],
     customStatus: "",
-    atCapacitySqFt: false,
-    atCapacityPallet: false,
     minPallet: "",
     maxPallet: "",
     minSqFt: "",
@@ -127,7 +119,6 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
     rentMethods: [] as string[],
     security: [] as string[],
     accessType: "",
-    appointmentRequired: false,
     accessControl: "",
     productAcceptanceStartTime: "",
     productAcceptanceEndTime: "",
@@ -219,11 +210,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
               console.error('Error processing video:', error)
             }
           }
-          
+
           setWarehousePhotos(photoFiles)
           setWarehouseVideo(videoFiles)
-          setCityLocation(warehouse.city || "")
-          
+
           // Set form data
           setFormData({
             address: warehouse.address || "",
@@ -234,12 +224,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             latitude: warehouse.latitude?.toString() || "",
             longitude: warehouse.longitude?.toString() || "",
             amenities: Array.isArray(warehouse.amenities) ? warehouse.amenities.join(", ") : (warehouse.amenities || ""),
-            warehouseType: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : (warehouse.warehouseType ? [warehouse.warehouseType] : []),
-            storageTypes: Array.isArray(warehouse.storageTypes) ? warehouse.storageTypes : (warehouse.storageTypes ? [warehouse.storageTypes] : []),
-            temperatureTypes: Array.isArray(warehouse.temperatureTypes) ? warehouse.temperatureTypes : (warehouse.temperatureTypes ? [warehouse.temperatureTypes] : []),
+            warehouseType: (Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType[0] : warehouse.warehouseType) || "",
+            storageType: warehouse.storageType || (Array.isArray(warehouse.storageTypes) ? warehouse.storageTypes[0] : warehouse.storageTypes) || "",
+            temperatureTypes: Array.isArray(warehouse.temperatureTypes) ? warehouse.temperatureTypes : [],
             customStatus: warehouse.customStatus || "",
-            atCapacitySqFt: warehouse.atCapacitySqFt || false,
-            atCapacityPallet: warehouse.atCapacityPallet || false,
             minPallet: warehouse.minPallet != null ? formatNumber(warehouse.minPallet) : "",
             maxPallet: warehouse.maxPallet != null ? formatNumber(warehouse.maxPallet) : "",
             minSqFt: warehouse.minSqFt != null ? formatNumber(warehouse.minSqFt) : "",
@@ -247,7 +235,6 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             rentMethods: Array.isArray(warehouse.rentMethods) ? warehouse.rentMethods : (warehouse.rentMethods ? [warehouse.rentMethods] : []),
             security: Array.isArray(warehouse.security) ? warehouse.security : (warehouse.security ? [warehouse.security] : []),
             accessType: warehouse.accessInfo?.accessType || "",
-            appointmentRequired: warehouse.accessInfo?.appointmentRequired || false,
             accessControl: warehouse.accessInfo?.accessControl || "",
             productAcceptanceStartTime: warehouse.productAcceptanceStartTime || "",
             productAcceptanceEndTime: warehouse.productAcceptanceEndTime || "",
@@ -259,7 +246,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             message: 'Warehouse not found',
             duration: 5000,
           })
-          router.push("/dashboard/my-company?tab=warehouses")
+          router.push("/dashboard/warehouses")
         }
       } catch (error) {
         console.error('Error fetching warehouse:', error)
@@ -268,7 +255,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
           message: 'Failed to load warehouse data',
           duration: 5000,
         })
-        router.push("/dashboard/my-company?tab=warehouses")
+        router.push("/dashboard/warehouses")
       } finally {
         setIsFetching(false)
       }
@@ -289,7 +276,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         .filter(a => a.length > 0)
 
       // Validate required fields
-      if (!formData.address || !formData.city || formData.warehouseType.length === 0) {
+      if (!formData.address || !formData.city || !formData.warehouseType) {
         addNotification({
           type: 'error',
           message: 'Please fill in all required fields (location, address, and warehouse type)',
@@ -299,10 +286,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         return
       }
 
-      if (formData.storageTypes.length === 0) {
+      if (!formData.storageType) {
         addNotification({
           type: 'error',
-          message: 'Please select at least one storage type',
+          message: 'Please select a storage type',
           duration: 5000,
         })
         setIsLoading(false)
@@ -320,9 +307,9 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
       }
 
       // Validate warehouse photos (minimum 2 required)
-      const successPhotos = warehousePhotos.filter(f => 
-        f.status === 'success' && 
-        f.path && 
+      const successPhotos = warehousePhotos.filter(f =>
+        f.status === 'success' &&
+        f.path &&
         f.path.trim().length > 0
       )
       if (successPhotos.length < 2) {
@@ -335,50 +322,105 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         return
       }
 
-      // Validate totalSqFt (required)
-      const totalSqFtValue = parseNumberInput(formData.totalSqFt)
-      if (!totalSqFtValue || totalSqFtValue.trim() === '') {
-        addNotification({
-          type: 'error',
-          message: 'Total square feet is required',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      const totalSqFt = parseInt(totalSqFtValue)
-      if (isNaN(totalSqFt) || totalSqFt <= 0) {
-        addNotification({
-          type: 'error',
-          message: 'Total square feet must be a positive number',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      // Validate totalPalletStorage (required)
+      // Validate that at least one total field is provided
       const totalPalletStorageValue = parseNumberInput(formData.totalPalletStorage)
-      if (!totalPalletStorageValue || totalPalletStorageValue.trim() === '') {
+      const totalSqFtValue = parseNumberInput(formData.totalSqFt)
+
+      const hasTotalPallet = totalPalletStorageValue && totalPalletStorageValue.trim() !== ''
+      const hasTotalSqFt = totalSqFtValue && totalSqFtValue.trim() !== ''
+
+      if (!hasTotalPallet && !hasTotalSqFt) {
         addNotification({
           type: 'error',
-          message: 'Total pallet storage is required',
+          message: 'Please provide at least one of: Total Pallet Storage or Total Square Feet',
           duration: 5000,
         })
         setIsLoading(false)
         return
       }
 
-      const totalPalletStorage = parseInt(totalPalletStorageValue)
-      if (isNaN(totalPalletStorage) || totalPalletStorage <= 0) {
-        addNotification({
-          type: 'error',
-          message: 'Total pallet storage must be a positive number',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
+      // Validate totalPalletStorage if provided
+      let totalPalletStorage: number | undefined
+      if (hasTotalPallet) {
+        totalPalletStorage = parseInt(totalPalletStorageValue)
+        if (isNaN(totalPalletStorage) || totalPalletStorage <= 0) {
+          addNotification({
+            type: 'error',
+            message: 'Total pallet storage must be a positive number',
+            duration: 5000,
+          })
+          setIsLoading(false)
+          return
+        }
+
+        // Validate min/max pallet against total
+        if (formData.minPallet) {
+          const minPallet = parseInt(parseNumberInput(formData.minPallet))
+          if (minPallet > totalPalletStorage) {
+            addNotification({
+              type: 'error',
+              message: 'Minimum pallet cannot be greater than total pallet storage',
+              duration: 5000,
+            })
+            setIsLoading(false)
+            return
+          }
+        }
+
+        if (formData.maxPallet) {
+          const maxPallet = parseInt(parseNumberInput(formData.maxPallet))
+          if (maxPallet > totalPalletStorage) {
+            addNotification({
+              type: 'error',
+              message: 'Maximum pallet cannot be greater than total pallet storage',
+              duration: 5000,
+            })
+            setIsLoading(false)
+            return
+          }
+        }
+      }
+
+      // Validate totalSqFt if provided
+      let totalSqFt: number | undefined
+      if (hasTotalSqFt) {
+        totalSqFt = parseInt(totalSqFtValue)
+        if (isNaN(totalSqFt) || totalSqFt <= 0) {
+          addNotification({
+            type: 'error',
+            message: 'Total square feet must be a positive number',
+            duration: 5000,
+          })
+          setIsLoading(false)
+          return
+        }
+
+        // Validate min/max sqft against total
+        if (formData.minSqFt) {
+          const minSqFt = parseInt(parseNumberInput(formData.minSqFt))
+          if (minSqFt > totalSqFt) {
+            addNotification({
+              type: 'error',
+              message: 'Minimum square feet cannot be greater than total square feet',
+              duration: 5000,
+            })
+            setIsLoading(false)
+            return
+          }
+        }
+
+        if (formData.maxSqFt) {
+          const maxSqFt = parseInt(parseNumberInput(formData.maxSqFt))
+          if (maxSqFt > totalSqFt) {
+            addNotification({
+              type: 'error',
+              message: 'Maximum square feet cannot be greater than total square feet',
+              duration: 5000,
+            })
+            setIsLoading(false)
+            return
+          }
+        }
       }
 
       // Prepare photo paths
@@ -390,10 +432,9 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         : undefined
 
       // Prepare access info
-      const accessInfo = formData.accessType || formData.appointmentRequired || formData.accessControl
+      const accessInfo = formData.accessType || formData.accessControl
         ? {
             accessType: formData.accessType || undefined,
-            appointmentRequired: formData.appointmentRequired || false,
             accessControl: formData.accessControl || undefined,
           }
         : undefined
@@ -402,16 +443,12 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         address: formData.address,
         city: formData.city,
         state: state,
-        warehouseType: formData.warehouseType,
-        storageTypes: formData.storageTypes,
+        warehouseType: formData.warehouseType ? formData.warehouseType : '',
+        storageType: formData.storageType ? formData.storageType : '',
         temperatureTypes: formData.temperatureTypes,
         amenities: amenitiesArray,
         photos: photoPaths,
-        totalSqFt: totalSqFt,
-        totalPalletStorage: totalPalletStorage,
         customStatus: formData.customStatus || undefined,
-        atCapacitySqFt: formData.atCapacitySqFt,
-        atCapacityPallet: formData.atCapacityPallet,
         minPallet: formData.minPallet ? parseInt(parseNumberInput(formData.minPallet)) : undefined,
         maxPallet: formData.maxPallet ? parseInt(parseNumberInput(formData.maxPallet)) : undefined,
         minSqFt: formData.minSqFt ? parseInt(parseNumberInput(formData.minSqFt)) : undefined,
@@ -423,6 +460,14 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         productAcceptanceStartTime: formData.productAcceptanceStartTime || undefined,
         productAcceptanceEndTime: formData.productAcceptanceEndTime || undefined,
         workingDays: formData.workingDays.length > 0 ? formData.workingDays : undefined,
+      }
+
+      // Add optional total fields if provided
+      if (totalSqFt !== undefined) {
+        requestBody.totalSqFt = totalSqFt
+      }
+      if (totalPalletStorage !== undefined) {
+        requestBody.totalPalletStorage = totalPalletStorage
       }
 
       if (formData.zipCode) {
@@ -440,7 +485,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['company-warehouses'] })
-        router.push("/dashboard/my-company?tab=warehouses")
+        router.push("/dashboard/warehouses")
       } else {
         setIsLoading(false)
       }
@@ -472,7 +517,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/dashboard/my-company?tab=warehouses">
+          <Link href="/dashboard/warehouses">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Warehouses
           </Link>
@@ -487,61 +532,49 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
           <CardContent className="space-y-6 pt-0">
             <div className="grid gap-6">
               {/* Warehouse Type */}
-              <div className="space-y-3">
-                <Label>
+              <div className="space-y-2">
+                <Label htmlFor="warehouseType">
                   Warehouse Type as per Product Content <span className="text-destructive">*</span>
                 </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {WAREHOUSE_TYPES.map((type) => (
-                    <div key={type.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`warehouse-type-${type.value}`}
-                        checked={formData.warehouseType.includes(type.value)}
-                        onCheckedChange={(checked) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            warehouseType: checked
-                              ? [...prev.warehouseType, type.value]
-                              : prev.warehouseType.filter((t) => t !== type.value),
-                          }))
-                        }}
-                      />
-                      <Label htmlFor={`warehouse-type-${type.value}`} className="text-sm font-normal cursor-pointer">
+                <Select
+                  value={formData.warehouseType}
+                  onValueChange={(value) => setFormData({ ...formData, warehouseType: value })}
+                >
+                  <SelectTrigger id="warehouseType">
+                    <SelectValue placeholder="Select warehouse type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WAREHOUSE_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
                         {type.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <Separator />
 
               {/* Storage Types */}
-              <div className="space-y-3">
-                <Label>
-                  Storage Types <span className="text-destructive">*</span>
+              <div className="space-y-2">
+                <Label htmlFor="storageType">
+                  Storage Type <span className="text-destructive">*</span>
                 </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {STORAGE_TYPES.map((type) => (
-                    <div key={type} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`storage-type-${type}`}
-                        checked={formData.storageTypes.includes(type)}
-                        onCheckedChange={(checked) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            storageTypes: checked
-                              ? [...prev.storageTypes, type]
-                              : prev.storageTypes.filter((t) => t !== type),
-                          }))
-                        }}
-                      />
-                      <Label htmlFor={`storage-type-${type}`} className="text-sm font-normal cursor-pointer">
-                        {formatLabel(type)}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <Select
+                  value={formData.storageType}
+                  onValueChange={(value) => setFormData({ ...formData, storageType: value })}
+                >
+                  <SelectTrigger id="storageType">
+                    <SelectValue placeholder="Select storage type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORAGE_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <Separator />
@@ -550,51 +583,16 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
               <div className="space-y-3">
                 <Label>
                   Temperature Options <span className="text-destructive">*</span>
+                  <p className="text-xs text-muted-foreground font-normal mt-1">Select one or more temperature types available in your warehouse</p>
                 </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TEMPERATURE_OPTIONS.map((temp) => (
-                    <div key={temp.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`temperature-${temp.value}`}
-                        checked={formData.temperatureTypes.includes(temp.value)}
-                        onCheckedChange={(checked) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            temperatureTypes: checked
-                              ? [...prev.temperatureTypes, temp.value]
-                              : prev.temperatureTypes.filter((t) => t !== temp.value),
-                          }))
-                        }}
-                      />
-                      <Label htmlFor={`temperature-${temp.value}`} className="text-sm font-normal cursor-pointer">
-                        {temp.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <TemperatureSelect
+                  value={formData.temperatureTypes}
+                  onChange={(values) => setFormData({ ...formData, temperatureTypes: values })}
+                  disabled={false}
+                />
               </div>
 
               <Separator />
-
-              {/* City/Location */}
-              <div className="space-y-2">
-                <Label>
-                  City or Location <span className="text-destructive">*</span>
-                </Label>
-                <BookingSearch
-                  value={cityLocation}
-                  onChange={(value, place) => {
-                    setCityLocation(value)
-                    if (place && place.name) {
-                      setFormData({ ...formData, city: place.name })
-                    } else if (value) {
-                      setFormData({ ...formData, city: value })
-                    }
-                  }}
-                  placeholder="Enter city or location"
-                  required
-                />
-              </div>
 
               {/* Address */}
               <div className="space-y-2">
@@ -618,6 +616,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                     if (place?.address_components) {
                       let cityName = ""
                       let zipCode = ""
+                      let stateName = ""
                       for (const component of place.address_components) {
                         const types = component.types
                         if (types.includes("locality") || types.includes("administrative_area_level_2")) {
@@ -627,8 +626,13 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                           zipCode = component.long_name
                         }
                         if (types.includes("administrative_area_level_1")) {
+                          stateName = component.long_name
                           setState(component.short_name || component.long_name)
                         }
+                      }
+                      // Format city as "District, Province" for better search matching
+                      if (cityName && stateName) {
+                        cityName = `${cityName}, ${stateName}`
                       }
                       if (cityName) setFormData(prev => ({ ...prev, city: cityName, address }))
                       if (zipCode) setFormData(prev => ({ ...prev, zipCode, address }))
@@ -657,133 +661,28 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                 }}
               />
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">Zip Code</Label>
-                  <Input
-                    id="zipCode"
-                    value={formData.zipCode}
-                    onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                    placeholder="07202"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="totalSqFt">
-                      Total Sq Ft <span className="text-destructive">*</span>
-                    </Label>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="atCapacitySqFt"
-                        checked={formData.atCapacitySqFt}
-                        onCheckedChange={(checked) => setFormData({ ...formData, atCapacitySqFt: checked as boolean })}
-                      />
-                      <Label htmlFor="atCapacitySqFt" className="text-xs font-normal cursor-pointer">
-                        At Capacity
-                      </Label>
-                    </div>
-                  </div>
-                  <Input
-                    id="totalSqFt"
-                    type="text"
-                    value={formData.totalSqFt}
-                    onChange={(e) => {
-                      const formatted = formatNumberInput(e.target.value)
-                      setFormData({ ...formData, totalSqFt: formatted })
-                    }}
-                    placeholder="240,000"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="totalPalletStorage">
-                      Total Pallet Storage <span className="text-destructive">*</span>
-                    </Label>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="atCapacityPallet"
-                        checked={formData.atCapacityPallet}
-                        onCheckedChange={(checked) => setFormData({ ...formData, atCapacityPallet: checked as boolean })}
-                      />
-                      <Label htmlFor="atCapacityPallet" className="text-xs font-normal cursor-pointer">
-                        At Capacity
-                      </Label>
-                    </div>
-                  </div>
-                  <Input
-                    id="totalPalletStorage"
-                    type="text"
-                    value={formData.totalPalletStorage}
-                    onChange={(e) => {
-                      const formatted = formatNumberInput(e.target.value)
-                      setFormData({ ...formData, totalPalletStorage: formatted })
-                    }}
-                    placeholder="1,000"
-                    required
-                  />
-                </div>
+              {/* City (Read-only, auto-filled from address) */}
+              <div className="space-y-2">
+                <Label htmlFor="city">
+                  City <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="city"
+                  value={formData.city}
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-filled from address"
+                />
               </div>
 
-              <Separator />
-
-              {/* Order Requirements */}
-              <div className="space-y-3">
-                <Label>Order Requirements</Label>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="minPallet">Min Pallet</Label>
-                    <Input
-                      id="minPallet"
-                      type="text"
-                      value={formData.minPallet}
-                      onChange={(e) => {
-                        const formatted = formatNumberInput(e.target.value)
-                        setFormData({ ...formData, minPallet: formatted })
-                      }}
-                      placeholder="10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxPallet">Max Pallet</Label>
-                    <Input
-                      id="maxPallet"
-                      type="text"
-                      value={formData.maxPallet}
-                      onChange={(e) => {
-                        const formatted = formatNumberInput(e.target.value)
-                        setFormData({ ...formData, maxPallet: formatted })
-                      }}
-                      placeholder="1,000"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="minSqFt">Min Sq Ft</Label>
-                    <Input
-                      id="minSqFt"
-                      type="text"
-                      value={formData.minSqFt}
-                      onChange={(e) => {
-                        const formatted = formatNumberInput(e.target.value)
-                        setFormData({ ...formData, minSqFt: formatted })
-                      }}
-                      placeholder="100"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxSqFt">Max Sq Ft</Label>
-                    <Input
-                      id="maxSqFt"
-                      type="text"
-                      value={formData.maxSqFt}
-                      onChange={(e) => {
-                        const formatted = formatNumberInput(e.target.value)
-                        setFormData({ ...formData, maxSqFt: formatted })
-                      }}
-                      placeholder="100,000"
-                    />
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">Zip Code</Label>
+                <Input
+                  id="zipCode"
+                  value={formData.zipCode}
+                  onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                  placeholder="07202"
+                />
               </div>
 
               <Separator />
@@ -812,6 +711,116 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Total Storage - At least one is required */}
+              <div className="space-y-3">
+                <Label>
+                  Total Storage Capacity
+                  <p className="text-xs text-muted-foreground font-normal mt-1">Provide at least one of the following</p>
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="totalPalletStorage">Total Pallet Storage</Label>
+                    <Input
+                      id="totalPalletStorage"
+                      type="text"
+                      value={formData.totalPalletStorage}
+                      onChange={(e) => {
+                        const formatted = formatNumberInput(e.target.value)
+                        setFormData({ ...formData, totalPalletStorage: formatted })
+                      }}
+                      placeholder="1,000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalSqFt">Total Sq Ft</Label>
+                    <Input
+                      id="totalSqFt"
+                      type="text"
+                      value={formData.totalSqFt}
+                      onChange={(e) => {
+                        const formatted = formatNumberInput(e.target.value)
+                        setFormData({ ...formData, totalSqFt: formatted })
+                      }}
+                      placeholder="240,000"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Order Requirements - Dynamic based on rent method */}
+              <div className="space-y-3">
+                <Label>Order Requirements</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {formData.rentMethods.includes('pallet') && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="minPallet">Min Pallet</Label>
+                        <Input
+                          id="minPallet"
+                          type="text"
+                          value={formData.minPallet}
+                          onChange={(e) => {
+                            const formatted = formatNumberInput(e.target.value)
+                            setFormData({ ...formData, minPallet: formatted })
+                          }}
+                          placeholder="10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxPallet">Max Pallet</Label>
+                        <Input
+                          id="maxPallet"
+                          type="text"
+                          value={formData.maxPallet}
+                          onChange={(e) => {
+                            const formatted = formatNumberInput(e.target.value)
+                            setFormData({ ...formData, maxPallet: formatted })
+                          }}
+                          placeholder="1,000"
+                        />
+                      </div>
+                    </>
+                  )}
+                  {formData.rentMethods.includes('sq_ft') && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="minSqFt">Min Sq Ft</Label>
+                        <Input
+                          id="minSqFt"
+                          type="text"
+                          value={formData.minSqFt}
+                          onChange={(e) => {
+                            const formatted = formatNumberInput(e.target.value)
+                            setFormData({ ...formData, minSqFt: formatted })
+                          }}
+                          placeholder="100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxSqFt">Max Sq Ft</Label>
+                        <Input
+                          id="maxSqFt"
+                          type="text"
+                          value={formData.maxSqFt}
+                          onChange={(e) => {
+                            const formatted = formatNumberInput(e.target.value)
+                            setFormData({ ...formData, maxSqFt: formatted })
+                          }}
+                          placeholder="100,000"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                {(formData.rentMethods.includes('pallet') || formData.rentMethods.includes('sq_ft')) && (
+                  <p className="text-xs text-muted-foreground">
+                    Min and max values cannot exceed total storage capacity
+                  </p>
+                )}
               </div>
 
               <Separator />
@@ -907,16 +916,6 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="appointmentRequired"
-                      checked={formData.appointmentRequired}
-                      onCheckedChange={(checked) => setFormData({ ...formData, appointmentRequired: checked as boolean })}
-                    />
-                    <Label htmlFor="appointmentRequired" className="text-sm font-normal cursor-pointer">
-                      Appointment Required
-                    </Label>
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="accessControl">Access Control Method</Label>
                     <Input
@@ -1001,7 +1000,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push("/dashboard/my-company?tab=warehouses")}
+              onClick={() => router.push("/dashboard/warehouses")}
               disabled={isLoading}
             >
               Cancel

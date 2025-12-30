@@ -5,19 +5,10 @@ import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { MapPin, Loader2 } from "@/components/icons"
 import { cn } from "@/lib/utils"
-import { debounce } from "@/lib/utils/search"
-
-interface CitySearchResult {
-  name: string
-  city: string
-  state?: string
-  country?: string
-  countryCode?: string
-}
 
 interface BookingSearchProps {
   value: string
-  onChange: (value: string, place?: any) => void
+  onChange: (value: string) => void
   placeholder?: string
   className?: string
   required?: boolean
@@ -32,120 +23,61 @@ export function BookingSearch({
   required = false,
   inputClassName,
 }: BookingSearchProps) {
-  const [searchQuery, setSearchQuery] = useState(value)
-  const [suggestions, setSuggestions] = useState<CitySearchResult[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [cities, setCities] = useState<string[]>([])
+  const [filteredCities, setFilteredCities] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  // Search cities function
-  const searchCities = async (query: string) => {
-    // Query is already trimmed in handleInputChange, just check length
-    if (!query || query.length < 2) {
-      setSuggestions([])
+  // Fetch cities from API
+  useEffect(() => {
+    const fetchCities = async () => {
+      setIsLoading(true)
+      try {
+        const response = await fetch("/api/v1/warehouses/public/cities")
+        const data = await response.json()
+
+        if (data.success && data.data.cities) {
+          setCities(data.data.cities)
+        }
+      } catch (error) {
+        console.error("[BookingSearch] Failed to fetch cities:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchCities()
+  }, [])
+
+  // Filter cities based on input value
+  useEffect(() => {
+    if (!value || value.trim() === "") {
+      setFilteredCities([])
       setShowSuggestions(false)
-      setIsLoading(false)
       return
     }
 
-    setIsLoading(true)
-    try {
-      const response = await fetch(
-        `/api/v1/cities/search?q=${encodeURIComponent(query)}`
-      )
-      const data = await response.json()
+    const searchTerm = value.toLowerCase()
+    const matches = cities.filter((city) =>
+      city.toLowerCase().includes(searchTerm)
+    )
 
-      if (data.success && data.data) {
-        setSuggestions(data.data)
-        setShowSuggestions(true)
-      } else {
-        setSuggestions([])
-        setShowSuggestions(false)
-      }
-    } catch (error) {
-      console.error("Failed to search cities:", error)
-      setSuggestions([])
-      setShowSuggestions(false)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Debounced search function
-  const debouncedSearch = React.useMemo(
-    () => debounce(searchCities, 300),
-    []
-  )
-
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    setSearchQuery(newValue)
-    onChange(newValue)
+    setFilteredCities(matches)
+    setShowSuggestions(matches.length > 0)
     setSelectedIndex(-1)
+  }, [value, cities])
 
-    // Trim only for length check, but preserve internal spaces for better matching
-    // Only trim leading/trailing spaces, keep internal spaces
-    const trimmedValue = newValue.trim()
-    if (trimmedValue.length >= 2) {
-      // Use trimmed value for search (preserves internal spaces like "New York")
-      debouncedSearch(trimmedValue)
-    } else {
-      setSuggestions([])
-      setShowSuggestions(false)
-    }
-  }
-
-  // Handle suggestion select
-  const handleSelectSuggestion = (city: CitySearchResult) => {
-    setSearchQuery(city.name)
-    onChange(city.name, city)
-    setShowSuggestions(false)
-    setSuggestions([])
-    setSelectedIndex(-1)
-
-    // Focus back to input
-    inputRef.current?.focus()
-  }
-
-  // Handle keyboard navigation
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggestions || suggestions.length === 0) return
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault()
-        setSelectedIndex((prev) =>
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        )
-        break
-      case "ArrowUp":
-        e.preventDefault()
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1))
-        break
-      case "Enter":
-        e.preventDefault()
-        if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-          handleSelectSuggestion(suggestions[selectedIndex])
-        }
-        break
-      case "Escape":
-        setShowSuggestions(false)
-        setSelectedIndex(-1)
-        break
-    }
-  }
-
-  // Close dropdown when clicking outside
+  // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
         inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
+        !inputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false)
       }
@@ -155,10 +87,42 @@ export function BookingSearch({
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Update local state when value prop changes
-  useEffect(() => {
-    setSearchQuery(value)
-  }, [value])
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value)
+  }
+
+  const handleCitySelect = (city: string) => {
+    onChange(city)
+    setShowSuggestions(false)
+    setSelectedIndex(-1)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || filteredCities.length === 0) return
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        setSelectedIndex((prev) =>
+          prev < filteredCities.length - 1 ? prev + 1 : prev
+        )
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        break
+      case "Enter":
+        e.preventDefault()
+        if (selectedIndex >= 0 && selectedIndex < filteredCities.length) {
+          handleCitySelect(filteredCities[selectedIndex])
+        }
+        break
+      case "Escape":
+        setShowSuggestions(false)
+        setSelectedIndex(-1)
+        break
+    }
+  }
 
   return (
     <div className={cn("relative w-full", className)}>
@@ -167,55 +131,53 @@ export function BookingSearch({
         <Input
           ref={inputRef}
           type="text"
-          value={searchQuery}
+          value={value}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (suggestions.length > 0 && searchQuery.length >= 2) {
+            if (filteredCities.length > 0) {
               setShowSuggestions(true)
             }
           }}
           placeholder={placeholder}
           className={cn("pl-9", inputClassName)}
           required={required}
-          aria-autocomplete="list"
-          aria-expanded={showSuggestions}
-          aria-haspopup="listbox"
+          autoComplete="off"
         />
         {isLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         )}
       </div>
 
-      {/* Suggestions Dropdown */}
-      {showSuggestions && suggestions.length > 0 && (
+      {/* Suggestions dropdown */}
+      {showSuggestions && filteredCities.length > 0 && (
         <div
-          ref={dropdownRef}
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover shadow-lg"
-          role="listbox"
+          ref={suggestionsRef}
+          className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto"
         >
-          {suggestions.map((city, index) => (
+          {filteredCities.map((city, index) => (
             <button
-              key={`${city.name}-${index}`}
+              key={city}
               type="button"
-              role="option"
-              aria-selected={index === selectedIndex}
+              onClick={() => handleCitySelect(city)}
               className={cn(
-                "w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                index === selectedIndex && "bg-accent text-accent-foreground"
+                "w-full text-left px-4 py-2 hover:bg-muted transition-colors flex items-center gap-2",
+                selectedIndex === index && "bg-muted"
               )}
-              onClick={() => handleSelectSuggestion(city)}
-              onMouseEnter={() => setSelectedIndex(index)}
             >
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="truncate">{city.name}</span>
-              </div>
+              <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm">{city}</span>
             </button>
           ))}
         </div>
+      )}
+
+      {!isLoading && cities.length === 0 && (
+        <p className="text-xs text-muted-foreground mt-1">
+          No cities available
+        </p>
       )}
     </div>
   )

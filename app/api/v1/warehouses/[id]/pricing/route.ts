@@ -81,9 +81,18 @@ export async function POST(
 
     if (existingPricing) {
       // Update existing pricing
+      let defaultUnit = 'per_sqft_per_day'
+      if (pricingType === 'pallet') {
+        defaultUnit = 'per_pallet_per_day'
+      } else if (pricingType === 'pallet-monthly') {
+        defaultUnit = 'per_pallet_per_month'
+      } else if (pricingType === 'area') {
+        defaultUnit = 'per_sqft_per_month'
+      }
+
       const updatePayload = {
         base_price: basePrice,
-        unit: unit || (pricingType === 'pallet' ? 'per_pallet_per_day' : 'per_sqft_per_day'),
+        unit: unit || defaultUnit,
         min_quantity: minQuantity || null,
         max_quantity: maxQuantity || null,
         volume_discounts: volumeDiscounts || null,
@@ -103,11 +112,20 @@ export async function POST(
       error = result.error
     } else {
       // Insert new pricing
+      let defaultUnit = 'per_sqft_per_day'
+      if (pricingType === 'pallet') {
+        defaultUnit = 'per_pallet_per_day'
+      } else if (pricingType === 'pallet-monthly') {
+        defaultUnit = 'per_pallet_per_month'
+      } else if (pricingType === 'area') {
+        defaultUnit = 'per_sqft_per_month'
+      }
+
       const insertPayload = {
         warehouse_id: warehouseId,
         pricing_type: pricingType,
         base_price: basePrice,
-        unit: unit || (pricingType === 'pallet' ? 'per_pallet_per_day' : 'per_sqft_per_day'),
+        unit: unit || defaultUnit,
         min_quantity: minQuantity || null,
         max_quantity: maxQuantity || null,
         volume_discounts: volumeDiscounts || null,

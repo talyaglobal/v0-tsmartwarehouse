@@ -88,19 +88,8 @@ export function BookingSearchForm({
     }
   }
 
-  const handleLocationChange = (value: string, place?: any) => {
+  const handleLocationChange = (value: string) => {
     setLocation(value)
-    // Extract city from Google Places result if available
-    if (place?.address_components) {
-      const cityComponent = place.address_components.find(
-        (component: any) =>
-          component.types.includes("locality") ||
-          component.types.includes("administrative_area_level_1")
-      )
-      if (cityComponent) {
-        // You can extract city name or other details here if needed
-      }
-    }
   }
 
   const handleStorageTypeChange = (value: string) => {

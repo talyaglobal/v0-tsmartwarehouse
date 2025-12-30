@@ -34,6 +34,10 @@ interface Warehouse {
       basePrice: number
       unit: string
     }
+    palletMonthly?: {
+      basePrice: number
+      unit: string
+    }
     areaRental?: {
       basePrice: number
       unit: string
@@ -68,24 +72,31 @@ export default function FindWarehousesPage() {
     const fetchWarehouses = async () => {
       setLoading(true)
       try {
-        // Extract city from location if it's in format "City, State" or "City, Country"
-        // Example: "Fair Lawn, New Jersey" -> "Fair Lawn"
-        const city = location.split(",")[0].trim()
+        // Use the full location string for search
+        // Backend will match against any part of the city field
+        // Examples:
+        // - User selects "İzmir" -> matches "Menemen, İzmir"
+        // - User selects "New Jersey" -> matches "Bergen County, New Jersey"
+        // - User selects "Menemen, İzmir" -> matches "Menemen, İzmir"
 
         let url = "/api/v1/warehouses/public/search"
-        if (city && city.length > 0) {
-          url += `?city=${encodeURIComponent(city)}`
+        if (location && location.trim().length > 0) {
+          // Send the full location string, backend will do ILIKE search
+          url += `?city=${encodeURIComponent(location.trim())}`
         } else {
           // If no location specified, fetch all warehouses
           url += "?"
         }
 
         console.log("[find-warehouses] Fetching warehouses with URL:", url)
+        console.log("[find-warehouses] Location parameter:", location)
 
         const response = await fetch(url)
         const data = await response.json()
 
         console.log("[find-warehouses] API response:", data)
+        console.log("[find-warehouses] Response success:", data.success)
+        console.log("[find-warehouses] Warehouses count:", data.data?.warehouses?.length || 0)
 
         if (data.success && data.data && data.data.warehouses) {
           // Transform warehouse data

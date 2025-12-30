@@ -133,11 +133,23 @@ export async function PATCH(
     if (body.latitude !== undefined) updates.latitude = body.latitude
     if (body.longitude !== undefined) updates.longitude = body.longitude
     if (body.warehouseType !== undefined) updates.warehouseType = body.warehouseType
-    if (body.storageTypes !== undefined) updates.storageTypes = body.storageTypes
+    if (body.storageType !== undefined) updates.storageType = body.storageType
     if (body.temperatureTypes !== undefined) updates.temperatureTypes = body.temperatureTypes
     if (body.amenities !== undefined) updates.amenities = body.amenities
     if (body.photos !== undefined) updates.photos = body.photos
     if (body.operatingHours !== undefined) updates.operatingHours = body.operatingHours
+    if (body.customStatus !== undefined) updates.customStatus = body.customStatus
+    if (body.minPallet !== undefined) updates.minPallet = body.minPallet
+    if (body.maxPallet !== undefined) updates.maxPallet = body.maxPallet
+    if (body.minSqFt !== undefined) updates.minSqFt = body.minSqFt
+    if (body.maxSqFt !== undefined) updates.maxSqFt = body.maxSqFt
+    if (body.rentMethods !== undefined) updates.rentMethods = body.rentMethods
+    if (body.security !== undefined) updates.security = body.security
+    if (body.videoUrl !== undefined) updates.videoUrl = body.videoUrl
+    if (body.accessInfo !== undefined) updates.accessInfo = body.accessInfo
+    if (body.productAcceptanceStartTime !== undefined) updates.productAcceptanceStartTime = body.productAcceptanceStartTime
+    if (body.productAcceptanceEndTime !== undefined) updates.productAcceptanceEndTime = body.productAcceptanceEndTime
+    if (body.workingDays !== undefined) updates.workingDays = body.workingDays
 
     const updatedWarehouse = await updateWarehouse(id, updates)
 
