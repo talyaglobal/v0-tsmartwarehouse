@@ -60,6 +60,15 @@ export function BookingSearch({
       return
     }
 
+    // Check if the value exactly matches a city - if so, hide suggestions
+    const exactMatch = cities.some((city) => city.toLowerCase() === value.toLowerCase())
+    if (exactMatch) {
+      setFilteredCities([])
+      setShowSuggestions(false)
+      setSelectedIndex(-1)
+      return
+    }
+
     const searchTerm = value.toLowerCase()
     const matches = cities.filter((city) =>
       city.toLowerCase().includes(searchTerm)

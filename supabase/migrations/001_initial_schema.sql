@@ -2,8 +2,8 @@
 -- PostgreSQL Schema for Supabase
 -- Generated: December 2024
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable UUID extension (optional - Supabase has gen_random_uuid() built-in)
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Note: JWT secret is configured in Supabase project settings
 
@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- USERS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin', 'customer', 'worker')),
@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 -- WAREHOUSES TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS warehouses (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   address TEXT NOT NULL,
   city TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS warehouses (
 -- WAREHOUSE FLOORS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS warehouse_floors (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
   floor_number INTEGER NOT NULL CHECK (floor_number IN (1, 2, 3)),
   name TEXT NOT NULL,
@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_warehouse_floors_warehouse_id ON warehouse_floors
 -- WAREHOUSE HALLS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS warehouse_halls (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   floor_id UUID NOT NULL REFERENCES warehouse_floors(id) ON DELETE CASCADE,
   hall_name TEXT NOT NULL CHECK (hall_name IN ('A', 'B')),
   sq_ft INTEGER NOT NULL,
@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_warehouse_halls_floor_id ON warehouse_halls(floor
 -- WAREHOUSE ZONES TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS warehouse_zones (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   hall_id UUID NOT NULL REFERENCES warehouse_halls(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('pallet', 'area-rental', 'cold-storage', 'hazmat')),
@@ -101,7 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_warehouse_zones_type ON warehouse_zones(type);
 -- BOOKINGS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS bookings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   customer_name TEXT NOT NULL,
   customer_email TEXT NOT NULL,
@@ -130,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_start_date ON bookings(start_date);
 -- INVOICES TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS invoices (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE RESTRICT,
   customer_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   customer_name TEXT NOT NULL,
@@ -153,7 +153,7 @@ CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);
 -- TASKS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type TEXT NOT NULL CHECK (type IN ('receiving', 'putaway', 'picking', 'packing', 'shipping', 'inventory-check', 'maintenance')),
   title TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -182,7 +182,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 -- INCIDENTS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS incidents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   type TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -208,7 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_incidents_affected_booking_id ON incidents(affect
 -- CLAIMS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS claims (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   customer_name TEXT NOT NULL,
   incident_id UUID REFERENCES incidents(id) ON DELETE SET NULL,
@@ -233,7 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status);
 -- NOTIFICATIONS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('booking', 'invoice', 'task', 'incident', 'system')),
   channel TEXT NOT NULL CHECK (channel IN ('email', 'sms', 'push', 'whatsapp')),
@@ -251,7 +251,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created
 -- WORKER SHIFTS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS worker_shifts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   worker_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   worker_name TEXT NOT NULL,
   check_in_time TIMESTAMPTZ NOT NULL,

@@ -7,22 +7,42 @@ import { z } from "zod"
 
 /**
  * GET /api/v1/warehouses/[id]/services
- * Get all active services for a warehouse (public endpoint for customers)
+ * Get all services for a warehouse
+ * If includeInactive query param is true, returns all services (active and inactive)
+ * Otherwise, returns only active services (for public/customer view)
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: warehouseId } = await params
+    const { searchParams } = new URL(request.url)
+    const includeInactive = searchParams.get('includeInactive') === 'true'
+    
     const supabase = createServerSupabaseClient()
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('warehouse_services')
-      .select('*')
+      .select(`
+        *,
+        company_services (
+          id,
+          service_name,
+          service_description,
+          pricing_type,
+          base_price
+        )
+      `)
       .eq('warehouse_id', warehouseId)
-      .eq('is_active', true)
-      .order('service_name', { ascending: true })
+      .eq('status', true) // Soft delete filter
+
+    // Only filter by is_active if includeInactive is false
+    if (!includeInactive) {
+      query = query.eq('is_active', true)
+    }
+
+    const { data, error } = await query.order('service_name', { ascending: true })
 
     if (error) {
       throw new Error(`Failed to fetch services: ${error.message}`)

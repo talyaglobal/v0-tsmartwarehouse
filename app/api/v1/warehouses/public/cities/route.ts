@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
@@ -8,7 +8,7 @@ import type { ErrorResponse } from "@/types/api"
  * Public endpoint to get all unique cities from active warehouses
  * Returns list of cities for autocomplete (no authentication required)
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = createServerSupabaseClient()
 

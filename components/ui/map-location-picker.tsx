@@ -241,12 +241,15 @@ export function MapLocationPicker({
 
     return () => {
       clearTimeout(timer)
-      if (markerRef.current) {
-        markerRef.current.setMap(null)
-        markerRef.current = null
+      // Don't remove map instance when coordinates change, only when dialog closes
+      if (!open) {
+        if (markerRef.current) {
+          markerRef.current.setMap(null)
+          markerRef.current = null
+        }
+        mapInstanceRef.current = null
+        setIsMapReady(false)
       }
-      mapInstanceRef.current = null
-      setIsMapReady(false)
     }
   }, [open, initialLat, initialLng])
 

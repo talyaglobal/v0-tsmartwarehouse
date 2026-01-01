@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +21,8 @@ interface Warehouse {
   city: string
   zipCode: string
   totalSqFt: number
+  totalPalletStorage?: number
+  photos?: string[]
 }
 
 interface BookingDetails {
@@ -45,6 +48,9 @@ export default function BookingReviewPage() {
   const [guestEmail, setGuestEmail] = useState("")
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [availableSqFt, setAvailableSqFt] = useState<number | null>(null)
+  const [availablePallets, setAvailablePallets] = useState<number | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
   // Check user auth status
   useEffect(() => {
@@ -85,7 +91,7 @@ export default function BookingReviewPage() {
     })
   }, [searchParams, warehouseId, router])
 
-  // Fetch warehouse details
+  // Fetch warehouse details and calculate available space
   useEffect(() => {
     const fetchWarehouse = async () => {
       try {
@@ -93,6 +99,51 @@ export default function BookingReviewPage() {
         const data = await response.json()
         if (data.success && data.data) {
           setWarehouse(data.data)
+          
+          // Create Supabase client for photo URL and bookings
+          const supabase = createClient()
+          
+          // Convert photo path to public URL if exists
+          if (data.data.photos && data.data.photos.length > 0) {
+            const { data: urlData } = supabase.storage.from('docs').getPublicUrl(data.data.photos[0])
+            setPhotoUrl(urlData.publicUrl)
+          }
+          
+          // Calculate available space from active bookings
+          const today = new Date().toISOString().split('T')[0]
+          
+          // Get active bookings for this warehouse
+          // Active bookings are those where today is between start_date and end_date
+          const { data: activeBookings } = await supabase
+            .from('bookings')
+            .select('type, pallet_count, area_sq_ft')
+            .eq('warehouse_id', warehouseId)
+            .eq('status', true)
+            .in('booking_status', ['confirmed', 'active'])
+            .lte('start_date', today)
+            .gte('end_date', today)
+          
+          if (activeBookings) {
+            // Calculate occupied space
+            const occupiedSqFt = activeBookings
+              .filter((b: any) => b.type === 'area-rental')
+              .reduce((sum: number, b: any) => sum + (b.area_sq_ft || 0), 0)
+            
+            const occupiedPallets = activeBookings
+              .filter((b: any) => b.type === 'pallet')
+              .reduce((sum: number, b: any) => sum + (b.pallet_count || 0), 0)
+            
+            // Calculate available space
+            const totalSqFt = data.data.totalSqFt || 0
+            const totalPallets = data.data.totalPalletStorage || 0
+            
+            setAvailableSqFt(Math.max(0, totalSqFt - occupiedSqFt))
+            setAvailablePallets(Math.max(0, totalPallets - occupiedPallets))
+          } else {
+            // No active bookings, all space is available
+            setAvailableSqFt(data.data.totalSqFt || 0)
+            setAvailablePallets(data.data.totalPalletStorage || 0)
+          }
         }
       } catch (error) {
         console.error("Failed to fetch warehouse:", error)
@@ -241,22 +292,48 @@ export default function BookingReviewPage() {
                     <CardTitle>Warehouse Details</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <h3 className="text-xl font-semibold">{warehouse.name}</h3>
-                      <div className="flex items-center gap-2 text-muted-foreground mt-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>
-                          {warehouse.address}, {warehouse.city} {warehouse.zipCode}
-                        </span>
+                    <div className="flex items-start gap-3">
+                      {photoUrl && (
+                        <div className="relative w-16 h-16 flex-shrink-0 rounded-md overflow-hidden border">
+                          <Image
+                            src={photoUrl}
+                            alt={warehouse.name}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold">{warehouse.name}</h3>
+                        <div className="flex items-center gap-2 text-muted-foreground mt-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>
+                            {warehouse.address}, {warehouse.city} {warehouse.zipCode}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <Separator />
-                    <div className="flex items-center gap-3">
-                      <Building2 className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Total Space</div>
-                        <div className="font-semibold">{formatNumber(warehouse.totalSqFt)} sq ft</div>
-                      </div>
+                    <div className="space-y-3">
+                      {availableSqFt !== null && (
+                        <div className="flex items-center gap-3">
+                          <Building2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <div className="text-sm text-muted-foreground">Total Available Space</div>
+                            <div className="font-semibold">{formatNumber(availableSqFt)} sq ft</div>
+                          </div>
+                        </div>
+                      )}
+                      {availablePallets !== null && warehouse.totalPalletStorage && (
+                        <div className="flex items-center gap-3">
+                          <Building2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <div className="text-sm text-muted-foreground">Total Available Pallets</div>
+                            <div className="font-semibold">{formatNumber(availablePallets)} pallet</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

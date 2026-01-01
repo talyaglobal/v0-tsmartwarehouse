@@ -19,14 +19,22 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 
 ## Running Migrations
 
-### Option 1: Using Supabase Dashboard
+### ⚠️ IMPORTANT: Auto-Push Policy
 
-1. Go to your Supabase project dashboard
-2. Navigate to SQL Editor
-3. Copy the contents of `migrations/001_initial_schema.sql`
-4. Paste and run the SQL script
+**AI Assistant will ALWAYS automatically push migrations to Supabase when creating new migration files.**
+- **Every time a new migration file is created, the AI will automatically attempt to push it**
+- The AI will use `supabase db push` or direct SQL execution to apply migrations
+- If Supabase CLI is not installed or project is not linked, the AI will create a combined SQL file for manual execution
+- If migration errors occur, the AI will fix them and push again automatically
+- **No need to manually request migration pushes - this is ALWAYS handled automatically**
 
-### Option 2: Using Supabase CLI
+**The AI will:**
+1. Always attempt to push migrations immediately after creating them
+2. Create combined SQL files if direct push fails
+3. Fix any migration errors and retry automatically
+4. Never leave migrations unapplied
+
+### Using Supabase CLI
 
 ```bash
 # Install Supabase CLI (if not already installed)

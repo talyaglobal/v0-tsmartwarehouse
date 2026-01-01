@@ -48,17 +48,6 @@ const STORAGE_TYPES = [
   { value: "closed-yard", label: "Closed Yard" },
 ] as const
 
-const TEMPERATURE_OPTIONS = [
-  { value: "ambient-with-ac", label: "Ambient (with A/C)" },
-  { value: "ambient-without-ac", label: "Ambient (without A/C)" },
-  { value: "ambient-with-heater", label: "Ambient (with heater)" },
-  { value: "ambient-without-heater", label: "Ambient (without heater)" },
-  { value: "chilled", label: "Chilled (+40°F)" },
-  { value: "frozen", label: "Frozen (0°F)" },
-  { value: "open-area-with-tent", label: "Open Area (with tent)" },
-  { value: "open-area", label: "Open Area" },
-] as const
-
 const RENT_METHODS = [
   { value: "pallet", label: "Pallet" },
   { value: "sq_ft", label: "Square Feet" },
@@ -612,11 +601,15 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                 <PlacesAutocomplete
                   value={formData.address}
                   onChange={(address, place) => {
-                    setFormData({ ...formData, address })
+                    setFormData(prev => ({ ...prev, address }))
+
+                    // Extract address components from Google Places result
+                    // Only process when place is selected (not during typing)
                     if (place?.address_components) {
                       let cityName = ""
                       let zipCode = ""
                       let stateName = ""
+
                       for (const component of place.address_components) {
                         const types = component.types
                         if (types.includes("locality") || types.includes("administrative_area_level_2")) {
@@ -626,22 +619,35 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                           zipCode = component.long_name
                         }
                         if (types.includes("administrative_area_level_1")) {
-                          stateName = component.long_name
+                          stateName = component.long_name // Use long_name for full state/province name
                           setState(component.short_name || component.long_name)
                         }
                       }
+
                       // Format city as "District, Province" for better search matching
+                      // Example: "Karşıyaka, İzmir" or "Manhattan, New York"
                       if (cityName && stateName) {
                         cityName = `${cityName}, ${stateName}`
                       }
-                      if (cityName) setFormData(prev => ({ ...prev, city: cityName, address }))
-                      if (zipCode) setFormData(prev => ({ ...prev, zipCode, address }))
+
+                      setFormData(prev => ({
+                        ...prev,
+                        address,
+                        ...(cityName && { city: cityName }),
+                        ...(zipCode && { zipCode }),
+                      }))
                     }
+                    // Don't do geocoding here - let PlacesAutocomplete handle it on blur
+                    // This prevents automatic selection while typing
                   }}
                   onLocationChange={(location) => {
-                    setFormData({ ...formData, latitude: location.lat.toString(), longitude: location.lng.toString() })
+                    setFormData(prev => ({
+                      ...prev,
+                      latitude: location.lat.toString(),
+                      longitude: location.lng.toString(),
+                    }))
                   }}
-                  placeholder="Enter address"
+                  placeholder="Enter full address (city and location will be auto-filled)"
                 />
               </div>
 
@@ -658,6 +664,44 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                     longitude: location.lng.toString(),
                     address: location.address || prev.address,
                   }))
+
+                  // If address was geocoded, also try to extract city and zip code
+                  if (typeof window !== 'undefined' && window.google?.maps?.Geocoder) {
+                    const geocoder = new window.google.maps.Geocoder()
+                    geocoder.geocode({ location: { lat: location.lat, lng: location.lng } }, (results: any, status: string) => {
+                      if (status === 'OK' && results && results[0]) {
+                        let cityName = ""
+                        let zipCode = ""
+                        let stateName = ""
+
+                        for (const component of results[0].address_components) {
+                          const types = component.types
+                          if (types.includes("locality") || types.includes("administrative_area_level_2")) {
+                            cityName = component.long_name
+                          }
+                          if (types.includes("postal_code")) {
+                            zipCode = component.long_name
+                          }
+                          if (types.includes("administrative_area_level_1")) {
+                            stateName = component.long_name
+                            setState(component.short_name || component.long_name)
+                          }
+                        }
+
+                        // Format city as "District, Province"
+                        if (cityName && stateName) {
+                          cityName = `${cityName}, ${stateName}`
+                        }
+
+                        setFormData((prev) => ({
+                          ...prev,
+                          ...(cityName && { city: cityName }),
+                          ...(zipCode && { zipCode }),
+                          address: location.address || prev.address,
+                        }))
+                      }
+                    })
+                  }
                 }}
               />
 

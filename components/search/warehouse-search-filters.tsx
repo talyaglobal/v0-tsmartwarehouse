@@ -310,10 +310,10 @@ export function WarehouseSearchFilters({
             <div className="[&_input]:h-14 [&_input]:text-base [&_input]:px-4 [&_input]:text-lg [&_input]:shadow-sm">
               <BookingSearch
                 value={tempLocation}
-                onChange={(value, place) => {
+                onChange={(value) => {
                   setTempLocation(value)
-                  // If a place/city is selected from suggestions, auto-apply it
-                  if (place && value.trim()) {
+                  // If value is set, auto-apply it
+                  if (value.trim()) {
                     handleLocationSelect(value)
                   }
                 }}

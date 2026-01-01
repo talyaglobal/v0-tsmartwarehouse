@@ -46,17 +46,6 @@ const STORAGE_TYPES = [
   { value: "closed-yard", label: "Closed Yard" },
 ] as const
 
-const TEMPERATURE_OPTIONS = [
-  { value: "ambient-with-ac", label: "Ambient (with A/C)" },
-  { value: "ambient-without-ac", label: "Ambient (without A/C)" },
-  { value: "ambient-with-heater", label: "Ambient (with heater)" },
-  { value: "ambient-without-heater", label: "Ambient (without heater)" },
-  { value: "chilled", label: "Chilled (+40°F)" },
-  { value: "frozen", label: "Frozen (0°F)" },
-  { value: "open-area-with-tent", label: "Open Area (with tent)" },
-  { value: "open-area", label: "Open Area" },
-] as const
-
 const RENT_METHODS = [
   { value: "pallet", label: "Pallet" },
   { value: "sq_ft", label: "Square Feet" },
@@ -477,8 +466,8 @@ export default function NewWarehousePage() {
                 </div>
                 <PlacesAutocomplete
                   value={formData.address}
-                  onChange={(address, place) => {
-                    setFormData({ ...formData, address })
+                  onChange={async (address, place) => {
+                    setFormData(prev => ({ ...prev, address }))
 
                     // Extract address components from Google Places result
                     if (place?.address_components) {
@@ -506,12 +495,72 @@ export default function NewWarehousePage() {
                         cityName = `${cityName}, ${stateName}`
                       }
 
-                      if (cityName) setFormData(prev => ({ ...prev, city: cityName, address }))
-                      if (zipCode) setFormData(prev => ({ ...prev, zipCode, address }))
+                      setFormData(prev => ({
+                        ...prev,
+                        address,
+                        ...(cityName && { city: cityName }),
+                        ...(zipCode && { zipCode }),
+                      }))
+                    } else if (address && address.trim() && typeof window !== 'undefined' && window.google?.maps?.Geocoder) {
+                      // If place is not available (manual input), try geocoding
+                      const geocoder = new window.google.maps.Geocoder()
+                      geocoder.geocode(
+                        { address: address.trim() },
+                        (results: any, status: string) => {
+                          if (status === 'OK' && results && results[0]) {
+                            let cityName = ""
+                            let zipCode = ""
+                            let stateName = ""
+
+                            for (const component of results[0].address_components) {
+                              const types = component.types
+                              if (types.includes("locality") || types.includes("administrative_area_level_2")) {
+                                cityName = component.long_name
+                              }
+                              if (types.includes("postal_code")) {
+                                zipCode = component.long_name
+                              }
+                              if (types.includes("administrative_area_level_1")) {
+                                stateName = component.long_name
+                                setState(component.short_name || component.long_name)
+                              }
+                            }
+
+                            // Format city as "District, Province"
+                            if (cityName && stateName) {
+                              cityName = `${cityName}, ${stateName}`
+                            }
+
+                            setFormData(prev => ({
+                              ...prev,
+                              address: results[0].formatted_address || prev.address,
+                              ...(cityName && { city: cityName }),
+                              ...(zipCode && { zipCode }),
+                            }))
+
+                            // Update location if available
+                            if (results[0].geometry?.location) {
+                              const location = {
+                                lat: results[0].geometry.location.lat(),
+                                lng: results[0].geometry.location.lng(),
+                              }
+                              setFormData(prev => ({
+                                ...prev,
+                                latitude: location.lat.toString(),
+                                longitude: location.lng.toString(),
+                              }))
+                            }
+                          }
+                        }
+                      )
                     }
                   }}
                   onLocationChange={(location) => {
-                    setFormData({ ...formData, latitude: location.lat.toString(), longitude: location.lng.toString() })
+                    setFormData(prev => ({
+                      ...prev,
+                      latitude: location.lat.toString(),
+                      longitude: location.lng.toString(),
+                    }))
                   }}
                   placeholder="Enter full address (city and location will be auto-filled)"
                 />

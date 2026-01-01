@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical, Settings } from "@/components/icons"
+import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical, Settings, AlertCircle } from "@/components/icons"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { api } from "@/lib/api/client"
 import { formatNumber, formatCurrency } from "@/lib/utils/format"
@@ -74,11 +74,11 @@ export default function WarehousesPage() {
               console.error('Failed to fetch pricing for warehouse:', warehouse.id, err)
             }
 
-            return { ...warehouse, photos: photoUrls, pricing }
+            return { ...warehouse, photos: photoUrls, pricing } as Warehouse
           })
         )
 
-        setWarehouses(warehousesWithUrls)
+        setWarehouses(warehousesWithUrls as Warehouse[])
         // Initialize photo indexes for each warehouse
         const indexes: Record<string, number> = {}
         warehousesWithUrls.forEach(w => {
@@ -99,6 +99,31 @@ export default function WarehousesPage() {
     }
     return true
   })
+
+  // Check for missing pricing
+  const requiredPricingTypes: ('pallet' | 'pallet-monthly' | 'area')[] = ['pallet', 'pallet-monthly', 'area']
+  const pricingTypeLabels: Record<string, string> = {
+    'pallet': 'Pallet (per day)',
+    'pallet-monthly': 'Pallet (per month)',
+    'area': 'Area Rental (per sqft/month)'
+  }
+
+  const warehousesWithMissingPricing = filteredWarehouses.map(warehouse => {
+    const pricingArray = (warehouse as any).pricing as any[] | null | undefined
+    const existingPricingTypes = (pricingArray || []).map((p: any) => p.pricing_type)
+    const missingTypes = requiredPricingTypes.filter(type => !existingPricingTypes.includes(type))
+    return {
+      warehouse,
+      missingTypes
+    }
+  }).filter(item => item.missingTypes.length > 0)
+
+  const hasMissingPricing = warehousesWithMissingPricing.length > 0
+
+  // Helper function to check if a warehouse has missing pricing
+  const hasMissingPricingForWarehouse = (warehouseId: string) => {
+    return warehousesWithMissingPricing.some(item => item.warehouse.id === warehouseId)
+  }
 
   const handlePreviousPhoto = (warehouseId: string, photos: string[]) => {
     setCurrentPhotoIndexes(prev => ({
@@ -182,6 +207,35 @@ export default function WarehousesPage() {
         </Link>
       </PageHeader>
 
+      {/* Missing Pricing Warning */}
+      {hasMissingPricing && (
+        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900 dark:text-red-100 mb-2">
+                  Please set pricing for all warehouses
+                </h3>
+                <p className="text-sm text-red-800 dark:text-red-200 mb-3">
+                  Some warehouses are missing required pricing information. Please configure pricing for the following warehouses:
+                </p>
+                <div className="space-y-2">
+                  {warehousesWithMissingPricing.map(({ warehouse, missingTypes }) => (
+                    <div key={warehouse.id} className="text-sm">
+                      <span className="font-medium text-red-900 dark:text-red-100">{warehouse.name}:</span>
+                      <span className="text-red-700 dark:text-red-300 ml-2">
+                        Missing {missingTypes.map(type => pricingTypeLabels[type]).join(', ')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search and View Toggle */}
       <Card>
         <CardContent className="pt-6">
@@ -242,8 +296,13 @@ export default function WarehousesPage() {
             const currentIndex = currentPhotoIndexes[warehouse.id] || 0
             const hasPhotos = photos.length > 0
 
+            const hasMissingPricing = hasMissingPricingForWarehouse(warehouse.id)
+
             return (
-              <Card key={warehouse.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+              <Card key={warehouse.id} className={cn(
+                "hover:shadow-lg transition-shadow overflow-hidden",
+                hasMissingPricing && "border-2 border-red-500 dark:border-red-400"
+              )}>
                 {/* Photo Slider */}
                 {hasPhotos && (
                   <div className="relative w-full h-48 bg-muted">
@@ -409,7 +468,7 @@ export default function WarehousesPage() {
                         </Link>
                       </div>
                       <div className="flex gap-2 mb-2">
-                        <Link href={`/dashboard/warehouses/${warehouse.id}/services`} className="flex-1">
+                        <Link href={`/dashboard/services?warehouseId=${warehouse.id}&tab=warehouse-mapping`} className="flex-1">
                           <Button variant="outline" className="w-full">
                             <Settings className="h-4 w-4 mr-2" />
                             Services
@@ -446,8 +505,13 @@ export default function WarehousesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredWarehouses.map((warehouse) => (
-                  <TableRow key={warehouse.id}>
+                {filteredWarehouses.map((warehouse) => {
+                  const hasMissingPricing = hasMissingPricingForWarehouse(warehouse.id)
+                  
+                  return (
+                  <TableRow key={warehouse.id} className={cn(
+                    hasMissingPricing && "border-l-4 border-l-red-500 dark:border-l-red-400"
+                  )}>
                     <TableCell className="font-medium">{warehouse.name}</TableCell>
                     <TableCell>
                       {warehouse.address}, {warehouse.city} {warehouse.zipCode}
@@ -543,7 +607,7 @@ export default function WarehousesPage() {
                             Set Price
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/warehouses/${warehouse.id}/services`}>
+                            <Link href={`/dashboard/services?warehouseId=${warehouse.id}&tab=warehouse-mapping`}>
                               <Settings className="h-4 w-4 mr-2" />
                               Services
                             </Link>
@@ -559,7 +623,8 @@ export default function WarehousesPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
               </TableBody>
             </Table>
           </CardContent>

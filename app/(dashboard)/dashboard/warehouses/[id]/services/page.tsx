@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, ArrowLeft, Edit, Trash2, Power } from "@/components/icons"
+import { Plus, ArrowLeft, Edit, Trash2, Power, MapPin } from "@/components/icons"
 import { ServiceFormDialog } from "@/components/warehouse/service-form-dialog"
 import { formatCurrency } from "@/lib/utils/format"
 import Link from "next/link"
@@ -32,7 +32,6 @@ const PRICING_TYPE_LABELS: Record<string, string> = {
 
 export default function WarehouseServicesPage() {
   const params = useParams()
-  const router = useRouter()
   const warehouseId = params.id as string
 
   const [services, setServices] = useState<WarehouseService[]>([])
@@ -143,10 +142,12 @@ export default function WarehouseServicesPage() {
               Manage additional services customers can add to their bookings
             </p>
           </div>
-          <Button onClick={handleCreateService}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Service
-          </Button>
+          <Link href="/dashboard/services">
+            <Button>
+              <MapPin className="h-4 w-4 mr-2" />
+              Map Services
+            </Button>
+          </Link>
         </div>
 
         {/* Services List */}

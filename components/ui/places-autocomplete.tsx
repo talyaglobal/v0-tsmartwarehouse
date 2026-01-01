@@ -135,7 +135,7 @@ export function PlacesAutocomplete({
       if (!input.value.trim()) return
       
       // If autocomplete didn't trigger place_changed, try to geocode the entered address
-      if (window.google?.maps?.Geocoder && onLocationChange) {
+      if (window.google?.maps?.Geocoder) {
         const geocoder = new window.google.maps.Geocoder()
         geocoder.geocode(
           { 
@@ -145,14 +145,21 @@ export function PlacesAutocomplete({
           (results: any, status: string) => {
             if (status === 'OK' && results && results[0]) {
               const location = results[0].geometry.location
-              onLocationChange({
-                lat: location.lat(),
-                lng: location.lng(),
-              })
               
-              // Update the input with formatted address
+              // Update location if callback provided
+              if (onLocationChange) {
+                onLocationChange({
+                  lat: location.lat(),
+                  lng: location.lng(),
+                })
+              }
+              
+              // Update the input with formatted address and pass place object for address component extraction
               if (results[0].formatted_address && results[0].formatted_address !== input.value) {
                 onChange(results[0].formatted_address, results[0])
+              } else {
+                // Even if address didn't change, pass the place object so address components can be extracted
+                onChange(input.value, results[0])
               }
             }
           }

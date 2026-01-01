@@ -46,10 +46,10 @@ export async function createBookingRequest(input: {
       return { success: false, error: 'Profile not found' }
     }
 
-    // Get warehouse owner
+    // Get warehouse owner and city
     const { data: warehouse } = await supabase
       .from('warehouses')
-      .select('owner_company_id')
+      .select('owner_company_id, city')
       .eq('id', input.warehouseId)
       .single()
 
@@ -57,10 +57,20 @@ export async function createBookingRequest(input: {
       return { success: false, error: 'Warehouse not found' }
     }
 
+    // Generate unique booking ID
+    const { generateUniqueBookingId } = await import('@/lib/utils/booking-id')
+    const bookingId = await generateUniqueBookingId({
+      city: warehouse.city || 'UNK',
+      startDate: input.startDate,
+      endDate: input.endDate || input.startDate,
+      type: input.type,
+    })
+
     // Create booking
     const { data: booking, error } = await supabase
       .from('bookings')
       .insert({
+        id: bookingId,
         customer_id: profile.id,
         customer_name: profile.name,
         customer_email: profile.email,

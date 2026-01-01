@@ -1,0 +1,23 @@
+# Cursor AI Rules for TSmart Warehouse Project
+
+## Supabase Migration Auto-Push Policy
+
+When creating or modifying Supabase migration files:
+1. **Automatically attempt to push** the migration using `supabase db push` or `npx supabase db push`
+2. If push fails due to CLI not being installed/linked:
+   - Note this in the response
+   - Migration file is ready for manual execution via Supabase Dashboard
+3. If migration errors occur during push:
+   - Fix the errors in the migration file
+   - Attempt to push again automatically
+4. **Never ask the user to manually push migrations** - handle this automatically
+
+## General Development Rules
+
+- Always use TypeScript with strict type checking
+- Follow the existing code patterns and architecture
+- Use server components by default, client components only when needed
+- All user-facing text must be in English (no Turkish)
+- Write comprehensive error handling
+- Update relevant documentation when making significant changes
+

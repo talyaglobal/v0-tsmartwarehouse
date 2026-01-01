@@ -191,7 +191,28 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
 export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): Promise<Booking> {
   const supabase = createServerSupabaseClient()
   
+  // Get warehouse city for booking ID generation
+  const { data: warehouse } = await supabase
+    .from('warehouses')
+    .select('city')
+    .eq('id', booking.warehouseId)
+    .single()
+
+  if (!warehouse) {
+    throw new Error('Warehouse not found')
+  }
+
+  // Generate unique booking ID
+  const { generateUniqueBookingId } = await import('@/lib/utils/booking-id')
+  const bookingId = await generateUniqueBookingId({
+    city: warehouse.city || 'UNK',
+    startDate: booking.startDate,
+    endDate: booking.endDate || booking.startDate,
+    type: booking.type,
+  })
+  
   const bookingRow = {
+    id: bookingId,
     customer_id: booking.customerId,
     customer_name: booking.customerName,
     customer_email: booking.customerEmail,

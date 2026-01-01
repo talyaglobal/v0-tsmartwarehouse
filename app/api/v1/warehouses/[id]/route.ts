@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { getWarehouseById, updateWarehouse, deleteWarehouse } from "@/lib/db/warehouses"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
 import type { ErrorResponse } from "@/types/api"
 
 /**
@@ -150,6 +151,40 @@ export async function PATCH(
     if (body.productAcceptanceStartTime !== undefined) updates.productAcceptanceStartTime = body.productAcceptanceStartTime
     if (body.productAcceptanceEndTime !== undefined) updates.productAcceptanceEndTime = body.productAcceptanceEndTime
     if (body.workingDays !== undefined) updates.workingDays = body.workingDays
+
+    // Regenerate warehouse name if city, state, or warehouseType changed
+    const cityChanged = body.city !== undefined && body.city !== existingWarehouse.city
+    const stateChanged = body.state !== undefined && body.state !== (existingWarehouse as any).state
+    
+    // Handle warehouseType comparison (can be string or array)
+    const existingType = Array.isArray(existingWarehouse.warehouseType) 
+      ? existingWarehouse.warehouseType[0] 
+      : existingWarehouse.warehouseType
+    const newType = Array.isArray(body.warehouseType) 
+      ? body.warehouseType[0] 
+      : body.warehouseType
+    const typeChanged = body.warehouseType !== undefined && newType !== existingType
+
+    if (cityChanged || stateChanged || typeChanged) {
+      let newCity = body.city !== undefined ? body.city : existingWarehouse.city
+      const newState = body.state !== undefined ? body.state : (existingWarehouse as any).state
+      const newWarehouseType = body.warehouseType !== undefined 
+        ? (Array.isArray(body.warehouseType) ? body.warehouseType[0] : body.warehouseType)
+        : (Array.isArray(existingWarehouse.warehouseType) ? existingWarehouse.warehouseType[0] : existingWarehouse.warehouseType)
+
+      // Extract city name if it's in "City, State" format
+      if (newCity && newCity.includes(',')) {
+        newCity = newCity.split(',')[0].trim()
+      }
+
+      // Generate new warehouse name based on updated city/state/type
+      const newWarehouseName = generateWarehouseName(
+        newCity,
+        newWarehouseType || 'general',
+        newState
+      )
+      updates.name = newWarehouseName
+    }
 
     const updatedWarehouse = await updateWarehouse(id, updates)
 

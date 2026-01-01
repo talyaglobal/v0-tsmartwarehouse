@@ -34,10 +34,16 @@ const PRICING_TYPE_OPTIONS = [
 ]
 
 export function ServiceFormDialog({ open, onClose, warehouseId, service }: ServiceFormDialogProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    serviceName: string
+    serviceDescription: string
+    pricingType: 'one_time' | 'per_pallet' | 'per_sqft' | 'per_day' | 'per_month'
+    basePrice: string
+    isActive: boolean
+  }>({
     serviceName: '',
     serviceDescription: '',
-    pricingType: 'one_time' as const,
+    pricingType: 'one_time',
     basePrice: '',
     isActive: true
   })
