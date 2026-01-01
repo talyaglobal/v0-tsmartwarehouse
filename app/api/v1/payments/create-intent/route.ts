@@ -16,6 +16,10 @@ interface CreateIntentRequest {
     areaSqFt?: number
     startDate: string
     endDate: string
+    needTransportation?: boolean
+    selectedPort?: string
+    selectedContainerType?: string
+    serviceIds?: string[]
   }
   customerEmail: string
   isGuest: boolean
@@ -109,7 +113,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createServerSupabaseClient()
     const { data: warehouse, error: warehouseError } = await supabase
       .from('warehouses')
-      .select('available_pallet_storage, available_sq_ft')
+      .select('available_pallet_storage, available_sq_ft, city')
       .eq('id', body.warehouseId)
       .single()
 
@@ -182,7 +186,66 @@ export async function POST(request: NextRequest) {
     // Use server client (service role) to bypass RLS
     // Reuse supabase instance from availability check above
 
+    // Generate unique booking ID
+    console.log('[create-intent] Starting booking ID generation, warehouse.city:', warehouse.city)
+    
+    if (!warehouse.city) {
+      console.error('[create-intent] Warehouse city is missing')
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Warehouse city not found",
+        statusCode: 500,
+      }
+      return NextResponse.json(errorData, { status: 500 })
+    }
+
+    let bookingId: string
+    try {
+      const { generateUniqueBookingId } = await import('@/lib/utils/booking-id')
+      bookingId = await generateUniqueBookingId({
+        city: warehouse.city,
+        type: body.bookingDetails.type,
+        startDate: body.bookingDetails.startDate,
+        endDate: body.bookingDetails.endDate,
+      })
+      console.log('[create-intent] Generated booking ID:', bookingId)
+    } catch (error) {
+      console.error('[create-intent] Error generating booking ID:', error)
+      const errorData: ErrorResponse = {
+        success: false,
+        error: `Failed to generate booking ID: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        statusCode: 500,
+      }
+      return NextResponse.json(errorData, { status: 500 })
+    }
+
+    if (!bookingId || bookingId.trim() === '') {
+      console.error('[create-intent] Generated booking ID is empty')
+      const errorData: ErrorResponse = {
+        success: false,
+        error: "Failed to generate booking ID",
+        statusCode: 500,
+      }
+      return NextResponse.json(errorData, { status: 500 })
+    }
+
+    // Build metadata object
+    const metadata: any = {}
+    if (body.bookingDetails.needTransportation) {
+      metadata.needTransportation = body.bookingDetails.needTransportation
+      if (body.bookingDetails.selectedPort) {
+        metadata.selectedPort = body.bookingDetails.selectedPort
+      }
+      if (body.bookingDetails.selectedContainerType) {
+        metadata.selectedContainerType = body.bookingDetails.selectedContainerType
+      }
+    }
+    if (body.bookingDetails.serviceIds && body.bookingDetails.serviceIds.length > 0) {
+      metadata.serviceIds = body.bookingDetails.serviceIds
+    }
+
     const bookingData: any = {
+      id: bookingId,
       customer_name: customerName,
       customer_email: body.customerEmail,
       warehouse_id: body.warehouseId,
@@ -193,7 +256,7 @@ export async function POST(request: NextRequest) {
       end_date: body.bookingDetails.endDate,
       total_amount: body.amount,
       status: true, // Soft delete flag (active booking)
-      booking_status: "payment_pending",
+      booking_status: body.bookingDetails.type === "pallet" ? "pre_order" : "payment_pending",
       payment_status: "processing",
       payment_intent_id: paymentIntent.id,
       stripe_customer_id: stripeCustomerId,
@@ -202,16 +265,23 @@ export async function POST(request: NextRequest) {
       amount_due: body.amount,
     }
 
+    // Add metadata only if it has content
+    if (Object.keys(metadata).length > 0) {
+      bookingData.metadata = metadata
+    }
+
     // Add customer_id only if user is authenticated
     if (userId) {
       bookingData.customer_id = userId
     }
 
     console.log('[create-intent] Creating booking:', {
+      bookingId: bookingData.id,
       hasCustomerId: !!userId,
       customerName: customerName,
       isGuest: body.isGuest,
-      hasGuestEmail: !!bookingData.guest_email
+      hasGuestEmail: !!bookingData.guest_email,
+      bookingDataKeys: Object.keys(bookingData)
     })
 
     const { data: booking, error: bookingError } = await supabase

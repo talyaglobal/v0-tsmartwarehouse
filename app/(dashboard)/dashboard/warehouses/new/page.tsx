@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Warehouse, ArrowLeft } from "@/components/icons"
+import { Loader2, Warehouse, ArrowLeft, Plus, X } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
@@ -111,7 +111,96 @@ export default function NewWarehousePage() {
     productAcceptanceEndTime: "",
     // Working days
     workingDays: [] as string[],
+    // Warehouse fees
+    warehouseInFee: "",
+    warehouseOutFee: "",
+    // Transportation
+    ports: [] as Array<{
+      name: string
+      container40DC: string
+      container40HC: string
+      container20DC: string
+    }>,
+    // Pricing
+    pricing: [] as Array<{
+      pricingType: string
+      basePrice: string
+      unit: string
+      minQuantity: string
+      maxQuantity: string
+      volumeDiscounts: Record<string, string>
+    }>,
   })
+
+  // Auto-generate pricing based on rent methods
+  useEffect(() => {
+    const newPricing: Array<{
+      pricingType: string
+      basePrice: string
+      unit: string
+      minQuantity: string
+      maxQuantity: string
+      volumeDiscounts: Record<string, string>
+    }> = []
+
+    if (formData.rentMethods.includes('pallet')) {
+      // Add per pallet per day if not exists
+      if (!formData.pricing.some(p => p.pricingType === 'pallet')) {
+        newPricing.push({
+          pricingType: 'pallet',
+          basePrice: '',
+          unit: 'per_pallet_per_day',
+          minQuantity: formData.minPallet || '',
+          maxQuantity: formData.maxPallet || '',
+          volumeDiscounts: {},
+        })
+      }
+      // Add per pallet per month if not exists
+      if (!formData.pricing.some(p => p.pricingType === 'pallet-monthly')) {
+        newPricing.push({
+          pricingType: 'pallet-monthly',
+          basePrice: '',
+          unit: 'per_pallet_per_month',
+          minQuantity: formData.minPallet || '',
+          maxQuantity: formData.maxPallet || '',
+          volumeDiscounts: {},
+        })
+      }
+    }
+
+    if (formData.rentMethods.includes('sq_ft')) {
+      // Add per sq feet per day if not exists
+      if (!formData.pricing.some(p => p.pricingType === 'area')) {
+        newPricing.push({
+          pricingType: 'area',
+          basePrice: '',
+          unit: 'per_sqft_per_day',
+          minQuantity: formData.minSqFt || '',
+          maxQuantity: formData.maxSqFt || '',
+          volumeDiscounts: {},
+        })
+      }
+    }
+
+    // Remove pricing that doesn't match rent methods
+    const filteredPricing = formData.pricing.filter(p => {
+      if (p.pricingType === 'pallet' || p.pricingType === 'pallet-monthly') {
+        return formData.rentMethods.includes('pallet')
+      }
+      if (p.pricingType === 'area') {
+        return formData.rentMethods.includes('sq_ft')
+      }
+      return false
+    })
+
+    // Update pricing if needed
+    if (newPricing.length > 0 || filteredPricing.length !== formData.pricing.length) {
+      setFormData(prev => ({
+        ...prev,
+        pricing: [...filteredPricing, ...newPricing],
+      }))
+    }
+  }, [formData.rentMethods, formData.minPallet, formData.maxPallet, formData.minSqFt, formData.maxSqFt])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -149,6 +238,18 @@ export default function NewWarehousePage() {
         addNotification({
           type: 'error',
           message: 'Please select a storage type',
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Validate pricing - at least one pricing entry is required
+      const validPricing = formData.pricing.filter(p => p.pricingType && p.basePrice)
+      if (validPricing.length === 0) {
+        addNotification({
+          type: 'error',
+          message: 'Please add at least one pricing entry (Pallet, Pallet Monthly, or Area Rental)',
           duration: 5000,
         })
         setIsLoading(false)
@@ -323,6 +424,18 @@ export default function NewWarehousePage() {
         productAcceptanceStartTime: formData.productAcceptanceStartTime || undefined,
         productAcceptanceEndTime: formData.productAcceptanceEndTime || undefined,
         workingDays: formData.workingDays.length > 0 ? formData.workingDays : undefined,
+        // Warehouse fees
+        warehouseInFee: formData.warehouseInFee ? parseFloat(formData.warehouseInFee) : undefined,
+        warehouseOutFee: formData.warehouseOutFee ? parseFloat(formData.warehouseOutFee) : undefined,
+        // Ports & Container Pricing
+        ports: formData.ports
+          .filter(port => port.name && port.name.trim() !== '')
+          .map(port => ({
+            name: port.name.trim(),
+            container40DC: port.container40DC ? parseFloat(port.container40DC) : undefined,
+            container40HC: port.container40HC ? parseFloat(port.container40HC) : undefined,
+            container20DC: port.container20DC ? parseFloat(port.container20DC) : undefined,
+          })),
       }
 
       // Add optional total fields if provided
@@ -331,6 +444,18 @@ export default function NewWarehousePage() {
       }
       if (hasTotalSqFt) {
         requestBody.totalSqFt = parseInt(totalSqFtValue)
+      }
+
+      // Add pricing if provided
+      if (validPricing.length > 0) {
+        requestBody.pricing = validPricing.map(p => ({
+          pricing_type: p.pricingType,
+          base_price: parseFloat(p.basePrice),
+          unit: p.unit || (p.pricingType === 'pallet' ? 'per_pallet_per_day' : p.pricingType === 'pallet-monthly' ? 'per_pallet_per_month' : 'per_sqft_per_month'),
+          min_quantity: p.minQuantity ? parseInt(p.minQuantity) : null,
+          max_quantity: p.maxQuantity ? parseInt(p.maxQuantity) : null,
+          volume_discounts: p.volumeDiscounts && Object.keys(p.volumeDiscounts).length > 0 ? p.volumeDiscounts : null,
+        }))
       }
 
       if (formData.zipCode) {
@@ -466,10 +591,12 @@ export default function NewWarehousePage() {
                 </div>
                 <PlacesAutocomplete
                   value={formData.address}
-                  onChange={async (address, place) => {
+                  onChange={(address, place) => {
+                    // Only update address, don't extract components here
+                    // Components will be extracted on blur or when place is explicitly selected
                     setFormData(prev => ({ ...prev, address }))
 
-                    // Extract address components from Google Places result
+                    // Only extract address components if place is explicitly selected (not on every keystroke)
                     if (place?.address_components) {
                       let cityName = ""
                       let zipCode = ""
@@ -484,13 +611,12 @@ export default function NewWarehousePage() {
                           zipCode = component.long_name
                         }
                         if (types.includes("administrative_area_level_1")) {
-                          stateName = component.long_name // Use long_name for full state/province name
+                          stateName = component.long_name
                           setState(component.short_name || component.long_name)
                         }
                       }
 
                       // Format city as "District, Province" for better search matching
-                      // Example: "Karşıyaka, İzmir" or "Manhattan, New York"
                       if (cityName && stateName) {
                         cityName = `${cityName}, ${stateName}`
                       }
@@ -501,58 +627,6 @@ export default function NewWarehousePage() {
                         ...(cityName && { city: cityName }),
                         ...(zipCode && { zipCode }),
                       }))
-                    } else if (address && address.trim() && typeof window !== 'undefined' && window.google?.maps?.Geocoder) {
-                      // If place is not available (manual input), try geocoding
-                      const geocoder = new window.google.maps.Geocoder()
-                      geocoder.geocode(
-                        { address: address.trim() },
-                        (results: any, status: string) => {
-                          if (status === 'OK' && results && results[0]) {
-                            let cityName = ""
-                            let zipCode = ""
-                            let stateName = ""
-
-                            for (const component of results[0].address_components) {
-                              const types = component.types
-                              if (types.includes("locality") || types.includes("administrative_area_level_2")) {
-                                cityName = component.long_name
-                              }
-                              if (types.includes("postal_code")) {
-                                zipCode = component.long_name
-                              }
-                              if (types.includes("administrative_area_level_1")) {
-                                stateName = component.long_name
-                                setState(component.short_name || component.long_name)
-                              }
-                            }
-
-                            // Format city as "District, Province"
-                            if (cityName && stateName) {
-                              cityName = `${cityName}, ${stateName}`
-                            }
-
-                            setFormData(prev => ({
-                              ...prev,
-                              address: results[0].formatted_address || prev.address,
-                              ...(cityName && { city: cityName }),
-                              ...(zipCode && { zipCode }),
-                            }))
-
-                            // Update location if available
-                            if (results[0].geometry?.location) {
-                              const location = {
-                                lat: results[0].geometry.location.lat(),
-                                lng: results[0].geometry.location.lng(),
-                              }
-                              setFormData(prev => ({
-                                ...prev,
-                                latitude: location.lat.toString(),
-                                longitude: location.lng.toString(),
-                              }))
-                            }
-                          }
-                        }
-                      )
                     }
                   }}
                   onLocationChange={(location) => {
@@ -643,6 +717,142 @@ export default function NewWarehousePage() {
                     onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
                     placeholder="07202"
                   />
+                </div>
+              </div>
+
+              {/* Warehouse Fees */}
+              <Separator />
+              <div className="space-y-3">
+                <Label>Warehouse Fees</Label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="warehouseInFee">Warehouse In Fee (per unit)</Label>
+                    <Input
+                      id="warehouseInFee"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.warehouseInFee}
+                      onChange={(e) => setFormData({ ...formData, warehouseInFee: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Fee charged when items are brought into the warehouse
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="warehouseOutFee">Warehouse Out Fee (per unit)</Label>
+                    <Input
+                      id="warehouseOutFee"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.warehouseOutFee}
+                      onChange={(e) => setFormData({ ...formData, warehouseOutFee: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Fee charged when items are taken out of the warehouse
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transportation */}
+              <Separator />
+              <div className="space-y-3">
+                <Label>Ports & Container Pricing</Label>
+                <div className="space-y-3">
+                  {formData.ports.map((port, index) => (
+                    <div key={index} className="p-4 border rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Port {index + 1}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newPorts = formData.ports.filter((_, i) => i !== index)
+                            setFormData({ ...formData, ports: newPorts })
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`port-name-${index}`}>Port Name <span className="text-destructive">*</span></Label>
+                        <Input
+                          id={`port-name-${index}`}
+                          placeholder="Enter port name"
+                          value={port.name}
+                          onChange={(e) => {
+                            const newPorts = [...formData.ports]
+                            newPorts[index].name = e.target.value
+                            setFormData({ ...formData, ports: newPorts })
+                          }}
+                        />
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor={`port-40dc-${index}`}>40 DC Price</Label>
+                          <Input
+                            id={`port-40dc-${index}`}
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={port.container40DC}
+                            onChange={(e) => {
+                              const newPorts = [...formData.ports]
+                              newPorts[index].container40DC = e.target.value
+                              setFormData({ ...formData, ports: newPorts })
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`port-40hc-${index}`}>40 HC Price</Label>
+                          <Input
+                            id={`port-40hc-${index}`}
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={port.container40HC}
+                            onChange={(e) => {
+                              const newPorts = [...formData.ports]
+                              newPorts[index].container40HC = e.target.value
+                              setFormData({ ...formData, ports: newPorts })
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`port-20dc-${index}`}>20 DC Price</Label>
+                          <Input
+                            id={`port-20dc-${index}`}
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={port.container20DC}
+                            onChange={(e) => {
+                              const newPorts = [...formData.ports]
+                              newPorts[index].container20DC = e.target.value
+                              setFormData({ ...formData, ports: newPorts })
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        ports: [...formData.ports, { name: "", container40DC: "", container40HC: "", container20DC: "" }],
+                      })
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Port
+                  </Button>
                 </div>
               </div>
 
@@ -746,6 +956,45 @@ export default function NewWarehousePage() {
                           placeholder="1,000"
                         />
                       </div>
+                      {/* Pricing for Pallet */}
+                      {formData.pricing.filter(p => p.pricingType === 'pallet').map((price, idx) => (
+                        <div key={`pallet-${idx}`} className="space-y-2">
+                          <Label>Per Pallet Per Day Price <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={price.basePrice}
+                            onChange={(e) => {
+                              const newPricing = [...formData.pricing]
+                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'pallet')
+                              if (priceIndex >= 0) {
+                                newPricing[priceIndex].basePrice = e.target.value
+                                setFormData({ ...formData, pricing: newPricing })
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
+                      {formData.pricing.filter(p => p.pricingType === 'pallet-monthly').map((price, idx) => (
+                        <div key={`pallet-monthly-${idx}`} className="space-y-2">
+                          <Label>Per Pallet Per Month Price <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={price.basePrice}
+                            onChange={(e) => {
+                              const newPricing = [...formData.pricing]
+                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'pallet-monthly')
+                              if (priceIndex >= 0) {
+                                newPricing[priceIndex].basePrice = e.target.value
+                                setFormData({ ...formData, pricing: newPricing })
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
                     </>
                   )}
                   {formData.rentMethods.includes('sq_ft') && (
@@ -776,6 +1025,26 @@ export default function NewWarehousePage() {
                           placeholder="100,000"
                         />
                       </div>
+                      {/* Pricing for Area */}
+                      {formData.pricing.filter(p => p.pricingType === 'area').map((price, idx) => (
+                        <div key={`area-${idx}`} className="space-y-2">
+                          <Label>Per Sq Feet Per Day Price <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={price.basePrice}
+                            onChange={(e) => {
+                              const newPricing = [...formData.pricing]
+                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'area')
+                              if (priceIndex >= 0) {
+                                newPricing[priceIndex].basePrice = e.target.value
+                                setFormData({ ...formData, pricing: newPricing })
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
                     </>
                   )}
                 </div>
@@ -961,8 +1230,8 @@ export default function NewWarehousePage() {
                 </p>
               </div>
 
+              {/* Amenities */}
               <Separator />
-
               <div className="space-y-2">
                 <Label htmlFor="amenities">
                   Amenities (comma-separated)

@@ -151,6 +151,34 @@ export async function PATCH(
     if (body.productAcceptanceStartTime !== undefined) updates.productAcceptanceStartTime = body.productAcceptanceStartTime
     if (body.productAcceptanceEndTime !== undefined) updates.productAcceptanceEndTime = body.productAcceptanceEndTime
     if (body.workingDays !== undefined) updates.workingDays = body.workingDays
+    if (body.warehouseInFee !== undefined) updates.warehouseInFee = body.warehouseInFee
+    if (body.warehouseOutFee !== undefined) updates.warehouseOutFee = body.warehouseOutFee
+    if (body.ports !== undefined) updates.ports = body.ports
+
+    // Handle pricing updates
+    if (body.pricing !== undefined) {
+      // Delete existing pricing entries
+      await supabase
+        .from('warehouse_pricing')
+        .update({ status: false })
+        .eq('warehouse_id', id)
+
+      // Insert new pricing entries
+      if (Array.isArray(body.pricing) && body.pricing.length > 0) {
+        for (const price of body.pricing) {
+          await supabase.from('warehouse_pricing').insert({
+            warehouse_id: id,
+            pricing_type: price.pricing_type,
+            base_price: price.base_price,
+            unit: price.unit,
+            min_quantity: price.min_quantity,
+            max_quantity: price.max_quantity,
+            volume_discounts: price.volume_discounts,
+            status: true,
+          })
+        }
+      }
+    }
 
     // Regenerate warehouse name if city, state, or warehouseType changed
     const cityChanged = body.city !== undefined && body.city !== existingWarehouse.city

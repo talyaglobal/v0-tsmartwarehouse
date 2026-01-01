@@ -67,6 +67,14 @@ export default function FindWarehousesPage() {
   const [temperature, setTemperature] = useState<string[]>([])
   const [rating, setRating] = useState<number | null>(null)
 
+  // Update location state when URL params change
+  useEffect(() => {
+    const urlLocation = searchParams.get("location") || ""
+    if (urlLocation !== location) {
+      setLocation(urlLocation)
+    }
+  }, [searchParams, location])
+
   // Fetch warehouses based on location
   useEffect(() => {
     const fetchWarehouses = async () => {

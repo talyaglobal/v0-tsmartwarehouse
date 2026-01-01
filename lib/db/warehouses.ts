@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_type, temperature_types, photos, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_type, temperature_types, photos, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, video_url, access_info, product_acceptance_start_time, product_acceptance_end_time, working_days, warehouse_in_fee, warehouse_out_fee, ports, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -89,6 +89,9 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       product_acceptance_start_time,
       product_acceptance_end_time,
       working_days,
+      warehouse_in_fee,
+      warehouse_out_fee,
+      ports,
       created_at,
       updated_at,
       warehouse_pricing(pricing_type, base_price, unit)
@@ -149,6 +152,9 @@ export async function createWarehouse(
       product_acceptance_start_time: (warehouse as any).productAcceptanceStartTime,
       product_acceptance_end_time: (warehouse as any).productAcceptanceEndTime,
       working_days: (warehouse as any).workingDays,
+      warehouse_in_fee: (warehouse as any).warehouseInFee,
+      warehouse_out_fee: (warehouse as any).warehouseOutFee,
+      ports: (warehouse as any).ports || [],
     })
     .select()
     .single()
@@ -200,6 +206,9 @@ export async function updateWarehouse(
   if ((updates as any).productAcceptanceStartTime !== undefined) updateData.product_acceptance_start_time = (updates as any).productAcceptanceStartTime
   if ((updates as any).productAcceptanceEndTime !== undefined) updateData.product_acceptance_end_time = (updates as any).productAcceptanceEndTime
   if ((updates as any).workingDays !== undefined) updateData.working_days = (updates as any).workingDays
+  if ((updates as any).warehouseInFee !== undefined) updateData.warehouse_in_fee = (updates as any).warehouseInFee
+  if ((updates as any).warehouseOutFee !== undefined) updateData.warehouse_out_fee = (updates as any).warehouseOutFee
+  if ((updates as any).ports !== undefined) updateData.ports = (updates as any).ports
 
   const { data, error } = await supabase
     .from('warehouses')
@@ -303,7 +312,11 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     productAcceptanceEndTime: row.product_acceptance_end_time || undefined,
     workingDays: Array.isArray(row.working_days) ? row.working_days : [],
     pricing: Object.keys(pricing).length > 0 ? pricing : undefined, // Add pricing to warehouse object
-  }
+    // Additional fields
+    warehouseInFee: row.warehouse_in_fee != null ? parseFloat(row.warehouse_in_fee.toString()) : undefined,
+    warehouseOutFee: row.warehouse_out_fee != null ? parseFloat(row.warehouse_out_fee.toString()) : undefined,
+    ports: row.ports || [],
+  } as any
   // Add ownerCompanyId as additional property
   return {
     ...warehouse,

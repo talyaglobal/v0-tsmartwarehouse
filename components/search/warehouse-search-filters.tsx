@@ -1,13 +1,11 @@
 "use client"
 
-import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { BookingSearch } from "@/components/home/booking-search"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Star } from "lucide-react"
 import { MapPin } from "@/components/icons"
 import { cn } from "@/lib/utils"
@@ -81,8 +79,6 @@ export function WarehouseSearchFilters({
   rating,
   onRatingChange,
 }: WarehouseSearchFiltersProps) {
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
-  const [tempLocation, setTempLocation] = useState("")
 
   const handleWarehouseTypeToggle = (type: string, checked: boolean) => {
     if (checked) {
@@ -105,24 +101,6 @@ export function WarehouseSearchFilters({
       onTemperatureChange([...temperature, temp])
     } else {
       onTemperatureChange(temperature.filter((t) => t !== temp))
-    }
-  }
-
-  const handleOpenLocationModal = () => {
-    setTempLocation("")
-    setIsLocationModalOpen(true)
-  }
-
-  const handleCloseLocationModal = () => {
-    setIsLocationModalOpen(false)
-    setTempLocation("")
-  }
-
-  const handleLocationSelect = (newLocation: string) => {
-    if (newLocation.trim()) {
-      onLocationChange(newLocation)
-      setIsLocationModalOpen(false)
-      setTempLocation("")
     }
   }
 
@@ -161,20 +139,7 @@ export function WarehouseSearchFilters({
         <CardContent className="space-y-6">
           {/* Location */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Location</Label>
-              {location && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleOpenLocationModal}
-                  className="h-auto p-1 text-xs"
-                >
-                  Change
-                </Button>
-              )}
-            </div>
+            <Label>Location</Label>
             {location ? (
               <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/50">
                 <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -290,40 +255,6 @@ export function WarehouseSearchFilters({
         </div>
       </CardContent>
     </Card>
-
-    {/* Location Change Modal */}
-    <Dialog open={isLocationModalOpen} onOpenChange={(open) => {
-      if (!open) {
-        handleCloseLocationModal()
-      }
-    }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Find Your New Location</DialogTitle>
-          <DialogDescription>
-            Search for a new location to find warehouses
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold">Location</Label>
-            <div className="[&_input]:h-14 [&_input]:text-base [&_input]:px-4 [&_input]:text-lg [&_input]:shadow-sm">
-              <BookingSearch
-                value={tempLocation}
-                onChange={(value) => {
-                  setTempLocation(value)
-                  // If value is set, auto-apply it
-                  if (value.trim()) {
-                    handleLocationSelect(value)
-                  }
-                }}
-                placeholder="Search location"
-              />
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
     </>
   )
 }

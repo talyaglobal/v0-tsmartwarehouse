@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MapPin, Building2, Package, Warehouse as WarehouseIcon, ArrowLeft, Calendar, ChevronLeft, ChevronRight, Play } from "@/components/icons"
 import { Star } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -68,6 +70,12 @@ interface Warehouse {
       unit: string
     }
   }
+  ports?: Array<{
+    name: string
+    container40DC?: number
+    container40HC?: number
+    container20DC?: number
+  }>
 }
 
 export default function WarehouseDetailPage() {
@@ -81,6 +89,11 @@ export default function WarehouseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [showVideoPlayer, setShowVideoPlayer] = useState(false)
+  const [warehouseServices, setWarehouseServices] = useState<any[]>([])
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set())
+  const [needTransportation, setNeedTransportation] = useState(false)
+  const [selectedPort, setSelectedPort] = useState<string | null>(null)
+  const [selectedContainerType, setSelectedContainerType] = useState<'container40DC' | 'container40HC' | 'container20DC' | null>(null)
 
   // Check user auth status
   useEffect(() => {
@@ -110,6 +123,22 @@ export default function WarehouseDetailPage() {
         if (data.success && data.data) {
           const wh = data.data
           // transformWarehouseRow already converts zip_code to zipCode and total_sq_ft to totalSqFt
+          
+          // Parse ports if it's a string (JSONB)
+          let parsedPorts: any[] = []
+          if (wh.ports) {
+            if (typeof wh.ports === 'string') {
+              try {
+                parsedPorts = JSON.parse(wh.ports)
+              } catch (e) {
+                console.error('Error parsing ports:', e)
+                parsedPorts = []
+              }
+            } else if (Array.isArray(wh.ports)) {
+              parsedPorts = wh.ports
+            }
+          }
+          
           setWarehouse({
             id: wh.id,
             name: wh.name,
@@ -147,10 +176,13 @@ export default function WarehouseDetailPage() {
             productAcceptanceEndTime: wh.productAcceptanceEndTime,
             workingDays: wh.workingDays || [],
             pricing: wh.pricing || {},
+            ports: parsedPorts,
           })
 
           console.log('[warehouse-detail] Loaded warehouse:', wh.name)
           console.log('[warehouse-detail] Pricing:', wh.pricing)
+          console.log('[warehouse-detail] Raw ports:', wh.ports)
+          console.log('[warehouse-detail] Parsed ports:', parsedPorts)
         } else {
           console.error("Failed to fetch warehouse:", data.error)
         }
@@ -166,7 +198,61 @@ export default function WarehouseDetailPage() {
     }
   }, [warehouseId])
 
-  // Calculate total price based on warehouse pricing
+  // Fetch warehouse services
+  useEffect(() => {
+    const fetchServices = async () => {
+      if (!warehouseId) return
+      
+      try {
+        const response = await fetch(`/api/v1/warehouses/${warehouseId}/services`)
+        const data = await response.json()
+        
+        if (data.success && data.data && data.data.services) {
+          // Only show active services
+          const activeServices = data.data.services.filter((s: any) => s.is_active)
+          setWarehouseServices(activeServices)
+        }
+      } catch (error) {
+        console.error("Failed to fetch warehouse services:", error)
+      }
+    }
+    
+    if (warehouseId) {
+      fetchServices()
+    }
+  }, [warehouseId])
+
+  // Calculate service prices based on pricing type and booking duration
+  const calculateServicePrice = (service: any) => {
+    if (!startDate || !endDate || !uomQty) return 0
+
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    const quantity = parseInt(uomQty)
+    const basePrice = service.base_price || service.company_services?.base_price || 0
+    const pricingType = service.pricing_type || service.company_services?.pricing_type
+
+    if (!pricingType || !basePrice) return 0
+
+    switch (pricingType) {
+      case 'one_time':
+        return basePrice
+      case 'per_pallet':
+        return basePrice * quantity
+      case 'per_sqft':
+        return basePrice * quantity
+      case 'per_day':
+        return basePrice * days
+      case 'per_month':
+        const months = Math.ceil(days / 30)
+        return basePrice * months
+      default:
+        return 0
+    }
+  }
+
+  // Calculate total price based on warehouse pricing and selected services
   const calculateTotalPrice = () => {
     if (!startDate || !endDate || !uomQty || !warehouse) {
       console.log('[calculateTotalPrice] Missing required data:', { startDate, endDate, uomQty, hasWarehouse: !!warehouse })
@@ -185,60 +271,82 @@ export default function WarehouseDetailPage() {
     const quantity = parseInt(uomQty)
     console.log('[calculateTotalPrice] Calculation params:', { productinfo, days, quantity, pricing: warehouse.pricing })
 
+    let baseTotal = 0
+
     // Check pricing based on product type
     if (productinfo === "4490") {
       // Pallet storage - smart pricing
       // < 30 days = daily pricing, >= 30 days = monthly pricing
       if (days < 30 && warehouse.pricing?.pallet) {
         const dailyRate = warehouse.pricing.pallet.basePrice
-        return {
-          total: dailyRate * days * quantity,
-          days,
-          quantity,
-          unit: 'pallet',
-          rate: dailyRate,
-          period: 'daily'
-        }
+        baseTotal = dailyRate * days * quantity
       } else if (days >= 30 && warehouse.pricing?.palletMonthly) {
         // Use monthly pricing for bookings >= 30 days
         const monthlyRate = warehouse.pricing.palletMonthly.basePrice
         const months = days / 30
-        return {
-          total: monthlyRate * months * quantity,
-          days,
-          months,
-          quantity,
-          unit: 'pallet',
-          rate: monthlyRate,
-          period: 'monthly'
-        }
+        baseTotal = monthlyRate * months * quantity
       } else if (warehouse.pricing?.pallet) {
         // Fallback to daily if monthly not available
         const dailyRate = warehouse.pricing.pallet.basePrice
-        return {
-          total: dailyRate * days * quantity,
-          days,
-          quantity,
-          unit: 'pallet',
-          rate: dailyRate,
-          period: 'daily'
-        }
+        baseTotal = dailyRate * days * quantity
       }
     } else if (productinfo === "4491" && warehouse.pricing?.areaRental) {
       // Area rental - monthly pricing
       const monthlyRate = warehouse.pricing.areaRental.basePrice
       const months = Math.ceil(days / 30) // Round up to nearest month
-      return {
-        total: monthlyRate * months * quantity,
-        months,
-        quantity,
-        unit: 'sq ft',
-        rate: monthlyRate,
-        period: 'monthly'
+      baseTotal = monthlyRate * months * quantity
+    }
+
+    // Add selected services prices
+    let servicesTotal = 0
+    const selectedServicesList = warehouseServices.filter(s => selectedServices.has(s.id))
+    selectedServicesList.forEach(service => {
+      servicesTotal += calculateServicePrice(service)
+    })
+
+    // Add transportation price if selected
+    let transportationTotal = 0
+    if (needTransportation && selectedPort && selectedContainerType && warehouse.ports) {
+      const port = warehouse.ports.find((p: any) => p.name === selectedPort)
+      if (port) {
+        const containerPrice = port[selectedContainerType]
+        if (containerPrice) {
+          transportationTotal = containerPrice
+        }
       }
     }
 
-    return null
+    const total = baseTotal + servicesTotal + transportationTotal
+
+    if (baseTotal === 0 && servicesTotal === 0 && transportationTotal === 0) {
+      return null
+    }
+
+    return {
+      total,
+      baseTotal,
+      servicesTotal,
+      transportationTotal,
+      days,
+      quantity,
+      unit: productinfo === "4490" ? 'pallet' : 'sq ft',
+      rate: baseTotal / (productinfo === "4490" ? (days < 30 ? days * quantity : (days / 30) * quantity) : (Math.ceil(days / 30) * quantity)),
+      period: productinfo === "4490" ? (days < 30 ? 'daily' : 'monthly') : 'monthly',
+      months: productinfo === "4490" ? (days >= 30 ? days / 30 : undefined) : Math.ceil(days / 30)
+    }
+  }
+
+  // Handle service toggle
+  const handleServiceToggle = (serviceId: string, checked: boolean) => {
+    setSelectedServices(prev => {
+      const newSet = new Set(prev)
+      if (checked) {
+        newSet.add(serviceId)
+      } else {
+        newSet.delete(serviceId)
+      }
+      return newSet
+    })
   }
 
   const handleBookNow = async () => {
@@ -267,9 +375,21 @@ export default function WarehouseDetailPage() {
     reviewParams.set("endDate", endDate)
     reviewParams.set("totalAmount", totalAmount.toString())
 
+    // Add selected service IDs
+    if (selectedServices.size > 0) {
+      reviewParams.set("serviceIds", Array.from(selectedServices).join(","))
+    }
+
+    // Add transportation info if selected
+    if (needTransportation && selectedPort && selectedContainerType) {
+      reviewParams.set("needTransportation", "true")
+      reviewParams.set("selectedPort", selectedPort)
+      reviewParams.set("selectedContainerType", selectedContainerType)
+    }
+
     const reviewUrl = `/warehouses/${warehouseId}/review?${reviewParams.toString()}`
 
-    console.log('🔍 Book Now clicked:', { user: !!user, reviewUrl })
+    console.log('🔍 Book Now clicked:', { user: !!user, reviewUrl, selectedServices: Array.from(selectedServices) })
 
     if (!user) {
       // Not logged in - redirect to login page with return URL
@@ -806,6 +926,155 @@ export default function WarehouseDetailPage() {
                     </div>
                   )}
 
+                  {/* Optional Services */}
+                  {warehouseServices.length > 0 && (
+                    <div className="pt-4 border-t space-y-3">
+                      <Label className="text-base font-semibold">Optional Services</Label>
+                      <div className="space-y-2">
+                        {warehouseServices.map((service) => {
+                          const serviceName = service.service_name || service.company_services?.service_name || 'Service'
+                          const serviceDescription = service.service_description || service.company_services?.service_description
+                          const servicePrice = calculateServicePrice(service)
+                          const isSelected = selectedServices.has(service.id)
+                          
+                          return (
+                            <div key={service.id} className="flex items-start space-x-2 p-2 rounded-md border hover:bg-muted/50">
+                              <Checkbox
+                                id={`service-${service.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked) => handleServiceToggle(service.id, checked as boolean)}
+                                className="mt-1"
+                              />
+                              <Label
+                                htmlFor={`service-${service.id}`}
+                                className="flex-1 cursor-pointer"
+                              >
+                                <div className="font-medium text-sm">{serviceName}</div>
+                                {serviceDescription && (
+                                  <div className="text-xs text-muted-foreground mt-0.5">{serviceDescription}</div>
+                                )}
+                                <div className="text-sm font-semibold text-primary mt-1">
+                                  {formatCurrency(servicePrice)}
+                                </div>
+                              </Label>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Transportation */}
+                  {warehouse.ports && Array.isArray(warehouse.ports) && warehouse.ports.length > 0 && warehouse.ports.some((p: any) => p.name) && (
+                    <div className="pt-4 border-t space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="needTransportation"
+                          checked={needTransportation}
+                          onCheckedChange={(checked) => {
+                            setNeedTransportation(checked as boolean)
+                            if (!checked) {
+                              setSelectedPort(null)
+                              setSelectedContainerType(null)
+                            }
+                          }}
+                        />
+                        <Label htmlFor="needTransportation" className="text-base font-semibold cursor-pointer">
+                          Need a Transportation?
+                        </Label>
+                      </div>
+                      {needTransportation && (
+                        <div className="pl-6 space-y-3">
+                          <div className="space-y-2">
+                            <Label>Select Port</Label>
+                            <select
+                              className="w-full px-3 py-2 border rounded-md bg-background"
+                              value={selectedPort || ""}
+                              onChange={(e) => {
+                                setSelectedPort(e.target.value)
+                                setSelectedContainerType(null)
+                              }}
+                            >
+                              <option value="">Select a port</option>
+                              {warehouse.ports.map((port: any, index: number) => (
+                                <option key={index} value={port.name}>
+                                  {port.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {selectedPort && (
+                            <div className="space-y-2">
+                              <Label>Select Container Type</Label>
+                              <div className="space-y-2">
+                                {(() => {
+                                  const port = warehouse.ports?.find((p: any) => p.name === selectedPort)
+                                  if (!port) return null
+                                  
+                                  return (
+                                    <>
+                                      {port.container40DC != null && (
+                                        <div className="flex items-center space-x-2 p-2 rounded-md border hover:bg-muted/50">
+                                          <Checkbox
+                                            id="container40DC"
+                                            checked={selectedContainerType === 'container40DC'}
+                                            onCheckedChange={(checked) => {
+                                              setSelectedContainerType(checked ? 'container40DC' : null)
+                                            }}
+                                          />
+                                          <Label htmlFor="container40DC" className="flex-1 cursor-pointer">
+                                            <div className="font-medium text-sm">40 DC</div>
+                                            <div className="text-sm font-semibold text-primary mt-1">
+                                              {formatCurrency(port.container40DC)}
+                                            </div>
+                                          </Label>
+                                        </div>
+                                      )}
+                                      {port.container40HC != null && (
+                                        <div className="flex items-center space-x-2 p-2 rounded-md border hover:bg-muted/50">
+                                          <Checkbox
+                                            id="container40HC"
+                                            checked={selectedContainerType === 'container40HC'}
+                                            onCheckedChange={(checked) => {
+                                              setSelectedContainerType(checked ? 'container40HC' : null)
+                                            }}
+                                          />
+                                          <Label htmlFor="container40HC" className="flex-1 cursor-pointer">
+                                            <div className="font-medium text-sm">40 HC</div>
+                                            <div className="text-sm font-semibold text-primary mt-1">
+                                              {formatCurrency(port.container40HC)}
+                                            </div>
+                                          </Label>
+                                        </div>
+                                      )}
+                                      {port.container20DC != null && (
+                                        <div className="flex items-center space-x-2 p-2 rounded-md border hover:bg-muted/50">
+                                          <Checkbox
+                                            id="container20DC"
+                                            checked={selectedContainerType === 'container20DC'}
+                                            onCheckedChange={(checked) => {
+                                              setSelectedContainerType(checked ? 'container20DC' : null)
+                                            }}
+                                          />
+                                          <Label htmlFor="container20DC" className="flex-1 cursor-pointer">
+                                            <div className="font-medium text-sm">20 DC</div>
+                                            <div className="text-sm font-semibold text-primary mt-1">
+                                              {formatCurrency(port.container20DC)}
+                                            </div>
+                                          </Label>
+                                        </div>
+                                      )}
+                                    </>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Pricing Calculation */}
                   {(() => {
                     const priceCalculation = calculateTotalPrice()
@@ -832,6 +1101,12 @@ export default function WarehouseDetailPage() {
                             <span className="text-muted-foreground">Quantity</span>
                             <span className="font-medium">{formatNumber(priceCalculation.quantity)} {priceCalculation.unit}{priceCalculation.quantity !== 1 ? 's' : ''}</span>
                           </div>
+                          {priceCalculation.servicesTotal > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground">Additional Services</span>
+                              <span className="font-medium">{formatCurrency(priceCalculation.servicesTotal)}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center pt-3 border-t">
                             <span className="text-base font-semibold">Total Cost</span>
                             <span className="text-3xl font-bold text-primary">

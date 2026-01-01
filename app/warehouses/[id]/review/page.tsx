@@ -33,6 +33,10 @@ interface BookingDetails {
   startDate: string
   endDate: string
   totalAmount: number
+  needTransportation?: boolean
+  selectedPort?: string
+  selectedContainerType?: string
+  serviceIds?: string[]
 }
 
 export default function BookingReviewPage() {
@@ -70,6 +74,10 @@ export default function BookingReviewPage() {
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
     const totalAmount = searchParams.get("totalAmount")
+    const needTransportation = searchParams.get("needTransportation") === "true"
+    const selectedPort = searchParams.get("selectedPort")
+    const selectedContainerType = searchParams.get("selectedContainerType")
+    const serviceIds = searchParams.get("serviceIds")?.split(",").filter(Boolean) || []
 
     if (!productinfo || !startDate || !endDate || !totalAmount) {
       console.error('Missing booking parameters, redirecting back to warehouse')
@@ -88,6 +96,10 @@ export default function BookingReviewPage() {
       startDate,
       endDate,
       totalAmount: parseFloat(totalAmount),
+      needTransportation: needTransportation || undefined,
+      selectedPort: selectedPort || undefined,
+      selectedContainerType: selectedContainerType || undefined,
+      serviceIds: serviceIds.length > 0 ? serviceIds : undefined,
     })
   }, [searchParams, warehouseId, router])
 
@@ -193,7 +205,32 @@ export default function BookingReviewPage() {
 
     setIsProcessing(true)
     try {
-      // Create payment intent
+      // For pallet bookings, create pre-order and redirect to pre-orders page
+      if (bookingDetails.type === "pallet") {
+        const response = await fetch("/api/v1/payments/create-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: bookingDetails.totalAmount,
+            warehouseId: bookingDetails.warehouseId,
+            bookingDetails: bookingDetails,
+            customerEmail: user?.email || guestEmail,
+            isGuest: !user,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.error || "Failed to create pre-order")
+        }
+
+        // Redirect to pre-orders page
+        router.push(`/dashboard/bookings/pre-orders`)
+        return
+      }
+
+      // For area-rental bookings, proceed with payment
       const response = await fetch("/api/v1/payments/create-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

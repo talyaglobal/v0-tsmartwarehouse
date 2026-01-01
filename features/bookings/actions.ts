@@ -66,6 +66,9 @@ export async function createBookingRequest(input: {
       type: input.type,
     })
 
+    // Determine booking status: pre_order for pallet bookings, pending for area-rental
+    const bookingStatus = input.type === 'pallet' ? 'pre_order' : 'pending'
+
     // Create booking
     const { data: booking, error } = await supabase
       .from('bookings')
@@ -76,7 +79,7 @@ export async function createBookingRequest(input: {
         customer_email: profile.email,
         warehouse_id: input.warehouseId,
         type: input.type,
-        status: 'pending',
+        booking_status: bookingStatus,
         pallet_count: input.palletCount,
         area_sq_ft: input.areaSqFt,
         start_date: input.startDate,

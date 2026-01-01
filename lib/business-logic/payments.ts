@@ -14,6 +14,7 @@ import {
   createRefund,
 } from "@/lib/db/payments"
 import { getInvoiceById, updateInvoice } from "@/lib/db/invoices"
+import { getBookingById } from "@/lib/db/bookings"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { Payment, PaymentStatus, Refund } from "@/types"
 
@@ -61,6 +62,21 @@ export async function processInvoicePayment(
 
   if (invoice.customerId !== input.customerId) {
     throw new Error("Invoice does not belong to this customer")
+  }
+
+  // Validate time slot for pre-order bookings
+  if (invoice.bookingId) {
+    const booking = await getBookingById(invoice.bookingId, false)
+    if (booking) {
+      if (booking.status === "pre_order") {
+        if (!booking.scheduledDropoffDatetime) {
+          throw new Error("Time slot has not been set by warehouse worker. Please wait for warehouse to assign a time slot.")
+        }
+        if (!booking.timeSlotConfirmedAt) {
+          throw new Error("Time slot has not been confirmed. Please confirm the assigned time slot before proceeding with payment.")
+        }
+      }
+    }
   }
 
   const amountToPay = input.amount || invoice.total

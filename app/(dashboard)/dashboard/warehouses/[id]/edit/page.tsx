@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ArrowLeft, Warehouse as WarehouseIcon } from "@/components/icons"
+import { Loader2, ArrowLeft, Warehouse as WarehouseIcon, Plus, X } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
@@ -112,6 +112,25 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
     productAcceptanceStartTime: "",
     productAcceptanceEndTime: "",
     workingDays: [] as string[],
+    // Warehouse fees
+    warehouseInFee: "",
+    warehouseOutFee: "",
+    // Transportation
+    ports: [] as Array<{
+      name: string
+      container40DC: string
+      container40HC: string
+      container20DC: string
+    }>,
+    // Pricing
+    pricing: [] as Array<{
+      pricingType: string
+      basePrice: string
+      unit: string
+      minQuantity: string
+      maxQuantity: string
+      volumeDiscounts: Record<string, string>
+    }>,
   })
 
   // Resolve params
@@ -228,6 +247,58 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             productAcceptanceStartTime: warehouse.productAcceptanceStartTime || "",
             productAcceptanceEndTime: warehouse.productAcceptanceEndTime || "",
             workingDays: Array.isArray(warehouse.workingDays) ? warehouse.workingDays : [],
+            // Warehouse fees
+            warehouseInFee: (warehouse as any).warehouseInFee != null ? (warehouse as any).warehouseInFee.toString() : "",
+            warehouseOutFee: (warehouse as any).warehouseOutFee != null ? (warehouse as any).warehouseOutFee.toString() : "",
+            // Transportation
+            ports: Array.isArray((warehouse as any).ports) ? (warehouse as any).ports.map((p: any) => ({
+              name: p.name || "",
+              container40DC: p.container40DC != null ? p.container40DC.toString() : "",
+              container40HC: p.container40HC != null ? p.container40HC.toString() : "",
+              container20DC: p.container20DC != null ? p.container20DC.toString() : "",
+            })) : [],
+            // Pricing - convert from object format to array format
+            pricing: warehouse.pricing ? (() => {
+              const pricingArray: Array<{
+                pricingType: string
+                basePrice: string
+                unit: string
+                minQuantity: string
+                maxQuantity: string
+                volumeDiscounts: Record<string, string>
+              }> = []
+              if (warehouse.pricing.pallet) {
+                pricingArray.push({
+                  pricingType: 'pallet',
+                  basePrice: warehouse.pricing.pallet.basePrice?.toString() || '',
+                  unit: warehouse.pricing.pallet.unit || '',
+                  minQuantity: '',
+                  maxQuantity: '',
+                  volumeDiscounts: {},
+                })
+              }
+              if (warehouse.pricing.palletMonthly) {
+                pricingArray.push({
+                  pricingType: 'pallet-monthly',
+                  basePrice: warehouse.pricing.palletMonthly.basePrice?.toString() || '',
+                  unit: warehouse.pricing.palletMonthly.unit || '',
+                  minQuantity: '',
+                  maxQuantity: '',
+                  volumeDiscounts: {},
+                })
+              }
+              if (warehouse.pricing.areaRental) {
+                pricingArray.push({
+                  pricingType: 'area',
+                  basePrice: warehouse.pricing.areaRental.basePrice?.toString() || '',
+                  unit: warehouse.pricing.areaRental.unit || '',
+                  minQuantity: '',
+                  maxQuantity: '',
+                  volumeDiscounts: {},
+                })
+              }
+              return pricingArray
+            })() : [],
           })
         } else {
           addNotification({
@@ -449,6 +520,31 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         productAcceptanceStartTime: formData.productAcceptanceStartTime || undefined,
         productAcceptanceEndTime: formData.productAcceptanceEndTime || undefined,
         workingDays: formData.workingDays.length > 0 ? formData.workingDays : undefined,
+        // Warehouse fees
+        warehouseInFee: formData.warehouseInFee ? parseFloat(formData.warehouseInFee) : undefined,
+        warehouseOutFee: formData.warehouseOutFee ? parseFloat(formData.warehouseOutFee) : undefined,
+        // Ports & Container Pricing
+        ports: formData.ports
+          .filter(port => port.name && port.name.trim() !== '')
+          .map(port => ({
+            name: port.name.trim(),
+            container40DC: port.container40DC ? parseFloat(port.container40DC) : undefined,
+            container40HC: port.container40HC ? parseFloat(port.container40HC) : undefined,
+            container20DC: port.container20DC ? parseFloat(port.container20DC) : undefined,
+          })),
+      }
+
+      // Add pricing if provided
+      const validPricing = formData.pricing.filter(p => p.pricingType && p.basePrice)
+      if (validPricing.length > 0) {
+        requestBody.pricing = validPricing.map(p => ({
+          pricing_type: p.pricingType,
+          base_price: parseFloat(p.basePrice),
+          unit: p.unit || (p.pricingType === 'pallet' ? 'per_pallet_per_day' : p.pricingType === 'pallet-monthly' ? 'per_pallet_per_month' : 'per_sqft_per_month'),
+          min_quantity: p.minQuantity ? parseInt(p.minQuantity) : null,
+          max_quantity: p.maxQuantity ? parseInt(p.maxQuantity) : null,
+          volume_discounts: p.volumeDiscounts && Object.keys(p.volumeDiscounts).length > 0 ? p.volumeDiscounts : null,
+        }))
       }
 
       // Add optional total fields if provided
@@ -729,6 +825,142 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                 />
               </div>
 
+              {/* Warehouse Fees */}
+              <Separator />
+              <div className="space-y-3">
+                <Label>Warehouse Fees</Label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="warehouseInFee">Warehouse In Fee (per unit)</Label>
+                    <Input
+                      id="warehouseInFee"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.warehouseInFee}
+                      onChange={(e) => setFormData({ ...formData, warehouseInFee: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Fee charged when items are brought into the warehouse
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="warehouseOutFee">Warehouse Out Fee (per unit)</Label>
+                    <Input
+                      id="warehouseOutFee"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.warehouseOutFee}
+                      onChange={(e) => setFormData({ ...formData, warehouseOutFee: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Fee charged when items are taken out of the warehouse
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transportation */}
+              <Separator />
+              <div className="space-y-3">
+                <Label>Ports & Container Pricing</Label>
+                <div className="space-y-3">
+                    {formData.ports.map((port, index) => (
+                      <div key={index} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>Port {index + 1}</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newPorts = formData.ports.filter((_, i) => i !== index)
+                              setFormData({ ...formData, ports: newPorts })
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`port-name-${index}`}>Port Name <span className="text-destructive">*</span></Label>
+                          <Input
+                            id={`port-name-${index}`}
+                            placeholder="Enter port name"
+                            value={port.name}
+                            onChange={(e) => {
+                              const newPorts = [...formData.ports]
+                              newPorts[index].name = e.target.value
+                              setFormData({ ...formData, ports: newPorts })
+                            }}
+                          />
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label htmlFor={`port-40dc-${index}`}>40 DC Price</Label>
+                            <Input
+                              id={`port-40dc-${index}`}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={port.container40DC}
+                              onChange={(e) => {
+                                const newPorts = [...formData.ports]
+                                newPorts[index].container40DC = e.target.value
+                                setFormData({ ...formData, ports: newPorts })
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`port-40hc-${index}`}>40 HC Price</Label>
+                            <Input
+                              id={`port-40hc-${index}`}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={port.container40HC}
+                              onChange={(e) => {
+                                const newPorts = [...formData.ports]
+                                newPorts[index].container40HC = e.target.value
+                                setFormData({ ...formData, ports: newPorts })
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`port-20dc-${index}`}>20 DC Price</Label>
+                            <Input
+                              id={`port-20dc-${index}`}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={port.container20DC}
+                              onChange={(e) => {
+                                const newPorts = [...formData.ports]
+                                newPorts[index].container20DC = e.target.value
+                                setFormData({ ...formData, ports: newPorts })
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          ports: [...formData.ports, { name: "", container40DC: "", container40HC: "", container20DC: "" }],
+                        })
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Port
+                    </Button>
+                </div>
+              </div>
+
               <Separator />
 
               {/* Customer Rent Method */}
@@ -741,11 +973,74 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                         id={`rent-method-${method.value}`}
                         checked={formData.rentMethods.includes(method.value)}
                         onCheckedChange={(checked) => {
+                          const newRentMethods = checked
+                            ? [...formData.rentMethods, method.value]
+                            : formData.rentMethods.filter((m) => m !== method.value)
+                          
+                          // Auto-generate pricing based on rent methods
+                          const newPricing: Array<{
+                            pricingType: string
+                            basePrice: string
+                            unit: string
+                            minQuantity: string
+                            maxQuantity: string
+                            volumeDiscounts: Record<string, string>
+                          }> = []
+
+                          if (newRentMethods.includes('pallet')) {
+                            // Add per pallet per day if not exists
+                            if (!formData.pricing.some(p => p.pricingType === 'pallet')) {
+                              newPricing.push({
+                                pricingType: 'pallet',
+                                basePrice: '',
+                                unit: 'per_pallet_per_day',
+                                minQuantity: formData.minPallet || '',
+                                maxQuantity: formData.maxPallet || '',
+                                volumeDiscounts: {},
+                              })
+                            }
+                            // Add per pallet per month if not exists
+                            if (!formData.pricing.some(p => p.pricingType === 'pallet-monthly')) {
+                              newPricing.push({
+                                pricingType: 'pallet-monthly',
+                                basePrice: '',
+                                unit: 'per_pallet_per_month',
+                                minQuantity: formData.minPallet || '',
+                                maxQuantity: formData.maxPallet || '',
+                                volumeDiscounts: {},
+                              })
+                            }
+                          }
+
+                          if (newRentMethods.includes('sq_ft')) {
+                            // Add per sq feet per day if not exists
+                            if (!formData.pricing.some(p => p.pricingType === 'area')) {
+                              newPricing.push({
+                                pricingType: 'area',
+                                basePrice: '',
+                                unit: 'per_sqft_per_day',
+                                minQuantity: formData.minSqFt || '',
+                                maxQuantity: formData.maxSqFt || '',
+                                volumeDiscounts: {},
+                              })
+                            }
+                          }
+
+                          // Remove pricing that doesn't match rent methods
+                          const filteredPricing = formData.pricing.filter(p => {
+                            if (p.pricingType === 'pallet' || p.pricingType === 'pallet-monthly') {
+                              return newRentMethods.includes('pallet')
+                            }
+                            if (p.pricingType === 'area') {
+                              return newRentMethods.includes('sq_ft')
+                            }
+                            return false
+                          })
+
                           setFormData((prev) => ({
                             ...prev,
-                            rentMethods: checked
-                              ? [...prev.rentMethods, method.value]
-                              : prev.rentMethods.filter((m) => m !== method.value),
+                            rentMethods: newRentMethods,
+                            pricing: [...filteredPricing, ...newPricing],
                           }))
                         }}
                       />
@@ -827,6 +1122,45 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                           placeholder="1,000"
                         />
                       </div>
+                      {/* Pricing for Pallet */}
+                      {formData.pricing.filter(p => p.pricingType === 'pallet').map((price, idx) => (
+                        <div key={`pallet-${idx}`} className="space-y-2">
+                          <Label>Per Pallet Per Day Price <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={price.basePrice}
+                            onChange={(e) => {
+                              const newPricing = [...formData.pricing]
+                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'pallet')
+                              if (priceIndex >= 0) {
+                                newPricing[priceIndex].basePrice = e.target.value
+                                setFormData({ ...formData, pricing: newPricing })
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
+                      {formData.pricing.filter(p => p.pricingType === 'pallet-monthly').map((price, idx) => (
+                        <div key={`pallet-monthly-${idx}`} className="space-y-2">
+                          <Label>Per Pallet Per Month Price <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={price.basePrice}
+                            onChange={(e) => {
+                              const newPricing = [...formData.pricing]
+                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'pallet-monthly')
+                              if (priceIndex >= 0) {
+                                newPricing[priceIndex].basePrice = e.target.value
+                                setFormData({ ...formData, pricing: newPricing })
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
                     </>
                   )}
                   {formData.rentMethods.includes('sq_ft') && (
@@ -857,6 +1191,26 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                           placeholder="100,000"
                         />
                       </div>
+                      {/* Pricing for Area */}
+                      {formData.pricing.filter(p => p.pricingType === 'area').map((price, idx) => (
+                        <div key={`area-${idx}`} className="space-y-2">
+                          <Label>Per Sq Feet Per Day Price <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={price.basePrice}
+                            onChange={(e) => {
+                              const newPricing = [...formData.pricing]
+                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'area')
+                              if (priceIndex >= 0) {
+                                newPricing[priceIndex].basePrice = e.target.value
+                                setFormData({ ...formData, pricing: newPricing })
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
                     </>
                   )}
                 </div>

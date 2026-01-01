@@ -30,6 +30,7 @@ export interface CreateBookingInput {
   months?: number
   notes?: string
   membershipTier?: MembershipTier
+  isPreOrder?: boolean // If true, creates booking with 'pre_order' status
 }
 
 export interface CreateBookingResult {
@@ -105,13 +106,18 @@ export async function createBookingWithAvailability(
   }
 
   // Step 4: Create booking
+  // For pallet bookings, default to pre-order flow unless explicitly set
+  const bookingStatus = input.isPreOrder !== undefined 
+    ? (input.isPreOrder ? "pre_order" : "pending")
+    : (input.type === "pallet" ? "pre_order" : "pending")
+
   const booking = await createBooking({
     customerId: input.customerId,
     customerName: input.customerName,
     customerEmail: input.customerEmail,
     warehouseId: input.warehouseId,
     type: input.type,
-    status: "pending", // Will be confirmed by admin
+    status: bookingStatus,
     palletCount: input.palletCount,
     areaSqFt: input.areaSqFt,
     floorNumber: input.floorNumber,

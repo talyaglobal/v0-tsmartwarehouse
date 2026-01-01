@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ListResponse, ApiResponse } from "@/types/api"
 import { createWarehouse, getWarehouses } from "@/lib/db/warehouses"
 import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
 const createWarehouseSchema = z.object({
@@ -44,6 +45,25 @@ const createWarehouseSchema = z.object({
   productAcceptanceStartTime: z.string().optional(),
   productAcceptanceEndTime: z.string().optional(),
   workingDays: z.array(z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])).optional(),
+  // Warehouse fees
+  warehouseInFee: z.number().nonnegative().optional(),
+  warehouseOutFee: z.number().nonnegative().optional(),
+  // Transportation
+  ports: z.array(z.object({
+    name: z.string().min(1, "Port name is required"),
+    container40DC: z.number().nonnegative().optional(),
+    container40HC: z.number().nonnegative().optional(),
+    container20DC: z.number().nonnegative().optional(),
+  })).optional(),
+  // Pricing (will be handled separately in warehouse_pricing table)
+  pricing: z.array(z.object({
+    pricing_type: z.enum(["pallet", "pallet-monthly", "area"]),
+    base_price: z.number().positive(),
+    unit: z.string(),
+    min_quantity: z.number().int().nonnegative().nullable().optional(),
+    max_quantity: z.number().int().nonnegative().nullable().optional(),
+    volume_discounts: z.record(z.string(), z.number()).nullable().optional(),
+  })).min(1, "At least one pricing entry is required"),
 }).refine((data) => {
   // At least one of totalSqFt or totalPalletStorage must be provided
   return data.totalSqFt !== undefined || data.totalPalletStorage !== undefined;
@@ -214,7 +234,29 @@ export async function POST(request: NextRequest) {
       productAcceptanceStartTime: validated.productAcceptanceStartTime,
       productAcceptanceEndTime: validated.productAcceptanceEndTime,
       workingDays: validated.workingDays,
+      // Warehouse fees
+      warehouseInFee: validated.warehouseInFee,
+      warehouseOutFee: validated.warehouseOutFee,
+      // Ports & Container Pricing
+      ports: validated.ports || [],
     })
+
+    // Create pricing entries if provided
+    if (validated.pricing && validated.pricing.length > 0) {
+      const supabase = await createServerSupabaseClient()
+      for (const price of validated.pricing) {
+        await supabase.from('warehouse_pricing').insert({
+          warehouse_id: warehouse.id,
+          pricing_type: price.pricing_type,
+          base_price: price.base_price,
+          unit: price.unit,
+          min_quantity: price.min_quantity,
+          max_quantity: price.max_quantity,
+          volume_discounts: price.volume_discounts,
+          status: true,
+        })
+      }
+    }
 
     const responseData: ApiResponse = {
       success: true,
