@@ -4,6 +4,7 @@ import { DashboardHeader } from "@/components/dashboard/header"
 import { AIAssistant } from "@/components/dashboard/ai-assistant"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { TopLoadingBar } from "@/components/ui/top-loading-bar"
+import { RoleBasedMainContent } from "@/components/dashboard/role-based-main-content"
 
 // Force dynamic rendering - requires authentication
 export const dynamic = 'force-dynamic'
@@ -30,8 +31,10 @@ export default async function DashboardLayout({
         <div className="flex-1 flex flex-col overflow-hidden">
           <DashboardHeader />
           <div className="flex-1 flex overflow-hidden">
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+            {/* Main Content - Role-based background */}
+            <RoleBasedMainContent>
+              {children}
+            </RoleBasedMainContent>
             {/* AI Assistant - Fixed on the right */}
             <AIAssistant />
           </div>

@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import type { UserRole } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 
@@ -106,8 +107,16 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
     return labels[role] || role
   }
 
+  // Get role-based header colors (root admin gets pastel red)
+  const getHeaderColors = () => {
+    if (isRootUser) {
+      return 'bg-red-50/95 dark:bg-red-950/95 border-b border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
+    }
+    return 'bg-card border-b'
+  }
+
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
+    <header className={cn("flex h-16 items-center justify-between px-6", getHeaderColors())}>
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick}>
           <Menu className="h-5 w-5" />

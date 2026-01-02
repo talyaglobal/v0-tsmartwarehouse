@@ -211,8 +211,32 @@ export function DashboardSidebar() {
     setLogoError(false)
   }, [profile?.companyLogo])
 
+  // Get role-based sidebar colors
+  const getSidebarColors = (role: string | undefined) => {
+    switch (role) {
+      case 'root':
+        return 'bg-red-50/95 dark:bg-red-950/95 border-r border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
+      case 'company_owner':
+        return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-r border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
+      case 'company_admin':
+        return 'bg-blue-50/95 dark:bg-blue-950/95 border-r border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
+      case 'customer':
+        return 'bg-violet-50/95 dark:bg-violet-950/95 border-r border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'
+      case 'warehouse_staff':
+        return 'bg-slate-100/95 dark:bg-slate-900/95 border-r border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
+      default:
+        return 'bg-slate-200/90 dark:bg-slate-950/98 border-r border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
+    }
+  }
+
+  // Determine actual role (considering root test role)
+  let actualRole = profile?.role || 'customer'
+  if (profile?.role === 'root' && selectedTestRole) {
+    actualRole = selectedTestRole
+  }
+
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
+    <div className={cn("flex h-full w-64 flex-col", getSidebarColors(actualRole))}>
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
         {profile?.companyLogo && !logoError ? (

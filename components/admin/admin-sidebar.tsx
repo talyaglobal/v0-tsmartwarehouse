@@ -182,8 +182,16 @@ export function AdminSidebar() {
     return pathname.startsWith(href)
   }
 
+  // Get role-based sidebar colors (root admin gets pastel red)
+  const getSidebarColors = () => {
+    if (isRoot) {
+      return 'bg-red-50/95 dark:bg-red-950/95 border-r border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
+    }
+    return 'bg-card shadow-sm border-r'
+  }
+
   return (
-    <div className="flex h-full w-72 flex-col border-r bg-card shadow-sm">
+    <div className={cn("flex h-full w-72 flex-col", getSidebarColors())}>
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b px-6 bg-gradient-to-r from-primary/5 to-primary/10">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">

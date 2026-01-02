@@ -90,13 +90,55 @@ export default function CustomerDashboardPage() {
     )
   }
 
+  // Get role badge configuration with pastel colors
+  const getRoleBadge = (role: string) => {
+    const roleConfig: Record<string, { label: string; className: string }> = {
+      root: {
+        label: 'Root',
+        className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
+      },
+      company_owner: {
+        label: 'Company Owner',
+        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
+      },
+      company_admin: {
+        label: 'Company Admin',
+        className: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+      },
+      customer: {
+        label: 'Customer',
+        className: 'bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800',
+      },
+      warehouse_staff: {
+        label: 'Warehouse Staff',
+        className: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700',
+      },
+    }
+    return roleConfig[role] || null
+  }
+
+  const roleBadge = getRoleBadge(userRole)
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" description="Welcome back, Sarah. Here's an overview of your warehouse activity.">
-        <Link href="/dashboard/bookings/new">
-          <Button>New Booking</Button>
-        </Link>
-      </PageHeader>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-muted-foreground">Welcome back, Sarah. Here's an overview of your warehouse activity.</p>
+            {roleBadge && (
+              <Badge className={roleBadge.className}>
+                {roleBadge.label}
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/bookings/new">
+            <Button>New Booking</Button>
+          </Link>
+        </div>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

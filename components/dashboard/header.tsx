@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { useUser } from "@/lib/hooks/use-user"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 import type { UserRole } from "@/types"
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
@@ -85,30 +86,30 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     refetchOnWindowFocus: true,
   })
 
-  // Get role badge configuration
+  // Get role badge configuration with pastel colors
   const getRoleBadge = (role: string | null) => {
     if (!role) return null
     
     const roleConfig: Record<string, { label: string; className: string }> = {
       root: {
         label: 'Root',
-        className: 'bg-red-500 text-white hover:bg-red-600',
+        className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
       },
       company_owner: {
         label: 'Company Owner',
-        className: 'bg-green-500 text-white hover:bg-green-600',
+        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
       },
       company_admin: {
         label: 'Company Admin',
-        className: 'bg-blue-500 text-white hover:bg-blue-600',
+        className: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
       },
       customer: {
         label: 'Customer',
-        className: 'bg-purple-500 text-white hover:bg-purple-600',
+        className: 'bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800',
       },
       warehouse_staff: {
         label: 'Warehouse Staff',
-        className: 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50',
+        className: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700',
       },
     }
 
@@ -175,8 +176,29 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     return labels[role] || role
   }
 
+  // Get role-based header colors
+  const getHeaderColors = (role: string | null) => {
+    // If root user with test role, use test role colors
+    const displayRole = (profile?.role === 'root' && selectedTestRole) ? selectedTestRole : role
+    
+    switch (displayRole) {
+      case 'root':
+        return 'bg-red-50/95 dark:bg-red-950/95 border-b border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
+      case 'company_owner':
+        return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-b border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
+      case 'company_admin':
+        return 'bg-blue-50/95 dark:bg-blue-950/95 border-b border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
+      case 'customer':
+        return 'bg-violet-50/95 dark:bg-violet-950/95 border-b border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'
+      case 'warehouse_staff':
+        return 'bg-slate-100/95 dark:bg-slate-900/95 border-b border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
+      default:
+        return 'bg-slate-200/90 dark:bg-slate-950/98 border-b border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
+    }
+  }
+
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
+    <header className={cn("flex h-16 items-center justify-between px-6", getHeaderColors(profile?.role || null))}>
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick}>
           <Menu className="h-5 w-5" />

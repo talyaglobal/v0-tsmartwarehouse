@@ -3,6 +3,7 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { TopLoadingBar } from "@/components/ui/top-loading-bar"
+import { AdminRoleBasedMainContent } from "@/components/admin/admin-role-based-main-content"
 
 // Force dynamic rendering - requires authentication
 export const dynamic = 'force-dynamic'
@@ -28,7 +29,9 @@ export default async function AdminLayout({
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <AdminHeader />
-          <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+          <AdminRoleBasedMainContent>
+            {children}
+          </AdminRoleBasedMainContent>
         </div>
       </div>
     </ErrorBoundary>
