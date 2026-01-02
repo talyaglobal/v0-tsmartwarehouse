@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Booking, Invoice, Claim } from "@/types"
 import { api } from "@/lib/api/client"
 import { createClient } from "@/lib/supabase/client"
+import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 
 export default function CustomerDashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -20,6 +21,7 @@ export default function CustomerDashboardPage() {
   const [user, setUser] = useState<{ membershipTier?: string; creditBalance?: number } | null>(null)
   const [userRole, setUserRole] = useState<string>('customer')
   const [loading, setLoading] = useState(true)
+  const [selectedBookingForTimeSlot, setSelectedBookingForTimeSlot] = useState<Booking | null>(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -80,6 +82,7 @@ export default function CustomerDashboardPage() {
   const creditBalance = user?.creditBalance || 0
   const recentClaims = claims.filter((c) => c.status === "submitted" || c.status === "under-review")
   const isCustomer = userRole === 'customer'
+  const awaitingTimeSlotBookings = bookings.filter((b) => b.status === "awaiting_time_slot")
 
   if (loading) {
     return (
@@ -138,6 +141,32 @@ export default function CustomerDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Pending Actions Section - Only for customers */}
+      {isCustomer && awaitingTimeSlotBookings.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-900">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  Pending for Your Action
+                </CardTitle>
+                <CardDescription>
+                  You have {awaitingTimeSlotBookings.length} booking{awaitingTimeSlotBookings.length > 1 ? 's' : ''} waiting for time slot selection
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {awaitingTimeSlotBookings.map((booking) => (
+                <PendingActionCard key={booking.id} booking={booking} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -327,6 +356,51 @@ export default function CustomerDashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Time Slot Selection Modal */}
+      {selectedBookingForTimeSlot && (
+        <TimeSlotSelectionModal
+          booking={selectedBookingForTimeSlot}
+          open={!!selectedBookingForTimeSlot}
+          onOpenChange={(open) => !open && setSelectedBookingForTimeSlot(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function PendingActionCard({ booking }: { booking: Booking }) {
+  const [openModal, setOpenModal] = useState(false)
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-4 bg-background border border-orange-200 dark:border-orange-900 rounded-lg hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+            <Calendar className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium">
+              Booking {booking.id} - {booking.type === "pallet" ? `${booking.palletCount} Pallets` : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {booking.proposedStartDate
+                ? `Proposed: ${formatDate(booking.proposedStartDate)} ${booking.proposedStartTime || ""}`
+                : `Requested: ${formatDate(booking.startDate)}`}
+            </p>
+          </div>
+        </div>
+        <Button onClick={() => setOpenModal(true)} size="sm">
+          Select Time Slot
+        </Button>
+      </div>
+      {openModal && (
+        <TimeSlotSelectionModal
+          booking={booking}
+          open={openModal}
+          onOpenChange={setOpenModal}
+        />
+      )}
+    </>
   )
 }

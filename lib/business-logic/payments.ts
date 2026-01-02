@@ -246,7 +246,7 @@ export async function confirmPayment(
     completedAt: status === "succeeded" ? new Date().toISOString() : undefined,
   })
 
-  // If payment succeeded, update invoice
+  // If payment succeeded, update invoice and booking
   if (status === "succeeded") {
     const invoice = await getInvoiceById(payment.invoiceId)
     if (invoice && invoice.status !== "paid") {
@@ -254,6 +254,22 @@ export async function confirmPayment(
         status: "paid",
         paidDate: new Date().toISOString().split("T")[0],
       })
+
+      // Update booking status if invoice has a booking
+      if (invoice.bookingId) {
+        const { updateBooking } = await import("@/lib/db/bookings")
+        const booking = await getBookingById(invoice.bookingId, false)
+        if (booking) {
+          // Update booking status based on current status
+          let newStatus: "confirmed" | "payment_pending" = "confirmed"
+          if (booking.status === "pre_order" || booking.status === "payment_pending") {
+            newStatus = "confirmed"
+          }
+          await updateBooking(invoice.bookingId, {
+            status: newStatus,
+          })
+        }
+      }
     }
 
     // Create transaction record

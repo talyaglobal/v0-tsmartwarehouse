@@ -7,6 +7,7 @@ import type { Appointment, AppointmentParticipant, AppointmentStatus } from '@/t
 
 interface GetAppointmentsOptions {
   warehouseId?: string
+  warehouseIds?: string[] // Support multiple warehouse IDs
   appointmentTypeId?: string
   status?: AppointmentStatus
   startDate?: string
@@ -31,6 +32,9 @@ export async function getAppointments(filters?: GetAppointmentsOptions): Promise
 
   if (filters?.warehouseId) {
     query = query.eq('warehouse_id', filters.warehouseId)
+  }
+  if (filters?.warehouseIds && filters.warehouseIds.length > 0) {
+    query = query.in('warehouse_id', filters.warehouseIds)
   }
   if (filters?.appointmentTypeId) {
     query = query.eq('appointment_type_id', filters.appointmentTypeId)

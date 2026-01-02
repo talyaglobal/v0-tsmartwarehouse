@@ -72,6 +72,7 @@ interface GetInventoryOptions {
   bookingId?: string
   customerId?: string
   warehouseId?: string
+  warehouseIds?: string[] // Support multiple warehouse IDs
   hallId?: string
   zoneId?: string
   status?: InventoryItem['status']
@@ -131,6 +132,9 @@ export async function getInventoryItems(filters?: GetInventoryOptions) {
   }
   if (warehouseId) {
     query = query.eq('warehouse_id', warehouseId)
+  }
+  if (filters?.warehouseIds && filters.warehouseIds.length > 0) {
+    query = query.in('warehouse_id', filters.warehouseIds)
   }
   if (hallId) {
     query = query.eq('hall_id', hallId)

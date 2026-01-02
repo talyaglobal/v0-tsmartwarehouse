@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useImperativeHandle, forwardRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -51,7 +51,11 @@ interface Invitation {
   } | null
 }
 
-export function TeamMembersTab() {
+export interface TeamMembersTabRef {
+  openAddMemberDialog?: (role?: string) => void
+}
+
+export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((props, ref) => {
   const { user } = useUser()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
@@ -83,6 +87,16 @@ export function TeamMembersTab() {
     password: "",
   })
   
+  // Expose method to open add member dialog with role
+  useImperativeHandle(ref, () => ({
+    openAddMemberDialog: (role?: string) => {
+      if (role && ["company_admin", "member", "warehouse_staff"].includes(role)) {
+        setAddMemberForm((prev) => ({ ...prev, role: role as "company_admin" | "member" | "warehouse_staff" }))
+      }
+      setAddMemberDialogOpen(true)
+    },
+  }))
+
   // Handle phone change for edit form
   const handleEditPhoneChange = useCallback((value: string) => {
     setEditForm((prev) => ({ ...prev, phone: value }))
@@ -1018,5 +1032,7 @@ export function TeamMembersTab() {
       </Dialog>
     </div>
   )
-}
+})
+
+TeamMembersTab.displayName = "TeamMembersTab"
 

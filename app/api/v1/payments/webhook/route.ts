@@ -12,14 +12,46 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ""
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const supabase = await createServerSupabaseClient()
 
-  // Find booking by payment_intent_id
-  const { data: booking, error: fetchError } = await supabase
+  // First try to find booking by payment_intent_id
+  let booking = null
+  const { data: bookingByIntent, error: fetchError } = await supabase
     .from("bookings")
     .select("*")
     .eq("payment_intent_id", paymentIntent.id)
-    .single()
+    .maybeSingle()
 
-  if (fetchError || !booking) {
+  if (!fetchError && bookingByIntent) {
+    booking = bookingByIntent
+  } else {
+    // If not found by payment_intent_id, try to find via invoice
+    const { data: payment } = await supabase
+      .from("payments")
+      .select("invoice_id")
+      .eq("stripe_payment_intent_id", paymentIntent.id)
+      .maybeSingle()
+
+    if (payment?.invoice_id) {
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("booking_id")
+        .eq("id", payment.invoice_id)
+        .maybeSingle()
+
+      if (invoice?.booking_id) {
+        const { data: bookingByInvoice } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("id", invoice.booking_id)
+          .maybeSingle()
+
+        if (bookingByInvoice) {
+          booking = bookingByInvoice
+        }
+      }
+    }
+  }
+
+  if (!booking) {
     console.error("Booking not found for payment intent:", paymentIntent.id)
     return
   }

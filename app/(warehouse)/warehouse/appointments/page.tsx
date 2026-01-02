@@ -26,17 +26,24 @@ export default function AppointmentsPage() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch appointments
+  // Fetch appointments for warehouse staff (automatically filtered by assigned warehouses)
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
-    queryKey: ['appointments', user?.id],
+    queryKey: ['appointments', 'warehouse-staff', user?.id],
     queryFn: async () => {
       if (!user) return []
       const response = await fetch('/api/v1/appointments')
-      if (!response.ok) throw new Error('Failed to fetch appointments')
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to fetch appointments')
+      }
       const data = await response.json()
       return data.data || []
     },
     enabled: !!user,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
   })
 
   // Transform appointments to calendar events

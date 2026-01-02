@@ -119,7 +119,7 @@ export interface Warehouse {
 }
 
 // Booking Types
-export type BookingStatus = "pending" | "pre_order" | "payment_pending" | "confirmed" | "active" | "completed" | "cancelled"
+export type BookingStatus = "pending" | "pre_order" | "awaiting_time_slot" | "payment_pending" | "confirmed" | "active" | "completed" | "cancelled"
 export type BookingType = "pallet" | "area-rental"
 export type ServiceType = "pallet-in" | "storage" | "pallet-out" | "area-rental"
 
@@ -147,6 +147,11 @@ export interface Booking {
   timeSlotSetBy?: string
   timeSlotSetAt?: string
   timeSlotConfirmedAt?: string
+  // Date/time change proposal fields (for warehouse staff)
+  proposedStartDate?: string
+  proposedStartTime?: string
+  dateChangeRequestedAt?: string
+  dateChangeRequestedBy?: string
   createdAt: string
   updatedAt: string
 }

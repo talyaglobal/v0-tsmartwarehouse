@@ -52,13 +52,13 @@ export default function BookingsPage() {
     queryFn: async () => {
       if (!user) return []
 
-      // If customer role, fetch only their own bookings
+      // If customer role, fetch only their own bookings (all statuses including pre_order and payment_pending)
       if (isCustomer) {
         const result = await api.get<Booking[]>(`/api/v1/bookings?customerId=${user.id}`, { showToast: false })
         return result.success ? (result.data || []) : []
       }
 
-      // For company roles, fetch all bookings to company warehouses (from ANY customer)
+      // For company roles, fetch all bookings to company warehouses (from ANY customer, all statuses)
       if (userCompanyId) {
         const result = await api.get<Booking[]>(`/api/v1/bookings?warehouseCompanyId=${userCompanyId}`, { showToast: false })
         return result.success ? (result.data || []) : []

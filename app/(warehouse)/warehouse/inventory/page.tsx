@@ -1,15 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Search, Package, Layers, Building2, Loader2 } from "@/components/icons"
-import { WAREHOUSE_CONFIG } from "@/lib/constants"
+import { Button } from "@/components/ui/button"
 import { formatNumber } from "@/lib/utils/format"
 import { api } from "@/lib/api/client"
+import { useUser } from "@/lib/hooks/use-user"
 
 interface InventoryItem {
   id: string
@@ -20,54 +22,108 @@ interface InventoryItem {
   description?: string
   hall_id?: string
   zone_id?: string
+  warehouse_id?: string
+}
+
+interface WarehouseFloor {
+  id: string
+  warehouseId: string
+  floorNumber: number
+  name: string
+  totalSqFt: number
+  halls: WarehouseHall[]
+}
+
+interface WarehouseHall {
+  id: string
+  floorId: string
+  hallName: string
+  sqFt: number
+  availableSqFt: number
+  occupiedSqFt: number
+  zones: WarehouseZone[]
+}
+
+interface WarehouseZone {
+  id: string
+  hallId: string
+  name: string
+  type: string
+  totalSlots?: number | null
+  availableSlots?: number | null
 }
 
 export default function InventoryPage() {
+  const { user, isLoading: userLoading } = useUser()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFloor, setSelectedFloor] = useState("1")
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<{
-    total: number
-    byStatus: Record<string, number>
-    byHall: Record<string, number>
-  } | null>(null)
+  const [warehouseFloors, setWarehouseFloors] = useState<WarehouseFloor[]>([])
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null)
 
-  const currentFloor = WAREHOUSE_CONFIG.floors.find((f) => f.floorNumber === Number(selectedFloor))
+  // Fetch assigned warehouse IDs
+  const { data: warehouseIds = [] } = useQuery({
+    queryKey: ['warehouse-staff-warehouse-ids', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return []
+      // Use the warehouse staff bookings endpoint to get warehouse IDs
+      const result = await api.get<any[]>(`/api/v1/warehouse-staff/bookings`, { showToast: false })
+      // Extract unique warehouse IDs from bookings
+      if (result.success && result.data) {
+        const ids = [...new Set(result.data.map((b: any) => b.warehouseId).filter(Boolean))]
+        return ids
+      }
+      return []
+    },
+    enabled: !!user?.id && !userLoading,
+  })
 
+  // Set default warehouse if only one
   useEffect(() => {
-    fetchInventoryData()
-  }, [selectedFloor, searchQuery])
+    if (warehouseIds && warehouseIds.length > 0 && !selectedWarehouseId) {
+      setSelectedWarehouseId(warehouseIds[0])
+    }
+  }, [warehouseIds, selectedWarehouseId])
 
-  const fetchInventoryData = async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch inventory items
+  // Fetch inventory items
+  const { data: inventoryItems = [], isLoading: itemsLoading } = useQuery<InventoryItem[]>({
+    queryKey: ['inventory', 'warehouse-staff', selectedWarehouseId, searchQuery],
+    queryFn: async () => {
       const params = new URLSearchParams()
       if (searchQuery) {
         params.append('search', searchQuery)
       }
-      // Note: In a real implementation, you'd filter by floor/hall based on selectedFloor
+      if (selectedWarehouseId) {
+        params.append('warehouse_id', selectedWarehouseId)
+      }
       
-      const [itemsData, statsData] = await Promise.all([
-        api.get(`/api/v1/inventory?${params.toString()}`, { showToast: false }),
-        api.get(`/api/v1/inventory?stats=true`, { showToast: false }),
-      ])
+      const result = await api.get<InventoryItem[]>(`/api/v1/inventory?${params.toString()}`, { showToast: false })
+      return result.success ? (result.data || []) : []
+    },
+    enabled: !!selectedWarehouseId,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30 * 1000,
+  })
 
-      if (itemsData.success) {
-        setInventoryItems(itemsData.data || [])
+  // Fetch stats
+  const { data: stats } = useQuery({
+    queryKey: ['inventory-stats', 'warehouse-staff', selectedWarehouseId],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      params.append('stats', 'true')
+      if (selectedWarehouseId) {
+        params.append('warehouse_id', selectedWarehouseId)
       }
+      
+      const result = await api.get(`/api/v1/inventory?${params.toString()}`, { showToast: false })
+      return result.success ? result.data : null
+    },
+    enabled: !!selectedWarehouseId,
+    staleTime: 0,
+  })
 
-      if (statsData.success) {
-        setStats(statsData.data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch inventory:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const loading = userLoading || itemsLoading
 
   return (
     <div className="p-4 space-y-4">
@@ -84,81 +140,49 @@ export default function InventoryPage() {
         />
       </div>
 
-      {/* Floor Tabs */}
-      <Tabs value={selectedFloor} onValueChange={setSelectedFloor}>
-        <TabsList className="grid grid-cols-3 w-full">
-          <TabsTrigger value="1">Level 1</TabsTrigger>
-          <TabsTrigger value="2">Level 2</TabsTrigger>
-          <TabsTrigger value="3">Level 3</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Floor Overview */}
-      {currentFloor && (
+      {/* Warehouse Selector (if multiple warehouses) */}
+      {warehouseIds.length > 1 && (
         <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{currentFloor.name}</CardTitle>
-              {currentFloor.floorNumber === 3 && <Badge>Area Rental</Badge>}
-            </div>
+          <CardHeader>
+            <CardTitle className="text-base">Select Warehouse</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
+            <div className="flex gap-2">
+              {warehouseIds.map((warehouseId) => (
+                <Button
+                  key={warehouseId}
+                  variant={selectedWarehouseId === warehouseId ? "default" : "outline"}
+                  onClick={() => setSelectedWarehouseId(warehouseId)}
+                >
+                  {warehouseId}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Stats Summary */}
+      {stats && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Inventory Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-muted rounded-lg text-center">
-                <Building2 className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                <p className="text-lg font-bold">{formatNumber(currentFloor.totalSqFt)}</p>
-                <p className="text-xs text-muted-foreground">Total sq ft</p>
+                <Layers className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-lg font-bold">{stats.total || 0}</p>
+                <p className="text-xs text-muted-foreground">Total Items</p>
               </div>
               <div className="p-3 bg-muted rounded-lg text-center">
-                <Layers className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                <p className="text-lg font-bold">{stats?.total || 0}</p>
-                <p className="text-xs text-muted-foreground">Total Pallets</p>
+                <Package className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-lg font-bold">
+                  {stats.byStatus?.['stored'] || stats.byStatus?.['received'] || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">Stored Items</p>
               </div>
             </div>
-
-            {/* Halls */}
-            {currentFloor.halls.map((hall) => {
-              const utilization = Math.round((hall.occupiedSqFt / hall.sqFt) * 100)
-
-              return (
-                <div key={hall.id} className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium">Hall {hall.hallName}</span>
-                    <Badge variant={utilization > 80 ? "destructive" : "secondary"}>{utilization}% Used</Badge>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
-                    <div
-                      className={`h-full ${utilization > 80 ? "bg-red-500" : utilization > 50 ? "bg-amber-500" : "bg-green-500"}`}
-                      style={{ width: `${utilization}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{formatNumber(hall.occupiedSqFt)} used</span>
-                    <span>{formatNumber(hall.availableSqFt)} available</span>
-                  </div>
-
-                  {/* Zones (not for Level 3) */}
-                  {currentFloor.floorNumber !== 3 && (
-                    <div className="mt-3 space-y-2">
-                      {hall.zones.map((zone) => (
-                        <div
-                          key={zone.id}
-                          className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                            <span>{zone.name}</span>
-                          </div>
-                          <span className="text-muted-foreground">
-                            {zone.availableSlots}/{zone.totalSlots}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
           </CardContent>
         </Card>
       )}

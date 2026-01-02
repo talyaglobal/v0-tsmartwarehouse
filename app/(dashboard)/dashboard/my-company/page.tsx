@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { PageHeader } from "@/components/ui/page-header"
@@ -9,7 +9,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Loader2 } from "@/components/icons"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
-import { TeamMembersTab } from "@/features/my-company/components/team-members-tab"
+import { TeamMembersTab, type TeamMembersTabRef } from "@/features/my-company/components/team-members-tab"
 import { WarehousesTab } from "@/features/my-company/components/warehouses-tab"
 import { CompanyInformationTab } from "@/features/my-company/components/company-information-tab"
 import { AccessLogsTab } from "@/features/my-company/components/access-logs-tab"
@@ -20,6 +20,7 @@ export default function MyCompanyPage() {
   const router = useRouter()
   const pathname = usePathname()
   const [activeTab, setActiveTab] = useState("team")
+  const teamMembersTabRef = useRef<TeamMembersTabRef>(null)
 
   // Handle tab query parameter
   useEffect(() => {
@@ -28,6 +29,23 @@ export default function MyCompanyPage() {
       setActiveTab(tab)
     }
   }, [searchParams])
+
+  // Handle openAddMemberDialog query parameter
+  useEffect(() => {
+    const openAddMember = searchParams.get("openAddMember")
+    const role = searchParams.get("role")
+    if (openAddMember === "true" && activeTab === "team") {
+      // Small delay to ensure TeamMembersTab is mounted
+      setTimeout(() => {
+        teamMembersTabRef.current?.openAddMemberDialog?.(role || undefined)
+        // Clean up URL
+        const newSearchParams = new URLSearchParams(searchParams.toString())
+        newSearchParams.delete("openAddMember")
+        newSearchParams.delete("role")
+        router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false })
+      }, 100)
+    }
+  }, [searchParams, activeTab, pathname, router])
 
   // Update URL when tab changes to trigger loading bar
   const handleTabChange = (value: string) => {
@@ -92,7 +110,7 @@ export default function MyCompanyPage() {
         </TabsList>
 
         <TabsContent value="team" className="space-y-4">
-          <TeamMembersTab />
+          <TeamMembersTab ref={teamMembersTabRef} />
         </TabsContent>
 
         <TabsContent value="warehouses" className="space-y-4">

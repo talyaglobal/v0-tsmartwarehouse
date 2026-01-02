@@ -12,13 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical, Settings, AlertCircle } from "@/components/icons"
+import { Building2, MapPin, Package, Search, Loader2, Plus, Grid, List, Edit, ChevronLeft, ChevronRight, DollarSign, Trash2, MoreVertical, Settings, AlertCircle, Users } from "@/components/icons"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { api } from "@/lib/api/client"
 import { formatNumber, formatCurrency } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 import type { Warehouse } from "@/types"
 import { createClient } from "@/lib/supabase/client"
+import { AssignStaffDialog } from "@/components/warehouses/assign-staff-dialog"
 
 type ViewMode = "grid" | "list"
 
@@ -34,6 +35,8 @@ export default function WarehousesPage() {
   const [isSavingPrice, setIsSavingPrice] = useState(false)
   const [deleteConfirmWarehouse, setDeleteConfirmWarehouse] = useState<Warehouse | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [assignStaffWarehouse, setAssignStaffWarehouse] = useState<Warehouse | null>(null)
+  const [isAssigningStaff, setIsAssigningStaff] = useState(false)
 
   useEffect(() => {
     fetchWarehouses()
@@ -468,21 +471,29 @@ export default function WarehousesPage() {
                         </Link>
                       </div>
                       <div className="flex gap-2 mb-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setAssignStaffWarehouse(warehouse)}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Assign Staff
+                        </Button>
                         <Link href={`/dashboard/services?warehouseId=${warehouse.id}&tab=warehouse-mapping`} className="flex-1">
                           <Button variant="outline" className="w-full">
                             <Settings className="h-4 w-4 mr-2" />
                             Services
                           </Button>
                         </Link>
-                        <Button
-                          variant="outline"
-                          className="flex-1 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirmWarehouse(warehouse)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
                       </div>
+                      <Button
+                        variant="outline"
+                        className="w-full text-destructive hover:text-destructive"
+                        onClick={() => setDeleteConfirmWarehouse(warehouse)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -606,6 +617,12 @@ export default function WarehousesPage() {
                             <DollarSign className="h-4 w-4 mr-2" />
                             Set Price
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setAssignStaffWarehouse(warehouse)}
+                          >
+                            <Users className="h-4 w-4 mr-2" />
+                            Assign Staff
+                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/services?warehouseId=${warehouse.id}&tab=warehouse-mapping`}>
                               <Settings className="h-4 w-4 mr-2" />
@@ -706,6 +723,13 @@ export default function WarehousesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Staff Dialog */}
+      <AssignStaffDialog
+        warehouse={assignStaffWarehouse}
+        open={!!assignStaffWarehouse}
+        onOpenChange={(open) => !open && setAssignStaffWarehouse(null)}
+      />
     </div>
   )
 }

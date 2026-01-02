@@ -131,12 +131,21 @@ export async function GET(request: NextRequest) {
     // Cache can cause issues when new bookings are created
     filters.useCache = false
 
+    // Don't filter by status if not specified - get all bookings including pre_order and payment_pending
     const bookings = await getBookings(filters)
+    
+    // Filter out cancelled bookings for customers (unless explicitly requested)
+    // But keep all statuses for company admins
+    const filteredBookings = validatedParams.status 
+      ? bookings 
+      : (isAdmin && userCompanyId) 
+        ? bookings // Company admins see all statuses
+        : bookings.filter(b => b.status !== 'cancelled') // Customers don't see cancelled by default
 
     const responseData: BookingsListResponse = {
       success: true,
-      data: bookings,
-      total: bookings.length,
+      data: filteredBookings,
+      total: filteredBookings.length,
     }
 
     const response = NextResponse.json(responseData)

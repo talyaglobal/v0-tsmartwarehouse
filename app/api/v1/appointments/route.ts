@@ -43,7 +43,51 @@ export async function GET(request: NextRequest) {
 
     const filters: Parameters<typeof getAppointments>[0] = {}
 
-    if (validatedParams.warehouseId) filters.warehouseId = validatedParams.warehouseId
+    // Check if user is warehouse staff
+    let userRole: string | null = null
+    let warehouseIds: string[] | null = null
+    
+    if (authenticatedUserId) {
+      const { createServerSupabaseClient } = await import('@/lib/supabase/server')
+      const supabase = createServerSupabaseClient()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authenticatedUserId)
+        .single()
+      
+      userRole = profile?.role || null
+      
+      // If warehouse staff, get their assigned warehouses
+      if (userRole === 'warehouse_staff') {
+        const { getWarehouseStaffWarehouses } = await import('@/lib/business-logic/warehouse-staff')
+        const warehouses = await getWarehouseStaffWarehouses(authenticatedUserId)
+        warehouseIds = warehouses.map(w => w.warehouseId)
+      }
+    }
+
+    // For warehouse staff, filter by their assigned warehouses
+    if (warehouseIds && warehouseIds.length > 0) {
+      // If specific warehouseId is provided, verify staff has access
+      if (validatedParams.warehouseId) {
+        if (!warehouseIds.includes(validatedParams.warehouseId)) {
+          const errorData: ErrorResponse = {
+            success: false,
+            error: "You don't have access to this warehouse",
+            statusCode: 403,
+          }
+          return NextResponse.json(errorData, { status: 403 })
+        }
+        filters.warehouseId = validatedParams.warehouseId
+      } else {
+        // For warehouse staff, filter by all assigned warehouses
+        filters.warehouseIds = warehouseIds
+      }
+    } else {
+      // For non-warehouse staff, use normal filtering
+      if (validatedParams.warehouseId) filters.warehouseId = validatedParams.warehouseId
+    }
+
     if (validatedParams.appointmentTypeId) filters.appointmentTypeId = validatedParams.appointmentTypeId
     if (validatedParams.status) filters.status = validatedParams.status
     if (validatedParams.startDate) filters.startDate = validatedParams.startDate
@@ -52,8 +96,8 @@ export async function GET(request: NextRequest) {
     if (validatedParams.limit) filters.limit = validatedParams.limit
     if (validatedParams.offset) filters.offset = validatedParams.offset
 
-    // If authenticated and no createdBy specified, default to user's appointments
-    if (authenticatedUserId && !validatedParams.createdBy) {
+    // If authenticated and no createdBy specified, default to user's appointments (only for non-warehouse staff)
+    if (authenticatedUserId && !validatedParams.createdBy && userRole !== 'warehouse_staff') {
       filters.createdBy = authenticatedUserId
     }
 
