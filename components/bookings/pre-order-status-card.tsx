@@ -2,9 +2,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { StatusBadge } from "@/components/ui/status-badge"
-import { Clock, CheckCircle2, Package, Building2, Calendar, AlertCircle } from "lucide-react"
-import { formatCurrency, formatDate, formatNumber, getBookingTypeLabel } from "@/lib/utils/format"
+import { Badge } from "@/components/ui/badge"
+import { Clock, CheckCircle2, Package, Building2, Calendar } from "lucide-react"
+import { formatCurrency, formatDate, formatDateTime, formatNumber, getBookingTypeLabel } from "@/lib/utils/format"
 import Link from "next/link"
 import type { Booking } from "@/types"
 
@@ -35,7 +35,7 @@ export function PreOrderStatusCard({
               {getBookingTypeLabel(booking.type)} • {formatCurrency(booking.totalAmount)}
             </CardDescription>
           </div>
-          <StatusBadge status="warning">Pre-Order</StatusBadge>
+          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pre-Order</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -96,7 +96,7 @@ export function PreOrderStatusCard({
                     Time Slot Assigned
                   </div>
                   <div className="text-sm text-blue-700 dark:text-blue-300">
-                    Scheduled: {formatDate(booking.scheduledDropoffDatetime!, { includeTime: true })}
+                    Scheduled: {formatDateTime(booking.scheduledDropoffDatetime!)}
                   </div>
                 </div>
               </div>
@@ -127,7 +127,7 @@ export function PreOrderStatusCard({
                     Time Slot Confirmed
                   </div>
                   <div className="text-sm text-green-700 dark:text-green-300">
-                    Scheduled: {formatDate(booking.scheduledDropoffDatetime!, { includeTime: true })}
+                    Scheduled: {formatDateTime(booking.scheduledDropoffDatetime!)}
                   </div>
                 </div>
               </div>

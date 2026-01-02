@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { checkPalletCapacity, checkAreaRentalCapacity, reserveCapacity } from "./capacity"
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
-import { getBookings, createBooking, updateBooking } from "@/lib/db/bookings"
+import { getBookings, getBookingById, createBooking, updateBooking } from "@/lib/db/bookings"
 import { getNotificationService } from "@/lib/notifications/service"
 import type { Booking, BookingType, MembershipTier } from "@/types"
 
@@ -308,5 +308,131 @@ export async function cancelBooking(bookingId: string): Promise<Booking> {
   })
 
   return updatedBooking
+}
+
+/**
+ * Set time slot for a pre-order booking (warehouse worker action)
+ */
+export async function setBookingTimeSlot(
+  bookingId: string,
+  scheduledDatetime: string,
+  workerId: string
+): Promise<Booking> {
+  // Get booking
+  const booking = await getBookingById(bookingId, false)
+  if (!booking) {
+    throw new Error("Booking not found")
+  }
+
+  // Verify booking is in pre_order status
+  if (booking.status !== "pre_order") {
+    throw new Error(`Booking is not in pre_order status. Current status: ${booking.status}`)
+  }
+
+  // Validate datetime
+  const datetime = new Date(scheduledDatetime)
+  if (isNaN(datetime.getTime())) {
+    throw new Error("Invalid datetime format")
+  }
+
+  // Update booking with time slot information
+  const updatedBooking = await updateBooking(bookingId, {
+    scheduledDropoffDatetime: scheduledDatetime,
+    timeSlotSetBy: workerId,
+    timeSlotSetAt: new Date().toISOString(),
+  })
+
+  // Send notification to customer
+  try {
+    const notificationService = getNotificationService()
+    await notificationService.sendNotification({
+      userId: booking.customerId,
+      type: "booking",
+      channels: ["email", "push"],
+      title: "Time Slot Assigned",
+      message: `A time slot has been assigned for your booking #${bookingId.slice(0, 8)}. Please confirm the time slot to proceed with payment.`,
+      template: "time-slot-assigned",
+      templateData: {
+        bookingId: bookingId.slice(0, 8),
+        scheduledDatetime: scheduledDatetime,
+        customerName: booking.customerName,
+      },
+    })
+  } catch (error) {
+    // Log error but don't fail the time slot assignment
+    console.error("Failed to send time slot notification:", error)
+  }
+
+  return updatedBooking
+}
+
+/**
+ * Confirm time slot for a pre-order booking (customer action)
+ */
+export async function confirmBookingTimeSlot(
+  bookingId: string,
+  customerId: string
+): Promise<Booking> {
+  // Get booking
+  const booking = await getBookingById(bookingId, false)
+  if (!booking) {
+    throw new Error("Booking not found")
+  }
+
+  // Verify customer owns the booking
+  if (booking.customerId !== customerId) {
+    throw new Error("You do not have permission to confirm this booking's time slot")
+  }
+
+  // Verify booking is in pre_order status
+  if (booking.status !== "pre_order") {
+    throw new Error(`Booking is not in pre_order status. Current status: ${booking.status}`)
+  }
+
+  // Verify time slot has been set
+  if (!booking.scheduledDropoffDatetime) {
+    throw new Error("Time slot has not been set yet. Please wait for warehouse staff to assign a time slot.")
+  }
+
+  // Update booking with confirmation timestamp and change status to payment_pending
+  const updatedBooking = await updateBooking(bookingId, {
+    timeSlotConfirmedAt: new Date().toISOString(),
+    status: "payment_pending",
+  })
+
+  // Send notification to warehouse staff
+  try {
+    // Note: You might want to get warehouse staff IDs here
+    // For now, we'll just log it
+    console.log(`Time slot confirmed for booking ${bookingId} by customer ${customerId}`)
+  } catch (error) {
+    // Log error but don't fail the confirmation
+    console.error("Failed to send confirmation notification:", error)
+  }
+
+  return updatedBooking
+}
+
+/**
+ * Get bookings awaiting time slot assignment
+ */
+export async function getBookingsAwaitingTimeSlot(warehouseId: string): Promise<Booking[]> {
+  return await getBookings({
+    warehouseId,
+    status: "pre_order",
+  })
+}
+
+/**
+ * Get bookings with confirmed time slots (ready for payment)
+ */
+export async function getBookingsWithConfirmedTimeSlots(warehouseId: string): Promise<Booking[]> {
+  const bookings = await getBookings({
+    warehouseId,
+    status: "payment_pending",
+  })
+  
+  // Filter to only include bookings with confirmed time slots
+  return bookings.filter(booking => booking.timeSlotConfirmedAt !== undefined)
 }
 

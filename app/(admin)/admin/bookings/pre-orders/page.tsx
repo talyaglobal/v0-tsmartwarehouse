@@ -5,11 +5,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
-import { StatusBadge } from "@/components/ui/status-badge"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Loader2, Clock, Package } from "lucide-react"
-import { formatCurrency, formatDate, formatNumber, getBookingTypeLabel } from "@/lib/utils/format"
+import { formatCurrency, formatDateTime, formatNumber, getBookingTypeLabel } from "@/lib/utils/format"
 import { api } from "@/lib/api/client"
 import type { Booking } from "@/types"
 import { PreOrderTimeSlotForm } from "@/components/admin/pre-order-time-slot-form"
@@ -156,9 +156,9 @@ export default function PreOrdersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={booking.type === "pallet" ? "default" : "secondary"}>
+                      <Badge variant={booking.type === "pallet" ? "default" : "secondary"}>
                         {getBookingTypeLabel(booking.type)}
-                      </StatusBadge>
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {booking.type === "pallet" ? (
@@ -175,7 +175,7 @@ export default function PreOrdersPage() {
                       {booking.scheduledDropoffDatetime ? (
                         <div>
                           <div className="font-medium">
-                            {formatDate(booking.scheduledDropoffDatetime, { includeTime: true })}
+                            {formatDateTime(booking.scheduledDropoffDatetime)}
                           </div>
                           {booking.timeSlotConfirmedAt && (
                             <div className="text-xs text-green-600">Confirmed</div>
@@ -186,7 +186,7 @@ export default function PreOrdersPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status="warning">Pre-Order</StatusBadge>
+                      <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pre-Order</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       {!booking.scheduledDropoffDatetime ? (

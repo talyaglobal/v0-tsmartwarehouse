@@ -19,6 +19,7 @@ interface StatusBadgeProps {
 const statusConfig: Record<StatusType, { label: string; className: string }> = {
   // Booking statuses
   pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
+  pre_order: { label: "Pre-Order", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
   payment_pending: { label: "Payment Pending", className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" },
   confirmed: { label: "Confirmed", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
   active: { label: "Active", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },

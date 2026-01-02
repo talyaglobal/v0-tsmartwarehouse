@@ -234,11 +234,6 @@ export async function POST(request: NextRequest) {
       productAcceptanceStartTime: validated.productAcceptanceStartTime,
       productAcceptanceEndTime: validated.productAcceptanceEndTime,
       workingDays: validated.workingDays,
-      // Warehouse fees
-      warehouseInFee: validated.warehouseInFee,
-      warehouseOutFee: validated.warehouseOutFee,
-      // Ports & Container Pricing
-      ports: validated.ports || [],
     })
 
     // Create pricing entries if provided

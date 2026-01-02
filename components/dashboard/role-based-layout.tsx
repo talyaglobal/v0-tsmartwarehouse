@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
-import { cn } from "@/lib/utils"
 
 interface RoleBasedLayoutProps {
   children: React.ReactNode
