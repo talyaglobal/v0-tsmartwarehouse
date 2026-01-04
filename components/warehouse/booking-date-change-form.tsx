@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Calendar, Clock } from "@/components/icons"
+import { Loader2, Clock } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import type { TimeSlot } from "@/lib/business-logic/availability"
 

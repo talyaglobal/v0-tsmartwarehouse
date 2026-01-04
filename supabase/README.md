@@ -19,33 +19,33 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 
 ## Running Migrations
 
-### ⚠️ IMPORTANT: Auto-Push Policy
+### 🚨 CRITICAL: Automatic Migration Push Policy
 
-**AI Assistant will ALWAYS automatically push migrations to Supabase when creating new migration files.**
-- **Every time a new migration file is created, the AI will automatically attempt to push it**
-- The AI will use `supabase db push` or direct SQL execution to apply migrations
-- If Supabase CLI is not installed or project is not linked, the AI will create a combined SQL file for manual execution
-- If migration errors occur, the AI will fix them and push again automatically
-- **No need to manually request migration pushes - this is ALWAYS handled automatically**
+**The AI Assistant (Auto) is responsible for ALL Supabase migration operations. Users should NEVER manually push migrations.**
+
+**See `SUPABASE_MIGRATION_AUTOMATION.md for complete details.**
+
+**Key Points:**
+- ✅ AI automatically pushes migrations when created
+- ✅ AI tracks which migrations are applied
+- ✅ AI handles all error recovery
+- ❌ Users should NEVER run `supabase db push` manually
+- ❌ Users should NEVER apply migrations via Supabase Dashboard
 
 **The AI will:**
-1. Always attempt to push migrations immediately after creating them
-2. Create combined SQL files if direct push fails
-3. Fix any migration errors and retry automatically
-4. Never leave migrations unapplied
+1. Automatically detect new migration files
+2. Check which migrations are already applied
+3. Push only new/unapplied migrations
+4. Handle all errors and retry automatically
+5. Track migration status continuously
 
-### Using Supabase CLI
+### Migration Status
 
-```bash
-# Install Supabase CLI (if not already installed)
-npm install -g supabase
+- ✅ All migrations 001-107 are applied
+- ✅ Migration 107 (PostGIS + Enhanced Marketplace Tables) - Applied successfully
+- Future migrations will be automatically pushed by the AI
 
-# Link to your project
-supabase link --project-ref your-project-ref
-
-# Run migrations
-supabase db push
-```
+**Note**: Users should never run `supabase db push` manually. The AI handles all migration operations automatically.
 
 ## Row Level Security (RLS)
 

@@ -5,13 +5,13 @@ import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Package, Layers, Building2, Loader2 } from "@/components/icons"
+import { Search, Package, Layers, Building2, Loader2, Calendar } from "@/components/icons"
 import { Button } from "@/components/ui/button"
-import { formatNumber } from "@/lib/utils/format"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
+import { useRouter } from "next/navigation"
 
 interface InventoryItem {
   id: string
@@ -25,57 +25,42 @@ interface InventoryItem {
   warehouse_id?: string
 }
 
-interface WarehouseFloor {
-  id: string
-  warehouseId: string
-  floorNumber: number
-  name: string
-  totalSqFt: number
-  halls: WarehouseHall[]
-}
 
-interface WarehouseHall {
-  id: string
-  floorId: string
-  hallName: string
-  sqFt: number
-  availableSqFt: number
-  occupiedSqFt: number
-  zones: WarehouseZone[]
-}
 
-interface WarehouseZone {
-  id: string
-  hallId: string
-  name: string
-  type: string
-  totalSlots?: number | null
-  availableSlots?: number | null
-}
+import type { Booking } from "@/types"
 
 export default function InventoryPage() {
   const { user, isLoading: userLoading } = useUser()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedFloor, setSelectedFloor] = useState("1")
-  const [warehouseFloors, setWarehouseFloors] = useState<WarehouseFloor[]>([])
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null)
+  const router = useRouter()
 
-  // Fetch assigned warehouse IDs
-  const { data: warehouseIds = [] } = useQuery({
-    queryKey: ['warehouse-staff-warehouse-ids', user?.id],
+  interface WarehouseAssignment {
+    warehouseId: string
+    warehouseName: string
+    warehouseCity?: string
+    role: "manager" | "staff"
+    assignedAt: string
+  }
+
+  const [selectedCity, setSelectedCity] = useState<string>("all")
+
+  // Fetch assigned warehouses with names
+  const { data: warehouses = [] } = useQuery<WarehouseAssignment[]>({
+    queryKey: ['warehouse-staff-warehouses', user?.id],
     queryFn: async () => {
       if (!user?.id) return []
-      // Use the warehouse staff bookings endpoint to get warehouse IDs
-      const result = await api.get<any[]>(`/api/v1/warehouse-staff/bookings`, { showToast: false })
-      // Extract unique warehouse IDs from bookings
+      // Use the warehouse staff warehouses endpoint to get assigned warehouses
+      const result = await api.get<WarehouseAssignment[]>(`/api/v1/warehouse-staff/warehouses`, { showToast: false })
       if (result.success && result.data) {
-        const ids = [...new Set(result.data.map((b: any) => b.warehouseId).filter(Boolean))]
-        return ids
+        return result.data
       }
       return []
     },
     enabled: !!user?.id && !userLoading,
   })
+
+  const warehouseIds = warehouses.map(w => w.warehouseId)
 
   // Set default warehouse if only one
   useEffect(() => {
@@ -86,20 +71,27 @@ export default function InventoryPage() {
 
   // Fetch inventory items
   const { data: inventoryItems = [], isLoading: itemsLoading } = useQuery<InventoryItem[]>({
-    queryKey: ['inventory', 'warehouse-staff', selectedWarehouseId, searchQuery],
+    queryKey: ['inventory', 'warehouse-staff', selectedWarehouseId, searchQuery, warehouseIds],
     queryFn: async () => {
       const params = new URLSearchParams()
       if (searchQuery) {
         params.append('search', searchQuery)
       }
+      // If warehouse is selected, use it; otherwise API will fetch for all assigned warehouses
       if (selectedWarehouseId) {
         params.append('warehouse_id', selectedWarehouseId)
       }
       
       const result = await api.get<InventoryItem[]>(`/api/v1/inventory?${params.toString()}`, { showToast: false })
-      return result.success ? (result.data || []) : []
+      if (!result.success) {
+        console.error('Failed to fetch inventory items:', result.error)
+        return []
+      }
+      const items = result.data || []
+      console.log('Fetched inventory items:', items.length, 'for warehouse:', selectedWarehouseId || 'all assigned')
+      return items
     },
-    enabled: !!selectedWarehouseId,
+    enabled: warehouseIds.length > 0, // Enable when we have warehouse IDs (even if no specific warehouse selected)
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
@@ -108,7 +100,7 @@ export default function InventoryPage() {
 
   // Fetch stats
   const { data: stats } = useQuery({
-    queryKey: ['inventory-stats', 'warehouse-staff', selectedWarehouseId],
+    queryKey: ['inventory-stats', 'warehouse-staff', selectedWarehouseId, warehouseIds],
     queryFn: async () => {
       const params = new URLSearchParams()
       params.append('stats', 'true')
@@ -119,15 +111,66 @@ export default function InventoryPage() {
       const result = await api.get(`/api/v1/inventory?${params.toString()}`, { showToast: false })
       return result.success ? result.data : null
     },
-    enabled: !!selectedWarehouseId,
+    enabled: warehouseIds.length > 0, // Enable when we have warehouse IDs
     staleTime: 0,
   })
 
+  // Fetch bookings for assigned warehouses
+  const { data: bookings = [], isLoading: bookingsLoading } = useQuery<Booking[]>({
+    queryKey: ['warehouse-staff-bookings', user?.id, selectedWarehouseId],
+    queryFn: async () => {
+      if (!user?.id) return []
+      const result = await api.get<Booking[]>(`/api/v1/warehouse-staff/bookings`, { showToast: false })
+      if (!result.success) {
+        console.error('Failed to fetch bookings:', result.error)
+        return []
+      }
+      // Filter by selected warehouse if one is selected
+      let bookings = result.data || []
+      if (selectedWarehouseId) {
+        bookings = bookings.filter(b => b.warehouseId === selectedWarehouseId)
+      }
+      // Sort by start date
+      return bookings.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    },
+    enabled: !!user?.id && !userLoading && !!selectedWarehouseId,
+    staleTime: 0,
+    refetchOnMount: true,
+  })
+
+
   const loading = userLoading || itemsLoading
+
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (warehouseIds.length === 0) {
+    return (
+      <div className="p-4 space-y-4">
+        <h1 className="text-xl font-bold">Inventory</h1>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8 text-muted-foreground">
+              <Building2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>You are not assigned to any warehouses.</p>
+              <p className="text-sm mt-2">Please contact your administrator to be assigned to a warehouse.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-xl font-bold">Inventory</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">Inventory</h1>
+      </div>
 
       {/* Search */}
       <div className="relative">
@@ -141,22 +184,46 @@ export default function InventoryPage() {
       </div>
 
       {/* Warehouse Selector (if multiple warehouses) */}
-      {warehouseIds.length > 1 && (
+      {warehouses.length > 1 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Select Warehouse</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              {warehouseIds.map((warehouseId) => (
-                <Button
-                  key={warehouseId}
-                  variant={selectedWarehouseId === warehouseId ? "default" : "outline"}
-                  onClick={() => setSelectedWarehouseId(warehouseId)}
-                >
-                  {warehouseId}
-                </Button>
-              ))}
+          <CardContent className="space-y-4">
+            {/* City Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Filter by City</label>
+              <Select value={selectedCity} onValueChange={setSelectedCity}>
+                <SelectTrigger className="w-full sm:w-[250px]">
+                  <SelectValue placeholder="All Cities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cities</SelectItem>
+                  {Array.from(new Set(warehouses.map(w => w.warehouseCity).filter(Boolean))).map((city) => (
+                    <SelectItem key={city} value={city || ""}>
+                      {city}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Warehouse Buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {warehouses
+                .filter((warehouse) => selectedCity === "all" || warehouse.warehouseCity === selectedCity)
+                .map((warehouse) => (
+                  <Button
+                    key={warehouse.warehouseId}
+                    variant={selectedWarehouseId === warehouse.warehouseId ? "default" : "outline"}
+                    onClick={() => setSelectedWarehouseId(warehouse.warehouseId)}
+                  >
+                    {warehouse.warehouseName}
+                    {warehouse.warehouseCity && (
+                      <span className="ml-2 text-xs opacity-70">({warehouse.warehouseCity})</span>
+                    )}
+                  </Button>
+                ))}
             </div>
           </CardContent>
         </Card>
@@ -183,6 +250,87 @@ export default function InventoryPage() {
                 <p className="text-xs text-muted-foreground">Stored Items</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bookings List */}
+      {selectedWarehouseId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Bookings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bookingsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : bookings.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No bookings found for this warehouse</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bookings.map((booking) => (
+                    <TableRow key={booking.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{booking.customerName}</p>
+                          <p className="text-sm text-muted-foreground">{booking.customerEmail}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">
+                          {booking.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(booking.startDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        {booking.endDate
+                          ? new Date(booking.endDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          : 'Ongoing'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="capitalize">
+                          {booking.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/warehouse/bookings/${booking.id}`)}
+                        >
+                          Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}
@@ -234,6 +382,7 @@ export default function InventoryPage() {
           )}
         </CardContent>
       </Card>
+
     </div>
   )
 }

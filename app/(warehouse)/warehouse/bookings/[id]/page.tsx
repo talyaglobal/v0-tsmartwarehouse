@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { ArrowLeft, Package, Building2, Calendar, MapPin, FileText, Loader2, Clock, CheckCircle, Edit } from "@/components/icons"
-import { formatCurrency, formatDate, formatDateTime, getBookingTypeLabel } from "@/lib/utils/format"
+import { ArrowLeft, Package, Building2, Loader2, CheckCircle, Edit } from "@/components/icons"
+import { formatDate, formatDateTime, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking } from "@/types"
 import { api } from "@/lib/api/client"
 import { BookingDateChangeForm } from "@/components/warehouse/booking-date-change-form"
@@ -85,7 +85,7 @@ export default function WarehouseStaffBookingDetailPage({
       return result.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["warehouse-staff-booking", bookingId })
+      queryClient.invalidateQueries({ queryKey: ["warehouse-staff-booking", bookingId] })
       queryClient.invalidateQueries({ queryKey: ["warehouse-staff-bookings"] })
     },
   })
@@ -157,10 +157,6 @@ export default function WarehouseStaffBookingDetailPage({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-sm text-muted-foreground">Amount</span>
-              <p className="text-lg font-semibold">{formatCurrency(booking.totalAmount)}</p>
-            </div>
             <div>
               <span className="text-sm text-muted-foreground">Start Date</span>
               <p className="text-lg font-semibold">{formatDate(booking.startDate)}</p>

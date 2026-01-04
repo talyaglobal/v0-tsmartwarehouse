@@ -55,7 +55,7 @@ export interface TeamMembersTabRef {
   openAddMemberDialog?: (role?: string) => void
 }
 
-export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((props, ref) => {
+export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) => {
   const { user } = useUser()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()

@@ -36,7 +36,6 @@ export default function WarehousesPage() {
   const [deleteConfirmWarehouse, setDeleteConfirmWarehouse] = useState<Warehouse | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [assignStaffWarehouse, setAssignStaffWarehouse] = useState<Warehouse | null>(null)
-  const [isAssigningStaff, setIsAssigningStaff] = useState(false)
 
   useEffect(() => {
     fetchWarehouses()

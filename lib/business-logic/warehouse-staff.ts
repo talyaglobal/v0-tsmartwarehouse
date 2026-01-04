@@ -15,6 +15,7 @@ import type { Booking, BookingStatus } from "@/types"
 export interface WarehouseStaffAssignment {
   warehouseId: string
   warehouseName: string
+  warehouseCity?: string | null
   role: "manager" | "staff"
   assignedAt: string
 }
@@ -35,7 +36,8 @@ export async function getWarehouseStaffWarehouses(
       created_at,
       warehouses!inner (
         id,
-        name
+        name,
+        city
       )
     `)
     .eq("user_id", staffId)
@@ -52,6 +54,7 @@ export async function getWarehouseStaffWarehouses(
   return data.map((row: any) => ({
     warehouseId: row.warehouse_id,
     warehouseName: row.warehouses?.name || "Unknown Warehouse",
+    warehouseCity: row.warehouses?.city || null,
     role: row.role as "manager" | "staff",
     assignedAt: row.created_at,
   }))
@@ -135,27 +138,37 @@ export async function setBookingAwaitingTimeSlot(
   bookingId: string,
   staffId: string
 ): Promise<Booking> {
+  console.log(`[setBookingAwaitingTimeSlot] Starting for bookingId: ${bookingId}, staffId: ${staffId}`)
+  
   // Verify staff has access to the booking's warehouse
-  const booking = await getBookingById(bookingId)
+  const booking = await getBookingById(bookingId, false) // Disable cache to get fresh data
+  console.log(`[setBookingAwaitingTimeSlot] Booking fetched:`, booking ? `Found (status: ${booking.status})` : 'Not found')
+  
   if (!booking) {
-    throw new Error("Booking not found")
+    console.error(`[setBookingAwaitingTimeSlot] Booking not found for ID: ${bookingId}`)
+    throw new Error(`Booking not found: ${bookingId}`)
   }
 
   const hasAccess = await hasWarehouseAccess(staffId, booking.warehouseId)
+  console.log(`[setBookingAwaitingTimeSlot] Staff access check:`, hasAccess ? 'Has access' : 'No access')
+  
   if (!hasAccess) {
     throw new Error("Staff member does not have access to this warehouse")
   }
 
   // Verify booking is in pre_order status
   if (booking.status !== "pre_order") {
-    throw new Error("Booking must be in pre_order status to set awaiting_time_slot")
+    console.error(`[setBookingAwaitingTimeSlot] Invalid status: ${booking.status}, expected: pre_order`)
+    throw new Error(`Booking must be in pre_order status to set awaiting_time_slot. Current status: ${booking.status}`)
   }
 
   // Update booking status
+  console.log(`[setBookingAwaitingTimeSlot] Updating booking status to awaiting_time_slot`)
   const updatedBooking = await updateBooking(bookingId, {
     status: "awaiting_time_slot",
   })
 
+  console.log(`[setBookingAwaitingTimeSlot] Booking updated successfully`)
   return updatedBooking
 }
 
@@ -169,21 +182,36 @@ export async function proposeDateChange(
   newTime: string,
   staffId: string
 ): Promise<Booking> {
+  console.log(`[proposeDateChange] Starting for bookingId: ${bookingId}, staffId: ${staffId}, newDate: ${newDate}, newTime: ${newTime}`)
+  
   // Verify staff has access to the booking's warehouse
-  const booking = await getBookingById(bookingId)
+  const booking = await getBookingById(bookingId, false) // Disable cache to get fresh data
+  console.log(`[proposeDateChange] Booking fetched:`, booking ? `Found (status: ${booking.status})` : 'Not found')
+  
   if (!booking) {
-    throw new Error("Booking not found")
+    console.error(`[proposeDateChange] Booking not found for ID: ${bookingId}`)
+    throw new Error(`Booking not found: ${bookingId}`)
   }
 
   const hasAccess = await hasWarehouseAccess(staffId, booking.warehouseId)
+  console.log(`[proposeDateChange] Staff access check:`, hasAccess ? 'Has access' : 'No access')
+  
   if (!hasAccess) {
     throw new Error("Staff member does not have access to this warehouse")
   }
 
+  // Verify booking is in pre_order or awaiting_time_slot status
+  if (booking.status !== "pre_order" && booking.status !== "awaiting_time_slot") {
+    console.error(`[proposeDateChange] Invalid status: ${booking.status}, expected: pre_order or awaiting_time_slot`)
+    throw new Error(`Booking must be in 'pre_order' or 'awaiting_time_slot' status to propose date change. Current status: ${booking.status}`)
+  }
+
   // Combine date and time into a single datetime
   const proposedDateTime = `${newDate}T${newTime}:00`
+  console.log(`[proposeDateChange] Proposed datetime: ${proposedDateTime}`)
 
   // Update booking with proposed date/time
+  console.log(`[proposeDateChange] Updating booking with proposed date/time`)
   const updatedBooking = await updateBooking(bookingId, {
     proposedStartDate: proposedDateTime,
     proposedStartTime: newTime,
@@ -192,6 +220,7 @@ export async function proposeDateChange(
     status: "awaiting_time_slot", // Set status to awaiting customer confirmation
   })
 
+  console.log(`[proposeDateChange] Booking updated successfully`)
   return updatedBooking
 }
 
@@ -235,8 +264,8 @@ export async function checkDateAvailability(
  * This is a simplified version - full implementation should use availability.ts
  */
 export async function getAvailableTimeSlots(
-  warehouseId: string,
-  date: string
+  _warehouseId: string,
+  _date: string
 ): Promise<string[]> {
   // This is a placeholder - full implementation should use availability.ts
   // For now, return default time slots
@@ -251,23 +280,9 @@ export async function getAvailableTimeSlots(
     "16:00",
   ]
 
-  // Check which slots are available
-  const bookings = await getBookings({
-    warehouseId,
-    useCache: false,
-  })
-
-  const targetDate = new Date(date)
-  const conflictingBookings = bookings.filter((b) => {
-    const bookingDate = new Date(b.startDate)
-    return (
-      bookingDate.toDateString() === targetDate.toDateString() &&
-      (b.status === "confirmed" || b.status === "active")
-    )
-  })
-
   // For now, return all default slots
   // Full implementation should check actual time conflicts
+  // TODO: Use getBookings to filter out conflicting bookings when implementing full availability check
   return defaultSlots
 }
 

@@ -9,7 +9,7 @@ import type { ErrorResponse } from "@/types/api"
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Require authentication
@@ -18,7 +18,8 @@ export async function GET(
       return authResult
     }
 
-    const warehouseId = params.id
+    const { id } = await params
+    const warehouseId = id
     const { searchParams } = new URL(request.url)
     const date = searchParams.get("date")
     const time = searchParams.get("time")

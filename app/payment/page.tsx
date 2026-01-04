@@ -20,31 +20,100 @@ export default function PaymentPage() {
   const bookingId = searchParams.get("bookingId")
 
   useEffect(() => {
-    if (!clientSecret || !bookingId) {
-      router.push("/find-warehouses")
+    // If bookingId is provided, create payment intent from booking
+    if (bookingId && !clientSecret) {
+      const createPaymentFromBooking = async () => {
+        try {
+          setLoading(true)
+          // First, get the booking
+          const bookingResponse = await fetch(`/api/v1/bookings/${bookingId}`, {
+            credentials: 'include',
+          })
+          const bookingData = await bookingResponse.json()
+          
+          if (!bookingData.success || !bookingData.data) {
+            router.push("/dashboard/bookings")
+            return
+          }
+
+          const booking = bookingData.data
+
+          // Get invoice for this booking
+          const invoiceResponse = await fetch(`/api/v1/invoices?bookingId=${bookingId}`, {
+            credentials: 'include',
+          })
+          const invoiceData = await invoiceResponse.json()
+
+          let invoiceId: string | null = null
+          if (invoiceData.success && invoiceData.data && invoiceData.data.length > 0) {
+            invoiceId = invoiceData.data[0].id
+          }
+
+          // Create payment intent via processInvoicePayment or direct payment
+          const paymentResponse = await fetch("/api/v1/payments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: 'include',
+            body: JSON.stringify({
+              invoiceId: invoiceId || undefined,
+              paymentMethod: "card",
+              amount: booking.totalAmount,
+            }),
+          })
+          const paymentData = await paymentResponse.json()
+          
+          if (paymentData.success && paymentData.clientSecret) {
+            // Redirect with clientSecret
+            router.push(`/payment?intent=${paymentData.clientSecret}&bookingId=${bookingId}`)
+          } else {
+            console.error("Failed to create payment:", paymentData.error)
+            router.push("/dashboard/bookings")
+          }
+        } catch (error) {
+          console.error("Failed to create payment from booking:", error)
+          router.push("/dashboard/bookings")
+        } finally {
+          setLoading(false)
+        }
+      }
+
+      createPaymentFromBooking()
       return
     }
 
-    // Retrieve payment intent to get amount
-    const retrieveIntent = async () => {
-      try {
-        const response = await fetch("/api/v1/payments/retrieve-intent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientSecret }),
-        })
-        const data = await response.json()
-        if (data.success) {
-          setAmount(data.amount)
+    // If clientSecret is provided, retrieve payment intent
+    if (clientSecret && bookingId) {
+      const retrieveIntent = async () => {
+        try {
+          setLoading(true)
+          const response = await fetch("/api/v1/payments/retrieve-intent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: 'include',
+            body: JSON.stringify({ clientSecret }),
+          })
+          const data = await response.json()
+          if (data.success) {
+            setAmount(data.amount)
+          } else {
+            router.push("/dashboard/bookings")
+          }
+        } catch (error) {
+          console.error("Failed to retrieve payment intent:", error)
+          router.push("/dashboard/bookings")
+        } finally {
+          setLoading(false)
         }
-      } catch (error) {
-        console.error("Failed to retrieve payment intent:", error)
-      } finally {
-        setLoading(false)
       }
+
+      retrieveIntent()
+      return
     }
 
-    retrieveIntent()
+    // If neither bookingId nor clientSecret, redirect
+    if (!bookingId && !clientSecret) {
+      router.push("/dashboard/bookings")
+    }
   }, [clientSecret, bookingId, router])
 
   const handlePayment = async () => {

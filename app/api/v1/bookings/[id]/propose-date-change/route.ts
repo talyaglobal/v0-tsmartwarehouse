@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { proposeDateChange } from "@/lib/business-logic/warehouse-staff"
 import { getNotificationService } from "@/lib/notifications/service"
-import { getBookingById } from "@/lib/db/bookings"
 import type { ErrorResponse } from "@/types/api"
 import { z } from "zod"
 
@@ -18,7 +17,7 @@ const proposeDateChangeSchema = z.object({
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
   try {
     // Require authentication
@@ -47,7 +46,11 @@ export async function POST(
       return NextResponse.json(errorData, { status: 403 })
     }
 
-    const bookingId = params.id
+    // Resolve params (Next.js 15+ compatibility)
+    const resolvedParams = await Promise.resolve(params)
+    const bookingId = resolvedParams.id
+
+    console.log(`[propose-date-change API] Received request for bookingId: ${bookingId}, userId: ${user.id}`)
     const body = await request.json()
 
     // Validate request body

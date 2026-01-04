@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { setBookingAwaitingTimeSlot } from "@/lib/business-logic/warehouse-staff"
 import { getNotificationService } from "@/lib/notifications/service"
-import { getBookingById } from "@/lib/db/bookings"
 import type { ErrorResponse } from "@/types/api"
 
 /**
@@ -11,7 +10,7 @@ import type { ErrorResponse } from "@/types/api"
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
   try {
     // Require authentication
@@ -40,7 +39,11 @@ export async function POST(
       return NextResponse.json(errorData, { status: 403 })
     }
 
-    const bookingId = params.id
+    // Resolve params (Next.js 15+ compatibility)
+    const resolvedParams = await Promise.resolve(params)
+    const bookingId = resolvedParams.id
+
+    console.log(`[set-awaiting-time-slot API] Received request for bookingId: ${bookingId}, userId: ${user.id}`)
 
     // Set booking to awaiting_time_slot
     const updatedBooking = await setBookingAwaitingTimeSlot(bookingId, user.id)

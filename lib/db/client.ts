@@ -1,11 +1,14 @@
 /**
  * Database client wrapper
  * Provides a unified interface for database operations
- * Uses Supabase as the primary database client
+ * Uses Supabase for auth/realtime and Prisma for data queries
  */
 
 import { createServerSupabaseClient, createAuthenticatedSupabaseClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+
+// Export Prisma client for marketplace queries
+export { prisma, withPrisma } from '@/lib/prisma/client'
 
 /**
  * Get database client for server-side operations

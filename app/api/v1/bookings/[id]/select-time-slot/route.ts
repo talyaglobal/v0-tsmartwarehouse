@@ -16,7 +16,7 @@ const selectTimeSlotSchema = z.object({
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
   try {
     // Require authentication
@@ -26,7 +26,10 @@ export async function POST(
     }
 
     const { user } = authResult
-    const bookingId = params.id
+
+    // Resolve params (Next.js 15+ compatibility)
+    const resolvedParams = await Promise.resolve(params)
+    const bookingId = resolvedParams.id
 
     // Get booking
     const booking = await getBookingById(bookingId)
@@ -103,17 +106,23 @@ export async function POST(
     const scheduledDatetime = `${selectedDate}T${selectedTime}:00`
 
     // Update booking with selected time slot
+    // Clear proposed date/time fields if they exist (customer selected different time)
     const updatedBooking = await updateBooking(bookingId, {
       scheduledDropoffDatetime: scheduledDatetime,
       timeSlotConfirmedAt: new Date().toISOString(),
-      status: booking.status === "pre_order" ? "payment_pending" : booking.status, // Change to payment_pending if pre_order
+      status: "payment_pending", // Always move to payment_pending after time slot selection
+      // Clear proposed fields if customer selected different time
+      proposedStartDate: undefined,
+      proposedStartTime: undefined,
+      dateChangeRequestedAt: undefined,
+      dateChangeRequestedBy: undefined,
     })
 
     return NextResponse.json({
       success: true,
       data: updatedBooking,
       message: "Time slot selected successfully",
-      redirectUrl: `/payments?bookingId=${bookingId}`, // Redirect to payment page
+      redirectUrl: `/payment?bookingId=${bookingId}`, // Redirect to payment page
     })
   } catch (error) {
     console.error("Error selecting time slot:", error)

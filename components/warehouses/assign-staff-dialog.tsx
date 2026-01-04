@@ -122,7 +122,7 @@ export function AssignStaffDialog({ warehouse, open, onOpenChange }: AssignStaff
       
       return results.map(r => r.data)
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, _variables) => {
       const count = selectedStaffIds.length
       queryClient.invalidateQueries({ queryKey: ['warehouse-staff', warehouse?.id] })
       queryClient.invalidateQueries({ queryKey: ['company-warehouse-staff'] })

@@ -9,17 +9,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Warehouse, ArrowLeft, Plus, X } from "@/components/icons"
+import { Loader2, Warehouse, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
-import { FileUpload, UploadedFile } from "@/components/ui/file-upload"
+import { PhotoUpload } from "@/components/marketplace/photo-upload"
 import { MapLocationPicker } from "@/components/ui/map-location-picker"
 import { formatNumber } from "@/lib/utils/format"
 import { TemperatureSelect } from "@/components/warehouse/temperature-select"
+import { Progress } from "@/components/ui/progress"
 
 const WAREHOUSE_TYPES = [
   { value: "general-dry-ambient", label: "General (Dry/Ambient)" },
@@ -60,17 +61,25 @@ const SECURITY_OPTIONS = [
   "Fenced",
 ] as const
 
+const STEPS = [
+  { id: 1, title: "Basic Info", description: "Name, address, location" },
+  { id: 2, title: "Details", description: "Type, storage, temperature, capacity" },
+  { id: 3, title: "Photos", description: "Upload warehouse photos" },
+  { id: 4, title: "Pricing", description: "Set pricing and volume discounts" },
+  { id: 5, title: "Amenities", description: "Features and access information" },
+  { id: 6, title: "Review", description: "Review and publish" },
+] as const
+
 export default function NewWarehousePage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
   const [isLoading, setIsLoading] = useState(false)
-  const [state, setState] = useState("") // State for warehouse location
-  const [warehousePhotos, setWarehousePhotos] = useState<UploadedFile[]>([])
-  const [warehouseVideo, setWarehouseVideo] = useState<UploadedFile[]>([])
+  const [currentStep, setCurrentStep] = useState(1)
+  const [state, setState] = useState("")
+  const [warehousePhotos, setWarehousePhotos] = useState<string[]>([])
   const [showMapPicker, setShowMapPicker] = useState(false)
 
-  // Helper function to format number with thousands separator
   const formatNumberInput = (value: string): string => {
     const numericValue = value.replace(/\D/g, '')
     if (!numericValue) return ''
@@ -79,12 +88,12 @@ export default function NewWarehousePage() {
     return formatNumber(num)
   }
 
-  // Helper function to parse formatted number back to numeric string
   const parseNumberInput = (value: string): string => {
     return value.replace(/\D/g, '')
   }
 
   const [formData, setFormData] = useState({
+    name: "",
     address: "",
     city: "",
     zipCode: "",
@@ -96,38 +105,23 @@ export default function NewWarehousePage() {
     warehouseType: "",
     storageType: "",
     temperatureTypes: [] as string[],
-    customStatus: "",
     minPallet: "",
     maxPallet: "",
     minSqFt: "",
     maxSqFt: "",
     rentMethods: [] as string[],
     security: [] as string[],
-    // Access to warehouse
     accessType: "",
     accessControl: "",
-    // Product acceptance hours
     productAcceptanceStartTime: "",
     productAcceptanceEndTime: "",
-    // Working days
     workingDays: [] as string[],
-    // Warehouse fees
     warehouseInFee: "",
     warehouseOutFee: "",
-    // Transportation
-    ports: [] as Array<{
-      name: string
-      container40DC: string
-      container40HC: string
-      container20DC: string
-    }>,
-    // Pricing
     pricing: [] as Array<{
       pricingType: string
       basePrice: string
       unit: string
-      minQuantity: string
-      maxQuantity: string
       volumeDiscounts: Record<string, string>
     }>,
   })
@@ -138,322 +132,181 @@ export default function NewWarehousePage() {
       pricingType: string
       basePrice: string
       unit: string
-      minQuantity: string
-      maxQuantity: string
       volumeDiscounts: Record<string, string>
     }> = []
 
     if (formData.rentMethods.includes('pallet')) {
-      // Add per pallet per day if not exists
       if (!formData.pricing.some(p => p.pricingType === 'pallet')) {
         newPricing.push({
           pricingType: 'pallet',
           basePrice: '',
           unit: 'per_pallet_per_day',
-          minQuantity: formData.minPallet || '',
-          maxQuantity: formData.maxPallet || '',
           volumeDiscounts: {},
         })
       }
-      // Add per pallet per month if not exists
       if (!formData.pricing.some(p => p.pricingType === 'pallet-monthly')) {
         newPricing.push({
           pricingType: 'pallet-monthly',
           basePrice: '',
           unit: 'per_pallet_per_month',
-          minQuantity: formData.minPallet || '',
-          maxQuantity: formData.maxPallet || '',
           volumeDiscounts: {},
         })
       }
     }
 
     if (formData.rentMethods.includes('sq_ft')) {
-      // Add per sq feet per day if not exists
-      if (!formData.pricing.some(p => p.pricingType === 'area')) {
+      if (!formData.pricing.some(p => p.pricingType === 'area-rental')) {
         newPricing.push({
-          pricingType: 'area',
+          pricingType: 'area-rental',
           basePrice: '',
           unit: 'per_sqft_per_day',
-          minQuantity: formData.minSqFt || '',
-          maxQuantity: formData.maxSqFt || '',
           volumeDiscounts: {},
         })
       }
     }
 
-    // Remove pricing that doesn't match rent methods
     const filteredPricing = formData.pricing.filter(p => {
       if (p.pricingType === 'pallet' || p.pricingType === 'pallet-monthly') {
         return formData.rentMethods.includes('pallet')
       }
-      if (p.pricingType === 'area') {
+      if (p.pricingType === 'area-rental') {
         return formData.rentMethods.includes('sq_ft')
       }
       return false
     })
 
-    // Update pricing if needed
     if (newPricing.length > 0 || filteredPricing.length !== formData.pricing.length) {
       setFormData(prev => ({
         ...prev,
         pricing: [...filteredPricing, ...newPricing],
       }))
     }
-  }, [formData.rentMethods, formData.minPallet, formData.maxPallet, formData.minSqFt, formData.maxSqFt])
+  }, [formData.rentMethods])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const validateStep = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        if (!formData.name || !formData.address || !formData.city) {
+          addNotification({
+            type: 'error',
+            message: 'Please fill in name, address, and city',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      case 2:
+        if (!formData.warehouseType || !formData.storageType || formData.temperatureTypes.length === 0) {
+          addNotification({
+            type: 'error',
+            message: 'Please select warehouse type, storage type, and at least one temperature option',
+            duration: 5000,
+          })
+          return false
+        }
+        const totalPallet = parseNumberInput(formData.totalPalletStorage)
+        const totalSqFt = parseNumberInput(formData.totalSqFt)
+        if (!totalPallet && !totalSqFt) {
+          addNotification({
+            type: 'error',
+            message: 'Please provide at least one of: Total Pallet Storage or Total Square Feet',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      case 3:
+        if (warehousePhotos.length < 2) {
+          addNotification({
+            type: 'error',
+            message: 'Please upload at least 2 photos',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      case 4:
+        const validPricing = formData.pricing.filter(p => p.pricingType && p.basePrice)
+        if (validPricing.length === 0) {
+          addNotification({
+            type: 'error',
+            message: 'Please add at least one pricing entry',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      default:
+        return true
+    }
+  }
+
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, 6))
+    }
+  }
+
+  const handlePrevious = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1))
+  }
+
+  const handleSubmit = async () => {
+    if (!validateStep(6)) return
+
     setIsLoading(true)
-
     try {
-      // Parse amenities (comma-separated)
       const amenitiesArray = formData.amenities
         .split(",")
         .map(a => a.trim())
         .filter(a => a.length > 0)
 
-      // Validate required fields
-      if (!formData.address || !formData.city) {
-        addNotification({
-          type: 'error',
-          message: 'Please fill in address and city',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      if (!formData.warehouseType) {
-        addNotification({
-          type: 'error',
-          message: 'Please select a warehouse type',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      if (!formData.storageType) {
-        addNotification({
-          type: 'error',
-          message: 'Please select a storage type',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      // Validate pricing - at least one pricing entry is required
-      const validPricing = formData.pricing.filter(p => p.pricingType && p.basePrice)
-      if (validPricing.length === 0) {
-        addNotification({
-          type: 'error',
-          message: 'Please add at least one pricing entry (Pallet, Pallet Monthly, or Area Rental)',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      if (formData.temperatureTypes.length === 0) {
-        addNotification({
-          type: 'error',
-          message: 'Please select at least one temperature option',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      // Validate warehouse photos (minimum 2 required)
-      const successPhotos = warehousePhotos.filter(f =>
-        f.status === 'success' &&
-        f.path &&
-        f.path.trim().length > 0
-      )
-
-      if (successPhotos.length < 2) {
-        addNotification({
-          type: 'error',
-          message: `Please upload at least 2 warehouse photos. Currently uploaded: ${successPhotos.length}`,
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      // Validate that at least one total field is provided
       const totalPalletStorageValue = parseNumberInput(formData.totalPalletStorage)
       const totalSqFtValue = parseNumberInput(formData.totalSqFt)
 
-      const hasTotalPallet = totalPalletStorageValue && totalPalletStorageValue.trim() !== ''
-      const hasTotalSqFt = totalSqFtValue && totalSqFtValue.trim() !== ''
-
-      if (!hasTotalPallet && !hasTotalSqFt) {
-        addNotification({
-          type: 'error',
-          message: 'Please provide at least one of: Total Pallet Storage or Total Square Feet',
-          duration: 5000,
-        })
-        setIsLoading(false)
-        return
-      }
-
-      // Validate totalPalletStorage if provided
-      if (hasTotalPallet) {
-        const totalPalletStorage = parseInt(totalPalletStorageValue)
-        if (isNaN(totalPalletStorage) || totalPalletStorage <= 0) {
-          addNotification({
-            type: 'error',
-            message: 'Total pallet storage must be a positive number',
-            duration: 5000,
-          })
-          setIsLoading(false)
-          return
-        }
-
-        // Validate min/max pallet against total
-        if (formData.minPallet) {
-          const minPallet = parseInt(parseNumberInput(formData.minPallet))
-          if (minPallet > totalPalletStorage) {
-            addNotification({
-              type: 'error',
-              message: 'Minimum pallet cannot be greater than total pallet storage',
-              duration: 5000,
-            })
-            setIsLoading(false)
-            return
-          }
-        }
-
-        if (formData.maxPallet) {
-          const maxPallet = parseInt(parseNumberInput(formData.maxPallet))
-          if (maxPallet > totalPalletStorage) {
-            addNotification({
-              type: 'error',
-              message: 'Maximum pallet cannot be greater than total pallet storage',
-              duration: 5000,
-            })
-            setIsLoading(false)
-            return
-          }
-        }
-      }
-
-      // Validate totalSqFt if provided
-      if (hasTotalSqFt) {
-        const totalSqFt = parseInt(totalSqFtValue)
-        if (isNaN(totalSqFt) || totalSqFt <= 0) {
-          addNotification({
-            type: 'error',
-            message: 'Total square feet must be a positive number',
-            duration: 5000,
-          })
-          setIsLoading(false)
-          return
-        }
-
-        // Validate min/max sqft against total
-        if (formData.minSqFt) {
-          const minSqFt = parseInt(parseNumberInput(formData.minSqFt))
-          if (minSqFt > totalSqFt) {
-            addNotification({
-              type: 'error',
-              message: 'Minimum square feet cannot be greater than total square feet',
-              duration: 5000,
-            })
-            setIsLoading(false)
-            return
-          }
-        }
-
-        if (formData.maxSqFt) {
-          const maxSqFt = parseInt(parseNumberInput(formData.maxSqFt))
-          if (maxSqFt > totalSqFt) {
-            addNotification({
-              type: 'error',
-              message: 'Maximum square feet cannot be greater than total square feet',
-              duration: 5000,
-            })
-            setIsLoading(false)
-            return
-          }
-        }
-      }
-
-      // Prepare photo paths
-      const photoPaths = successPhotos.map(f => f.path).filter(Boolean) as string[]
-
-      // Prepare video path (optional, single file)
-      const videoPath = warehouseVideo.length > 0 && warehouseVideo[0].status === 'success' && warehouseVideo[0].path
-        ? warehouseVideo[0].path
-        : undefined
-
-      // Prepare access info
-      const accessInfo = formData.accessType || formData.accessControl
-        ? {
-            accessType: formData.accessType || undefined,
-            accessControl: formData.accessControl || undefined,
-          }
-        : undefined
-
       const requestBody: any = {
+        name: formData.name,
         address: formData.address,
         city: formData.city,
         state: state,
-        warehouseType: formData.warehouseType ? formData.warehouseType : '',
-        storageType: formData.storageType ? formData.storageType : '',
+        warehouseType: formData.warehouseType,
+        storageType: formData.storageType,
         temperatureTypes: formData.temperatureTypes,
         amenities: amenitiesArray,
-        photos: photoPaths,
+        photos: warehousePhotos,
         operatingHours: {
-          open: '08:00',
-          close: '18:00',
-          days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          open: formData.productAcceptanceStartTime || '08:00',
+          close: formData.productAcceptanceEndTime || '18:00',
+          days: formData.workingDays.length > 0 ? formData.workingDays : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
         },
-        customStatus: formData.customStatus || undefined,
-        minPallet: formData.minPallet ? parseInt(parseNumberInput(formData.minPallet)) : undefined,
-        maxPallet: formData.maxPallet ? parseInt(parseNumberInput(formData.maxPallet)) : undefined,
-        minSqFt: formData.minSqFt ? parseInt(parseNumberInput(formData.minSqFt)) : undefined,
-        maxSqFt: formData.maxSqFt ? parseInt(parseNumberInput(formData.maxSqFt)) : undefined,
         rentMethods: formData.rentMethods,
         security: formData.security,
-        videoUrl: videoPath,
-        accessInfo: accessInfo,
+        accessInfo: formData.accessType || formData.accessControl
+          ? {
+              accessType: formData.accessType || undefined,
+              accessControl: formData.accessControl || undefined,
+            }
+          : undefined,
         productAcceptanceStartTime: formData.productAcceptanceStartTime || undefined,
         productAcceptanceEndTime: formData.productAcceptanceEndTime || undefined,
         workingDays: formData.workingDays.length > 0 ? formData.workingDays : undefined,
-        // Warehouse fees
         warehouseInFee: formData.warehouseInFee ? parseFloat(formData.warehouseInFee) : undefined,
         warehouseOutFee: formData.warehouseOutFee ? parseFloat(formData.warehouseOutFee) : undefined,
-        // Ports & Container Pricing
-        ports: formData.ports
-          .filter(port => port.name && port.name.trim() !== '')
-          .map(port => ({
-            name: port.name.trim(),
-            container40DC: port.container40DC ? parseFloat(port.container40DC) : undefined,
-            container40HC: port.container40HC ? parseFloat(port.container40HC) : undefined,
-            container20DC: port.container20DC ? parseFloat(port.container20DC) : undefined,
-          })),
       }
 
-      // Add optional total fields if provided
-      if (hasTotalPallet) {
+      if (totalPalletStorageValue) {
         requestBody.totalPalletStorage = parseInt(totalPalletStorageValue)
       }
-      if (hasTotalSqFt) {
+      if (totalSqFtValue) {
         requestBody.totalSqFt = parseInt(totalSqFtValue)
       }
 
-      // Add pricing if provided
+      const validPricing = formData.pricing.filter(p => p.pricingType && p.basePrice)
       if (validPricing.length > 0) {
         requestBody.pricing = validPricing.map(p => ({
           pricing_type: p.pricingType,
           base_price: parseFloat(p.basePrice),
-          unit: p.unit || (p.pricingType === 'pallet' ? 'per_pallet_per_day' : p.pricingType === 'pallet-monthly' ? 'per_pallet_per_month' : 'per_sqft_per_month'),
-          min_quantity: p.minQuantity ? parseInt(p.minQuantity) : null,
-          max_quantity: p.maxQuantity ? parseInt(p.maxQuantity) : null,
+          unit: p.unit,
           volume_discounts: p.volumeDiscounts && Object.keys(p.volumeDiscounts).length > 0 ? p.volumeDiscounts : null,
         }))
       }
@@ -488,11 +341,13 @@ export default function NewWarehousePage() {
     }
   }
 
+  const progress = (currentStep / 6) * 100
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Add New Warehouse"
-        description="Create a new warehouse for your company"
+        title="Create New Warehouse Listing"
+        description="Add your warehouse to the marketplace"
       />
 
       <div className="flex items-center gap-4 mb-6">
@@ -504,23 +359,174 @@ export default function NewWarehousePage() {
         </Button>
       </div>
 
+      {/* Progress Indicator */}
       <Card>
-        <form onSubmit={handleSubmit}>
-          <CardHeader className="pb-4">
-            <CardTitle>Enter the details for your new warehouse</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 pt-0">
-            <div className="grid gap-6">
-              {/* Warehouse Type */}
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium">Step {currentStep} of {STEPS.length}</span>
+              <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+            <div className="flex items-center justify-between mt-4">
+              {STEPS.map((step) => (
+                <div
+                  key={step.id}
+                  className={`flex flex-col items-center flex-1 ${
+                    step.id < currentStep ? 'text-primary' : step.id === currentStep ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-2 ${
+                    step.id < currentStep
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : step.id === currentStep
+                      ? 'border-primary bg-background'
+                      : 'border-muted-foreground bg-background'
+                  }`}>
+                    {step.id < currentStep ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <span className="text-sm font-medium">{step.id}</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-center">{step.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{STEPS[currentStep - 1].description}</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Step 1: Basic Info */}
+          {currentStep === 1 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">
+                  Warehouse Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Main Warehouse - Downtown"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="address">
+                    Address <span className="text-destructive">*</span>
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMapPicker(true)}
+                  >
+                    Select on Map
+                  </Button>
+                </div>
+                <PlacesAutocomplete
+                  value={formData.address}
+                  onChange={(address, place) => {
+                    setFormData(prev => ({ ...prev, address }))
+                    if (place?.address_components) {
+                      let cityName = ""
+                      let zipCode = ""
+                      let stateName = ""
+
+                      for (const component of place.address_components) {
+                        const types = component.types
+                        if (types.includes("locality") || types.includes("administrative_area_level_2")) {
+                          cityName = component.long_name
+                        }
+                        if (types.includes("postal_code")) {
+                          zipCode = component.long_name
+                        }
+                        if (types.includes("administrative_area_level_1")) {
+                          stateName = component.long_name
+                          setState(component.short_name || component.long_name)
+                        }
+                      }
+
+                      if (cityName && stateName) {
+                        cityName = `${cityName}, ${stateName}`
+                      }
+
+                      setFormData(prev => ({
+                        ...prev,
+                        address,
+                        ...(cityName && { city: cityName }),
+                        ...(zipCode && { zipCode }),
+                      }))
+                    }
+                  }}
+                  onLocationChange={(location) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      latitude: location.lat.toString(),
+                      longitude: location.lng.toString(),
+                    }))
+                  }}
+                  placeholder="Enter full address"
+                />
+              </div>
+
+              <MapLocationPicker
+                open={showMapPicker}
+                onOpenChange={setShowMapPicker}
+                initialLat={formData.latitude ? parseFloat(formData.latitude) : undefined}
+                initialLng={formData.longitude ? parseFloat(formData.longitude) : undefined}
+                onLocationSelect={(location) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    latitude: location.lat.toString(),
+                    longitude: location.lng.toString(),
+                    address: location.address || prev.address,
+                  }))
+                }}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city">City (auto-filled)</Label>
+                  <Input
+                    id="city"
+                    value={formData.city}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">Zip Code</Label>
+                  <Input
+                    id="zipCode"
+                    value={formData.zipCode}
+                    onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Details */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="warehouseType">
-                  Warehouse Type as per Product Content <span className="text-destructive">*</span>
+                  Warehouse Type <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={formData.warehouseType}
                   onValueChange={(value) => setFormData({ ...formData, warehouseType: value })}
                 >
-                  <SelectTrigger id="warehouseType">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select warehouse type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -533,9 +539,6 @@ export default function NewWarehousePage() {
                 </Select>
               </div>
 
-              <Separator />
-
-              {/* Storage Type - Single Selection */}
               <div className="space-y-2">
                 <Label htmlFor="storageType">
                   Storage Type <span className="text-destructive">*</span>
@@ -557,13 +560,9 @@ export default function NewWarehousePage() {
                 </Select>
               </div>
 
-              <Separator />
-
-              {/* Temperature Types - Multiple Selection */}
               <div className="space-y-3">
                 <Label>
                   Temperature Options <span className="text-destructive">*</span>
-                  <p className="text-xs text-muted-foreground font-normal mt-1">Select one or more temperature types available in your warehouse</p>
                 </Label>
                 <TemperatureSelect
                   value={formData.temperatureTypes}
@@ -572,326 +571,8 @@ export default function NewWarehousePage() {
                 />
               </div>
 
-              <Separator />
-
-              {/* Address with Google Maps Places Autocomplete */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="address">
-                    Enter Address <span className="text-destructive">*</span>
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowMapPicker(true)}
-                  >
-                    Select on Map
-                  </Button>
-                </div>
-                <PlacesAutocomplete
-                  value={formData.address}
-                  onChange={(address, place) => {
-                    // Only update address, don't extract components here
-                    // Components will be extracted on blur or when place is explicitly selected
-                    setFormData(prev => ({ ...prev, address }))
-
-                    // Only extract address components if place is explicitly selected (not on every keystroke)
-                    if (place?.address_components) {
-                      let cityName = ""
-                      let zipCode = ""
-                      let stateName = ""
-
-                      for (const component of place.address_components) {
-                        const types = component.types
-                        if (types.includes("locality") || types.includes("administrative_area_level_2")) {
-                          cityName = component.long_name
-                        }
-                        if (types.includes("postal_code")) {
-                          zipCode = component.long_name
-                        }
-                        if (types.includes("administrative_area_level_1")) {
-                          stateName = component.long_name
-                          setState(component.short_name || component.long_name)
-                        }
-                      }
-
-                      // Format city as "District, Province" for better search matching
-                      if (cityName && stateName) {
-                        cityName = `${cityName}, ${stateName}`
-                      }
-
-                      setFormData(prev => ({
-                        ...prev,
-                        address,
-                        ...(cityName && { city: cityName }),
-                        ...(zipCode && { zipCode }),
-                      }))
-                    }
-                  }}
-                  onLocationChange={(location) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      latitude: location.lat.toString(),
-                      longitude: location.lng.toString(),
-                    }))
-                  }}
-                  placeholder="Enter full address (city and location will be auto-filled)"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Type your address and select from suggestions. City and location will be automatically extracted.
-                </p>
-              </div>
-
-              {/* Map Location Picker Dialog */}
-              <MapLocationPicker
-                open={showMapPicker}
-                onOpenChange={setShowMapPicker}
-                initialLat={formData.latitude ? parseFloat(formData.latitude) : undefined}
-                initialLng={formData.longitude ? parseFloat(formData.longitude) : undefined}
-                onLocationSelect={(location) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    latitude: location.lat.toString(),
-                    longitude: location.lng.toString(),
-                    address: location.address || prev.address,
-                  }))
-
-                  // If address was geocoded, also try to extract city and zip code
-                  if (typeof window !== 'undefined' && window.google?.maps?.Geocoder) {
-                    const geocoder = new window.google.maps.Geocoder()
-                    geocoder.geocode({ location: { lat: location.lat, lng: location.lng } }, (results: any, status: string) => {
-                      if (status === 'OK' && results && results[0]) {
-                        let cityName = ""
-                        let zipCode = ""
-                        let stateName = ""
-
-                        for (const component of results[0].address_components) {
-                          const types = component.types
-                          if (types.includes("locality") || types.includes("administrative_area_level_2")) {
-                            cityName = component.long_name
-                          }
-                          if (types.includes("postal_code")) {
-                            zipCode = component.long_name
-                          }
-                          if (types.includes("administrative_area_level_1")) {
-                            stateName = component.long_name
-                            setState(component.short_name || component.long_name)
-                          }
-                        }
-
-                        // Format city as "District, Province"
-                        if (cityName && stateName) {
-                          cityName = `${cityName}, ${stateName}`
-                        }
-
-                        setFormData((prev) => ({
-                          ...prev,
-                          ...(cityName && { city: cityName }),
-                          ...(zipCode && { zipCode }),
-                          address: location.address || prev.address,
-                        }))
-                      }
-                    })
-                  }
-                }}
-              />
-
-              {/* City (auto-filled, read-only) */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City (auto-filled)</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    readOnly
-                    placeholder="Will be auto-filled from address"
-                    className="bg-muted"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">Zip Code</Label>
-                  <Input
-                    id="zipCode"
-                    value={formData.zipCode}
-                    onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                    placeholder="07202"
-                  />
-                </div>
-              </div>
-
-              {/* Warehouse Fees */}
-              <Separator />
               <div className="space-y-3">
-                <Label>Warehouse Fees</Label>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="warehouseInFee">Warehouse In Fee (per unit)</Label>
-                    <Input
-                      id="warehouseInFee"
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={formData.warehouseInFee}
-                      onChange={(e) => setFormData({ ...formData, warehouseInFee: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Fee charged when items are brought into the warehouse
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="warehouseOutFee">Warehouse Out Fee (per unit)</Label>
-                    <Input
-                      id="warehouseOutFee"
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={formData.warehouseOutFee}
-                      onChange={(e) => setFormData({ ...formData, warehouseOutFee: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Fee charged when items are taken out of the warehouse
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Transportation */}
-              <Separator />
-              <div className="space-y-3">
-                <Label>Ports & Container Pricing</Label>
-                <div className="space-y-3">
-                  {formData.ports.map((port, index) => (
-                    <div key={index} className="p-4 border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label>Port {index + 1}</Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newPorts = formData.ports.filter((_, i) => i !== index)
-                            setFormData({ ...formData, ports: newPorts })
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`port-name-${index}`}>Port Name <span className="text-destructive">*</span></Label>
-                        <Input
-                          id={`port-name-${index}`}
-                          placeholder="Enter port name"
-                          value={port.name}
-                          onChange={(e) => {
-                            const newPorts = [...formData.ports]
-                            newPorts[index].name = e.target.value
-                            setFormData({ ...formData, ports: newPorts })
-                          }}
-                        />
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label htmlFor={`port-40dc-${index}`}>40 DC Price</Label>
-                          <Input
-                            id={`port-40dc-${index}`}
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={port.container40DC}
-                            onChange={(e) => {
-                              const newPorts = [...formData.ports]
-                              newPorts[index].container40DC = e.target.value
-                              setFormData({ ...formData, ports: newPorts })
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`port-40hc-${index}`}>40 HC Price</Label>
-                          <Input
-                            id={`port-40hc-${index}`}
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={port.container40HC}
-                            onChange={(e) => {
-                              const newPorts = [...formData.ports]
-                              newPorts[index].container40HC = e.target.value
-                              setFormData({ ...formData, ports: newPorts })
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`port-20dc-${index}`}>20 DC Price</Label>
-                          <Input
-                            id={`port-20dc-${index}`}
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={port.container20DC}
-                            onChange={(e) => {
-                              const newPorts = [...formData.ports]
-                              newPorts[index].container20DC = e.target.value
-                              setFormData({ ...formData, ports: newPorts })
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        ports: [...formData.ports, { name: "", container40DC: "", container40HC: "", container20DC: "" }],
-                      })
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Port
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Customer Rent Method */}
-              <div className="space-y-3">
-                <Label>
-                  Customer Rent Method <span className="text-destructive">*</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {RENT_METHODS.map((method) => (
-                    <div key={method.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`rent-method-${method.value}`}
-                        checked={formData.rentMethods.includes(method.value)}
-                        onCheckedChange={(checked) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            rentMethods: checked
-                              ? [...prev.rentMethods, method.value]
-                              : prev.rentMethods.filter((m) => m !== method.value),
-                          }))
-                        }}
-                      />
-                      <Label htmlFor={`rent-method-${method.value}`} className="text-sm font-normal cursor-pointer">
-                        {method.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Total Storage - At least one is required */}
-              <div className="space-y-3">
-                <Label>
-                  Total Storage Capacity
-                  <p className="text-xs text-muted-foreground font-normal mt-1">Provide at least one of the following</p>
-                </Label>
+                <Label>Total Storage Capacity</Label>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="totalPalletStorage">Total Pallet Storage</Label>
@@ -921,143 +602,115 @@ export default function NewWarehousePage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              <Separator />
+          {/* Step 3: Photos */}
+          {currentStep === 3 && (
+            <div className="space-y-4">
+              <PhotoUpload
+                onPhotosChange={setWarehousePhotos}
+                initialPhotos={warehousePhotos}
+                maxPhotos={10}
+                bucket="warehouse-photos"
+              />
+              <p className="text-sm text-muted-foreground">
+                Upload at least 2 photos. The first photo will be used as the primary image.
+              </p>
+            </div>
+          )}
 
-              {/* Order Requirements - Dynamic based on rent method */}
+          {/* Step 4: Pricing */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
               <div className="space-y-3">
-                <Label>Order Requirements</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {formData.rentMethods.includes('pallet') && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="minPallet">Min Pallet</Label>
-                        <Input
-                          id="minPallet"
-                          type="text"
-                          value={formData.minPallet}
-                          onChange={(e) => {
-                            const formatted = formatNumberInput(e.target.value)
-                            setFormData({ ...formData, minPallet: formatted })
-                          }}
-                          placeholder="10"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="maxPallet">Max Pallet</Label>
-                        <Input
-                          id="maxPallet"
-                          type="text"
-                          value={formData.maxPallet}
-                          onChange={(e) => {
-                            const formatted = formatNumberInput(e.target.value)
-                            setFormData({ ...formData, maxPallet: formatted })
-                          }}
-                          placeholder="1,000"
-                        />
-                      </div>
-                      {/* Pricing for Pallet */}
-                      {formData.pricing.filter(p => p.pricingType === 'pallet').map((price, idx) => (
-                        <div key={`pallet-${idx}`} className="space-y-2">
-                          <Label>Per Pallet Per Day Price <span className="text-destructive">*</span></Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={price.basePrice}
-                            onChange={(e) => {
-                              const newPricing = [...formData.pricing]
-                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'pallet')
-                              if (priceIndex >= 0) {
-                                newPricing[priceIndex].basePrice = e.target.value
-                                setFormData({ ...formData, pricing: newPricing })
-                              }
-                            }}
-                          />
-                        </div>
-                      ))}
-                      {formData.pricing.filter(p => p.pricingType === 'pallet-monthly').map((price, idx) => (
-                        <div key={`pallet-monthly-${idx}`} className="space-y-2">
-                          <Label>Per Pallet Per Month Price <span className="text-destructive">*</span></Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={price.basePrice}
-                            onChange={(e) => {
-                              const newPricing = [...formData.pricing]
-                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'pallet-monthly')
-                              if (priceIndex >= 0) {
-                                newPricing[priceIndex].basePrice = e.target.value
-                                setFormData({ ...formData, pricing: newPricing })
-                              }
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </>
-                  )}
-                  {formData.rentMethods.includes('sq_ft') && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="minSqFt">Min Sq Ft</Label>
-                        <Input
-                          id="minSqFt"
-                          type="text"
-                          value={formData.minSqFt}
-                          onChange={(e) => {
-                            const formatted = formatNumberInput(e.target.value)
-                            setFormData({ ...formData, minSqFt: formatted })
-                          }}
-                          placeholder="100"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="maxSqFt">Max Sq Ft</Label>
-                        <Input
-                          id="maxSqFt"
-                          type="text"
-                          value={formData.maxSqFt}
-                          onChange={(e) => {
-                            const formatted = formatNumberInput(e.target.value)
-                            setFormData({ ...formData, maxSqFt: formatted })
-                          }}
-                          placeholder="100,000"
-                        />
-                      </div>
-                      {/* Pricing for Area */}
-                      {formData.pricing.filter(p => p.pricingType === 'area').map((price, idx) => (
-                        <div key={`area-${idx}`} className="space-y-2">
-                          <Label>Per Sq Feet Per Day Price <span className="text-destructive">*</span></Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={price.basePrice}
-                            onChange={(e) => {
-                              const newPricing = [...formData.pricing]
-                              const priceIndex = formData.pricing.findIndex(p => p.pricingType === 'area')
-                              if (priceIndex >= 0) {
-                                newPricing[priceIndex].basePrice = e.target.value
-                                setFormData({ ...formData, pricing: newPricing })
-                              }
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </>
-                  )}
+                <Label>
+                  Customer Rent Method <span className="text-destructive">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {RENT_METHODS.map((method) => (
+                    <div key={method.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`rent-method-${method.value}`}
+                        checked={formData.rentMethods.includes(method.value)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            rentMethods: checked
+                              ? [...prev.rentMethods, method.value]
+                              : prev.rentMethods.filter((m) => m !== method.value),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`rent-method-${method.value}`} className="text-sm font-normal cursor-pointer">
+                        {method.label}
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-                {(formData.rentMethods.includes('pallet') || formData.rentMethods.includes('sq_ft')) && (
-                  <p className="text-xs text-muted-foreground">
-                    Min and max values cannot exceed total storage capacity
-                  </p>
-                )}
               </div>
 
-              <Separator />
+              {formData.pricing.map((price, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-3">
+                  <Label>
+                    {price.pricingType === 'pallet' && 'Per Pallet Per Day'}
+                    {price.pricingType === 'pallet-monthly' && 'Per Pallet Per Month'}
+                    {price.pricingType === 'area-rental' && 'Per Square Foot Per Day'}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={price.basePrice}
+                    onChange={(e) => {
+                      const newPricing = [...formData.pricing]
+                      newPricing[index].basePrice = e.target.value
+                      setFormData({ ...formData, pricing: newPricing })
+                    }}
+                  />
+                </div>
+              ))}
 
-              {/* Security */}
+              <div className="space-y-2">
+                <Label htmlFor="warehouseInFee">Warehouse In Fee (per unit)</Label>
+                <Input
+                  id="warehouseInFee"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.warehouseInFee}
+                  onChange={(e) => setFormData({ ...formData, warehouseInFee: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="warehouseOutFee">Warehouse Out Fee (per unit)</Label>
+                <Input
+                  id="warehouseOutFee"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.warehouseOutFee}
+                  onChange={(e) => setFormData({ ...formData, warehouseOutFee: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Amenities */}
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="amenities">Amenities (comma-separated)</Label>
+                <Input
+                  id="amenities"
+                  placeholder="24/7 Access, Security, Climate Control"
+                  value={formData.amenities}
+                  onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
+                />
+              </div>
+
               <div className="space-y-3">
                 <Label>Security</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1083,125 +736,55 @@ export default function NewWarehousePage() {
                 </div>
               </div>
 
-              <Separator />
-
-              {/* Warehouse Photos - Required (minimum 2) */}
-              <div className="space-y-3">
-                <Label>
-                  Warehouse Photos <span className="text-destructive">*</span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Upload at least 2 photos of your warehouse (Minimum 2 required). Supported formats: JPEG, PNG, WebP, GIF, BMP, AVIF (Max 5MB per file)
-                </p>
-                <FileUpload
-                  value={warehousePhotos}
-                  onChange={setWarehousePhotos}
-                  bucket="docs"
-                  folder="warehouse"
-                  maxFiles={10}
-                  maxSize={5 * 1024 * 1024} // 5MB per file
-                  acceptedFileTypes={['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']}
-                  disabled={isLoading}
-                />
-                {warehousePhotos.filter(f => f.status === 'success').length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {warehousePhotos.filter(f => f.status === 'success').length} photo(s) uploaded.
-                    {warehousePhotos.filter(f => f.status === 'success').length < 2 && ` ${2 - warehousePhotos.filter(f => f.status === 'success').length} more required.`}
-                  </p>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="accessType">Access Type</Label>
+                <Select
+                  value={formData.accessType}
+                  onValueChange={(value) => setFormData({ ...formData, accessType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select access type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24/7">24/7 Access</SelectItem>
+                    <SelectItem value="business-hours">Business Hours</SelectItem>
+                    <SelectItem value="by-appointment">By Appointment Only</SelectItem>
+                    <SelectItem value="restricted">Restricted Access</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <Separator />
-
-              {/* Warehouse Video - Optional */}
-              <div className="space-y-3">
-                <Label>
-                  Warehouse Video (Optional)
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Upload a video showcasing your warehouse. Supported formats: MP4, WebM, MOV, AVI (Max 100MB)
-                </p>
-                <FileUpload
-                  value={warehouseVideo}
-                  onChange={setWarehouseVideo}
-                  bucket="docs"
-                  folder="warehouse"
-                  maxFiles={1}
-                  maxSize={100 * 1024 * 1024} // 100MB per file
-                  acceptedFileTypes={['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo']}
-                  disabled={isLoading}
+              <div className="space-y-2">
+                <Label htmlFor="accessControl">Access Control Method</Label>
+                <Input
+                  id="accessControl"
+                  placeholder="e.g., Key card, Biometric, Security code"
+                  value={formData.accessControl}
+                  onChange={(e) => setFormData({ ...formData, accessControl: e.target.value })}
                 />
               </div>
 
-              <Separator />
-
-              {/* Access to Warehouse */}
-              <div className="space-y-4">
-                <Label>Access to Warehouse</Label>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="accessType">Access Type</Label>
-                    <Select
-                      value={formData.accessType}
-                      onValueChange={(value) => setFormData({ ...formData, accessType: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select access type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="24/7">24/7 Access</SelectItem>
-                        <SelectItem value="business-hours">Business Hours</SelectItem>
-                        <SelectItem value="by-appointment">By Appointment Only</SelectItem>
-                        <SelectItem value="restricted">Restricted Access</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="accessControl">Access Control Method</Label>
-                    <Input
-                      id="accessControl"
-                      placeholder="e.g., Key card, Biometric, Security code"
-                      value={formData.accessControl}
-                      onChange={(e) => setFormData({ ...formData, accessControl: e.target.value })}
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="productAcceptanceStartTime">Product Acceptance Start Time</Label>
+                  <Input
+                    id="productAcceptanceStartTime"
+                    type="time"
+                    value={formData.productAcceptanceStartTime}
+                    onChange={(e) => setFormData({ ...formData, productAcceptanceStartTime: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productAcceptanceEndTime">Product Acceptance End Time</Label>
+                  <Input
+                    id="productAcceptanceEndTime"
+                    type="time"
+                    value={formData.productAcceptanceEndTime}
+                    onChange={(e) => setFormData({ ...formData, productAcceptanceEndTime: e.target.value })}
+                  />
                 </div>
               </div>
 
-              <Separator />
-
-              {/* Product Acceptance Hours */}
-              <div className="space-y-3">
-                <Label>Product Acceptance Hours</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="productAcceptanceStartTime">Start Time</Label>
-                    <Input
-                      id="productAcceptanceStartTime"
-                      type="time"
-                      value={formData.productAcceptanceStartTime}
-                      onChange={(e) => setFormData({ ...formData, productAcceptanceStartTime: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="productAcceptanceEndTime">End Time</Label>
-                    <Input
-                      id="productAcceptanceEndTime"
-                      type="time"
-                      value={formData.productAcceptanceEndTime}
-                      onChange={(e) => setFormData({ ...formData, productAcceptanceEndTime: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Specify the hours during which products can be accepted at the warehouse
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Working Days */}
               <div className="space-y-3">
                 <Label>Working Days</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1225,55 +808,122 @@ export default function NewWarehousePage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Select the days when the warehouse operates
-                </p>
-              </div>
-
-              {/* Amenities */}
-              <Separator />
-              <div className="space-y-2">
-                <Label htmlFor="amenities">
-                  Amenities (comma-separated)
-                </Label>
-                <Input
-                  id="amenities"
-                  placeholder="24/7 Access, Security, Climate Control"
-                  value={formData.amenities}
-                  onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Separate multiple amenities with commas
-                </p>
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push("/dashboard/warehouses")}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Warehouse className="h-4 w-4 mr-2" />
-                  Create Warehouse
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+          )}
 
+          {/* Step 6: Review */}
+          {currentStep === 6 && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>
+                    <p className="font-medium">{formData.name || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Address:</span>
+                    <p className="font-medium">{formData.address || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">City:</span>
+                    <p className="font-medium">{formData.city || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Zip Code:</span>
+                    <p className="font-medium">{formData.zipCode || "Not set"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Warehouse Type:</span>
+                    <p className="font-medium">{formData.warehouseType || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Storage Type:</span>
+                    <p className="font-medium">{formData.storageType || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total Pallet Storage:</span>
+                    <p className="font-medium">{formData.totalPalletStorage || "Not set"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total Sq Ft:</span>
+                    <p className="font-medium">{formData.totalSqFt || "Not set"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Photos</h3>
+                <p className="text-sm text-muted-foreground">
+                  {warehousePhotos.length} photo(s) uploaded
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Pricing</h3>
+                <div className="space-y-2 text-sm">
+                  {formData.pricing.filter(p => p.basePrice).map((price, index) => (
+                    <div key={index}>
+                      <span className="text-muted-foreground">
+                        {price.pricingType === 'pallet' && 'Per Pallet Per Day: '}
+                        {price.pricingType === 'pallet-monthly' && 'Per Pallet Per Month: '}
+                        {price.pricingType === 'area-rental' && 'Per Square Foot Per Day: '}
+                      </span>
+                      <span className="font-medium">${price.basePrice}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={currentStep === 1}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Previous
+          </Button>
+          <div className="flex gap-2">
+            {currentStep < 6 ? (
+              <Button type="button" onClick={handleNext}>
+                Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <Button type="button" onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Warehouse className="h-4 w-4 mr-2" />
+                    Publish Listing
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

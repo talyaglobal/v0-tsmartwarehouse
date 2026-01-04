@@ -1,167 +1,138 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
+// Using Supabase implementation with PostGIS support
+import { searchWarehouses } from "@/lib/services/warehouse-search-supabase"
+import { z } from "zod"
+import type { WarehouseSearchParams } from "@/types/marketplace"
 
-interface PublicWarehouseSearchResult {
-  id: string
-  name: string
-  address: string
-  city: string
-  state?: string
-  zipCode: string
-  totalSqFt?: number
-  totalPalletStorage?: number
-  availableSqFt?: number
-  availablePalletStorage?: number
-  warehouseType?: string
-  storageTypes?: string[]
-  temperatureTypes?: string[]
-  amenities?: string[]
-  latitude?: number
-  longitude?: number
-  photos?: string[]
-  pricing?: {
-    pallet?: {
-      basePrice: number
-      unit: string
-    }
-    areaRental?: {
-      basePrice: number
-      unit: string
-    }
-  }
-}
+/**
+ * Validation schema for search parameters
+ */
+const searchParamsSchema = z.object({
+  // Location-based search
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  radius_km: z.coerce.number().min(1).max(500).optional().default(50),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+
+  // Booking requirements
+  type: z.enum(['pallet', 'area-rental']).optional(),
+  quantity: z.coerce.number().min(1).optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+
+  // Filters
+  warehouse_type: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
+  storage_type: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
+  temperature_types: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
+  amenities: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
+
+  // Pricing
+  min_price: z.coerce.number().min(0).optional(),
+  max_price: z.coerce.number().min(0).optional(),
+
+  // Rating
+  min_rating: z.coerce.number().min(1).max(5).optional(),
+
+  // Pagination & sorting
+  page: z.coerce.number().min(1).optional().default(1),
+  limit: z.coerce.number().min(1).max(100).optional().default(20),
+  sort_by: z.enum(['price', 'distance', 'rating', 'availability', 'name']).optional().default('distance'),
+  sort_order: z.enum(['asc', 'desc']).optional().default('asc'),
+
+  // Legacy support
+  q: z.string().optional(),
+  offset: z.coerce.number().min(0).optional(), // Legacy pagination
+})
 
 /**
  * GET /api/v1/warehouses/public/search
- * Public endpoint to search warehouses by city (no authentication required)
- * Returns basic warehouse information for location search
+ * Enhanced public endpoint to search warehouses with filters, sorting, and pagination
+ * Currently using Supabase implementation. Prisma version available for future migration.
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const searchQuery = searchParams.get("q") || ""
-    const city = searchParams.get("city") || ""
+    
+    // Parse and validate search parameters
+    const rawParams = Object.fromEntries(searchParams.entries())
+    const validationResult = searchParamsSchema.safeParse(rawParams)
 
-    const supabase = createServerSupabaseClient()
-
-    // Build query - search by city or name/address if search query provided
-    // Note: Service role key bypasses RLS, so we can query warehouses without authentication
-            let query = supabase
-              .from("warehouses")
-              .select(`
-                id,
-                name,
-                address,
-                city,
-                zip_code,
-                total_sq_ft,
-                total_pallet_storage,
-                available_sq_ft,
-                available_pallet_storage,
-                warehouse_type,
-                storage_type,
-                temperature_types,
-                amenities,
-                latitude,
-                longitude,
-                photos,
-                warehouse_pricing(pricing_type, base_price, unit)
-              `)
-              .eq("status", true) // Only active warehouses (status is BOOLEAN DEFAULT true NOT NULL)
-
-    if (city) {
-      // City match - partial match (ilike is case-insensitive)
-      // This handles cases like "Fair Lawn" matching "Fair Lawn, NJ"
-      query = query.ilike("city", `%${city}%`)
-    } else if (searchQuery) {
-      // Search in name, city, or address
-      query = query.or(
-        `name.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%`
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid search parameters",
+          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+          statusCode: 400,
+        } as ErrorResponse,
+        { status: 400 }
       )
     }
 
-    // If no city or searchQuery, return all active warehouses (limited)
-    // Limit results to 50 for performance
-    query = query.limit(50).order("city", { ascending: true })
-    
-    console.log(`[warehouses/public/search] Query params: city="${city}", searchQuery="${searchQuery}"`)
+    const params = validationResult.data
 
-    const { data, error } = await query
-
-    if (error) {
-      console.error("[warehouses/public/search] Query error:", error)
-      throw new Error(`Failed to fetch warehouses: ${error.message}`)
+    // Map legacy 'q' parameter to city if city not provided
+    if (params.q && !params.city) {
+      params.city = params.q
     }
 
-    console.log(`[warehouses/public/search] Found ${data?.length || 0} warehouses for city: "${city}"`)
-    if (data && data.length > 0) {
-      console.log(`[warehouses/public/search] Sample warehouse:`, data[0])
+    // Build search query parameters
+    const queryParams: WarehouseSearchParams = {
+      lat: params.lat,
+      lng: params.lng,
+      radius_km: params.radius_km,
+      city: params.city,
+      state: params.state,
+      zipCode: params.zipCode,
+      type: params.type,
+      quantity: params.quantity,
+      start_date: params.start_date,
+      end_date: params.end_date,
+      warehouse_type: params.warehouse_type,
+      storage_type: params.storage_type,
+      temperature_types: params.temperature_types,
+      amenities: params.amenities,
+      min_price: params.min_price,
+      max_price: params.max_price,
+      min_rating: params.min_rating,
+      page: params.page,
+      limit: params.limit,
+      sort_by: params.sort_by,
+      sort_order: params.sort_order,
     }
 
-    // Transform results to match PublicWarehouseSearchResult interface
-    const results: PublicWarehouseSearchResult[] = (data || []).map((row: any) => {
-      // Transform pricing data
-      const pricingData = row.warehouse_pricing || []
-      const pricing: any = {}
+    // Use Supabase-based search service with PostGIS support
+    const results = await searchWarehouses(queryParams)
 
-      pricingData.forEach((p: any) => {
-        if (p.pricing_type === 'pallet') {
-          pricing.pallet = {
-            basePrice: p.base_price,
-            unit: p.unit
-          }
-        } else if (p.pricing_type === 'pallet-monthly') {
-          pricing.palletMonthly = {
-            basePrice: p.base_price,
-            unit: p.unit
-          }
-        } else if (p.pricing_type === 'area' || p.pricing_type === 'area-rental') {
-          pricing.areaRental = {
-            basePrice: p.base_price,
-            unit: p.unit
-          }
-        }
-      })
-
-      return {
-        id: row.id,
-        name: row.name,
-        address: row.address,
-        city: row.city,
-        state: undefined, // State column doesn't exist in warehouses table
-        zipCode: row.zip_code,
-        totalSqFt: row.total_sq_ft,
-        totalPalletStorage: row.total_pallet_storage,
-        availableSqFt: row.available_sq_ft,
-        availablePalletStorage: row.available_pallet_storage,
-        amenities: row.amenities || [],
-        latitude: row.latitude ? parseFloat(row.latitude) : undefined,
-        longitude: row.longitude ? parseFloat(row.longitude) : undefined,
-        warehouseType: row.warehouse_type,
-        storageTypes: row.storage_type ? [row.storage_type] : [], // Convert single value to array
-        temperatureTypes: row.temperature_types || [], // Already an array
-        photos: row.photos || [],
-        pricing: Object.keys(pricing).length > 0 ? pricing : undefined,
-      }
-    })
-
-    // Remove duplicates by city name and format for autocomplete
+    // Get unique cities for autocomplete (legacy support)
     const uniqueCities = Array.from(
-      new Set(results.map((w) => w.city))
+      new Set(results.warehouses.map((w) => w.city))
     ).sort()
 
     const responseData = {
       success: true,
       data: {
-        warehouses: results,
-        cities: uniqueCities,
+        warehouses: results.warehouses,
+        total: results.total,
+        page: results.page,
+        limit: results.limit,
+        total_pages: results.total_pages,
+        hasMore: results.page < results.total_pages,
+        cities: uniqueCities, // Legacy support
       },
     }
 
-    return NextResponse.json(responseData)
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+      },
+    })
   } catch (error) {
+    console.error("[warehouses/public/search] Error:", error)
     const errorResponse = handleApiError(error, {
       context: "Failed to search public warehouses",
     })

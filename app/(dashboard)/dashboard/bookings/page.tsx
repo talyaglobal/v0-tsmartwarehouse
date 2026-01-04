@@ -8,20 +8,26 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle } from "@/components/icons"
+import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle, DollarSign } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
+import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
+import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
+import { useRouter } from "next/navigation"
 
 export default function BookingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [openStatusDropdown, setOpenStatusDropdown] = useState<string | null>(null)
   const [pendingStatusChange, setPendingStatusChange] = useState<{ bookingId: string; newStatus: BookingStatus } | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null)
+  const [selectedBookingForTimeSlot, setSelectedBookingForTimeSlot] = useState<Booking | null>(null)
+  const [selectedBookingForAccept, setSelectedBookingForAccept] = useState<Booking | null>(null)
   const { user, isLoading: userLoading } = useUser()
   const queryClient = useQueryClient()
+  const router = useRouter()
 
   // Get user's role and company ID
   const { data: userProfile } = useQuery({
@@ -276,7 +282,12 @@ export default function BookingsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                bookings.map((booking) => (
+                bookings.map((booking) => {
+                  // Normalize status: handle different formats like "Payment Pending", "payment_pending", etc.
+                  const normalizedStatus = booking.status?.toLowerCase()?.replace(/\s+/g, '_')?.replace(/-/g, '_')
+                  const isPaymentPending = normalizedStatus === 'payment_pending' || booking.status === 'payment_pending'
+                  
+                  return (
                 <TableRow key={booking.id}>
                   <TableCell className="font-medium">{booking.id}</TableCell>
                   <TableCell>
@@ -352,29 +363,75 @@ export default function BookingsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
                       <Link href={`/dashboard/bookings/${booking.id}`}>
                         <Button variant="ghost" size="sm" title="View details">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
                       {isCustomer ? (
-                        // Customer can only cancel bookings (not edit or delete)
-                        booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Cancel booking"
-                            onClick={() => handleCancel(booking.id)}
-                            disabled={statusMutation.isPending}
-                          >
-                            {statusMutation.isPending && statusMutation.variables?.bookingId === booking.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-orange-500" />
-                            )}
-                          </Button>
-                        )
+                        <>
+                          {/* Time Slot Actions for awaiting_time_slot status */}
+                          {booking.status === 'awaiting_time_slot' && booking.proposedStartDate && booking.proposedStartTime && (
+                            <>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setSelectedBookingForAccept(booking)}
+                                title="Accept proposed time"
+                              >
+                                Accept Time
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedBookingForTimeSlot(booking)}
+                                title="Select different time"
+                              >
+                                Select Time
+                              </Button>
+                            </>
+                          )}
+                          {/* Time Slot Selection for awaiting_time_slot without proposed time */}
+                          {booking.status === 'awaiting_time_slot' && !booking.proposedStartDate && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setSelectedBookingForTimeSlot(booking)}
+                              title="Select time slot"
+                            >
+                              Select Time Slot
+                            </Button>
+                          )}
+                          {/* Pay Now button for payment_pending status */}
+                          {isPaymentPending && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => router.push(`/payment?bookingId=${booking.id}`)}
+                              title="Pay now"
+                            >
+                              <DollarSign className="h-4 w-4 mr-1" />
+                              Pay Now
+                            </Button>
+                          )}
+                          {/* Cancel button */}
+                          {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Cancel booking"
+                              onClick={() => handleCancel(booking.id)}
+                              disabled={statusMutation.isPending}
+                            >
+                              {statusMutation.isPending && statusMutation.variables?.bookingId === booking.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-orange-500" />
+                              )}
+                            </Button>
+                          )}
+                        </>
                       ) : (
                         // Company staff can edit and delete
                         <>
@@ -401,12 +458,41 @@ export default function BookingsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-                ))
+                )
+                })
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Time Slot Selection Modal */}
+      {selectedBookingForTimeSlot && (
+        <TimeSlotSelectionModal
+          booking={selectedBookingForTimeSlot}
+          open={!!selectedBookingForTimeSlot}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedBookingForTimeSlot(null)
+              queryClient.invalidateQueries({ queryKey: ['bookings', user?.id, userCompanyId, isCustomer] })
+            }
+          }}
+        />
+      )}
+
+      {/* Accept Proposed Time Modal */}
+      {selectedBookingForAccept && (
+        <AcceptProposedTimeModal
+          booking={selectedBookingForAccept}
+          open={!!selectedBookingForAccept}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedBookingForAccept(null)
+              queryClient.invalidateQueries({ queryKey: ['bookings', user?.id, userCompanyId, isCustomer] })
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

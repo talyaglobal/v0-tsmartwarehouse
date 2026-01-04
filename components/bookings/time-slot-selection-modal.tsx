@@ -12,10 +12,16 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Loader2, Calendar, Clock, CheckCircle } from "@/components/icons"
-import { formatDate, formatDateTime } from "@/lib/utils/format"
+import { Loader2, Clock, CheckCircle } from "@/components/icons"
+import { formatDateTime } from "@/lib/utils/format"
 import { api } from "@/lib/api/client"
-import type { Booking, TimeSlot } from "@/types"
+import type { Booking } from "@/types"
+
+interface TimeSlot {
+  time: string
+  available: boolean
+  reason?: string
+}
 
 interface TimeSlotSelectionModalProps {
   booking: Booking
@@ -98,11 +104,15 @@ export function TimeSlotSelectionModal({
         }
       )
 
-      if (result.success && result.data?.redirectUrl) {
-        router.push(result.data.redirectUrl)
-      } else if (result.success) {
-        onOpenChange(false)
-        router.refresh()
+      if (result.success) {
+        // Check for redirectUrl in response (can be at root level or in data)
+        const redirectUrl = (result as any).redirectUrl || result.data?.redirectUrl
+        if (redirectUrl) {
+          router.push(redirectUrl)
+        } else {
+          onOpenChange(false)
+          router.refresh()
+        }
       }
     } catch (error) {
       console.error("Failed to select time slot:", error)

@@ -10,6 +10,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import Link from "next/link"
 import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
+import { WarehouseCard } from "@/components/marketplace/warehouse-card"
 
 interface Warehouse {
   id: string
@@ -189,6 +190,25 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
   }
 
   if (viewMode === "grid") {
+    return (
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {warehouses.map((warehouse) => {
+          // Use new WarehouseCard component for better consistency
+          return (
+            <WarehouseCard
+              key={warehouse.id}
+              warehouse={warehouse as any}
+              viewMode="grid"
+              searchParams={searchParams}
+            />
+          )
+        })}
+      </div>
+    )
+  }
+
+  // Legacy grid view (keeping for reference, but using WarehouseCard above)
+  if (false && viewMode === "grid") {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {warehouses.map((warehouse) => {

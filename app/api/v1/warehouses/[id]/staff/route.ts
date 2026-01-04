@@ -57,7 +57,8 @@ export async function GET(
     })
   } catch (error) {
     console.error("Error fetching warehouse staff:", error)
-    const errorResponse = handleApiError(error, { path: `/api/v1/warehouses/${params.id}/staff` })
+    const resolvedParams = params instanceof Promise ? await params : params
+    const errorResponse = handleApiError(error, { path: `/api/v1/warehouses/${resolvedParams.id}/staff` })
     const errorData: ErrorResponse = {
       success: false,
       error: errorResponse.message,
@@ -281,7 +282,8 @@ export async function POST(
     })
   } catch (error) {
     console.error("Error assigning warehouse staff:", error)
-    const errorResponse = handleApiError(error, { path: `/api/v1/warehouses/${params.id}/staff` })
+    const resolvedParams = params instanceof Promise ? await params : params
+    const errorResponse = handleApiError(error, { path: `/api/v1/warehouses/${resolvedParams.id}/staff` })
     const errorData: ErrorResponse = {
       success: false,
       error: errorResponse.message,
@@ -351,7 +353,8 @@ export async function DELETE(
     })
   } catch (error) {
     console.error("Error removing warehouse staff:", error)
-    const errorResponse = handleApiError(error, { path: `/api/v1/warehouses/${params.id}/staff` })
+    const resolvedParams = params instanceof Promise ? await params : params
+    const errorResponse = handleApiError(error, { path: `/api/v1/warehouses/${resolvedParams.id}/staff` })
     const errorData: ErrorResponse = {
       success: false,
       error: errorResponse.message,

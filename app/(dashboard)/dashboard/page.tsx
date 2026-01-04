@@ -13,6 +13,7 @@ import type { Booking, Invoice, Claim } from "@/types"
 import { api } from "@/lib/api/client"
 import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
+import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
 
 export default function CustomerDashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -370,7 +371,10 @@ export default function CustomerDashboardPage() {
 }
 
 function PendingActionCard({ booking }: { booking: Booking }) {
-  const [openModal, setOpenModal] = useState(false)
+  const [openTimeSlotModal, setOpenTimeSlotModal] = useState(false)
+  const [openAcceptModal, setOpenAcceptModal] = useState(false)
+
+  const hasProposedDateTime = booking.proposedStartDate && booking.proposedStartTime
 
   return (
     <>
@@ -384,21 +388,41 @@ function PendingActionCard({ booking }: { booking: Booking }) {
               Booking {booking.id} - {booking.type === "pallet" ? `${booking.palletCount} Pallets` : `${booking.areaSqFt?.toLocaleString()} sq ft`}
             </p>
             <p className="text-sm text-muted-foreground">
-              {booking.proposedStartDate
-                ? `Proposed: ${formatDate(booking.proposedStartDate)} ${booking.proposedStartTime || ""}`
+              {hasProposedDateTime
+                ? `Proposed: ${formatDate(booking.proposedStartDate!)} ${booking.proposedStartTime}`
                 : `Requested: ${formatDate(booking.startDate)}`}
             </p>
           </div>
         </div>
-        <Button onClick={() => setOpenModal(true)} size="sm">
-          Select Time Slot
-        </Button>
+        <div className="flex gap-2">
+          {hasProposedDateTime ? (
+            <>
+              <Button onClick={() => setOpenAcceptModal(true)} size="sm" variant="default">
+                Accept Proposed Time
+              </Button>
+              <Button onClick={() => setOpenTimeSlotModal(true)} size="sm" variant="outline">
+                Select Different Time
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => setOpenTimeSlotModal(true)} size="sm">
+              Select Time Slot
+            </Button>
+          )}
+        </div>
       </div>
-      {openModal && (
+      {openAcceptModal && (
+        <AcceptProposedTimeModal
+          booking={booking}
+          open={openAcceptModal}
+          onOpenChange={setOpenAcceptModal}
+        />
+      )}
+      {openTimeSlotModal && (
         <TimeSlotSelectionModal
           booking={booking}
-          open={openModal}
-          onOpenChange={setOpenModal}
+          open={openTimeSlotModal}
+          onOpenChange={setOpenTimeSlotModal}
         />
       )}
     </>

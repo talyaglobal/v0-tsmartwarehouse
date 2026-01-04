@@ -1,5 +1,4 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -52,6 +51,9 @@ export async function createAuthenticatedSupabaseClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables')
   }
+
+  // Dynamically import cookies to avoid issues when this file is imported in client components
+  const { cookies } = await import('next/headers')
 
   // During build time, cookies() may not be available
   // Return a client that will fail gracefully
