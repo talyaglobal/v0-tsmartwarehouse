@@ -55,7 +55,7 @@ export function DateRangePicker({
   const endDateMin = startDate || minDate || today
 
   return (
-    <div className={cn("flex gap-2", className)}>
+    <div className={cn("flex flex-col sm:flex-row gap-2", className)}>
       <div className="flex-1">
         <label htmlFor="start-date" className="sr-only">
           {startDateLabel}

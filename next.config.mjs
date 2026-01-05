@@ -115,7 +115,7 @@ const nextConfig = {
               "img-src 'self' data: https: blob: https://maps.gstatic.com https://*.googleapis.com https://*.googleusercontent.com",
               "font-src 'self' data: https://fonts.gstatic.com",
               "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com",
-              "frame-src 'self' https://js.stripe.com https://www.google.com",
+              "frame-src 'self' https://js.stripe.com https://www.google.com https://maps.google.com https://*.google.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

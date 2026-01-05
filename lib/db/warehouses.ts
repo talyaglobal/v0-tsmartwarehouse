@@ -94,7 +94,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       ports,
       created_at,
       updated_at,
-      warehouse_pricing(pricing_type, base_price, unit)
+      warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts)
     `)
     .eq('id', id)
     .eq('status', true) // Soft delete filter
@@ -258,17 +258,26 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
       if (p.pricing_type === 'pallet') {
         pricing.pallet = {
           basePrice: p.base_price,
-          unit: p.unit
+          unit: p.unit,
+          minQuantity: p.min_quantity,
+          maxQuantity: p.max_quantity,
+          volumeDiscounts: p.volume_discounts || {}
         }
       } else if (p.pricing_type === 'pallet-monthly') {
         pricing.palletMonthly = {
           basePrice: p.base_price,
-          unit: p.unit
+          unit: p.unit,
+          minQuantity: p.min_quantity,
+          maxQuantity: p.max_quantity,
+          volumeDiscounts: p.volume_discounts || {}
         }
       } else if (p.pricing_type === 'area' || p.pricing_type === 'area-rental') {
         pricing.areaRental = {
           basePrice: p.base_price,
-          unit: p.unit
+          unit: p.unit,
+          minQuantity: p.min_quantity,
+          maxQuantity: p.max_quantity,
+          volumeDiscounts: p.volume_discounts || {}
         }
       }
     })
@@ -313,8 +322,8 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     workingDays: Array.isArray(row.working_days) ? row.working_days : [],
     pricing: Object.keys(pricing).length > 0 ? pricing : undefined, // Add pricing to warehouse object
     // Additional fields
-    warehouseInFee: row.warehouse_in_fee != null ? parseFloat(row.warehouse_in_fee.toString()) : undefined,
-    warehouseOutFee: row.warehouse_out_fee != null ? parseFloat(row.warehouse_out_fee.toString()) : undefined,
+    warehouseInFee: row.warehouse_in_fee != null && row.warehouse_in_fee !== '' ? parseFloat(row.warehouse_in_fee.toString()) : undefined,
+    warehouseOutFee: row.warehouse_out_fee != null && row.warehouse_out_fee !== '' ? parseFloat(row.warehouse_out_fee.toString()) : undefined,
     ports: row.ports || [],
   } as any
   // Add ownerCompanyId as additional property

@@ -19,7 +19,7 @@ export function PhotoUpload({
   onPhotosChange,
   initialPhotos = [],
   maxPhotos = 10,
-  bucket = "warehouse-photos",
+  bucket = "docs",
 }: PhotoUploadProps) {
   const [photos, setPhotos] = useState<string[]>(initialPhotos)
   const [uploading, setUploading] = useState(false)
@@ -54,27 +54,28 @@ export function PhotoUpload({
             throw new Error(`${file.name} is too large. Maximum size is 5MB`)
           }
 
-          // Generate unique filename
-          const fileExt = file.name.split(".").pop()
-          const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
-          const filePath = `${fileName}`
+          // Upload via API route to bypass RLS issues
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('bucket', bucket)
+          formData.append('folder', 'warehouse')
 
-          // Upload to Supabase Storage
-          const { error } = await supabase.storage
-            .from(bucket)
-            .upload(filePath, file, {
-              cacheControl: "3600",
-              upsert: false,
-            })
+          const response = await fetch('/api/v1/files/upload', {
+            method: 'POST',
+            body: formData,
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to upload file')
+          }
 
-          // Get public URL
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from(bucket).getPublicUrl(filePath)
+          const result = await response.json()
+          if (!result.success || !result.data?.url) {
+            throw new Error('Upload failed: Invalid response')
+          }
 
-          return publicUrl
+          return result.data.url
         })
 
         const uploadedUrls = await Promise.all(uploadPromises)

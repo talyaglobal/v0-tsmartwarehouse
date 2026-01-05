@@ -22,17 +22,22 @@ export async function createBookingRequest(input: {
   startDate: string
   endDate?: string
   notes?: string
+  serviceIds?: string[]
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    // Use authenticated client to read user session from cookies
+    const { createAuthenticatedSupabaseClient } = await import('@/lib/supabase/server')
+    const supabase = await createAuthenticatedSupabaseClient()
 
     // Get current user
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
 
-    if (!user) {
-      return { success: false, error: 'Unauthorized' }
+    if (authError || !user) {
+      console.error('Auth error:', authError)
+      return { success: false, error: 'Unauthorized. Please log in to create a booking.' }
     }
 
     // Get user profile
@@ -69,6 +74,62 @@ export async function createBookingRequest(input: {
     // Determine booking status: pre_order for pallet bookings, pending for area-rental
     const bookingStatus = input.type === 'pallet' ? 'pre_order' : 'pending'
 
+    // Calculate base price
+    let baseTotal = 0
+    try {
+      const { calculatePrice } = await import('@/lib/services/pricing')
+      const quantity = input.type === 'pallet' ? (input.palletCount || 0) : (input.areaSqFt || 0)
+      const priceBreakdown = await calculatePrice({
+        warehouse_id: input.warehouseId,
+        type: input.type,
+        quantity,
+        start_date: input.startDate,
+        end_date: input.endDate || input.startDate,
+      })
+      baseTotal = priceBreakdown.total
+    } catch (error) {
+      console.error('Error calculating price:', error)
+      // Continue with 0 if price calculation fails
+    }
+
+    // Calculate services total
+    let servicesTotal = 0
+    if (input.serviceIds && input.serviceIds.length > 0) {
+      const { data: services } = await supabase
+        .from('warehouse_services')
+        .select('*')
+        .in('id', input.serviceIds)
+        .eq('warehouse_id', input.warehouseId)
+        .eq('is_active', true)
+
+      if (services && services.length > 0) {
+        servicesTotal = services.reduce((total, service) => {
+          let servicePrice = parseFloat(service.base_price)
+
+          // Calculate price based on pricing type
+          if (service.pricing_type === 'per_pallet' && input.palletCount) {
+            servicePrice = parseFloat(service.base_price) * input.palletCount
+          } else if (service.pricing_type === 'per_sqft' && input.areaSqFt) {
+            servicePrice = parseFloat(service.base_price) * input.areaSqFt
+          } else if (service.pricing_type === 'per_day') {
+            const start = new Date(input.startDate)
+            const end = new Date(input.endDate || input.startDate)
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1
+            servicePrice = parseFloat(service.base_price) * days
+          } else if (service.pricing_type === 'per_month') {
+            const start = new Date(input.startDate)
+            const end = new Date(input.endDate || input.startDate)
+            const months = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)) || 1
+            servicePrice = parseFloat(service.base_price) * months
+          }
+
+          return total + servicePrice
+        }, 0)
+      }
+    }
+
+    const totalAmount = baseTotal + servicesTotal
+
     // Create booking
     const { data: booking, error } = await supabase
       .from('bookings')
@@ -84,7 +145,7 @@ export async function createBookingRequest(input: {
         area_sq_ft: input.areaSqFt,
         start_date: input.startDate,
         end_date: input.endDate,
-        total_amount: 0, // Will be set when proposal is accepted
+        total_amount: totalAmount,
         notes: input.notes,
       })
       .select()
@@ -92,6 +153,62 @@ export async function createBookingRequest(input: {
 
     if (error) {
       return { success: false, error: error.message }
+    }
+
+    // Add selected services to booking_services table
+    if (input.serviceIds && input.serviceIds.length > 0) {
+      // Fetch service details for snapshot
+      const { data: services } = await supabase
+        .from('warehouse_services')
+        .select('*')
+        .in('id', input.serviceIds)
+        .eq('warehouse_id', input.warehouseId)
+        .eq('is_active', true)
+
+      if (services && services.length > 0) {
+        // Calculate service prices based on booking details
+        const bookingServices = services.map((service) => {
+          let calculatedPrice = parseFloat(service.base_price)
+
+          // Calculate price based on pricing type
+          if (service.pricing_type === 'per_pallet' && input.palletCount) {
+            calculatedPrice = parseFloat(service.base_price) * input.palletCount
+          } else if (service.pricing_type === 'per_sqft' && input.areaSqFt) {
+            calculatedPrice = parseFloat(service.base_price) * input.areaSqFt
+          } else if (service.pricing_type === 'per_day') {
+            const start = new Date(input.startDate)
+            const end = new Date(input.endDate || input.startDate)
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1
+            calculatedPrice = parseFloat(service.base_price) * days
+          } else if (service.pricing_type === 'per_month') {
+            const start = new Date(input.startDate)
+            const end = new Date(input.endDate || input.startDate)
+            const months = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)) || 1
+            calculatedPrice = parseFloat(service.base_price) * months
+          }
+
+          return {
+            booking_id: booking.id,
+            service_id: service.id,
+            service_name: service.service_name,
+            service_description: service.service_description,
+            pricing_type: service.pricing_type,
+            base_price: parseFloat(service.base_price),
+            quantity: 1,
+            calculated_price: calculatedPrice,
+          }
+        })
+
+        // Insert booking services
+        const { error: servicesError } = await supabase
+          .from('booking_services')
+          .insert(bookingServices)
+
+        if (servicesError) {
+          console.error('Error adding services to booking:', servicesError)
+          // Don't fail the booking creation if services fail
+        }
+      }
     }
 
     // Emit booking requested event

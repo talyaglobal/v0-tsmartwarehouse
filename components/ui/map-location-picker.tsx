@@ -8,7 +8,7 @@ import { Loader2 } from "@/components/icons"
 interface MapLocationPickerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onLocationSelect: (location: { lat: number; lng: number; address?: string }) => void
+  onLocationSelect: (location: { lat: number; lng: number; address?: string; addressComponents?: any[] }) => void
   initialLat?: number
   initialLng?: number
 }
@@ -259,8 +259,9 @@ export function MapLocationPicker({
 
     setIsLoading(true)
 
-    // Geocode to get address
+    // Geocode to get address and address components
     let address: string | undefined = undefined
+    let addressComponents: any = undefined
     if (window.google?.maps?.Geocoder) {
       const geocoder = new window.google.maps.Geocoder()
       try {
@@ -276,6 +277,7 @@ export function MapLocationPicker({
 
         if (results && results[0]) {
           address = results[0].formatted_address
+          addressComponents = results[0].address_components
         }
       } catch (error) {
         console.error("Failed to geocode location:", error)
@@ -286,6 +288,7 @@ export function MapLocationPicker({
       lat: selectedLocation.lat,
       lng: selectedLocation.lng,
       address,
+      addressComponents, // Pass address components for city extraction
     })
 
     setIsLoading(false)

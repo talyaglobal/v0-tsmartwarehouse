@@ -114,18 +114,62 @@ export default function FindWarehousesPage() {
   }, [filters])
 
   const handleFiltersChange = (newFilters: Partial<WarehouseSearchParams>) => {
-    setFilters({ ...filters, ...newFilters, page: 1 })
-    // Update URL params
+    // Merge with current filters to preserve all existing filters
+    const updatedFilters = { ...filters, ...newFilters }
+    setFilters(updatedFilters)
+    
+    // Update URL params - preserve all current URL params and merge with new filters
     const params = new URLSearchParams()
-    Object.entries({ ...filters, ...newFilters }).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (Array.isArray(value)) {
-          if (value.length > 0) params.set(key, value.join(","))
-        } else {
-          params.set(key, String(value))
-        }
+    
+    // Map of API filter keys to URL param keys
+    const filterKeyMap: Record<string, string> = {
+      city: 'location',
+      quantity: 'palletCount', // or 'areaSqFt' based on type
+      start_date: 'startDate',
+      end_date: 'endDate',
+    }
+    
+    // First, add all existing URL params to preserve them
+    searchParams.forEach((value, key) => {
+      // Skip the filters we're updating
+      const apiKey = Object.entries(filterKeyMap).find(([_, urlKey]) => urlKey === key)?.[0] || key
+      if (!(apiKey in newFilters) && !(key in newFilters)) {
+        params.set(key, value)
       }
     })
+    
+    // Then add/update the new filter values
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        // Map API key to URL param key
+        const urlKey = filterKeyMap[key] || key
+        
+        // Special handling for quantity -> palletCount/areaSqFt
+        if (key === 'quantity' && updatedFilters.type) {
+          if (updatedFilters.type === 'pallet') {
+            params.set('palletCount', String(value))
+            params.delete('areaSqFt')
+          } else if (updatedFilters.type === 'area-rental') {
+            params.set('areaSqFt', String(value))
+            params.delete('palletCount')
+          }
+        } else if (Array.isArray(value)) {
+          if (value.length > 0) {
+            params.set(urlKey, value.join(","))
+          } else {
+            // Remove empty arrays
+            params.delete(urlKey)
+          }
+        } else {
+          params.set(urlKey, String(value))
+        }
+      } else {
+        // Remove undefined/null values
+        const urlKey = filterKeyMap[key] || key
+        params.delete(urlKey)
+      }
+    })
+    
     router.push(`/find-warehouses?${params.toString()}`)
   }
 
@@ -284,7 +328,7 @@ export default function FindWarehousesPage() {
                 <>
                   <div className={viewMode === "grid" 
                     ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "space-y-4"
+                    : "space-y-6"
                   }>
                     {warehouses.map((warehouse) => (
                       <WarehouseCard
@@ -295,8 +339,8 @@ export default function FindWarehousesPage() {
                           type: filters.type,
                           palletCount: filters.type === "pallet" && filters.quantity ? filters.quantity.toString() : undefined,
                           areaSqFt: filters.type === "area-rental" && filters.quantity ? filters.quantity.toString() : undefined,
-                          startDate: filters.start_date,
-                          endDate: filters.end_date,
+                          startDate: filters.start_date || searchParams.get("startDate") || undefined,
+                          endDate: filters.end_date || searchParams.get("endDate") || undefined,
                         }}
                       />
                     ))}

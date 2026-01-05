@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 // Slider component not available - using Input fields for price range
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { RatingStars } from "./rating-stars"
 import { X, Filter } from "lucide-react"
 import type { WarehouseSearchParams } from "@/types/marketplace"
@@ -108,31 +106,6 @@ export function SearchFilters({
         </Tabs>
       </div>
 
-      {/* Quantity */}
-      <div className="space-y-2">
-        <Label>
-          {filters.type === "area-rental" ? "Square Feet" : "Number of Pallets"}
-        </Label>
-        <Input
-          type="number"
-          min="1"
-          placeholder={filters.type === "area-rental" ? "e.g., 1000" : "e.g., 10"}
-          value={filters.quantity || ""}
-          onChange={(e) => updateFilter("quantity", e.target.value ? parseInt(e.target.value) : undefined)}
-        />
-      </div>
-
-      {/* Date Range */}
-      <div className="space-y-2">
-        <Label>Date Range</Label>
-        <DateRangePicker
-          startDate={filters.start_date || ""}
-          endDate={filters.end_date || ""}
-          onStartDateChange={(date) => updateFilter("start_date", date || undefined)}
-          onEndDateChange={(date) => updateFilter("end_date", date || undefined)}
-        />
-      </div>
-
       {/* Price Range */}
       <div className="space-y-2">
         <Label>Price Range</Label>
@@ -157,28 +130,39 @@ export function SearchFilters({
       {/* Rating Filter */}
       <div className="space-y-2">
         <Label>Rating Score</Label>
-        <RadioGroup
-          value={filters.min_rating?.toString() || ""}
-          onValueChange={(value) => updateFilter("min_rating", value ? parseFloat(value) : undefined)}
-          className="space-y-2"
-        >
+        <div className="space-y-2">
           {[
             { value: 4.5, label: "4.5 stars and above" },
             { value: 4, label: "4 stars and above" },
             { value: 3, label: "3 stars and above" },
-          ].map((option) => (
-            <div key={option.value} className="flex items-center space-x-2">
-              <RadioGroupItem value={option.value.toString()} id={`rating-${option.value}`} />
-              <label
-                htmlFor={`rating-${option.value}`}
-                className="text-sm font-normal cursor-pointer flex items-center gap-1.5 flex-1"
-              >
-                <RatingStars rating={option.value} size="sm" showNumber={false} showCount={false} />
-                <span>{option.label}</span>
-              </label>
-            </div>
-          ))}
-        </RadioGroup>
+            { value: 2, label: "2 stars and above" },
+            { value: 1, label: "1 star and above" },
+          ].map((option) => {
+            const isChecked = filters.min_rating === option.value
+            return (
+              <div key={option.value} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`rating-${option.value}`}
+                  checked={isChecked}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      updateFilter("min_rating", option.value)
+                    } else {
+                      updateFilter("min_rating", undefined)
+                    }
+                  }}
+                />
+                <label
+                  htmlFor={`rating-${option.value}`}
+                  className="text-sm font-normal cursor-pointer flex items-center gap-1.5 flex-1"
+                >
+                  <RatingStars rating={option.value} size="sm" showNumber={false} showCount={false} />
+                  <span>{option.label}</span>
+                </label>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Warehouse Type */}

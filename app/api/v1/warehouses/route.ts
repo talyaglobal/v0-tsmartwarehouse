@@ -57,7 +57,7 @@ const createWarehouseSchema = z.object({
   })).optional(),
   // Pricing (will be handled separately in warehouse_pricing table)
   pricing: z.array(z.object({
-    pricing_type: z.enum(["pallet", "pallet-monthly", "area"]),
+    pricing_type: z.enum(["pallet", "pallet-monthly", "area", "area-rental"]),
     base_price: z.number().positive(),
     unit: z.string(),
     min_quantity: z.number().int().nonnegative().nullable().optional(),

@@ -72,6 +72,39 @@ export interface WarehouseSearchResult {
   company_name: string
   company_logo?: string
   is_verified: boolean
+  
+  // Additional warehouse details
+  custom_status?: 'antrepolu' | 'regular'
+  min_pallet?: number
+  max_pallet?: number
+  min_sq_ft?: number
+  max_sq_ft?: number
+  rent_methods?: string[]
+  security?: string[]
+  video_url?: string
+  access_info?: {
+    accessType?: string
+    accessControl?: string
+    [key: string]: any
+  }
+  product_acceptance_start_time?: string
+  product_acceptance_end_time?: string
+  working_days?: string[]
+  operating_hours?: {
+    open?: string
+    close?: string
+    days?: string[]
+    [key: string]: any
+  }
+  warehouse_in_fee?: number
+  warehouse_out_fee?: number
+  ports?: Array<{
+    name: string
+    container40DC?: number
+    container40HC?: number
+    container20DC?: number
+    [key: string]: any
+  }>
 }
 
 export interface SearchResponse {

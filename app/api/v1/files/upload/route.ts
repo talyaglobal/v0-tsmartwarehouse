@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth/api-middleware'
 import {
   validateFile,
@@ -62,16 +62,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Create Supabase client
-    const supabase = await createClient()
+    // Create Supabase client (server-side with service role for storage operations)
+    const supabase = createServerSupabaseClient()
 
     // Generate file path
     // For logo uploads, use logo folder without user ID prefix
     // For avatar uploads, use avatar folder with user ID prefix
+    // For warehouse photos, use warehouse folder
+    const isWarehouseUpload = bucket === 'docs' && folder === 'warehouse'
     const filePath = isLogoUpload
       ? `logo/${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
       : isAvatarUpload
       ? `avatar/${user.id}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      : isWarehouseUpload
+      ? `warehouse/${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
       : generateFilePath(file.name, folder, user.id)
 
     // Convert File to ArrayBuffer for upload
@@ -170,7 +174,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const { error } = await supabase.storage.from(bucket).remove([path])
 
     if (error) {

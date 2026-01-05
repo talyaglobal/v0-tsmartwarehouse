@@ -30,7 +30,7 @@ export default function WarehousesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [currentPhotoIndexes, setCurrentPhotoIndexes] = useState<Record<string, number>>({})
   const [pricingWarehouse, setPricingWarehouse] = useState<Warehouse | null>(null)
-  const [pricingType, setPricingType] = useState<'pallet' | 'pallet-monthly' | 'area'>('pallet')
+  const [pricingType, setPricingType] = useState<'pallet' | 'pallet-monthly' | 'area-rental'>('pallet')
   const [basePrice, setBasePrice] = useState<string>('')
   const [isSavingPrice, setIsSavingPrice] = useState(false)
   const [deleteConfirmWarehouse, setDeleteConfirmWarehouse] = useState<Warehouse | null>(null)
@@ -103,16 +103,19 @@ export default function WarehousesPage() {
   })
 
   // Check for missing pricing
-  const requiredPricingTypes: ('pallet' | 'pallet-monthly' | 'area')[] = ['pallet', 'pallet-monthly', 'area']
+  const requiredPricingTypes: ('pallet' | 'pallet-monthly' | 'area-rental')[] = ['pallet', 'pallet-monthly', 'area-rental']
   const pricingTypeLabels: Record<string, string> = {
     'pallet': 'Pallet (per day)',
     'pallet-monthly': 'Pallet (per month)',
-    'area': 'Area Rental (per sqft/month)'
+    'area-rental': 'Area Rental (per sqft/month)'
   }
 
   const warehousesWithMissingPricing = filteredWarehouses.map(warehouse => {
     const pricingArray = (warehouse as any).pricing as any[] | null | undefined
-    const existingPricingTypes = (pricingArray || []).map((p: any) => p.pricing_type)
+    const existingPricingTypes = (pricingArray || []).map((p: any) => {
+      // Map 'area' to 'area-rental' for compatibility
+      return p.pricing_type === 'area' ? 'area-rental' : p.pricing_type
+    })
     const missingTypes = requiredPricingTypes.filter(type => !existingPricingTypes.includes(type))
     return {
       warehouse,
@@ -150,6 +153,8 @@ export default function WarehousesPage() {
         unit = 'per_pallet_per_day'
       } else if (pricingType === 'pallet-monthly') {
         unit = 'per_pallet_per_month'
+      } else if (pricingType === 'area-rental') {
+        unit = 'per_sqft_per_month'
       }
 
       await api.post(`/api/v1/warehouses/${pricingWarehouse.id}/pricing`, {
@@ -431,7 +436,7 @@ export default function WarehousesPage() {
                         {(warehouse as any).pricing.map((price: any, idx: number) => (
                           <div key={idx} className="text-sm flex items-center justify-between">
                             <span className="text-muted-foreground">
-                              {price.pricing_type === 'pallet' ? 'Pallet' : price.pricing_type === 'pallet-monthly' ? 'Pallet (Monthly)' : 'Area'}:
+                              {price.pricing_type === 'pallet' ? 'Pallet' : price.pricing_type === 'pallet-monthly' ? 'Pallet (Monthly)' : (price.pricing_type === 'area-rental' || price.pricing_type === 'area') ? 'Area' : 'Area'}:
                             </span>
                             <span className="font-semibold text-primary">
                               {formatCurrency(price.base_price)}/{price.pricing_type === 'pallet' ? 'pallet/day' : price.pricing_type === 'pallet-monthly' ? 'pallet/month' : 'sq ft/month'}
@@ -451,7 +456,9 @@ export default function WarehousesPage() {
                             const existingPricing = (warehouse as any).pricing
                             if (existingPricing && existingPricing.length > 0) {
                               const firstPrice = existingPricing[0]
-                              setPricingType(firstPrice.pricing_type)
+                              // Map 'area' to 'area-rental' for compatibility
+                              const pricingType = firstPrice.pricing_type === 'area' ? 'area-rental' : firstPrice.pricing_type
+                              setPricingType(pricingType as 'pallet' | 'pallet-monthly' | 'area-rental')
                               setBasePrice(firstPrice.base_price.toString())
                             } else {
                               setPricingType('pallet')
@@ -605,7 +612,9 @@ export default function WarehousesPage() {
                               const existingPricing = (warehouse as any).pricing
                               if (existingPricing && existingPricing.length > 0) {
                                 const firstPrice = existingPricing[0]
-                                setPricingType(firstPrice.pricing_type)
+                                // Map 'area' to 'area-rental' for compatibility
+                              const pricingType = firstPrice.pricing_type === 'area' ? 'area-rental' : firstPrice.pricing_type
+                              setPricingType(pricingType as 'pallet' | 'pallet-monthly' | 'area-rental')
                                 setBasePrice(firstPrice.base_price.toString())
                               } else {
                                 setPricingType('pallet')
@@ -685,14 +694,37 @@ export default function WarehousesPage() {
           <div className="space-y-4">
             <div>
               <Label>Pricing Type</Label>
-              <Select onValueChange={(v) => setPricingType(v as any)} value={pricingType}>
+              <Select 
+                onValueChange={(v) => {
+                  const newPricingType = v as 'pallet' | 'pallet-monthly' | 'area-rental'
+                  setPricingType(newPricingType)
+                  
+                  // Find the price for the selected pricing type and update the textbox
+                  const existingPricing = (pricingWarehouse as any)?.pricing as any[] | null | undefined
+                  if (existingPricing && existingPricing.length > 0) {
+                    // Check for both 'area-rental' and 'area' for compatibility
+                    const selectedPrice = existingPricing.find((p: any) => 
+                      p.pricing_type === newPricingType || 
+                      (newPricingType === 'area-rental' && p.pricing_type === 'area')
+                    )
+                    if (selectedPrice) {
+                      setBasePrice(selectedPrice.base_price.toString())
+                    } else {
+                      setBasePrice('')
+                    }
+                  } else {
+                    setBasePrice('')
+                  }
+                }} 
+                value={pricingType}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pallet">Pallet (per pallet per day)</SelectItem>
                   <SelectItem value="pallet-monthly">Pallet (per pallet per month)</SelectItem>
-                  <SelectItem value="area">Area (per sq ft per month)</SelectItem>
+                  <SelectItem value="area-rental">Area (per sq ft per month)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

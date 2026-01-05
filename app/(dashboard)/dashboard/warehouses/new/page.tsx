@@ -93,7 +93,6 @@ export default function NewWarehousePage() {
   }
 
   const [formData, setFormData] = useState({
-    name: "",
     address: "",
     city: "",
     zipCode: "",
@@ -159,7 +158,7 @@ export default function NewWarehousePage() {
         newPricing.push({
           pricingType: 'area-rental',
           basePrice: '',
-          unit: 'per_sqft_per_day',
+          unit: 'per_sqft_per_month',
           volumeDiscounts: {},
         })
       }
@@ -186,10 +185,10 @@ export default function NewWarehousePage() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        if (!formData.name || !formData.address || !formData.city) {
+        if (!formData.address || !formData.city) {
           addNotification({
             type: 'error',
-            message: 'Please fill in name, address, and city',
+            message: 'Please fill in address and city',
             duration: 5000,
           })
           return false
@@ -265,7 +264,6 @@ export default function NewWarehousePage() {
       const totalSqFtValue = parseNumberInput(formData.totalSqFt)
 
       const requestBody: any = {
-        name: formData.name,
         address: formData.address,
         city: formData.city,
         state: state,
@@ -370,13 +368,28 @@ export default function NewWarehousePage() {
             <Progress value={progress} className="h-2" />
             <div className="flex items-center justify-between mt-4">
               {STEPS.map((step) => (
-                <div
+                <button
                   key={step.id}
-                  className={`flex flex-col items-center flex-1 ${
-                    step.id < currentStep ? 'text-primary' : step.id === currentStep ? 'text-foreground' : 'text-muted-foreground'
+                  type="button"
+                  onClick={() => {
+                    // Allow navigation to any step that has been completed or is the current step
+                    // For future steps, validate current step first
+                    if (step.id <= currentStep) {
+                      setCurrentStep(step.id)
+                    } else if (validateStep(currentStep)) {
+                      setCurrentStep(step.id)
+                    }
+                  }}
+                  className={`flex flex-col items-center flex-1 transition-colors ${
+                    step.id < currentStep 
+                      ? 'text-primary cursor-pointer hover:text-primary/80' 
+                      : step.id === currentStep 
+                      ? 'text-foreground cursor-pointer' 
+                      : 'text-muted-foreground cursor-pointer hover:text-muted-foreground/80'
                   }`}
+                  disabled={false}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-2 ${
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-2 transition-colors ${
                     step.id < currentStep
                       ? 'bg-primary border-primary text-primary-foreground'
                       : step.id === currentStep
@@ -390,7 +403,7 @@ export default function NewWarehousePage() {
                     )}
                   </div>
                   <span className="text-xs font-medium text-center">{step.title}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -407,18 +420,6 @@ export default function NewWarehousePage() {
           {currentStep === 1 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">
-                  Warehouse Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Main Warehouse - Downtown"
-                />
-              </div>
-
-              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="address">
                     Address <span className="text-destructive">*</span>
@@ -434,14 +435,44 @@ export default function NewWarehousePage() {
                 </div>
                 <PlacesAutocomplete
                   value={formData.address}
-                  onChange={(address, place) => {
+                  onChange={async (address, place) => {
                     setFormData(prev => ({ ...prev, address }))
-                    if (place?.address_components) {
+                    
+                    // Extract address components from place object
+                    // place can be from autocomplete (place_changed) or geocoding (blur event)
+                    let addressComponents = place?.address_components
+                    
+                    // If no address_components in place, try to geocode the address
+                    if (!addressComponents && address && window.google?.maps?.Geocoder) {
+                      const geocoder = new window.google.maps.Geocoder()
+                      try {
+                        const results = await new Promise<any[]>((resolve, reject) => {
+                          geocoder.geocode(
+                            { address },
+                            (results: any, status: string) => {
+                              if (status === 'OK' && results && results[0]) {
+                                resolve(results)
+                              } else {
+                                reject(new Error(`Geocoding failed: ${status}`))
+                              }
+                            }
+                          )
+                        })
+                        
+                        if (results && results[0] && results[0].address_components) {
+                          addressComponents = results[0].address_components
+                        }
+                      } catch (error) {
+                        console.error('Geocoding error:', error)
+                      }
+                    }
+                    
+                    if (addressComponents && Array.isArray(addressComponents) && addressComponents.length > 0) {
                       let cityName = ""
                       let zipCode = ""
                       let stateName = ""
 
-                      for (const component of place.address_components) {
+                      for (const component of addressComponents) {
                         const types = component.types
                         if (types.includes("locality") || types.includes("administrative_area_level_2")) {
                           cityName = component.long_name
@@ -484,11 +515,38 @@ export default function NewWarehousePage() {
                 initialLat={formData.latitude ? parseFloat(formData.latitude) : undefined}
                 initialLng={formData.longitude ? parseFloat(formData.longitude) : undefined}
                 onLocationSelect={(location) => {
+                  // Extract city from address components if available
+                  let cityName = ""
+                  let zipCode = ""
+                  let stateName = ""
+
+                  if (location.addressComponents) {
+                    for (const component of location.addressComponents) {
+                      const types = component.types
+                      if (types.includes("locality") || types.includes("administrative_area_level_2")) {
+                        cityName = component.long_name
+                      }
+                      if (types.includes("postal_code")) {
+                        zipCode = component.long_name
+                      }
+                      if (types.includes("administrative_area_level_1")) {
+                        stateName = component.long_name
+                        setState(component.short_name || component.long_name)
+                      }
+                    }
+                  }
+
+                  if (cityName && stateName) {
+                    cityName = `${cityName}, ${stateName}`
+                  }
+
                   setFormData((prev) => ({
                     ...prev,
                     latitude: location.lat.toString(),
                     longitude: location.lng.toString(),
                     address: location.address || prev.address,
+                    ...(cityName && { city: cityName }),
+                    ...(zipCode && { zipCode }),
                   }))
                 }}
               />
@@ -612,7 +670,7 @@ export default function NewWarehousePage() {
                 onPhotosChange={setWarehousePhotos}
                 initialPhotos={warehousePhotos}
                 maxPhotos={10}
-                bucket="warehouse-photos"
+                bucket="docs"
               />
               <p className="text-sm text-muted-foreground">
                 Upload at least 2 photos. The first photo will be used as the primary image.
@@ -655,7 +713,7 @@ export default function NewWarehousePage() {
                   <Label>
                     {price.pricingType === 'pallet' && 'Per Pallet Per Day'}
                     {price.pricingType === 'pallet-monthly' && 'Per Pallet Per Month'}
-                    {price.pricingType === 'area-rental' && 'Per Square Foot Per Day'}
+                    {price.pricingType === 'area-rental' && 'Per Square Foot Per Month'}
                     <span className="text-destructive">*</span>
                   </Label>
                   <Input
@@ -819,10 +877,6 @@ export default function NewWarehousePage() {
                 <h3 className="font-semibold">Basic Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Name:</span>
-                    <p className="font-medium">{formData.name || "Not set"}</p>
-                  </div>
-                  <div>
                     <span className="text-muted-foreground">Address:</span>
                     <p className="font-medium">{formData.address || "Not set"}</p>
                   </div>
@@ -880,7 +934,7 @@ export default function NewWarehousePage() {
                       <span className="text-muted-foreground">
                         {price.pricingType === 'pallet' && 'Per Pallet Per Day: '}
                         {price.pricingType === 'pallet-monthly' && 'Per Pallet Per Month: '}
-                        {price.pricingType === 'area-rental' && 'Per Square Foot Per Day: '}
+                        {price.pricingType === 'area-rental' && 'Per Square Foot Per Month: '}
                       </span>
                       <span className="font-medium">${price.basePrice}</span>
                     </div>

@@ -17,11 +17,10 @@ import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PhotoUpload } from "@/components/marketplace/photo-upload"
 import { MapLocationPicker } from "@/components/ui/map-location-picker"
-import { AvailabilityCalendar } from "@/components/marketplace/availability-calendar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatNumber } from "@/lib/utils/format"
 import { TemperatureSelect } from "@/components/warehouse/temperature-select"
-import { getWarehouseById } from "@/lib/services/warehouse-search-supabase"
+import { Progress } from "@/components/ui/progress"
+import { ArrowRight, CheckCircle2 } from "lucide-react"
 
 const WAREHOUSE_TYPES = [
   { value: "general-dry-ambient", label: "General (Dry/Ambient)" },
@@ -73,7 +72,15 @@ export default function EditWarehousePage() {
   const [state, setState] = useState("")
   const [warehousePhotos, setWarehousePhotos] = useState<string[]>([])
   const [showMapPicker, setShowMapPicker] = useState(false)
-  const [activeTab, setActiveTab] = useState("basic")
+  const [currentStep, setCurrentStep] = useState(1)
+
+  const STEPS = [
+    { id: 1, title: "Basic Info", description: "Address, location" },
+    { id: 2, title: "Details", description: "Type, storage, temperature, capacity" },
+    { id: 3, title: "Photos", description: "Upload warehouse photos" },
+    { id: 4, title: "Pricing", description: "Set pricing and volume discounts" },
+    { id: 5, title: "Amenities", description: "Features and access information" },
+  ] as const
 
   const formatNumberInput = (value: string): string => {
     const numericValue = value.replace(/\D/g, '')
@@ -88,7 +95,6 @@ export default function EditWarehousePage() {
   }
 
   const [formData, setFormData] = useState({
-    name: "",
     address: "",
     city: "",
     zipCode: "",
@@ -128,42 +134,92 @@ export default function EditWarehousePage() {
 
       setLoading(true)
       try {
-        const warehouse = await getWarehouseById(warehouseId)
+        // Fetch warehouse from API endpoint instead of direct DB call
+        const response = await fetch(`/api/v1/warehouses/${warehouseId}`)
+        if (!response.ok) {
+          throw new Error('Failed to fetch warehouse')
+        }
+        const result = await response.json()
+        if (!result.success || !result.data) {
+          throw new Error('Warehouse not found')
+        }
+        const warehouse = result.data
         if (warehouse) {
+          // Extract access info
+          const accessInfo = warehouse.accessInfo as any
+          const accessType = accessInfo?.accessType || ""
+          const accessControl = accessInfo?.accessControl || ""
+
+          // Extract pricing from warehouse object
+          const pricingArray: Array<{ type: string; price: number; unit: string; volumeDiscounts: Record<string, string> }> = []
+          if (warehouse.pricing) {
+            if (warehouse.pricing.pallet) {
+              pricingArray.push({
+                type: 'pallet',
+                price: warehouse.pricing.pallet.basePrice,
+                unit: warehouse.pricing.pallet.unit,
+                volumeDiscounts: (warehouse.pricing.pallet as any).volumeDiscounts || {},
+              })
+            }
+            if (warehouse.pricing.palletMonthly) {
+              pricingArray.push({
+                type: 'pallet-monthly',
+                price: warehouse.pricing.palletMonthly.basePrice,
+                unit: warehouse.pricing.palletMonthly.unit,
+                volumeDiscounts: (warehouse.pricing.palletMonthly as any).volumeDiscounts || {},
+              })
+            }
+            if (warehouse.pricing.areaRental) {
+              pricingArray.push({
+                type: 'area-rental',
+                price: warehouse.pricing.areaRental.basePrice,
+                unit: warehouse.pricing.areaRental.unit,
+                volumeDiscounts: (warehouse.pricing.areaRental as any).volumeDiscounts || {},
+              })
+            }
+          }
+
           setFormData({
-            name: warehouse.name || "",
             address: warehouse.address || "",
             city: warehouse.city || "",
             zipCode: warehouse.zipCode || "",
-            totalSqFt: warehouse.total_sq_ft?.toString() || "",
-            totalPalletStorage: warehouse.total_pallet_storage?.toString() || "",
+            totalSqFt: warehouse.totalSqFt?.toString() || "",
+            totalPalletStorage: warehouse.totalPalletStorage?.toString() || "",
             latitude: warehouse.latitude?.toString() || "",
             longitude: warehouse.longitude?.toString() || "",
             amenities: warehouse.amenities?.join(", ") || "",
-            warehouseType: warehouse.warehouse_type || "",
-            storageType: warehouse.storage_type || "",
-            temperatureTypes: warehouse.temperature_types || [],
-            rentMethods: warehouse.pricing?.map(p => p.type) || [],
-            security: [],
-            accessType: "",
-            accessControl: "",
-            productAcceptanceStartTime: "",
-            productAcceptanceEndTime: "",
-            workingDays: [],
-            warehouseInFee: "",
-            warehouseOutFee: "",
-            pricing: warehouse.pricing?.map(p => ({
+            warehouseType: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType[0] : warehouse.warehouseType || "",
+            storageType: warehouse.storageType || warehouse.storageTypes?.[0] || "",
+            temperatureTypes: warehouse.temperatureTypes || [],
+            rentMethods: warehouse.rentMethods || [],
+            security: warehouse.security || [],
+            accessType: accessType,
+            accessControl: accessControl,
+            productAcceptanceStartTime: warehouse.productAcceptanceStartTime || "",
+            productAcceptanceEndTime: warehouse.productAcceptanceEndTime || "",
+            workingDays: warehouse.workingDays || [],
+            warehouseInFee: warehouse.warehouseInFee != null ? warehouse.warehouseInFee.toString() : "",
+            warehouseOutFee: warehouse.warehouseOutFee != null ? warehouse.warehouseOutFee.toString() : "",
+            pricing: pricingArray.map(p => ({
               pricingType: p.type,
               basePrice: p.price.toString(),
               unit: p.unit,
-              volumeDiscounts: {},
-            })) || [],
-            minPallet: "",
-            maxPallet: "",
-            minSqFt: "",
-            maxSqFt: "",
+              volumeDiscounts: p.volumeDiscounts || {},
+            })),
+            minPallet: warehouse.minPallet?.toString() || "",
+            maxPallet: warehouse.maxPallet?.toString() || "",
+            minSqFt: warehouse.minSqFt?.toString() || "",
+            maxSqFt: warehouse.maxSqFt?.toString() || "",
           })
           setWarehousePhotos(warehouse.photos || [])
+          
+          // Set state if available
+          if (warehouse.city && warehouse.city.includes(',')) {
+            const parts = warehouse.city.split(',')
+            if (parts.length > 1) {
+              setState(parts[parts.length - 1].trim())
+            }
+          }
         }
       } catch (error) {
         console.error("Error loading warehouse:", error)
@@ -180,7 +236,77 @@ export default function EditWarehousePage() {
     loadWarehouse()
   }, [warehouseId])
 
+  const validateStep = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        if (!formData.address || !formData.city) {
+          addNotification({
+            type: 'error',
+            message: 'Please fill in address and city',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      case 2:
+        if (!formData.warehouseType || !formData.storageType || formData.temperatureTypes.length === 0) {
+          addNotification({
+            type: 'error',
+            message: 'Please select warehouse type, storage type, and at least one temperature option',
+            duration: 5000,
+          })
+          return false
+        }
+        const totalPallet = parseNumberInput(formData.totalPalletStorage)
+        const totalSqFt = parseNumberInput(formData.totalSqFt)
+        if (!totalPallet && !totalSqFt) {
+          addNotification({
+            type: 'error',
+            message: 'Please provide at least one of: Total Pallet Storage or Total Square Feet',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      case 3:
+        if (warehousePhotos.length < 2) {
+          addNotification({
+            type: 'error',
+            message: 'Please upload at least 2 photos',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      case 4:
+        const validPricing = formData.pricing.filter(p => p.pricingType && p.basePrice)
+        if (validPricing.length === 0) {
+          addNotification({
+            type: 'error',
+            message: 'Please add at least one pricing entry',
+            duration: 5000,
+          })
+          return false
+        }
+        return true
+      default:
+        return true
+    }
+  }
+
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, 5))
+    }
+  }
+
+  const handlePrevious = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1))
+  }
+
   const handleSubmit = async () => {
+    if (!validateStep(5)) return
+    
     setIsLoading(true)
     try {
       const amenitiesArray = formData.amenities
@@ -192,7 +318,6 @@ export default function EditWarehousePage() {
       const totalSqFtValue = parseNumberInput(formData.totalSqFt)
 
       const requestBody: any = {
-        name: formData.name,
         address: formData.address,
         city: formData.city,
         state: state,
@@ -287,37 +412,68 @@ export default function EditWarehousePage() {
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="basic">Basic Info</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="photos">Photos</TabsTrigger>
-          <TabsTrigger value="pricing">Pricing</TabsTrigger>
-          <TabsTrigger value="availability">Availability</TabsTrigger>
-        </TabsList>
+      {/* Progress Indicator */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium">Step {currentStep} of {STEPS.length}</span>
+              <span className="text-sm text-muted-foreground">{Math.round((currentStep / STEPS.length) * 100)}% complete</span>
+            </div>
+            <Progress value={(currentStep / STEPS.length) * 100} className="h-2" />
+            <div className="flex items-center justify-between mt-4">
+              {STEPS.map((step) => (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => {
+                    // Allow navigation to any step that has been completed or is the current step
+                    // For future steps, validate current step first
+                    if (step.id <= currentStep) {
+                      setCurrentStep(step.id)
+                    } else if (validateStep(currentStep)) {
+                      setCurrentStep(step.id)
+                    }
+                  }}
+                  className={`flex flex-col items-center flex-1 transition-colors ${
+                    step.id < currentStep 
+                      ? 'text-primary cursor-pointer hover:text-primary/80' 
+                      : step.id === currentStep 
+                      ? 'text-foreground cursor-pointer' 
+                      : 'text-muted-foreground cursor-pointer hover:text-muted-foreground/80'
+                  }`}
+                  disabled={false}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-2 transition-colors ${
+                    step.id < currentStep
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : step.id === currentStep
+                      ? 'border-primary bg-background'
+                      : 'border-muted-foreground bg-background'
+                  }`}>
+                    {step.id < currentStep ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <span className="text-sm font-medium">{step.id}</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-center">{step.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>
-              {activeTab === "basic" && "Basic Information"}
-              {activeTab === "details" && "Warehouse Details"}
-              {activeTab === "photos" && "Photos"}
-              {activeTab === "pricing" && "Pricing"}
-              {activeTab === "availability" && "Availability Calendar"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TabsContent value="basic" className="space-y-4 mt-0">
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  Warehouse Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{STEPS[currentStep - 1].description}</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Step 1: Basic Info */}
+          {currentStep === 1 && (
+            <div className="space-y-4">
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -335,14 +491,44 @@ export default function EditWarehousePage() {
                 </div>
                 <PlacesAutocomplete
                   value={formData.address}
-                  onChange={(address, place) => {
+                  onChange={async (address, place) => {
                     setFormData(prev => ({ ...prev, address }))
-                    if (place?.address_components) {
+                    
+                    // Extract address components from place object
+                    // place can be from autocomplete (place_changed) or geocoding (blur event)
+                    let addressComponents = place?.address_components
+                    
+                    // If no address_components in place, try to geocode the address
+                    if (!addressComponents && address && window.google?.maps?.Geocoder) {
+                      const geocoder = new window.google.maps.Geocoder()
+                      try {
+                        const results = await new Promise<any[]>((resolve, reject) => {
+                          geocoder.geocode(
+                            { address },
+                            (results: any, status: string) => {
+                              if (status === 'OK' && results && results[0]) {
+                                resolve(results)
+                              } else {
+                                reject(new Error(`Geocoding failed: ${status}`))
+                              }
+                            }
+                          )
+                        })
+                        
+                        if (results && results[0] && results[0].address_components) {
+                          addressComponents = results[0].address_components
+                        }
+                      } catch (error) {
+                        console.error('Geocoding error:', error)
+                      }
+                    }
+                    
+                    if (addressComponents && Array.isArray(addressComponents) && addressComponents.length > 0) {
                       let cityName = ""
                       let zipCode = ""
                       let stateName = ""
 
-                      for (const component of place.address_components) {
+                      for (const component of addressComponents) {
                         const types = component.types
                         if (types.includes("locality") || types.includes("administrative_area_level_2")) {
                           cityName = component.long_name
@@ -385,11 +571,38 @@ export default function EditWarehousePage() {
                 initialLat={formData.latitude ? parseFloat(formData.latitude) : undefined}
                 initialLng={formData.longitude ? parseFloat(formData.longitude) : undefined}
                 onLocationSelect={(location) => {
+                  // Extract city from address components if available
+                  let cityName = ""
+                  let zipCode = ""
+                  let stateName = ""
+
+                  if (location.addressComponents) {
+                    for (const component of location.addressComponents) {
+                      const types = component.types
+                      if (types.includes("locality") || types.includes("administrative_area_level_2")) {
+                        cityName = component.long_name
+                      }
+                      if (types.includes("postal_code")) {
+                        zipCode = component.long_name
+                      }
+                      if (types.includes("administrative_area_level_1")) {
+                        stateName = component.long_name
+                        setState(component.short_name || component.long_name)
+                      }
+                    }
+                  }
+
+                  if (cityName && stateName) {
+                    cityName = `${cityName}, ${stateName}`
+                  }
+
                   setFormData((prev) => ({
                     ...prev,
                     latitude: location.lat.toString(),
                     longitude: location.lng.toString(),
                     address: location.address || prev.address,
+                    ...(cityName && { city: cityName }),
+                    ...(zipCode && { zipCode }),
                   }))
                 }}
               />
@@ -413,9 +626,12 @@ export default function EditWarehousePage() {
                   />
                 </div>
               </div>
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="details" className="space-y-4 mt-0">
+          {/* Step 2: Details */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="warehouseType">Warehouse Type</Label>
                 <Select
@@ -527,18 +743,24 @@ export default function EditWarehousePage() {
                   ))}
                 </div>
               </div>
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="photos" className="space-y-4 mt-0">
+          {/* Step 3: Photos */}
+          {currentStep === 3 && (
+            <div className="space-y-4">
               <PhotoUpload
                 onPhotosChange={setWarehousePhotos}
                 initialPhotos={warehousePhotos}
                 maxPhotos={10}
-                bucket="warehouse-photos"
+                bucket="docs"
               />
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="pricing" className="space-y-4 mt-0">
+          {/* Step 4: Pricing */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
               <div className="space-y-3">
                 <Label>Customer Rent Method</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -569,7 +791,7 @@ export default function EditWarehousePage() {
                   <Label>
                     {price.pricingType === 'pallet' && 'Per Pallet Per Day'}
                     {price.pricingType === 'pallet-monthly' && 'Per Pallet Per Month'}
-                    {price.pricingType === 'area-rental' && 'Per Square Foot Per Day'}
+                    {price.pricingType === 'area-rental' && 'Per Square Foot Per Month'}
                   </Label>
                   <Input
                     type="number"
@@ -607,42 +829,157 @@ export default function EditWarehousePage() {
                   />
                 </div>
               </div>
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="availability" className="space-y-4 mt-0">
-              <AvailabilityCalendar
-                warehouseId={warehouseId}
-              />
-              <p className="text-sm text-muted-foreground">
-                Manage availability calendar for your warehouse. Block dates or set price overrides.
-              </p>
-            </TabsContent>
-          </CardContent>
-          <CardFooter className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push("/dashboard/warehouses")}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </Tabs>
+          {/* Step 5: Amenities */}
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="amenities">Amenities (comma-separated)</Label>
+                <Input
+                  id="amenities"
+                  placeholder="24/7 Access, Security, Climate Control"
+                  value={formData.amenities}
+                  onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label>Security</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SECURITY_OPTIONS.map((option) => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`security-${option}`}
+                        checked={formData.security.includes(option)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            security: checked
+                              ? [...prev.security, option]
+                              : prev.security.filter((s) => s !== option),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`security-${option}`} className="text-sm font-normal cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accessType">Access Type</Label>
+                <Select
+                  value={formData.accessType}
+                  onValueChange={(value) => setFormData({ ...formData, accessType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select access type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24/7">24/7 Access</SelectItem>
+                    <SelectItem value="business-hours">Business Hours</SelectItem>
+                    <SelectItem value="by-appointment">By Appointment Only</SelectItem>
+                    <SelectItem value="restricted">Restricted Access</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accessControl">Access Control Method</Label>
+                <Input
+                  id="accessControl"
+                  placeholder="e.g., Key card, Biometric, Security code"
+                  value={formData.accessControl}
+                  onChange={(e) => setFormData({ ...formData, accessControl: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="productAcceptanceStartTime">Product Acceptance Start Time</Label>
+                  <Input
+                    id="productAcceptanceStartTime"
+                    type="time"
+                    value={formData.productAcceptanceStartTime}
+                    onChange={(e) => setFormData({ ...formData, productAcceptanceStartTime: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productAcceptanceEndTime">Product Acceptance End Time</Label>
+                  <Input
+                    id="productAcceptanceEndTime"
+                    type="time"
+                    value={formData.productAcceptanceEndTime}
+                    onChange={(e) => setFormData({ ...formData, productAcceptanceEndTime: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Working Days</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                    <div key={day} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`working-day-${day}`}
+                        checked={formData.workingDays.includes(day)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            workingDays: checked
+                              ? [...prev.workingDays, day]
+                              : prev.workingDays.filter((d) => d !== day),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`working-day-${day}`} className="text-sm font-normal cursor-pointer">
+                        {day}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={currentStep === 1}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Previous
+          </Button>
+          <div className="flex gap-2">
+            {currentStep < 5 ? (
+              <Button type="button" onClick={handleNext}>
+                Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <Button type="button" onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

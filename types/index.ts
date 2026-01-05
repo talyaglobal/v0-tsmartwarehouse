@@ -102,6 +102,14 @@ export interface Warehouse {
   productAcceptanceStartTime?: string // Start time for product acceptance (e.g., 08:00)
   productAcceptanceEndTime?: string // End time for product acceptance (e.g., 18:00)
   workingDays?: string[] // Array of working days (e.g., Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
+  warehouseInFee?: number // Warehouse in fee (per unit)
+  warehouseOutFee?: number // Warehouse out fee (per unit)
+  ports?: Array<{
+    name: string
+    container40DC?: number
+    container40HC?: number
+    container20DC?: number
+  }> // Ports and transportation information
   pricing?: {
     pallet?: {
       basePrice: number

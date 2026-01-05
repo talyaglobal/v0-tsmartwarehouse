@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MapPin, Heart, Package, Ruler, CheckCircle2 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/format"
+import { formatPricingUnit } from "@/lib/utils/format-unit"
 import { RatingStars } from "./rating-stars"
 import { PhotoGallery } from "./photo-gallery"
 import type { WarehouseSearchResult } from "@/types/marketplace"
@@ -30,15 +31,71 @@ export function WarehouseCard({
   searchParams 
 }: WarehouseCardProps) {
   const [isFavorite, setIsFavorite] = useState(false)
+  const [totalPrice, setTotalPrice] = useState<number | null>(null)
   const photos = warehouse.photos || []
   
-  // Get pricing from new format
+  // Get pricing based on selected type (pallet or area-rental)
+  const selectedType = searchParams?.type || 'pallet'
   const pricing = warehouse.pricing?.find(
-    (p) => p.type === (searchParams?.type === 'pallet' ? 'pallet' : 'area-rental')
+    (p) => p.type === (selectedType === 'pallet' ? 'pallet' : 'area-rental')
   ) || warehouse.pricing?.[0]
   
   const price = pricing?.price || warehouse.min_price
-  const unit = pricing?.unit
+  const unit = formatPricingUnit(pricing?.unit)
+
+  // Calculate total price if we have all required params
+  useEffect(() => {
+    const calculateTotalPrice = async () => {
+      // Reset total price first
+      setTotalPrice(null)
+      
+      if (!searchParams?.startDate || !searchParams?.endDate) {
+        return
+      }
+
+      const quantity = selectedType === 'pallet' 
+        ? (searchParams.palletCount ? parseInt(searchParams.palletCount) : undefined)
+        : (searchParams.areaSqFt ? parseInt(searchParams.areaSqFt) : undefined)
+
+      if (!quantity || quantity <= 0 || isNaN(quantity)) {
+        return
+      }
+
+      try {
+        const response = await fetch('/api/v1/pricing/calculate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            warehouse_id: warehouse.id,
+            type: selectedType,
+            quantity,
+            start_date: searchParams.startDate,
+            end_date: searchParams.endDate,
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data && data.data.total) {
+            setTotalPrice(data.data.total)
+          }
+        }
+      } catch (error) {
+        console.error('Error calculating total price:', error)
+      }
+    }
+
+    calculateTotalPrice()
+  }, [
+    warehouse.id, 
+    selectedType, 
+    searchParams?.startDate, 
+    searchParams?.endDate, 
+    searchParams?.palletCount, 
+    searchParams?.areaSqFt
+  ])
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -106,18 +163,25 @@ export function WarehouseCard({
                         className={`h-4 w-4 ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
                       />
                     </Button>
-                    {price && (
-                      <div className="text-right">
-                        <p className="font-bold text-lg">
-                          {formatCurrency(price)}
-                          {unit && (
-                            <span className="text-sm font-normal text-muted-foreground">
-                              /{unit}
-                            </span>
+                    <div className="text-right">
+                      {price ? (
+                        <div>
+                          <p className="font-bold text-lg">
+                            {formatCurrency(price)}
+                            {unit && (
+                              <span className="text-sm font-normal text-muted-foreground">
+                                /{unit}
+                              </span>
+                            )}
+                          </p>
+                          {totalPrice !== null && (
+                            <p className="text-sm font-semibold text-primary mt-1">
+                              Total: {formatCurrency(totalPrice)}
+                            </p>
                           )}
-                        </p>
-                      </div>
-                    )}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
@@ -232,6 +296,11 @@ export function WarehouseCard({
                   </span>
                 )}
               </p>
+              {totalPrice !== null && (
+                <p className="text-sm font-semibold text-primary mt-1">
+                  Total: {formatCurrency(totalPrice)}
+                </p>
+              )}
             </div>
           )}
         </CardContent>

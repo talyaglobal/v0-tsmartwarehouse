@@ -291,15 +291,41 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
   try {
     const supabase = createServerSupabaseClient()
 
+    // Get warehouse with all fields from warehouses table
     const { data: warehouse, error } = await supabase
-      .from('warehouse_listings')
-      .select('*')
+      .from('warehouses')
+      .select(`
+        *,
+        companies(id, name, logo_url, verification_status),
+        warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts)
+      `)
       .eq('id', id)
+      .eq('status', true)
       .single()
 
     if (error || !warehouse) {
       return null
     }
+
+    // Get review summary
+    const { data: reviewSummary } = await supabase
+      .from('warehouse_review_summary')
+      .select('average_rating, total_reviews')
+      .eq('warehouse_id', id)
+      .single()
+
+    // Get company info
+    const company = Array.isArray(warehouse.companies) ? warehouse.companies[0] as any : warehouse.companies as any
+
+    // Transform pricing
+    const pricing = (warehouse.warehouse_pricing || []).map((p: any) => ({
+      type: p.pricing_type,
+      price: parseFloat(p.base_price),
+      unit: p.unit,
+    }))
+
+    // Get min price
+    const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p: any) => p.price)) : 0
 
     return {
       id: warehouse.id,
@@ -319,14 +345,31 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       temperature_types: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],
       photos: warehouse.photos && Array.isArray(warehouse.photos) ? getStoragePublicUrls(warehouse.photos, 'docs') : [],
-      min_price: warehouse.min_price ? parseFloat(warehouse.min_price) : 0,
-      pricing: warehouse.pricing || [],
-      average_rating: warehouse.average_rating ? parseFloat(warehouse.average_rating) : 0,
-      total_reviews: warehouse.total_reviews || 0,
-      company_name: warehouse.company_name || '',
-      company_logo: warehouse.company_logo || undefined,
-      is_verified: warehouse.host_verification === 'verified',
-    }
+      min_price: minPrice,
+      pricing: pricing,
+      average_rating: reviewSummary?.average_rating ? parseFloat(reviewSummary.average_rating) : 0,
+      total_reviews: reviewSummary?.total_reviews || 0,
+      company_name: company?.name || '',
+      company_logo: company?.logo_url || undefined,
+      is_verified: company?.verification_status === 'verified',
+      // Additional fields
+      custom_status: warehouse.custom_status || undefined,
+      min_pallet: warehouse.min_pallet || undefined,
+      max_pallet: warehouse.max_pallet || undefined,
+      min_sq_ft: warehouse.min_sq_ft || undefined,
+      max_sq_ft: warehouse.max_sq_ft || undefined,
+      rent_methods: warehouse.rent_methods || [],
+      security: warehouse.security || [],
+      video_url: warehouse.video_url || undefined,
+      access_info: warehouse.access_info || undefined,
+      product_acceptance_start_time: warehouse.product_acceptance_start_time || undefined,
+      product_acceptance_end_time: warehouse.product_acceptance_end_time || undefined,
+      working_days: warehouse.working_days || [],
+      operating_hours: warehouse.operating_hours || undefined,
+      warehouse_in_fee: warehouse.warehouse_in_fee != null ? parseFloat(warehouse.warehouse_in_fee.toString()) : undefined,
+      warehouse_out_fee: warehouse.warehouse_out_fee != null ? parseFloat(warehouse.warehouse_out_fee.toString()) : undefined,
+      ports: warehouse.ports || [],
+    } as any
   } catch (error) {
     console.error('[warehouse-search] Error fetching warehouse:', error)
     return null
