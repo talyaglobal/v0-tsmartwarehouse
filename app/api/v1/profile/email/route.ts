@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest) {
     if (!profile || profile.role !== 'company_owner') {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Forbidden: Only company owners can change email addresses.",
+        error: "Forbidden: Only warehouse owners can change email addresses.",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })

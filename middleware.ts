@@ -134,7 +134,7 @@ export async function middleware(request: NextRequest) {
         else if (profile.role === 'customer') userRole = 'customer'
         else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
           userRole = profile.role
         }
       } else {
@@ -144,12 +144,12 @@ export async function middleware(request: NextRequest) {
         else if (metadataRole === 'customer') userRole = 'customer'
         else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner'].includes(metadataRole)) {
           userRole = metadataRole
         }
 
         // If root user and test role is set, use test role instead
-        if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+        if (userRole === 'root' && testRoleCookie && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
           userRole = testRoleCookie as typeof userRole
         }
       }
@@ -160,13 +160,13 @@ export async function middleware(request: NextRequest) {
       else if (metadataRole === 'customer') userRole = 'customer'
       else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_admin', 'customer', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(metadataRole)) {
         userRole = metadataRole
       }
     }
 
     // If root user and test role is set, use test role instead
-    if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+    if (userRole === 'root' && testRoleCookie && ['company_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
       userRole = testRoleCookie as typeof userRole
     }
 
@@ -176,7 +176,7 @@ export async function middleware(request: NextRequest) {
       targetRoute = '/admin'
     } else if (userRole === 'warehouse_staff') {
       targetRoute = '/warehouse'
-    } else if (['company_admin', 'customer', 'company_owner'].includes(userRole)) {
+    } else if (['warehouse_admin', 'customer', 'warehouse_owner'].includes(userRole)) {
       targetRoute = '/dashboard'
     }
 
@@ -230,12 +230,12 @@ export async function middleware(request: NextRequest) {
         else if (profile.role === 'customer') userRole = 'customer'
         else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
           userRole = profile.role
         }
         
         // If root user and test role is set, use test role instead
-        if (profile.role === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+        if (profile.role === 'root' && testRoleCookie && ['company_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
           userRole = testRoleCookie as typeof userRole
         }
       } else {
@@ -245,12 +245,12 @@ export async function middleware(request: NextRequest) {
         else if (metadataRole === 'customer') userRole = 'customer'
         else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner'].includes(metadataRole)) {
           userRole = metadataRole
         }
         
         // If root user and test role is set, use test role instead
-        if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+        if (userRole === 'root' && testRoleCookie && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
           userRole = testRoleCookie as typeof userRole
         }
       }
@@ -261,12 +261,12 @@ export async function middleware(request: NextRequest) {
       else if (metadataRole === 'customer') userRole = 'customer'
       else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
+      else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
         userRole = metadataRole
       }
       
       // If root user and test role is set, use test role instead
-      if (userRole === 'root' && testRoleCookie && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+      if (userRole === 'root' && testRoleCookie && ['company_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
         userRole = testRoleCookie as typeof userRole
       }
     }
@@ -282,8 +282,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Dashboard routes - company_admin, customer, and company_owner can access
-    if (isDashboardRoute && !['company_admin', 'customer', 'company_owner'].includes(userRole)) {
+    // Dashboard routes - warehouse_admin, customer, and warehouse_owner can access
+    if (isDashboardRoute && !['warehouse_admin', 'customer', 'warehouse_owner'].includes(userRole)) {
       if (userRole === 'warehouse_staff') {
         return NextResponse.redirect(new URL('/warehouse', request.url))
       } else if (userRole === 'root') {

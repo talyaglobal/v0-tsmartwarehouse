@@ -38,7 +38,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         if (profile.role === 'super_admin') userRole = 'root'
         else if (profile.role === 'customer') userRole = 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_owner', 'company_admin', 'warehouse_staff'].includes(profile.role)) {
+        else if (['root', 'warehouse_owner', 'company_admin', 'warehouse_staff'].includes(profile.role)) {
           userRole = profile.role as UserRole
         }
       } else {
@@ -47,7 +47,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         if (metadataRole === 'super_admin') userRole = 'root'
         else if (metadataRole === 'customer') userRole = 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
+        else if (['root', 'warehouse_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
           userRole = metadataRole as UserRole
         }
       }
@@ -66,7 +66,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       if (metadataRole === 'super_admin') userRole = 'root'
       else if (metadataRole === 'customer') userRole = 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'warehouse_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
         userRole = metadataRole as UserRole
       }
 

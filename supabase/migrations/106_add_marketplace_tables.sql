@@ -154,7 +154,7 @@ CREATE POLICY "Hosts can respond to reviews"
       AND warehouses.company_id IN (
         SELECT company_id FROM company_members
         WHERE user_id = auth.uid()
-        AND role IN ('company_owner', 'company_admin')
+        AND role IN ('warehouse_owner', 'company_admin')
       )
     )
   )
@@ -165,7 +165,7 @@ CREATE POLICY "Hosts can respond to reviews"
       AND warehouses.company_id IN (
         SELECT company_id FROM company_members
         WHERE user_id = auth.uid()
-        AND role IN ('company_owner', 'company_admin')
+        AND role IN ('warehouse_owner', 'company_admin')
       )
     )
   );

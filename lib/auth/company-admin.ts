@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
- * Check if user is a company admin or company owner (using profiles.role)
+ * Check if user is a warehouse admin or warehouse owner (using profiles.role)
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
   const supabase = createServerSupabaseClient()
@@ -10,7 +10,7 @@ export async function isCompanyAdmin(userId: string, companyId?: string): Promis
     .from('profiles')
     .select('role, company_id')
     .eq('id', userId)
-    .in('role', ['company_owner', 'company_admin'])
+    .in('role', ['warehouse_owner', 'warehouse_admin'])
   
   if (companyId) {
     query = query.eq('company_id', companyId)
@@ -47,7 +47,7 @@ export async function getUserCompanyId(userId: string): Promise<string | null> {
 /**
  * Get user's company member role (using profiles.role)
  */
-export async function getUserCompanyRole(userId: string, companyId: string): Promise<'company_owner' | 'company_admin' | 'warehouse_staff' | null> {
+export async function getUserCompanyRole(userId: string, companyId: string): Promise<'warehouse_owner' | 'warehouse_admin' | 'warehouse_staff' | null> {
   const supabase = createServerSupabaseClient()
   
   const { data: profile, error } = await supabase
@@ -62,8 +62,8 @@ export async function getUserCompanyRole(userId: string, companyId: string): Pro
   }
   
   // Map profile role to company role
-  if (profile.role === 'company_owner') return 'company_owner'
-  if (profile.role === 'company_admin') return 'company_admin'
+  if (profile.role === 'warehouse_owner') return 'warehouse_owner'
+  if (profile.role === 'warehouse_admin') return 'warehouse_admin'
   if (profile.role === 'warehouse_staff') return 'warehouse_staff'
   return null
 }
@@ -78,7 +78,7 @@ export async function getUserAdminCompanies(userId: string): Promise<string[]> {
     .from('profiles')
     .select('company_id')
     .eq('id', userId)
-    .in('role', ['company_owner', 'company_admin'])
+    .in('role', ['warehouse_owner', 'warehouse_admin'])
     .not('company_id', 'is', null)
   
   if (error || !profiles) {

@@ -175,6 +175,12 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
       proposed_start_time,
       date_change_requested_at,
       date_change_requested_by,
+      cancel_requested_at,
+      cancel_requested_by,
+      cancel_reason,
+      cancel_processed_at,
+      cancel_processed_by,
+      metadata,
       created_at,
       updated_at,
       warehouses(name, address, city)
@@ -285,6 +291,11 @@ export async function updateBooking(
   if (updates.proposedStartTime !== undefined) updateRow.proposed_start_time = updates.proposedStartTime ?? null
   if (updates.dateChangeRequestedAt !== undefined) updateRow.date_change_requested_at = updates.dateChangeRequestedAt ?? null
   if (updates.dateChangeRequestedBy !== undefined) updateRow.date_change_requested_by = updates.dateChangeRequestedBy ?? null
+  if ((updates as any).cancelRequestedAt !== undefined) updateRow.cancel_requested_at = (updates as any).cancelRequestedAt ?? null
+  if ((updates as any).cancelRequestedBy !== undefined) updateRow.cancel_requested_by = (updates as any).cancelRequestedBy ?? null
+  if ((updates as any).cancelReason !== undefined) updateRow.cancel_reason = (updates as any).cancelReason ?? null
+  if ((updates as any).cancelProcessedAt !== undefined) updateRow.cancel_processed_at = (updates as any).cancelProcessedAt ?? null
+  if ((updates as any).cancelProcessedBy !== undefined) updateRow.cancel_processed_by = (updates as any).cancelProcessedBy ?? null
 
   const { data, error } = await supabase
     .from('bookings')
@@ -349,6 +360,12 @@ function transformBookingRow(row: any): Booking & { warehouse_name?: string; war
     proposedStartTime: (row as any).proposed_start_time ?? undefined,
     dateChangeRequestedAt: (row as any).date_change_requested_at ?? undefined,
     dateChangeRequestedBy: (row as any).date_change_requested_by ?? undefined,
+    cancelRequestedAt: (row as any).cancel_requested_at ?? undefined,
+    cancelRequestedBy: (row as any).cancel_requested_by ?? undefined,
+    cancelReason: (row as any).cancel_reason ?? undefined,
+    cancelProcessedAt: (row as any).cancel_processed_at ?? undefined,
+    cancelProcessedBy: (row as any).cancel_processed_by ?? undefined,
+    metadata: (row as any).metadata ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

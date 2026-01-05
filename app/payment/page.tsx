@@ -49,15 +49,47 @@ export default function PaymentPage() {
             invoiceId = invoiceData.data[0].id
           }
 
-          // Create payment intent via processInvoicePayment or direct payment
+          // If no invoice exists, create one first
+          if (!invoiceId) {
+            try {
+              const generateInvoiceResponse = await fetch("/api/v1/invoices/generate-from-booking", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: 'include',
+                body: JSON.stringify({
+                  bookingId: bookingId,
+                }),
+              })
+              const generateInvoiceData = await generateInvoiceResponse.json()
+              
+              if (generateInvoiceData.success && generateInvoiceData.data) {
+                invoiceId = generateInvoiceData.data.id
+              } else {
+                console.error("Failed to generate invoice:", generateInvoiceData.error)
+                // Still try to proceed with payment using booking amount
+              }
+            } catch (error) {
+              console.error("Failed to generate invoice:", error)
+              // Continue with payment attempt using booking amount
+            }
+          }
+
+          // If we still don't have an invoiceId, we cannot proceed
+          if (!invoiceId) {
+            console.error("Invoice is required for payment")
+            setErrorMessage("Unable to create invoice for this booking. Please contact support.")
+            setLoading(false)
+            return
+          }
+
+          // Create payment intent via processInvoicePayment
           const paymentResponse = await fetch("/api/v1/payments", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: 'include',
             body: JSON.stringify({
-              invoiceId: invoiceId || undefined,
+              invoiceId: invoiceId,
               paymentMethod: "card",
-              amount: booking.totalAmount,
             }),
           })
           const paymentData = await paymentResponse.json()
@@ -67,12 +99,12 @@ export default function PaymentPage() {
             router.push(`/payment?intent=${paymentData.clientSecret}&bookingId=${bookingId}`)
           } else {
             console.error("Failed to create payment:", paymentData.error)
-            router.push("/dashboard/bookings")
+            setErrorMessage(paymentData.error || "Failed to create payment. Please try again.")
+            setLoading(false)
           }
         } catch (error) {
           console.error("Failed to create payment from booking:", error)
-          router.push("/dashboard/bookings")
-        } finally {
+          setErrorMessage(error instanceof Error ? error.message : "Failed to create payment. Please try again.")
           setLoading(false)
         }
       }
@@ -81,22 +113,36 @@ export default function PaymentPage() {
       return
     }
 
-    // If clientSecret is provided, retrieve payment intent
+    // If clientSecret is provided, retrieve payment intent and booking amount
     if (clientSecret && bookingId) {
       const retrieveIntent = async () => {
         try {
           setLoading(true)
-          const response = await fetch("/api/v1/payments/retrieve-intent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          
+          // Get booking to show the correct amount
+          const bookingResponse = await fetch(`/api/v1/bookings/${bookingId}`, {
             credentials: 'include',
-            body: JSON.stringify({ clientSecret }),
           })
-          const data = await response.json()
-          if (data.success) {
-            setAmount(data.amount)
+          const bookingData = await bookingResponse.json()
+          
+          if (bookingData.success && bookingData.data) {
+            // Use booking total amount (in dollars, convert to cents for display)
+            const bookingAmount = bookingData.data.totalAmount || 0
+            setAmount(Math.round(bookingAmount * 100)) // Convert to cents for consistency
           } else {
-            router.push("/dashboard/bookings")
+            // Fallback: get amount from payment intent
+            const response = await fetch("/api/v1/payments/retrieve-intent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: 'include',
+              body: JSON.stringify({ clientSecret }),
+            })
+            const data = await response.json()
+            if (data.success) {
+              setAmount(data.amount)
+            } else {
+              router.push("/dashboard/bookings")
+            }
           }
         } catch (error) {
           console.error("Failed to retrieve payment intent:", error)
@@ -147,7 +193,27 @@ export default function PaymentPage() {
       <div className="flex min-h-screen flex-col">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Loading payment page...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (errorMessage && !clientSecret) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12 max-w-md mx-auto">
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
+              <p className="text-red-800 font-medium">{errorMessage}</p>
+            </div>
+            <Link href="/dashboard/bookings">
+              <Button variant="outline" className="mt-4">
+                Back to Bookings
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -160,9 +226,9 @@ export default function PaymentPage() {
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <p className="text-muted-foreground">Invalid payment request</p>
-            <Link href="/find-warehouses">
+            <Link href="/dashboard/bookings">
               <Button variant="outline" className="mt-4">
-                Back to Search
+                Back to Bookings
               </Button>
             </Link>
           </div>

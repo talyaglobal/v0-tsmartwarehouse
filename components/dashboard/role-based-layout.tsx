@@ -39,7 +39,7 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
           header: 'bg-red-50/95 dark:bg-red-950/95 border-red-200 dark:border-red-900',
           background: 'bg-gradient-to-br from-red-50/80 via-white to-red-50/40 dark:from-red-950 dark:via-red-900 dark:to-red-900/50',
         }
-      case 'company_owner':
+      case 'warehouse_owner':
         return {
           sidebar: 'bg-emerald-50/95 dark:bg-emerald-950/95 border-emerald-200 dark:border-emerald-900',
           header: 'bg-emerald-50/95 dark:bg-emerald-950/95 border-emerald-200 dark:border-emerald-900',

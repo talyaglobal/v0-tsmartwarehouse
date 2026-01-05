@@ -123,8 +123,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       )
     }
 
-    // Only company staff (company_owner, company_admin, warehouse_staff) can delete
-    if (!['company_owner', 'company_admin', 'warehouse_staff', 'root'].includes(currentUser.role)) {
+    // Only company staff (warehouse_owner, warehouse_admin, warehouse_staff) can delete
+    if (!['warehouse_owner', 'warehouse_admin', 'warehouse_staff', 'root'].includes(currentUser.role)) {
       return NextResponse.json(
         { success: false, error: "Forbidden: Insufficient permissions" },
         { status: 403 }

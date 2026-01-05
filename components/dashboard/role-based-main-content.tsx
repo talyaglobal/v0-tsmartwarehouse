@@ -62,12 +62,12 @@ export function RoleBasedMainContent({ children }: RoleBasedMainContentProps) {
     switch (role) {
       case 'root':
         return 'bg-gradient-to-br from-red-50/80 via-white to-red-50/40 dark:from-red-950 dark:via-red-900 dark:to-red-900/50'
-      case 'company_owner':
+      case 'warehouse_owner':
         return 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/40 dark:from-emerald-950 dark:via-emerald-900 dark:to-emerald-900/50'
       case 'company_admin':
         return 'bg-gradient-to-br from-blue-50/80 via-white to-blue-50/40 dark:from-blue-950 dark:via-blue-900 dark:to-blue-900/50'
       case 'customer':
-        return 'bg-gradient-to-br from-violet-50/80 via-white to-violet-50/40 dark:from-violet-950 dark:via-violet-900 dark:to-violet-900/50'
+        return 'bg-white dark:bg-slate-950'
       case 'warehouse_staff':
         return 'bg-gradient-to-br from-slate-50/80 via-white to-slate-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800/50'
       default:

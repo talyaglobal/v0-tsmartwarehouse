@@ -27,17 +27,17 @@ import { createClient } from "@/lib/supabase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
 
 const baseNavigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Services", href: "/dashboard/services", icon: Wrench, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Bookings", href: "/dashboard/bookings", icon: Package, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Membership", href: "/dashboard/membership", icon: CreditCard, roles: ['company_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['customer', 'company_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Services", href: "/dashboard/services", icon: Wrench, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Bookings", href: "/dashboard/bookings", icon: Package, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Membership", href: "/dashboard/membership", icon: CreditCard, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
 ]
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
@@ -191,8 +191,8 @@ export function DashboardSidebar() {
         return false
       }
       
-      // Check if user is company owner or company_admin
-      if (!['company_owner', 'company_admin'].includes(profileData.role)) {
+      // Check if user is warehouse owner or company_admin
+      if (!['warehouse_owner', 'company_admin'].includes(profileData.role)) {
         return false
       }
       
@@ -216,7 +216,7 @@ export function DashboardSidebar() {
     switch (role) {
       case 'root':
         return 'bg-red-50/95 dark:bg-red-950/95 border-r border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
-      case 'company_owner':
+      case 'warehouse_owner':
         return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-r border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
       case 'company_admin':
         return 'bg-blue-50/95 dark:bg-blue-950/95 border-r border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
@@ -315,7 +315,7 @@ export function DashboardSidebar() {
         if (profile?.role === 'root' && selectedTestRole) {
           userRole = selectedTestRole
         }
-        const showMyCompany = isCompanyAdmin || ['company_owner', 'company_admin'].includes(userRole)
+        const showMyCompany = isCompanyAdmin || ['warehouse_owner', 'company_admin'].includes(userRole)
 
         return showMyCompany && (
           <div className="border-t p-4">

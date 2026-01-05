@@ -83,12 +83,12 @@ export async function POST(
     }
     const { user } = authResult
 
-    // Check if user is company_owner (or owner), company_admin, or root
-    const allowedRoles = ['company_owner', 'owner', 'company_admin', 'root']
+    // Check if user is warehouse_owner (or owner), company_admin, or root
+    const allowedRoles = ['warehouse_owner', 'owner', 'company_admin', 'root']
     if (!allowedRoles.includes(user.role)) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Unauthorized: Only company owners, company admins, or root can assign warehouse staff",
+        error: "Unauthorized: Only warehouse owners, company admins, or root can assign warehouse staff",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })
@@ -308,12 +308,12 @@ export async function DELETE(
     }
     const { user } = authResult
 
-    // Check if user is company_owner (or owner), company_admin, or root
-    const allowedRoles = ['company_owner', 'owner', 'company_admin', 'root']
+    // Check if user is warehouse_owner (or owner), company_admin, or root
+    const allowedRoles = ['warehouse_owner', 'owner', 'company_admin', 'root']
     if (!allowedRoles.includes(user.role)) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Unauthorized: Only company owners, company admins, or root can remove warehouse staff",
+        error: "Unauthorized: Only warehouse owners, company admins, or root can remove warehouse staff",
         statusCode: 403,
       }
       return NextResponse.json(errorData, { status: 403 })

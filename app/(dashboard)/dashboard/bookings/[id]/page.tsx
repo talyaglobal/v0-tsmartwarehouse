@@ -280,16 +280,18 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="grid grid-cols-2 gap-4 pt-3 border-t">
-              <div className="flex items-center gap-3">
-                <Ruler className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Area</p>
-                  <p className="font-semibold">
-                    {warehouse.total_sq_ft.toLocaleString()} sq ft
-                  </p>
+              {warehouse.total_sq_ft && (
+                <div className="flex items-center gap-3">
+                  <Ruler className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Area</p>
+                    <p className="font-semibold">
+                      {warehouse.total_sq_ft.toLocaleString()} sq ft
+                    </p>
+                  </div>
                 </div>
-              </div>
-              {warehouse.total_pallet_storage > 0 && (
+              )}
+              {warehouse.total_pallet_storage && warehouse.total_pallet_storage > 0 && (
                 <div className="flex items-center gap-3">
                   <Package className="h-5 w-5 text-muted-foreground" />
                   <div>

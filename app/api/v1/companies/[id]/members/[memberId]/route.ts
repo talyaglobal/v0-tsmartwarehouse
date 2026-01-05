@@ -68,11 +68,11 @@ export async function PATCH(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Prevent changing company owner role (only one owner should exist)
-    if (role && role !== 'company_owner' && member.role === 'company_owner') {
+    // Prevent changing warehouse owner role (only one owner should exist)
+    if (role && role !== 'warehouse_owner' && member.role === 'warehouse_owner') {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Cannot change company owner role. Transfer ownership first.",
+        error: "Cannot change warehouse owner role. Transfer ownership first.",
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })
@@ -315,13 +315,13 @@ export async function DELETE(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Prevent deleting the last company owner
-    if (member.role === 'company_owner') {
+    // Prevent deleting the last warehouse owner
+    if (member.role === 'warehouse_owner') {
       const { data: owners } = await supabase
         .from('profiles')
         .select('id')
         .eq('company_id', companyId)
-        .eq('role', 'company_owner')
+        .eq('role', 'warehouse_owner')
 
       if (owners && owners.length <= 1) {
         const errorData: ErrorResponse = {

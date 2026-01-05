@@ -30,7 +30,7 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+      if (savedRole && ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -93,13 +93,13 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff']
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      company_owner: '🟢 Company Owner',
+      warehouse_owner: '🟢 Warehouse Owner',
       company_admin: '🔵 Company Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
@@ -151,7 +151,7 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
                 <Settings className="h-4 w-4" />
                 Test Role
                 <Badge variant="secondary" className="ml-1">
-                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'company_owner' ? '🟢' : currentTestRole === 'company_admin' ? '🔵' : currentTestRole === 'customer' ? '🟣' : '⚪'}
+                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'warehouse_owner' ? '🟢' : currentTestRole === 'company_admin' ? '🔵' : currentTestRole === 'customer' ? '🟣' : '⚪'}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>

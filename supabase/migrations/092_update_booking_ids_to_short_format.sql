@@ -67,6 +67,15 @@ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'service_orders') THEN
     ALTER TABLE service_orders DROP CONSTRAINT IF EXISTS service_orders_booking_id_fkey;
   END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'warehouse_reviews') THEN
+    ALTER TABLE warehouse_reviews DROP CONSTRAINT IF EXISTS warehouse_reviews_booking_id_fkey;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'warehouse_messages') THEN
+    ALTER TABLE warehouse_messages DROP CONSTRAINT IF EXISTS warehouse_messages_booking_id_fkey;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inquiries') THEN
+    ALTER TABLE inquiries DROP CONSTRAINT IF EXISTS inquiries_converted_booking_id_fkey;
+  END IF;
 END $$;
 
 -- Step 2: Change the id column type from UUID to TEXT
@@ -113,6 +122,15 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'service_orders') THEN
     ALTER TABLE service_orders ALTER COLUMN booking_id TYPE TEXT;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'warehouse_reviews') THEN
+    ALTER TABLE warehouse_reviews ALTER COLUMN booking_id TYPE TEXT;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'warehouse_messages') THEN
+    ALTER TABLE warehouse_messages ALTER COLUMN booking_id TYPE TEXT;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inquiries') THEN
+    ALTER TABLE inquiries ALTER COLUMN converted_booking_id TYPE TEXT;
   END IF;
 END $$;
 

@@ -66,10 +66,13 @@ export async function getWarehouseStaffWarehouses(
 export async function getBookingsForWarehouseStaff(
   staffId: string,
   filters?: {
-    status?: BookingStatus
+    status?: BookingStatus | BookingStatus[] // Support single status or array of statuses
     warehouseId?: string
     startDate?: string
     endDate?: string
+    customerSearch?: string // Search by customer name or email
+    sortBy?: 'date' | 'amount' | 'status' | 'warehouse'
+    sortOrder?: 'asc' | 'desc'
   }
 ): Promise<Booking[]> {
   // First, get all warehouses assigned to this staff
@@ -88,12 +91,23 @@ export async function getBookingsForWarehouseStaff(
     }
   }
 
+  // Handle status filter - can be single status or array
+  let statusFilter: BookingStatus | undefined = undefined
+  if (filters?.status) {
+    if (Array.isArray(filters.status)) {
+      // If array, we'll filter after fetching (since getBookings only supports single status)
+      statusFilter = undefined // Fetch all, then filter
+    } else {
+      statusFilter = filters.status
+    }
+  }
+
   // Get bookings for assigned warehouses
   const bookings = await getBookings({
     warehouseId: filters?.warehouseId,
     warehouseIds: filters?.warehouseId ? undefined : warehouseIds, // Use warehouseIds if no specific warehouse filter
     warehouseCompanyId: undefined, // We're filtering by specific warehouse IDs
-    status: filters?.status,
+    status: statusFilter,
     useCache: false, // Always get fresh data for staff
   })
 
@@ -102,6 +116,13 @@ export async function getBookingsForWarehouseStaff(
   let filteredBookings = filters?.warehouseId 
     ? bookings 
     : bookings.filter((b) => warehouseIds.includes(b.warehouseId))
+
+  // Apply multiple status filter if provided as array
+  if (filters?.status && Array.isArray(filters.status)) {
+    filteredBookings = filteredBookings.filter((b) => 
+      filters.status!.includes(b.status as BookingStatus)
+    )
+  }
 
   // Apply date filters if provided
   if (filters?.startDate) {
@@ -114,6 +135,41 @@ export async function getBookingsForWarehouseStaff(
     filteredBookings = filteredBookings.filter(
       (b) => b.startDate <= filters.endDate!
     )
+  }
+
+  // Apply customer search filter
+  if (filters?.customerSearch) {
+    const searchTerm = filters.customerSearch.toLowerCase()
+    filteredBookings = filteredBookings.filter(
+      (b) => 
+        b.customerName.toLowerCase().includes(searchTerm) ||
+        b.customerEmail.toLowerCase().includes(searchTerm)
+    )
+  }
+
+  // Apply sorting
+  if (filters?.sortBy) {
+    const sortOrder = filters.sortOrder || 'desc'
+    filteredBookings.sort((a, b) => {
+      let comparison = 0
+      
+      switch (filters.sortBy) {
+        case 'date':
+          comparison = new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+          break
+        case 'amount':
+          comparison = (a.totalAmount || 0) - (b.totalAmount || 0)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'warehouse':
+          comparison = a.warehouseId.localeCompare(b.warehouseId)
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
   }
 
   return filteredBookings

@@ -57,22 +57,22 @@ export async function getAuthUser(request: NextRequest) {
       if (profile?.role) {
         // Map legacy roles to new roles
         if (profile.role === 'super_admin') userRole = 'root'
-        else if (profile.role === 'owner') userRole = 'company_owner' // Map 'owner' to 'company_owner'
+        else if (profile.role === 'owner') userRole = 'warehouse_owner' // Map 'owner' to 'warehouse_owner'
         else if (profile.role === 'customer') userRole = 'customer'
         else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(profile.role)) {
+        else if (['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(profile.role)) {
           userRole = profile.role as UserRole
         }
       } else {
         // Fallback to user_metadata if profile doesn't exist
         const metadataRole = user.user_metadata?.role as string
         if (metadataRole === 'super_admin') userRole = 'root'
-        else if (metadataRole === 'owner') userRole = 'company_owner' // Map 'owner' to 'company_owner'
+        else if (metadataRole === 'owner') userRole = 'warehouse_owner' // Map 'owner' to 'warehouse_owner'
         else if (metadataRole === 'customer') userRole = 'customer'
         else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(metadataRole)) {
+        else if (['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(metadataRole)) {
           userRole = metadataRole as UserRole
         }
       }
@@ -81,10 +81,10 @@ export async function getAuthUser(request: NextRequest) {
       // Fallback to user_metadata
       const metadataRole = user.user_metadata?.role as string
       if (metadataRole === 'super_admin') userRole = 'root'
-      else if (metadataRole === 'owner') userRole = 'company_owner' // Map 'owner' to 'company_owner'
+      else if (metadataRole === 'owner') userRole = 'warehouse_owner' // Map 'owner' to 'warehouse_owner'
       else if (metadataRole === 'customer') userRole = 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'company_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'warehouse_owner', 'warehouse_admin', 'warehouse_staff'].includes(metadataRole)) {
         userRole = metadataRole as UserRole
       }
     }

@@ -1,7 +1,7 @@
 // Core Types for TSmart Warehouse Management System
 
 // User Types
-export type UserRole = "root" | "company_owner" | "company_admin" | "customer" | "warehouse_staff"
+export type UserRole = "root" | "warehouse_owner" | "warehouse_admin" | "customer" | "warehouse_staff"
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
 export interface User {
@@ -11,7 +11,7 @@ export interface User {
   role: UserRole
   companyId?: string
   companyName?: string
-  companyRole?: 'company_owner' | 'company_admin' | 'warehouse_staff' | null // Role in company (from profiles table)
+  companyRole?: 'warehouse_owner' | 'warehouse_admin' | 'warehouse_staff' | null // Role in company (from profiles table)
   phone?: string
   avatar?: string
   membershipTier?: MembershipTier
@@ -127,7 +127,7 @@ export interface Warehouse {
 }
 
 // Booking Types
-export type BookingStatus = "pending" | "pre_order" | "awaiting_time_slot" | "payment_pending" | "confirmed" | "active" | "completed" | "cancelled"
+export type BookingStatus = "pending" | "pre_order" | "awaiting_time_slot" | "payment_pending" | "confirmed" | "active" | "cancel_request" | "completed" | "cancelled"
 export type BookingType = "pallet" | "area-rental"
 export type ServiceType = "pallet-in" | "storage" | "pallet-out" | "area-rental"
 

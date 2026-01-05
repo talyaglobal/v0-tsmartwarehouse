@@ -2,12 +2,13 @@
 -- These triggers automatically create notification_events when important changes occur
 
 -- Function to create notification event
+-- SECURITY DEFINER allows the function to bypass RLS policies
 CREATE OR REPLACE FUNCTION create_notification_event()
 RETURNS TRIGGER AS $$
 DECLARE
   event_type_value TEXT;
   entity_type_value TEXT;
-  entity_id_value UUID;
+  entity_id_value TEXT; -- Changed from UUID to TEXT to support both UUID and TEXT booking IDs
   payload_data JSONB;
   warehouse_owner_id UUID;
   customer_id_value UUID;
@@ -244,7 +245,7 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create triggers for bookings table
 DROP TRIGGER IF EXISTS notify_booking_requested ON bookings;

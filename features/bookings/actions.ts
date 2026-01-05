@@ -206,6 +206,12 @@ export async function createBookingRequest(input: {
 
         if (servicesError) {
           console.error('Error adding services to booking:', servicesError)
+          console.error('Services error details:', {
+            message: servicesError.message,
+            code: servicesError.code,
+            details: servicesError.details,
+            hint: servicesError.hint,
+          })
           // Don't fail the booking creation if services fail
         }
       }
@@ -226,6 +232,38 @@ export async function createBookingRequest(input: {
       areaSqFt: input.areaSqFt,
       timestamp: new Date().toISOString(),
     } as BookingRequestedPayload)
+
+    // Send notifications to warehouse owner and admin
+    const { getNotificationService } = await import('@/lib/notifications/service')
+    const notificationService = getNotificationService()
+    
+    const { data: companyUsers } = await supabase
+      .from('profiles')
+      .select('id, email, name')
+      .eq('company_id', warehouse.owner_company_id)
+      .in('role', ['warehouse_owner', 'warehouse_admin'])
+
+    if (companyUsers) {
+      for (const user of companyUsers) {
+        await notificationService.sendNotification({
+          userId: user.id,
+          type: 'booking',
+          title: 'New Booking Received',
+          message: `New booking ${booking.id} from ${profile.name || profile.email} for warehouse ${warehouse.name || input.warehouseId}`,
+          channels: ['email', 'push'],
+          metadata: {
+            bookingId: booking.id,
+            customerId: profile.id,
+            customerName: profile.name || profile.email,
+            warehouseId: input.warehouseId,
+            warehouseName: warehouse.name,
+            bookingType: input.type,
+            palletCount: input.palletCount,
+            areaSqFt: input.areaSqFt,
+          },
+        })
+      }
+    }
 
     revalidatePath('/dashboard/bookings')
     return { success: true, data: booking }

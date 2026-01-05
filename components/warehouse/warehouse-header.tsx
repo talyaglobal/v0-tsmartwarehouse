@@ -89,13 +89,13 @@ export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderP
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff']
   const currentTestRole = selectedTestRole || profile?.role || 'warehouse_staff'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      company_owner: '🟢 Company Owner',
+      warehouse_owner: '🟢 Warehouse Owner',
       company_admin: '🔵 Company Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',

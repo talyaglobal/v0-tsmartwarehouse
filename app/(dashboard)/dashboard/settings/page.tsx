@@ -162,9 +162,9 @@ export default function SettingsPage() {
       }
       
       // Get company role from profiles.role
-      let companyRole: 'company_owner' | 'company_admin' | 'member' | null = null
-      if (profileData.role === 'company_owner') {
-        companyRole = 'company_owner'
+      let companyRole: 'warehouse_owner' | 'company_admin' | 'member' | null = null
+      if (profileData.role === 'warehouse_owner') {
+        companyRole = 'warehouse_owner'
       } else if (profileData.role === 'company_admin') {
         companyRole = 'company_admin'
       } else if (profileData.role === 'customer') {
@@ -176,7 +176,7 @@ export default function SettingsPage() {
         company_id: companyId || profileData.company_id,
         companies: company,
         companyRole,
-        canChangeEmail: companyRole === 'company_owner', // Only company owners can change email
+        canChangeEmail: companyRole === 'warehouse_owner', // Only warehouse owners can change email
       }
       
       console.log('Final profile result:', result)

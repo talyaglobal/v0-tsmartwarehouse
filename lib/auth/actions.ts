@@ -17,7 +17,7 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   phone: z.string().optional(),
   companyName: z.string().min(2, 'Company name must be at least 2 characters').optional(),
-  role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'company_owner']).optional(),
+  role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'warehouse_owner']).optional(),
   storageType: z.string().optional(),
   userType: z.enum(['owner', 'customer']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -183,10 +183,18 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
 
     // Determine user role based on userType
     const isCustomer = validation.data.userType === 'customer'
-    const defaultRole = isCustomer ? 'customer' : 'member'
+    // For warehouse owners, set role to 'warehouse_owner' from the start
+    // For customers, use 'customer' role
+    const defaultRole = isCustomer ? 'customer' : 'warehouse_owner'
 
     // Create user directly with admin API (no email sent)
     console.log('Creating user with email:', validation.data.email, 'User type:', validation.data.userType || 'owner')
+    console.log('User metadata:', {
+      name: isCustomer ? null : (validation.data.name || null),
+      phone: validation.data.phone || null,
+      role: defaultRole,
+      storage_interest: validation.data.storageType || null,
+    })
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: validation.data.email,
       password: validation.data.password,
@@ -205,10 +213,17 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         message: error.message,
         status: error.status,
         name: error.name,
+        code: (error as any).code,
+        details: (error as any).details,
+        hint: (error as any).hint,
       })
+      // Return more detailed error message for debugging
+      const errorMessage = error.message || 'Database error creating new user'
+      const errorDetails = (error as any).details ? ` Details: ${(error as any).details}` : ''
+      const errorHint = (error as any).hint ? ` Hint: ${(error as any).hint}` : ''
       return {
         error: {
-          message: error.message || 'Database error creating new user',
+          message: `${errorMessage}${errorDetails}${errorHint}`,
         },
       }
     }
@@ -313,14 +328,14 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       ) || null
       
       let companyId: string
-      let finalRole: 'company_owner' | 'company_admin' = 'company_owner'
+      let finalRole: 'warehouse_owner' | 'warehouse_admin' = 'warehouse_owner'
 
       if (existingCompany) {
         // Exact match found - but this should not happen in normal flow
         // User should have selected from suggestions, but handle it anyway
         companyId = existingCompany.id
         console.log('Using existing company:', existingCompany.name)
-        finalRole = 'company_admin' // Use company_admin for existing company
+        finalRole = 'warehouse_admin' // Use warehouse_admin for existing company
         
         // Update profile with company_id and role
         const { error: profileUpdateError } = await supabaseAdmin
@@ -334,7 +349,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         if (profileUpdateError) {
           console.error('Profile update error:', profileUpdateError)
         } else {
-          console.log('User profile updated with company_id and company_admin role')
+          console.log('User profile updated with company_id and warehouse_admin role')
         }
       } else {
         // No exact match - create new company
@@ -390,9 +405,9 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         }
         companyId = newCompany.id
         console.log('Created new company:', newCompany.name)
-        finalRole = 'company_owner' // New company owner gets company_owner role
+        finalRole = 'warehouse_owner' // New warehouse owner gets warehouse_owner role
         
-        // Update profile with company_id and company_owner role
+        // Update profile with company_id and warehouse_owner role
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
           .update({
@@ -404,7 +419,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         if (profileUpdateError) {
           console.error('Profile update error:', profileUpdateError)
         } else {
-          console.log('User profile updated with company_id and company_owner role')
+          console.log('User profile updated with company_id and warehouse_owner role')
         }
       }
 
@@ -642,7 +657,7 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
       redirectPath = '/admin'
     } else if (role === 'warehouse_staff') {
       redirectPath = '/warehouse'
-    } else if (['company_admin', 'customer', 'company_owner'].includes(role)) {
+    } else if (['company_admin', 'customer', 'warehouse_owner'].includes(role)) {
       redirectPath = '/dashboard'
     }
 

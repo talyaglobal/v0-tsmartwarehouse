@@ -105,21 +105,53 @@ export async function processInvoicePayment(
   if (remainingAmount > 0 && (input.paymentMethod === "card" || input.paymentMethod === "both")) {
     // Process card payment via Stripe
     if (!input.paymentMethodId) {
-      // Create payment intent for client-side confirmation
-      const supabase = createServerSupabaseClient()
-      const { data: user } = await supabase
-        .from("users")
-        .select("email, name")
-        .eq("id", input.customerId)
-        .single()
+      // Get customer email and name from booking (most reliable source)
+      // Booking always has customerEmail and customerName
+      let customerEmail: string
+      let customerName: string = invoice.customerName || "Customer"
 
-      if (!user) {
-        throw new Error("Customer not found")
+      // Get email from booking (booking always has customerEmail)
+      if (invoice.bookingId) {
+        const booking = await getBookingById(invoice.bookingId, false)
+        if (booking) {
+          customerEmail = booking.customerEmail
+          if (booking.customerName) {
+            customerName = booking.customerName
+          }
+        } else {
+          throw new Error("Booking not found for this invoice")
+        }
+      } else {
+        // If no booking, try to get from auth (for service orders or other invoice types)
+        const supabase = createServerSupabaseClient()
+        
+        // Use service role to get user by ID
+        try {
+          const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(input.customerId)
+          
+          if (authError || !authUser || !authUser.email) {
+            throw new Error("Unable to retrieve customer email. Please ensure the booking exists.")
+          }
+          
+          customerEmail = authUser.email
+          if (authUser.user_metadata?.name) {
+            customerName = authUser.user_metadata.name
+          } else if (authUser.email) {
+            customerName = authUser.email.split("@")[0]
+          }
+        } catch (error) {
+          throw new Error("Customer email not found. Please ensure the booking exists and has customer information.")
+        }
+      }
+
+      // Final validation
+      if (!customerEmail) {
+        throw new Error("Customer email is required for payment processing. Please contact support.")
       }
 
       const stripeCustomer = await getOrCreateStripeCustomer({
-        email: user.email,
-        name: user.name,
+        email: customerEmail,
+        name: customerName,
         metadata: {
           customer_id: input.customerId,
         },

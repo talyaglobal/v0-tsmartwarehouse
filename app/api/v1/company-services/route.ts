@@ -103,11 +103,11 @@ export async function POST(request: NextRequest) {
       } as ErrorResponse, { status: 404 })
     }
 
-    // Check if user is company admin, company owner, or root
-    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'company_owner') {
+    // Check if user is company admin, warehouse owner, or root
+    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_owner') {
       return NextResponse.json({
         success: false,
-        error: "Only company admins and company owners can create company services",
+        error: "Only company admins and warehouse owners can create company services",
         statusCode: 403
       } as ErrorResponse, { status: 403 })
     }

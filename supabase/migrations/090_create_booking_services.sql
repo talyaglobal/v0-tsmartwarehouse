@@ -1,7 +1,7 @@
 -- Create booking_services table (pivot table for booking-service relationship)
 CREATE TABLE IF NOT EXISTS booking_services (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   service_id UUID NOT NULL REFERENCES warehouse_services(id) ON DELETE RESTRICT,
 
   -- Snapshot fields for historical data (in case service is edited/deleted later)

@@ -30,7 +30,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+      if (savedRole && ['warehouse_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -95,8 +95,8 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         label: 'Root',
         className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
       },
-      company_owner: {
-        label: 'Company Owner',
+      warehouse_owner: {
+        label: 'Warehouse Owner',
         className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
       },
       company_admin: {
@@ -162,13 +162,13 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff']
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      company_owner: '🟢 Company Owner',
+      warehouse_owner: '🟢 Warehouse Owner',
       company_admin: '🔵 Company Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
@@ -184,7 +184,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     switch (displayRole) {
       case 'root':
         return 'bg-red-50/95 dark:bg-red-950/95 border-b border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
-      case 'company_owner':
+      case 'warehouse_owner':
         return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-b border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
       case 'company_admin':
         return 'bg-blue-50/95 dark:bg-blue-950/95 border-b border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
@@ -252,7 +252,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                       Root → {getRoleLabel(selectedTestRole as UserRole).replace(/^[🔴🟢🔵🟣⚪]\s/, '')}
                     </span>
                   </div>
-                ) : profile?.role && (
+                ) : profile?.role && profile.role !== 'customer' && (
                   <div className="flex items-center">
                     {getRoleBadge(profile.role)}
                   </div>
@@ -274,7 +274,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                     Root → {getRoleLabel(selectedTestRole as UserRole).replace(/^[🔴🟢🔵🟣⚪]\s/, '')}
                   </span>
                 </div>
-              ) : profile?.role && (
+              ) : profile?.role && profile.role !== 'customer' && (
                 <div className="mt-1.5 flex items-center">
                   {getRoleBadge(profile.role)}
                 </div>

@@ -2,6 +2,7 @@ import { ReactNode } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Warehouse } from '@/components/icons'
+import { PlatformAuthButtons } from '@/components/platform/platform-auth-buttons'
 
 export default function PlatformLayout({ children }: { children: ReactNode }) {
   return (
@@ -99,20 +100,6 @@ export default function PlatformLayout({ children }: { children: ReactNode }) {
         </div>
       </footer>
     </div>
-  )
-}
-
-function PlatformAuthButtons() {
-  // This will be a client component in practice, but for now we'll keep it simple
-  return (
-    <>
-      <Link href="/login">
-        <Button variant="ghost">Sign In</Button>
-      </Link>
-      <Link href="/register">
-        <Button>Get Started</Button>
-      </Link>
-    </>
   )
 }
 

@@ -21,6 +21,7 @@ export default function CustomerDashboardPage() {
   const [claims, setClaims] = useState<Claim[]>([])
   const [user, setUser] = useState<{ membershipTier?: string; creditBalance?: number } | null>(null)
   const [userRole, setUserRole] = useState<string>('customer')
+  const [userName, setUserName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [selectedBookingForTimeSlot, setSelectedBookingForTimeSlot] = useState<Booking | null>(null)
 
@@ -39,12 +40,19 @@ export default function CustomerDashboardPage() {
       if (authUser) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, name')
           .eq('id', authUser.id)
           .maybeSingle()
 
         if (profile?.role) {
           setUserRole(profile.role)
+        }
+        
+        // Set user name from profile fullname, fallback to email
+        if (profile?.name) {
+          setUserName(profile.name)
+        } else if (authUser.email) {
+          setUserName(authUser.email.split('@')[0])
         }
       }
 
@@ -100,8 +108,8 @@ export default function CustomerDashboardPage() {
         label: 'Root',
         className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
       },
-      company_owner: {
-        label: 'Company Owner',
+      warehouse_owner: {
+        label: 'Warehouse Owner',
         className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
       },
       company_admin: {
@@ -125,15 +133,12 @@ export default function CustomerDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+          <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-muted-foreground">Welcome back, Sarah. Here's an overview of your warehouse activity.</p>
-            {roleBadge && (
-              <Badge className={roleBadge.className}>
-                {roleBadge.label}
-              </Badge>
-            )}
+            <p className="text-muted-foreground">
+              {userName ? `Welcome back, ${userName}. Here's an overview of your warehouse activity.` : "Welcome back. Here's an overview of your warehouse activity."}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">

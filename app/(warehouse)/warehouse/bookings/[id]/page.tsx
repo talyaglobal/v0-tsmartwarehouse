@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { ArrowLeft, Package, Building2, Loader2, CheckCircle, Edit } from "@/components/icons"
+import { ArrowLeft, Package, Building2, Loader2, CheckCircle, Edit, Calendar, MapPin, FileText, User } from "@/components/icons"
+import { Ruler } from "lucide-react"
 import { formatDate, formatDateTime, getBookingTypeLabel } from "@/lib/utils/format"
 import type { Booking } from "@/types"
+import type { WarehouseSearchResult } from "@/types/marketplace"
 import { api } from "@/lib/api/client"
 import { BookingDateChangeForm } from "@/components/warehouse/booking-date-change-form"
 
@@ -46,6 +48,23 @@ export default function WarehouseStaffBookingDetailPage({
       return result.success ? result.data : null
     },
     enabled: !!bookingId,
+  })
+
+  // Fetch warehouse details
+  const {
+    data: warehouse,
+    isLoading: warehouseLoading,
+  } = useQuery({
+    queryKey: ["warehouse", booking?.warehouseId],
+    queryFn: async () => {
+      if (!booking?.warehouseId) return null
+      const result = await api.get<WarehouseSearchResult>(
+        `/api/v1/warehouses/${booking.warehouseId}`,
+        { showToast: false }
+      )
+      return result.success ? result.data : null
+    },
+    enabled: !!booking?.warehouseId,
   })
 
   // Fetch availability for requested date
@@ -123,7 +142,7 @@ export default function WarehouseStaffBookingDetailPage({
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -149,55 +168,275 @@ export default function WarehouseStaffBookingDetailPage({
               <div>
                 <CardTitle>{getBookingTypeLabel(booking.type)}</CardTitle>
                 <CardDescription>
-                  {booking.customerName} • {booking.customerEmail}
+                  {booking.type === "pallet"
+                    ? `${booking.palletCount} pallets`
+                    : `${booking.areaSqFt?.toLocaleString()} sq ft`}
                 </CardDescription>
               </div>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-sm text-muted-foreground">Start Date</span>
-              <p className="text-lg font-semibold">{formatDate(booking.startDate)}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm font-medium">Start Date</span>
+              </div>
+              <p className="font-semibold">{formatDate(booking.startDate)}</p>
             </div>
-            {booking.palletCount && (
-              <div>
-                <span className="text-sm text-muted-foreground">Pallets</span>
-                <p className="text-lg font-semibold">{booking.palletCount}</p>
-              </div>
-            )}
-            {booking.areaSqFt && (
-              <div>
-                <span className="text-sm text-muted-foreground">Area</span>
-                <p className="text-lg font-semibold">{booking.areaSqFt.toLocaleString()} sq ft</p>
-              </div>
-            )}
-            {booking.scheduledDropoffDatetime && (
-              <div>
-                <span className="text-sm text-muted-foreground">Scheduled Drop-off</span>
-                <p className="text-lg font-semibold">
-                  {formatDateTime(booking.scheduledDropoffDatetime)}
-                </p>
-              </div>
-            )}
-            {booking.proposedStartDate && (
-              <div>
-                <span className="text-sm text-muted-foreground">Proposed Date/Time</span>
-                <p className="text-lg font-semibold">
-                  {formatDateTime(booking.proposedStartDate)} {booking.proposedStartTime}
-                </p>
+            {booking.endDate && (
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm font-medium">End Date</span>
+                </div>
+                <p className="font-semibold">{formatDate(booking.endDate)}</p>
               </div>
             )}
           </div>
-          {booking.notes && (
-            <div>
-              <span className="text-sm text-muted-foreground">Notes</span>
-              <p className="mt-1">{booking.notes}</p>
+
+          {booking.type === "area-rental" && booking.floorNumber && (
+            <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Location</span>
+              </div>
+              <p className="text-sm">
+                Level {booking.floorNumber}
+                {booking.hallId && ` - Hall ${booking.hallId.substring(0, 8)}...`}
+              </p>
+            </div>
+          )}
+
+          {/* Customer Requested Drop-in Time */}
+          {(booking as any).metadata?.requestedDropInTime && (
+            <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-900 dark:text-green-100">Customer Requested Drop-in Time</span>
+              </div>
+              <p className="font-semibold text-green-900 dark:text-green-100">
+                {formatDateTime((booking as any).metadata.requestedDropInTime)}
+              </p>
+            </div>
+          )}
+
+          {/* Warehouse Staff Scheduled Drop-off Time */}
+          {booking.scheduledDropoffDatetime && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Scheduled Drop-off (Set by Warehouse Staff)</span>
+              </div>
+              <p className="font-semibold text-blue-900 dark:text-blue-100">
+                {formatDateTime(booking.scheduledDropoffDatetime)}
+              </p>
+            </div>
+          )}
+
+          {booking.proposedStartDate && (
+            <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Proposed Date/Time</span>
+              </div>
+              <p className="font-semibold text-purple-900 dark:text-purple-100">
+                {formatDateTime(booking.proposedStartDate)} {booking.proposedStartTime && `- ${booking.proposedStartTime}`}
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Booking Details and Customer Information */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Booking Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Type</span>
+              <span className="text-sm font-medium">{getBookingTypeLabel(booking.type)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Status</span>
+              <StatusBadge status={booking.status} />
+            </div>
+            {booking.type === "pallet" && booking.palletCount && (
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Pallet Count</span>
+                <span className="text-sm font-medium">{booking.palletCount}</span>
+              </div>
+            )}
+            {booking.type === "area-rental" && (
+              <>
+                {booking.areaSqFt && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Area</span>
+                    <span className="text-sm font-medium">{booking.areaSqFt.toLocaleString()} sq ft</span>
+                  </div>
+                )}
+                {booking.floorNumber && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Floor</span>
+                    <span className="text-sm font-medium">Level {booking.floorNumber}</span>
+                  </div>
+                )}
+                {booking.hallId && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Hall ID</span>
+                    <span className="text-sm font-mono text-xs">{booking.hallId.substring(0, 8)}...</span>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Created</span>
+              <span className="text-sm">{formatDate(booking.createdAt)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Last Updated</span>
+              <span className="text-sm">{formatDate(booking.updatedAt)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Customer Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Name</span>
+              <span className="text-sm font-medium">{booking.customerName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Email</span>
+              <span className="text-sm font-medium break-all">{booking.customerEmail}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Customer ID</span>
+              <span className="text-sm font-mono text-xs">{booking.customerId.substring(0, 8)}...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Warehouse Information */}
+      {warehouseLoading ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : warehouse ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Warehouse Information
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="font-semibold text-lg">{warehouse.name}</h3>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                <MapPin className="h-4 w-4" />
+                <span className="text-sm">
+                  {warehouse.address}, {warehouse.city}
+                  {warehouse.state && `, ${warehouse.state}`}
+                  {warehouse.zip_code && ` ${warehouse.zip_code}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-3 border-t">
+              {warehouse.total_sq_ft && (
+                <div className="flex items-center gap-3">
+                  <Ruler className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Area</p>
+                    <p className="font-semibold">
+                      {warehouse.total_sq_ft.toLocaleString()} sq ft
+                    </p>
+                  </div>
+                </div>
+              )}
+              {warehouse.total_pallet_storage && warehouse.total_pallet_storage > 0 && (
+                <div className="flex items-center gap-3">
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pallet Storage</p>
+                    <p className="font-semibold">
+                      {warehouse.total_pallet_storage.toLocaleString()} pallets
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {warehouse.amenities && warehouse.amenities.length > 0 && (
+              <div className="pt-3 border-t">
+                <p className="text-sm font-medium mb-2">Amenities</p>
+                <div className="flex flex-wrap gap-2">
+                  {warehouse.amenities.slice(0, 6).map((amenity, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {amenity}
+                    </Badge>
+                  ))}
+                  {warehouse.amenities.length > 6 && (
+                    <Badge variant="secondary" className="text-xs">
+                      +{warehouse.amenities.length - 6} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {warehouse.company_name && (
+              <div className="pt-3 border-t">
+                <p className="text-sm font-medium mb-1">Host Company</p>
+                <div className="flex items-center gap-2">
+                  {warehouse.company_logo && (
+                    <img
+                      src={warehouse.company_logo}
+                      alt={warehouse.company_name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  )}
+                  <span className="text-sm">{warehouse.company_name}</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Notes */}
+      {booking.notes && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Notes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap">{booking.notes}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Actions for Pre-Order Bookings */}
       {booking.status === "pre_order" && (
@@ -218,7 +457,7 @@ export default function WarehouseStaffBookingDetailPage({
               <div>
                 <p className="text-sm font-medium mb-2">Requested Date Availability</p>
                 {isRequestedDateAvailable ? (
-                  <Badge variant="default" className="bg-green-100 text-green-800">
+                  <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Available
                   </Badge>
@@ -288,7 +527,7 @@ export default function WarehouseStaffBookingDetailPage({
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Proposed Date/Time:</p>
                 <p className="font-medium">
-                  {formatDateTime(booking.proposedStartDate)} {booking.proposedStartTime}
+                  {formatDateTime(booking.proposedStartDate)} {booking.proposedStartTime && `- ${booking.proposedStartTime}`}
                 </p>
               </div>
             ) : (
@@ -302,4 +541,3 @@ export default function WarehouseStaffBookingDetailPage({
     </div>
   )
 }
-

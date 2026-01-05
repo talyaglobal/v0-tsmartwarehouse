@@ -116,11 +116,11 @@ export async function PATCH(
       } as ErrorResponse, { status: 404 })
     }
 
-    // Check if user is company admin, company owner, or root
-    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'company_owner') {
+    // Check if user is company admin, warehouse owner, or root
+    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_owner') {
       return NextResponse.json({
         success: false,
-        error: "Only company admins and company owners can update company services",
+        error: "Only company admins and warehouse owners can update company services",
         statusCode: 403
       } as ErrorResponse, { status: 403 })
     }
@@ -225,11 +225,11 @@ export async function DELETE(
       } as ErrorResponse, { status: 404 })
     }
 
-    // Check if user is company admin, company owner, or root
-    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'company_owner') {
+    // Check if user is company admin, warehouse owner, or root
+    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_owner') {
       return NextResponse.json({
         success: false,
-        error: "Only company admins and company owners can delete company services",
+        error: "Only company admins and warehouse owners can delete company services",
         statusCode: 403
       } as ErrorResponse, { status: 403 })
     }

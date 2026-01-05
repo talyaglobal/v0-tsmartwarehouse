@@ -290,12 +290,12 @@ SELECT DISTINCT
   conversation_id,
   COALESCE(warehouse_id, (SELECT id FROM warehouses LIMIT 1)),
   CASE 
-    WHEN sender_id IN (SELECT user_id FROM company_members WHERE role IN ('company_owner', 'company_admin'))
+    WHEN sender_id IN (SELECT user_id FROM company_members WHERE role IN ('warehouse_owner', 'company_admin'))
     THEN sender_id
     ELSE receiver_id
   END as host_id,
   CASE 
-    WHEN sender_id IN (SELECT user_id FROM company_members WHERE role IN ('company_owner', 'company_admin'))
+    WHEN sender_id IN (SELECT user_id FROM company_members WHERE role IN ('warehouse_owner', 'company_admin'))
     THEN receiver_id
     ELSE sender_id
   END as guest_id,
@@ -749,7 +749,7 @@ CREATE POLICY "Hosts can manage availability"
       AND w.owner_company_id IN (
         SELECT company_id FROM company_members
         WHERE user_id = auth.uid()
-        AND role IN ('company_owner', 'company_admin')
+        AND role IN ('warehouse_owner', 'company_admin')
       )
     )
   );
@@ -772,7 +772,7 @@ CREATE POLICY "Hosts can update inquiries for their warehouses"
       AND w.owner_company_id IN (
         SELECT company_id FROM company_members
         WHERE user_id = auth.uid()
-        AND role IN ('company_owner', 'company_admin')
+        AND role IN ('warehouse_owner', 'company_admin')
       )
     )
   );
