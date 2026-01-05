@@ -23,9 +23,9 @@ export async function middleware(request: NextRequest) {
   if (!supabaseUrl || !supabaseAnonKey) {
     // For public routes, allow access during build
     const pathname = request.nextUrl.pathname
-    const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/auth/callback']
-    // Public warehouse detail pages (e.g., /warehouse/[id])
-    const isPublicWarehouseDetailRoute = pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)
+    const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/auth/callback', '/find-warehouses']
+    // Public warehouse detail pages (e.g., /warehouse/[id] or /warehouses/[id])
+    const isPublicWarehouseDetailRoute = (pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)) || (pathname.startsWith('/warehouses/') && pathname.match(/^\/warehouses\/[^\/]+$/))
     const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/')) || isPublicWarehouseDetailRoute
     
     if (isPublicRoute || pathname.startsWith('/api')) {
@@ -98,9 +98,9 @@ export async function middleware(request: NextRequest) {
   // Protected routes that require authentication
   const isAdminRoute = pathname.startsWith('/admin')
   const isDashboardRoute = pathname.startsWith('/dashboard')
-  // Public warehouse detail pages (e.g., /warehouse/[id]) - accessible to everyone
+  // Public warehouse detail pages (e.g., /warehouse/[id] or /warehouses/[id]) - accessible to everyone
   // Protected warehouse staff routes are under /warehouse (without ID) - handled separately
-  const isPublicWarehouseDetailRoute = pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)
+  const isPublicWarehouseDetailRoute = (pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)) || (pathname.startsWith('/warehouses/') && pathname.match(/^\/warehouses\/[^\/]+$/))
   // Public warehouse review/booking pages (e.g., /warehouses/[id]/review) - accessible to everyone
   const isPublicWarehouseReviewRoute = pathname.match(/^\/warehouses\/[^\/]+\/review/)
   const isWarehouseRoute = pathname.startsWith('/warehouse') && !isPublicWarehouseDetailRoute && !isPublicWarehouseReviewRoute

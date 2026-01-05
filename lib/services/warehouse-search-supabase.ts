@@ -11,6 +11,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { WarehouseSearchParams, WarehouseSearchResult, SearchResponse } from '@/types/marketplace'
+import { getStoragePublicUrls } from '@/lib/utils/storage'
 
 // Distance calculation is handled by PostGIS function
 
@@ -46,6 +47,9 @@ export async function searchWarehouses(
 
       // Transform PostGIS results
       let results: WarehouseSearchResult[] = (data || []).map((wh: any) => {
+        // Convert photo paths to full URLs
+        const photos = wh.photos && Array.isArray(wh.photos) ? getStoragePublicUrls(wh.photos, 'docs') : []
+        
         // Get pricing and company info
         return {
           id: wh.id,
@@ -63,7 +67,7 @@ export async function searchWarehouses(
           storage_type: wh.storage_type || '',
           temperature_types: wh.temperature_types || [],
           amenities: wh.amenities || [],
-          photos: wh.photos || [],
+          photos: photos,
           min_price: 0, // Will be populated below
           pricing: [],
           average_rating: 0,
@@ -235,32 +239,37 @@ export async function searchWarehouses(
     }
 
     // Transform results
-    const warehouses: WarehouseSearchResult[] = (data || []).map((wh: any) => ({
-      id: wh.id,
-      name: wh.name,
-      address: wh.address,
-      city: wh.city,
-      state: wh.state || undefined,
-      zipCode: wh.zip_code || '',
-      latitude: wh.latitude ? parseFloat(wh.latitude) : 0,
-      longitude: wh.longitude ? parseFloat(wh.longitude) : 0,
-      total_sq_ft: wh.total_sq_ft || 0,
-      available_sq_ft: wh.available_sq_ft || 0,
-      total_pallet_storage: wh.total_pallet_storage || 0,
-      available_pallet_storage: wh.available_pallet_storage || 0,
-      warehouse_type: wh.warehouse_type || '',
-      storage_type: wh.storage_type || '',
-      temperature_types: wh.temperature_types || [],
-      amenities: wh.amenities || [],
-      photos: wh.photos || [],
-      min_price: wh.min_price ? parseFloat(wh.min_price) : 0,
-      pricing: wh.pricing || [],
-      average_rating: wh.average_rating ? parseFloat(wh.average_rating) : 0,
-      total_reviews: wh.total_reviews || 0,
-      company_name: wh.company_name || '',
-      company_logo: wh.company_logo || undefined,
-      is_verified: wh.host_verification === 'verified',
-    }))
+    const warehouses: WarehouseSearchResult[] = (data || []).map((wh: any) => {
+      // Convert photo paths to full URLs
+      const photos = wh.photos && Array.isArray(wh.photos) ? getStoragePublicUrls(wh.photos, 'docs') : []
+      
+      return {
+        id: wh.id,
+        name: wh.name,
+        address: wh.address,
+        city: wh.city,
+        state: wh.state || undefined,
+        zipCode: wh.zip_code || '',
+        latitude: wh.latitude ? parseFloat(wh.latitude) : 0,
+        longitude: wh.longitude ? parseFloat(wh.longitude) : 0,
+        total_sq_ft: wh.total_sq_ft || 0,
+        available_sq_ft: wh.available_sq_ft || 0,
+        total_pallet_storage: wh.total_pallet_storage || 0,
+        available_pallet_storage: wh.available_pallet_storage || 0,
+        warehouse_type: wh.warehouse_type || '',
+        storage_type: wh.storage_type || '',
+        temperature_types: wh.temperature_types || [],
+        amenities: wh.amenities || [],
+        photos: photos,
+        min_price: wh.min_price ? parseFloat(wh.min_price) : 0,
+        pricing: wh.pricing || [],
+        average_rating: wh.average_rating ? parseFloat(wh.average_rating) : 0,
+        total_reviews: wh.total_reviews || 0,
+        company_name: wh.company_name || '',
+        company_logo: wh.company_logo || undefined,
+        is_verified: wh.host_verification === 'verified',
+      }
+    })
 
     return {
       warehouses,
@@ -309,7 +318,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       storage_type: warehouse.storage_type || '',
       temperature_types: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],
-      photos: warehouse.photos || [],
+      photos: warehouse.photos && Array.isArray(warehouse.photos) ? getStoragePublicUrls(warehouse.photos, 'docs') : [],
       min_price: warehouse.min_price ? parseFloat(warehouse.min_price) : 0,
       pricing: warehouse.pricing || [],
       average_rating: warehouse.average_rating ? parseFloat(warehouse.average_rating) : 0,

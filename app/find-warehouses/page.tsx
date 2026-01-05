@@ -20,7 +20,7 @@ export default function FindWarehousesPage() {
   const { user } = useUser()
   const [warehouses, setWarehouses] = useState<WarehouseSearchResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list")
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)

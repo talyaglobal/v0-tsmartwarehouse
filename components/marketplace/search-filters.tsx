@@ -9,9 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 // Slider component not available - using Input fields for price range
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { RatingStars } from "./rating-stars"
 import { X, Filter } from "lucide-react"
-import { cn } from "@/lib/utils"
 import type { WarehouseSearchParams } from "@/types/marketplace"
 
 interface SearchFiltersProps {
@@ -77,10 +77,6 @@ export function SearchFilters({
       ? current.filter((v) => v !== value)
       : [...current, value]
     updateFilter(key, updated)
-  }
-
-  const handleRatingClick = (rating: number) => {
-    updateFilter("min_rating", filters.min_rating === rating ? undefined : rating)
   }
 
   const hasActiveFilters = 
@@ -160,34 +156,29 @@ export function SearchFilters({
 
       {/* Rating Filter */}
       <div className="space-y-2">
-        <Label>Minimum Rating</Label>
-        <div className="flex items-center gap-2">
-          {[5, 4, 3, 2, 1].map((rating) => (
-            <button
-              key={rating}
-              type="button"
-              onClick={() => handleRatingClick(rating)}
-              className={cn(
-                "p-2 rounded-md border transition-colors",
-                filters.min_rating === rating
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              <RatingStars rating={rating} size="sm" showNumber={false} showCount={false} />
-            </button>
+        <Label>Rating Score</Label>
+        <RadioGroup
+          value={filters.min_rating?.toString() || ""}
+          onValueChange={(value) => updateFilter("min_rating", value ? parseFloat(value) : undefined)}
+          className="space-y-2"
+        >
+          {[
+            { value: 4.5, label: "4.5 stars and above" },
+            { value: 4, label: "4 stars and above" },
+            { value: 3, label: "3 stars and above" },
+          ].map((option) => (
+            <div key={option.value} className="flex items-center space-x-2">
+              <RadioGroupItem value={option.value.toString()} id={`rating-${option.value}`} />
+              <label
+                htmlFor={`rating-${option.value}`}
+                className="text-sm font-normal cursor-pointer flex items-center gap-1.5 flex-1"
+              >
+                <RatingStars rating={option.value} size="sm" showNumber={false} showCount={false} />
+                <span>{option.label}</span>
+              </label>
+            </div>
           ))}
-          {filters.min_rating && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => updateFilter("min_rating", undefined)}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        </RadioGroup>
       </div>
 
       {/* Warehouse Type */}
