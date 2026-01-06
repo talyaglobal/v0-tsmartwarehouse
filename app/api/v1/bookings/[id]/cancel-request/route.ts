@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getBookingById, updateBooking } from "@/lib/db/bookings"
+import { getBookingById } from "@/lib/db/bookings"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, BookingResponse } from "@/types/api"
 import { getCurrentUser } from "@/lib/auth/utils"
@@ -130,7 +130,7 @@ export async function POST(
 
     const responseData: BookingResponse = {
       success: true,
-      data: updatedBooking,
+      data: updatedBooking || undefined,
       message: "Cancel request submitted successfully",
     }
     return NextResponse.json(responseData)

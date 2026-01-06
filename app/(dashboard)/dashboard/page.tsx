@@ -91,7 +91,13 @@ export default function CustomerDashboardPage() {
   const creditBalance = user?.creditBalance || 0
   const recentClaims = claims.filter((c) => c.status === "submitted" || c.status === "under-review")
   const isCustomer = userRole === 'customer'
-  const awaitingTimeSlotBookings = bookings.filter((b) => b.status === "awaiting_time_slot")
+  // Show bookings that need customer action:
+  // 1. awaiting_time_slot status (with or without proposed date/time)
+  // 2. pending status with proposedStartDate/proposedStartTime (warehouse staff proposed a new time)
+  const awaitingTimeSlotBookings = bookings.filter((b) => 
+    b.status === "awaiting_time_slot" || 
+    (b.status === "pending" && b.proposedStartDate && b.proposedStartTime)
+  )
 
   if (loading) {
     return (
@@ -100,35 +106,6 @@ export default function CustomerDashboardPage() {
       </div>
     )
   }
-
-  // Get role badge configuration with pastel colors
-  const getRoleBadge = (role: string) => {
-    const roleConfig: Record<string, { label: string; className: string }> = {
-      root: {
-        label: 'Root',
-        className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
-      },
-      warehouse_owner: {
-        label: 'Warehouse Owner',
-        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
-      },
-      company_admin: {
-        label: 'Company Admin',
-        className: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
-      },
-      customer: {
-        label: 'Customer',
-        className: 'bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800',
-      },
-      warehouse_staff: {
-        label: 'Warehouse Staff',
-        className: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700',
-      },
-    }
-    return roleConfig[role] || null
-  }
-
-  const roleBadge = getRoleBadge(userRole)
 
   return (
     <div className="space-y-6">
@@ -406,7 +383,14 @@ function PendingActionCard({ booking }: { booking: Booking }) {
                 Accept Proposed Time
               </Button>
               <Button onClick={() => setOpenTimeSlotModal(true)} size="sm" variant="outline">
-                Select Different Time
+                Set New Date or Time
+              </Button>
+              <Button 
+                onClick={() => window.location.href = `/dashboard/bookings/${booking.id}`} 
+                size="sm" 
+                variant="outline"
+              >
+                Start Chat
               </Button>
             </>
           ) : (

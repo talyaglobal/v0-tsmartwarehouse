@@ -3,10 +3,8 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { generateBookingInvoice } from "@/lib/business-logic/invoices"
 import { getBookingById } from "@/lib/db/bookings"
 import { getInvoices } from "@/lib/db/invoices"
-import { getMembershipSettingByTier } from "@/lib/db/membership"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { ErrorResponse } from "@/types/api"
-import type { Invoice } from "@/types"
 
 /**
  * POST /api/v1/invoices/generate-from-booking

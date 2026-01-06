@@ -146,21 +146,37 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell>{customer.companyName || "-"}</TableCell>
                   <TableCell>
-                    {customer.companyRole && (
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          customer.companyRole === 'warehouse_owner'
-                            ? 'bg-purple-100 text-purple-800'
-                            : customer.companyRole === 'company_admin'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {customer.companyRole === 'warehouse_owner' && <Crown className="mr-1 h-3 w-3" />}
-                        {customer.companyRole === 'company_admin' ? 'Company Admin' : customer.companyRole === 'warehouse_owner' ? 'Warehouse Owner' : customer.companyRole}
-                      </span>
-                    )}
-                    {!customer.companyRole && <span className="text-muted-foreground">-</span>}
+                    {(() => {
+                      const role: 'warehouse_owner' | 'company_admin' | 'member' | null | undefined = customer.companyRole
+                      if (!role) {
+                        return <span className="text-muted-foreground">-</span>
+                      }
+                      
+                      let className: string
+                      let label: string
+                      let showCrown = false
+                      
+                      if (role === 'warehouse_owner') {
+                        className = 'bg-purple-100 text-purple-800'
+                        label = 'Warehouse Owner'
+                        showCrown = true
+                      } else if (role === 'company_admin') {
+                        className = 'bg-blue-100 text-blue-800'
+                        label = 'Company Admin'
+                      } else {
+                        className = 'bg-gray-100 text-gray-800'
+                        label = role
+                      }
+                      
+                      return (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}
+                        >
+                          {showCrown && <Crown className="mr-1 h-3 w-3" />}
+                          {label}
+                        </span>
+                      )
+                    })()}
                   </TableCell>
                   <TableCell>
                     {customer.membershipTier && (

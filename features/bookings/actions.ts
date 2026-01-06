@@ -23,6 +23,7 @@ export async function createBookingRequest(input: {
   endDate?: string
   notes?: string
   serviceIds?: string[]
+  metadata?: Record<string, any>
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     // Use authenticated client to read user session from cookies
@@ -54,7 +55,7 @@ export async function createBookingRequest(input: {
     // Get warehouse owner and city
     const { data: warehouse } = await supabase
       .from('warehouses')
-      .select('owner_company_id, city')
+      .select('owner_company_id, city, name')
       .eq('id', input.warehouseId)
       .single()
 
@@ -71,8 +72,8 @@ export async function createBookingRequest(input: {
       type: input.type,
     })
 
-    // Determine booking status: pre_order for pallet bookings, pending for area-rental
-    const bookingStatus = input.type === 'pallet' ? 'pre_order' : 'pending'
+    // Determine booking status: pending for all bookings (customer selects date/time)
+    const bookingStatus = 'pending'
 
     // Calculate base price
     let baseTotal = 0
@@ -147,6 +148,7 @@ export async function createBookingRequest(input: {
         end_date: input.endDate,
         total_amount: totalAmount,
         notes: input.notes,
+        metadata: input.metadata || {},
       })
       .select()
       .single()

@@ -50,7 +50,7 @@ const ALL_STATUSES: BookingStatus[] = [
   "active",
   "completed",
   "cancelled",
-  "cancel_requested",
+  "cancel_request",
 ]
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
@@ -61,7 +61,7 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   active: "Active",
   completed: "Completed",
   cancelled: "Cancelled",
-  cancel_requested: "Cancel Requested",
+  cancel_request: "Cancel Requested",
   pending: "Pending",
 }
 

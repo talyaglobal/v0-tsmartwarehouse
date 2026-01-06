@@ -17,8 +17,8 @@ import {
   Phone,
   Mail,
 } from "@/components/icons"
-import { PRICING, WAREHOUSE_CONFIG } from "@/lib/constants"
-import { formatCurrency, formatNumber } from "@/lib/utils/format"
+import { WAREHOUSE_CONFIG } from "@/lib/constants"
+import { formatNumber } from "@/lib/utils/format"
 import { useUser } from "@/lib/hooks/use-user"
 import { BookingSearchForm } from "@/components/home/booking-search-form"
 
@@ -37,9 +37,6 @@ export default function HomePage() {
           <nav className="hidden md:flex items-center gap-6">
             <Link href="#services" className="text-sm font-medium hover:text-primary transition-colors">
               Services
-            </Link>
-            <Link href="#pricing" className="text-sm font-medium hover:text-primary transition-colors">
-              Pricing
             </Link>
             <Link href="#facility" className="text-sm font-medium hover:text-primary transition-colors">
               Facility
@@ -70,8 +67,8 @@ export default function HomePage() {
       <main className="flex-1">
                 {/* Booking Search Section */}
                 <section className="relative bg-gradient-to-br from-primary/10 via-background to-background py-8 md:py-12">
-                  <div className="container mx-auto relative w-full">
-                    <div className="mx-auto max-w-5xl px-4">
+                  <div className="container mx-auto relative w-full px-4">
+                    <div className="w-full max-w-full">
                       <BookingSearchForm compact={true} />
                     </div>
                   </div>
@@ -99,34 +96,41 @@ export default function HomePage() {
                     Start Storing Today <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
-                <Link href="#pricing">
+                <Link href="/find-warehouses">
                   <Button size="lg" variant="outline">
-                    View Pricing
+                    Browse Warehouses
                   </Button>
                 </Link>
               </div>
-              {/* Quick Pricing */}
-              <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-3xl font-bold text-primary">{formatCurrency(PRICING.palletIn)}</div>
-                    <div className="text-sm text-muted-foreground">Pallet In</div>
-                  </CardContent>
-                </Card>
-                <Card className="text-center border-primary">
-                  <CardContent className="pt-6">
-                    <div className="text-3xl font-bold text-primary">
-                      {formatCurrency(PRICING.storagePerPalletPerMonth)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Per Pallet/Month</div>
-                  </CardContent>
-                </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-3xl font-bold text-primary">{formatCurrency(PRICING.palletOut)}</div>
-                    <div className="text-sm text-muted-foreground">Pallet Out</div>
-                  </CardContent>
-                </Card>
+              {/* Key Features */}
+              <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                    <Package className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Flexible Storage</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Choose from pallet storage or dedicated area rentals based on your needs
+                  </p>
+                </div>
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                    <CheckCircle className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Secure & Reliable</h3>
+                  <p className="text-sm text-muted-foreground">
+                    24/7 security monitoring and climate-controlled facilities
+                  </p>
+                </div>
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                    <Truck className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Easy Access</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Multiple loading docks and convenient location with highway access
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -152,15 +156,15 @@ export default function HomePage() {
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      {formatCurrency(PRICING.palletIn)} per pallet in
+                      Flexible storage terms
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      {formatCurrency(PRICING.storagePerPalletPerMonth)}/month storage
+                      Pay only for what you use
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      {formatCurrency(PRICING.palletOut)} per pallet out
+                      Competitive pricing from warehouse owners
                     </li>
                   </ul>
                 </CardContent>
@@ -177,11 +181,11 @@ export default function HomePage() {
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      {formatCurrency(PRICING.areaRentalPerSqFtPerYear)}/sq ft/year
+                      Custom pricing from warehouse owners
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      Min {formatNumber(PRICING.areaRentalMinSqFt)} sq ft
+                      Minimum 40,000 sq ft
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -306,100 +310,52 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Pricing Section */}
-        <section id="pricing" className="py-20 bg-muted/50">
+        {/* How It Works Section */}
+        <section id="how-it-works" className="py-20 bg-muted/50">
           <div className="container mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold mb-4">Simple, Transparent Pricing</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">No hidden fees. Pay only for what you use.</p>
+              <h2 className="text-3xl font-bold mb-4">How It Works</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Find the perfect warehouse space in just a few simple steps
+              </p>
             </div>
 
-            <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
-              {/* Pallet Storage Pricing */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Pallet Storage
-                  </CardTitle>
-                  <CardDescription>Perfect for businesses of all sizes</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span>Pallet In</span>
-                      <span className="font-bold">{formatCurrency(PRICING.palletIn)}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span>Monthly Storage</span>
-                      <span className="font-bold">{formatCurrency(PRICING.storagePerPalletPerMonth)}/pallet</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span>Pallet Out</span>
-                      <span className="font-bold">{formatCurrency(PRICING.palletOut)}</span>
-                    </div>
-                  </div>
-                  <div className="pt-4">
-                    <div className="text-sm font-medium mb-2">Volume Discounts:</div>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      {PRICING.volumeDiscounts.map((discount) => (
-                        <li key={discount.palletThreshold}>
-                          {discount.palletThreshold}+ pallets: {discount.discountPercent}% off
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <Link href="/register">
-                    <Button className="w-full">Get Started</Button>
-                  </Link>
-                </CardContent>
-              </Card>
+            <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary text-primary-foreground text-2xl font-bold mb-4">
+                  1
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Search & Compare</h3>
+                <p className="text-muted-foreground">
+                  Use our search tool to find warehouses by location, size, and features. Compare options from multiple warehouse owners.
+                </p>
+              </div>
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary text-primary-foreground text-2xl font-bold mb-4">
+                  2
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Request to Book</h3>
+                <p className="text-muted-foreground">
+                  Select your preferred dates and time slot. Each warehouse owner sets their own competitive pricing.
+                </p>
+              </div>
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary text-primary-foreground text-2xl font-bold mb-4">
+                  3
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Start Storing</h3>
+                <p className="text-muted-foreground">
+                  Once approved, deliver your items at the scheduled time. Manage everything from your dashboard.
+                </p>
+              </div>
+            </div>
 
-              {/* Area Rental Pricing */}
-              <Card className="border-primary">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5" />
-                      Area Rental
-                    </CardTitle>
-                    <Badge>Level 3</Badge>
-                  </div>
-                  <CardDescription>Dedicated space for large operations</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span>Annual Rate</span>
-                      <span className="font-bold">{formatCurrency(PRICING.areaRentalPerSqFtPerYear)}/sq ft</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span>Minimum Area</span>
-                      <span className="font-bold">{formatNumber(PRICING.areaRentalMinSqFt)} sq ft</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span>Starting From</span>
-                      <span className="font-bold">
-                        {formatCurrency(PRICING.areaRentalMinSqFt * PRICING.areaRentalPerSqFtPerYear)}/year
-                      </span>
-                    </div>
-                  </div>
-                  <div className="pt-4">
-                    <div className="text-sm font-medium mb-2">Includes:</div>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• Dedicated space on Level 3</li>
-                      <li>• 24/7 access</li>
-                      <li>• Climate control</li>
-                      <li>• Security monitoring</li>
-                    </ul>
-                  </div>
-                  <Link href="/register">
-                    <Button className="w-full" variant="default">
-                      Contact Sales
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
+            <div className="mt-12 text-center">
+              <Link href="/find-warehouses">
+                <Button size="lg" className="gap-2">
+                  Find Your Warehouse <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           </div>
         </section>
@@ -484,8 +440,8 @@ export default function HomePage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="#pricing" className="hover:text-foreground">
-                    Pricing
+                  <Link href="#how-it-works" className="hover:text-foreground">
+                    How It Works
                   </Link>
                 </li>
                 <li>

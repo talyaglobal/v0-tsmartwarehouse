@@ -78,8 +78,8 @@ export function WarehouseCard({
 
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.data && data.data.total) {
-            setTotalPrice(data.data.total)
+          if (data.success && data.breakdown && data.breakdown.total) {
+            setTotalPrice(data.breakdown.total)
           }
         }
       } catch (error) {
@@ -166,17 +166,23 @@ export function WarehouseCard({
                     <div className="text-right">
                       {price ? (
                         <div>
-                          <p className="font-bold text-lg">
-                            {formatCurrency(price)}
-                            {unit && (
-                              <span className="text-sm font-normal text-muted-foreground">
-                                /{unit}
-                              </span>
-                            )}
-                          </p>
-                          {totalPrice !== null && (
-                            <p className="text-sm font-semibold text-primary mt-1">
+                          {unit && (
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {unit}
+                            </p>
+                          )}
+                          {totalPrice !== null ? (
+                            <p className="font-bold text-lg text-primary">
                               Total: {formatCurrency(totalPrice)}
+                            </p>
+                          ) : (
+                            <p className="font-bold text-lg">
+                              {formatCurrency(price)}
+                              {unit && (
+                                <span className="text-sm font-normal text-muted-foreground">
+                                  /{unit}
+                                </span>
+                              )}
                             </p>
                           )}
                         </div>
@@ -288,17 +294,23 @@ export function WarehouseCard({
           )}
           {price && (
             <div className="mt-auto pt-3 border-t">
-              <p className="font-bold text-lg">
-                {formatCurrency(price)}
-                {unit && (
-                  <span className="text-sm font-normal text-muted-foreground">
-                    /{unit}
-                  </span>
-                )}
-              </p>
-              {totalPrice !== null && (
-                <p className="text-sm font-semibold text-primary mt-1">
+              {unit && (
+                <p className="text-xs text-muted-foreground mb-1">
+                  {unit}
+                </p>
+              )}
+              {totalPrice !== null ? (
+                <p className="font-bold text-lg text-primary">
                   Total: {formatCurrency(totalPrice)}
+                </p>
+              ) : (
+                <p className="font-bold text-lg">
+                  {formatCurrency(price)}
+                  {unit && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /{unit}
+                    </span>
+                  )}
                 </p>
               )}
             </div>

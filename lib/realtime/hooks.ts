@@ -201,7 +201,17 @@ export function useRealtimeNotifications(userId: string) {
 
         if (fetchError) throw fetchError
 
-        const notificationsData = initialData || []
+        const notificationsData = (initialData || []).map((n: any) => ({
+          id: n.id,
+          userId: n.user_id,
+          type: n.type,
+          channel: n.channel,
+          title: n.title,
+          message: n.message,
+          read: n.read || false,
+          createdAt: n.created_at || new Date().toISOString(),
+        })) as Notification[]
+        
         setNotifications(notificationsData)
         setUnreadCount(notificationsData.filter((n: Notification) => !n.read).length)
 
@@ -216,13 +226,33 @@ export function useRealtimeNotifications(userId: string) {
               table: "notifications",
               filter: `user_id=eq.${userId}`,
             },
-            (payload: RealtimePostgresChangesPayload<Notification>) => {
+            (payload: RealtimePostgresChangesPayload<any>) => {
               if (payload.eventType === "INSERT") {
-                const newNotification = payload.new as Notification
+                const rawNotification = payload.new
+                const newNotification: Notification = {
+                  id: rawNotification.id,
+                  userId: rawNotification.user_id,
+                  type: rawNotification.type,
+                  channel: rawNotification.channel,
+                  title: rawNotification.title,
+                  message: rawNotification.message,
+                  read: rawNotification.read || false,
+                  createdAt: rawNotification.created_at || new Date().toISOString(),
+                }
                 setNotifications((prev) => [newNotification, ...prev])
                 setUnreadCount((prev) => prev + 1)
               } else if (payload.eventType === "UPDATE") {
-                const updatedNotification = payload.new as Notification
+                const rawNotification = payload.new
+                const updatedNotification: Notification = {
+                  id: rawNotification.id,
+                  userId: rawNotification.user_id,
+                  type: rawNotification.type,
+                  channel: rawNotification.channel,
+                  title: rawNotification.title,
+                  message: rawNotification.message,
+                  read: rawNotification.read || false,
+                  createdAt: rawNotification.created_at || new Date().toISOString(),
+                }
                 setNotifications((prev) =>
                   prev.map((n) =>
                     n.id === updatedNotification.id ? updatedNotification : n

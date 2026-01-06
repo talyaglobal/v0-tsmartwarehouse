@@ -18,13 +18,12 @@ export async function calculatePrice(
   const { warehouse_id, type, quantity, start_date, end_date } = params
 
   try {
-    // Get pricing
-    const pricingType = type === 'pallet' ? 'pallet' : 'area-rental'
+    // Get pricing - support both 'area' and 'area-rental' for backward compatibility
     const { data: pricing, error } = await supabase
       .from('warehouse_pricing')
       .select('base_price, unit, volume_discounts')
       .eq('warehouse_id', warehouse_id)
-      .eq('pricing_type', pricingType)
+      .in('pricing_type', type === 'pallet' ? ['pallet'] : ['area-rental', 'area'])
       .eq('status', true)
       .single()
 

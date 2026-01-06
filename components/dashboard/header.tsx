@@ -30,7 +30,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['warehouse_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+      if (savedRole && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -99,8 +99,8 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         label: 'Warehouse Owner',
         className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
       },
-      company_admin: {
-        label: 'Company Admin',
+      warehouse_admin: {
+        label: 'Warehouse Admin',
         className: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
       },
       customer: {
@@ -162,14 +162,14 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff']
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
       warehouse_owner: '🟢 Warehouse Owner',
-      company_admin: '🔵 Company Admin',
+      warehouse_admin: '🔵 Warehouse Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
     }
@@ -186,7 +186,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         return 'bg-red-50/95 dark:bg-red-950/95 border-b border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
       case 'warehouse_owner':
         return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-b border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
-      case 'company_admin':
+      case 'warehouse_admin':
         return 'bg-blue-50/95 dark:bg-blue-950/95 border-b border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
       case 'customer':
         return 'bg-violet-50/95 dark:bg-violet-950/95 border-b border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'

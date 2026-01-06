@@ -180,9 +180,9 @@ export function BookingSearchForm({
       <Card className={cn("w-full shadow-lg", className)}>
         <CardContent className="p-4">
           <form onSubmit={handleSubmit}>
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-3 flex-wrap">
               {/* Location Search */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-[200px]">
                 <Label htmlFor="location" className="text-xs text-muted-foreground mb-1 block">
                   Where do you want to store?
                 </Label>
@@ -197,7 +197,7 @@ export function BookingSearchForm({
               </div>
 
               {/* Storage Type */}
-              <div className="flex-shrink-0" style={{ width: '180px' }}>
+              <div className="flex-shrink-0 min-w-[170px]">
                 <Label htmlFor="storage-type" className="text-xs text-muted-foreground mb-1 block">
                   Type of Storage
                 </Label>
@@ -214,7 +214,7 @@ export function BookingSearchForm({
 
               {/* Quantity Input - Inline with Storage Type */}
               {storageType === "pallet" ? (
-                <div className="flex-shrink-0" style={{ width: '100px' }}>
+                <div className="flex-shrink-0 min-w-[110px]">
                   <Label htmlFor="pallet-count" className="text-xs text-muted-foreground mb-1 block whitespace-nowrap">
                     Pallets
                   </Label>
@@ -226,11 +226,11 @@ export function BookingSearchForm({
                     onChange={(e) => setPalletCount(e.target.value)}
                     placeholder="1"
                     required
-                    className="h-10"
+                    className="h-10 w-full"
                   />
                 </div>
               ) : (
-                <div className="flex-shrink-0" style={{ width: '140px' }}>
+                <div className="flex-shrink-0 min-w-[140px]">
                   <Label htmlFor="area-sqft" className="text-xs text-muted-foreground mb-1 block">
                     Square feet
                   </Label>
@@ -243,14 +243,14 @@ export function BookingSearchForm({
                     onChange={(e) => setAreaSqFt(e.target.value)}
                     placeholder="40000"
                     required
-                    className="h-10"
+                    className="h-10 w-full"
                   />
                 </div>
               )}
 
-              {/* Duration (for area rental) or Start Date (for pallet) */}
+              {/* Duration (for area rental) */}
               {storageType === "area-rental" ? (
-                <div className="flex-shrink-0" style={{ width: '120px' }}>
+                <div className="flex-shrink-0 min-w-[120px]">
                   <Label htmlFor="duration" className="text-xs text-muted-foreground mb-1 block">
                     Months
                   </Label>
@@ -263,14 +263,14 @@ export function BookingSearchForm({
                     onChange={(e) => handleMonthDurationChange(e.target.value)}
                     placeholder="e.g. 5"
                     required
-                    className="h-10"
+                    className="h-10 w-full"
                     title="Enter number of months (minimum 1)"
                   />
                 </div>
               ) : null}
 
               {/* Start Date */}
-              <div className="flex-shrink-0" style={{ width: '140px' }}>
+              <div className="flex-shrink-0 min-w-[150px]">
                 <Label htmlFor="start-date" className="text-xs text-muted-foreground mb-1 block">
                   Start Date
                 </Label>
@@ -280,13 +280,13 @@ export function BookingSearchForm({
                   value={startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
                   min={today}
-                  className="h-10"
+                  className="h-10 w-full"
                   required
                 />
               </div>
 
               {/* End Date */}
-              <div className="flex-shrink-0" style={{ width: '140px' }}>
+              <div className="flex-shrink-0 min-w-[150px]">
                 <Label htmlFor="end-date" className="text-xs text-muted-foreground mb-1 block">
                   End Date
                 </Label>
@@ -302,7 +302,7 @@ export function BookingSearchForm({
                     }
                   }}
                   min={getMinEndDate()}
-                  className="h-10"
+                  className="h-10 w-full"
                   required
                   disabled={storageType === "area-rental"} // Auto-calculated for area rental
                 />
@@ -310,7 +310,7 @@ export function BookingSearchForm({
 
               {/* Submit Button */}
               {showSubmitButton && (
-                <Button type="submit" className="h-10 px-6 gap-2 whitespace-nowrap flex-shrink-0">
+                <Button type="submit" className="h-10 px-5 gap-2 whitespace-nowrap flex-shrink-0">
                   <Search className="h-4 w-4" />
                   Search
                 </Button>

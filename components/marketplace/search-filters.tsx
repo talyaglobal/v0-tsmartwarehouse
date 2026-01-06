@@ -15,9 +15,16 @@ import type { WarehouseSearchParams } from "@/types/marketplace"
 interface SearchFiltersProps {
   filters: Partial<WarehouseSearchParams>
   onFiltersChange: (filters: Partial<WarehouseSearchParams>) => void
-  onClear: () => void
+  onClear?: () => void // Optional, kept for backward compatibility but not used
   className?: string
   mobile?: boolean
+  searchCriteria?: {
+    city?: string
+    type?: "pallet" | "area-rental"
+    quantity?: number
+    start_date?: string
+    end_date?: string
+  }
 }
 
 const WAREHOUSE_TYPES = [
@@ -29,15 +36,6 @@ const WAREHOUSE_TYPES = [
   { value: "hazardous-materials-hazmat", label: "Hazardous Materials" },
 ] as const
 
-const STORAGE_TYPES = [
-  { value: "bulk-space", label: "Bulk Space" },
-  { value: "rack-space", label: "Rack Space" },
-  { value: "individual-unit", label: "Individual Unit" },
-  { value: "lockable-unit", label: "Lockable Unit" },
-  { value: "cage", label: "Cage" },
-  { value: "open-yard", label: "Open Yard" },
-  { value: "closed-yard", label: "Closed Yard" },
-] as const
 
 const TEMPERATURE_TYPES = [
   { value: "ambient-with-ac", label: "Ambient (with A/C)" },
@@ -59,9 +57,10 @@ const AMENITIES = [
 export function SearchFilters({
   filters,
   onFiltersChange,
-  onClear,
+  onClear: _onClear,
   className,
   mobile = false,
+  searchCriteria: providedSearchCriteria,
 }: SearchFiltersProps) {
   const [isOpen, setIsOpen] = useState(!mobile)
 
@@ -69,7 +68,7 @@ export function SearchFilters({
     onFiltersChange({ ...filters, [key]: value })
   }
 
-  const toggleArrayFilter = (key: "warehouse_type" | "storage_type" | "temperature_types" | "amenities", value: string) => {
+  const toggleArrayFilter = (key: "warehouse_type" | "temperature_types" | "amenities", value: string) => {
     const current = (filters[key] as string[]) || []
     const updated = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -77,18 +76,39 @@ export function SearchFilters({
     updateFilter(key, updated)
   }
 
+  // Search criteria (should NOT be cleared) - use provided or extract from filters
+  const searchCriteria = providedSearchCriteria || {
+    city: filters.city,
+    type: filters.type,
+    quantity: filters.quantity,
+    start_date: filters.start_date,
+    end_date: filters.end_date,
+  }
+
+  // Active filters (should be cleared) - exclude search criteria
   const hasActiveFilters = 
-    filters.type ||
-    filters.quantity ||
-    filters.start_date ||
-    filters.end_date ||
     (filters.warehouse_type && filters.warehouse_type.length > 0) ||
-    (filters.storage_type && filters.storage_type.length > 0) ||
     (filters.temperature_types && filters.temperature_types.length > 0) ||
     (filters.amenities && filters.amenities.length > 0) ||
     filters.min_price ||
     filters.max_price ||
     filters.min_rating
+
+  // Clear only filters, preserve search criteria
+  const handleClearFilters = () => {
+    const clearedFilters: Partial<WarehouseSearchParams> = {
+      ...searchCriteria, // Preserve search criteria
+      warehouse_type: undefined,
+      temperature_types: undefined,
+      amenities: undefined,
+      min_price: undefined,
+      max_price: undefined,
+      min_rating: undefined,
+      page: 1,
+      limit: filters.limit || 20,
+    }
+    onFiltersChange(clearedFilters)
+  }
 
   const content = (
     <div className="space-y-6">
@@ -187,27 +207,6 @@ export function SearchFilters({
         </div>
       </div>
 
-      {/* Storage Type */}
-      <div className="space-y-2">
-        <Label>Storage Type</Label>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {STORAGE_TYPES.map((type) => (
-            <div key={type.value} className="flex items-center space-x-2">
-              <Checkbox
-                id={`storage-type-${type.value}`}
-                checked={(filters.storage_type || []).includes(type.value)}
-                onCheckedChange={() => toggleArrayFilter("storage_type", type.value)}
-              />
-              <label
-                htmlFor={`storage-type-${type.value}`}
-                className="text-sm font-normal cursor-pointer"
-              >
-                {type.label}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Temperature Types */}
       <div className="space-y-2">
@@ -255,9 +254,9 @@ export function SearchFilters({
 
       {/* Clear All Button */}
       {hasActiveFilters && (
-        <Button variant="outline" onClick={onClear} className="w-full">
+        <Button variant="outline" onClick={handleClearFilters} className="w-full">
           <X className="h-4 w-4 mr-2" />
-          Clear All Filters
+          Clear Filters
         </Button>
       )}
     </div>
@@ -276,11 +275,7 @@ export function SearchFilters({
           {hasActiveFilters && (
             <span className="ml-2 px-2 py-0.5 bg-primary text-primary-foreground rounded-full text-xs">
               {[
-                filters.type,
-                filters.quantity,
-                filters.start_date,
                 filters.warehouse_type?.length,
-                filters.storage_type?.length,
                 filters.temperature_types?.length,
                 filters.amenities?.length,
                 filters.min_price,
@@ -313,7 +308,7 @@ export function SearchFilters({
         <CardTitle className="flex items-center justify-between">
           <span>Filters</span>
           {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={onClear}>
+            <Button variant="ghost" size="sm" onClick={handleClearFilters}>
               <X className="h-4 w-4 mr-1" />
               Clear
             </Button>

@@ -99,10 +99,9 @@ export async function POST(
       // Cancel the booking
       updatedBooking = await cancelBooking(bookingId)
       
-      // Update cancel processed fields
+      // Update booking status (cancelProcessedAt and cancelProcessedBy are not in Booking type)
       updatedBooking = await updateBooking(bookingId, {
-        cancelProcessedAt: new Date().toISOString(),
-        cancelProcessedBy: currentUser.id,
+        status: "cancelled",
       })
 
       // Notify customer
@@ -162,7 +161,7 @@ export async function POST(
 
     const responseData: BookingResponse = {
       success: true,
-      data: updatedBooking,
+      data: updatedBooking || undefined,
       message: `Cancel request ${action}d successfully`,
     }
     return NextResponse.json(responseData)

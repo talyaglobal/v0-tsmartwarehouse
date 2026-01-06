@@ -93,14 +93,14 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff']
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
       warehouse_owner: '🟢 Warehouse Owner',
-      company_admin: '🔵 Company Admin',
+      warehouse_admin: '🔵 Warehouse Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
     }

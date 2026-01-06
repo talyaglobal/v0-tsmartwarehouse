@@ -73,8 +73,14 @@ async function getWarehouseOperatingHours(
 
 /**
  * Check if a date is a working day
+ * If workingDays is empty, consider all days as working days
  */
 function isWorkingDay(date: Date, workingDays: string[]): boolean {
+  // If no working days specified, consider all days as working days
+  if (!workingDays || workingDays.length === 0) {
+    return true
+  }
+  
   const dayNames = [
     "Sunday",
     "Monday",
@@ -90,27 +96,58 @@ function isWorkingDay(date: Date, workingDays: string[]): boolean {
 
 /**
  * Generate time slots for a day based on operating hours
+ * Now generates 30-minute intervals
+ * Includes slots from openTime up to (but not including) closeTime
  */
 function generateTimeSlots(openTime: string, closeTime: string): string[] {
   const slots: string[] = []
-  const [openHour, openMin] = openTime.split(":").map(Number)
-  const [closeHour, closeMin] = closeTime.split(":").map(Number)
+  
+  try {
+    const [openHour, openMin] = openTime.split(":").map(Number)
+    const [closeHour, closeMin] = closeTime.split(":").map(Number)
 
-  let currentHour = openHour
-  let currentMin = openMin
-
-  while (
-    currentHour < closeHour ||
-    (currentHour === closeHour && currentMin < closeMin)
-  ) {
-    const timeString = `${currentHour.toString().padStart(2, "0")}:${currentMin.toString().padStart(2, "0")}`
-    slots.push(timeString)
-
-    // Increment by 1 hour
-    currentHour += 1
-    if (currentHour >= 24) {
-      break
+    // Validate times
+    if (isNaN(openHour) || isNaN(openMin) || isNaN(closeHour) || isNaN(closeMin)) {
+      console.error(`[generateTimeSlots] Invalid time format: openTime=${openTime}, closeTime=${closeTime}`)
+      return []
     }
+
+    // Check if times are valid
+    if (openHour < 0 || openHour >= 24 || openMin < 0 || openMin >= 60 ||
+        closeHour < 0 || closeHour >= 24 || closeMin < 0 || closeMin >= 60) {
+      console.error(`[generateTimeSlots] Invalid time values: openTime=${openTime}, closeTime=${closeTime}`)
+      return []
+    }
+
+    let currentHour = openHour
+    let currentMin = openMin
+
+    // Generate slots until we reach closeTime (exclusive)
+    while (
+      currentHour < closeHour ||
+      (currentHour === closeHour && currentMin < closeMin)
+    ) {
+      const timeString = `${currentHour.toString().padStart(2, "0")}:${currentMin.toString().padStart(2, "0")}`
+      slots.push(timeString)
+
+      // Increment by 30 minutes
+      currentMin += 30
+      if (currentMin >= 60) {
+        currentHour += 1
+        currentMin -= 60
+      }
+      if (currentHour >= 24) {
+        break
+      }
+    }
+
+    console.log(`[generateTimeSlots] Generated ${slots.length} slots from ${openTime} to ${closeTime}`)
+    if (slots.length > 0) {
+      console.log(`[generateTimeSlots] First slot: ${slots[0]}, Last slot: ${slots[slots.length - 1]}`)
+    }
+  } catch (error) {
+    console.error(`[generateTimeSlots] Error generating slots:`, error)
+    return []
   }
 
   return slots
@@ -258,42 +295,138 @@ export async function checkWarehouseAvailability(
 
 /**
  * Get available time slots for a specific date
+ * Checks:
+ * - Warehouse operating hours
+ * - Existing bookings with scheduled drop-off times
+ * - Warehouse staff tasks (receiving, putaway) at that time
  */
 export async function getAvailableTimeSlots(
   warehouseId: string,
   date: string
 ): Promise<TimeSlot[]> {
+  const supabase = createServerSupabaseClient()
+
   // Get operating hours
   const operatingHours = await getWarehouseOperatingHours(warehouseId)
 
   // Check if date is a working day
+  // If working days are not specified, allow all days
   const targetDate = new Date(date)
-  if (!isWorkingDay(targetDate, operatingHours.days || [])) {
+  const workingDays = operatingHours.days || []
+  
+  // Only check working days if they are explicitly set
+  if (workingDays.length > 0 && !isWorkingDay(targetDate, workingDays)) {
+    console.log(`[availability] Date ${date} is not a working day. Working days: ${workingDays.join(', ')}`)
     return [] // No slots available on non-working days
   }
 
-  // Generate all possible time slots for the day
-  const allSlots = generateTimeSlots(
-    operatingHours.open!,
-    operatingHours.close!
-  )
+  // Get warehouse product acceptance hours if available
+  const { data: warehouse, error: warehouseError } = await supabase
+    .from("warehouses")
+    .select("product_acceptance_start_time, product_acceptance_end_time")
+    .eq("id", warehouseId)
+    .single()
 
-  // Get conflicting bookings
-  const conflictingBookings = await getConflictingBookings(warehouseId, date)
+  if (warehouseError) {
+    console.warn(`[availability] Error fetching warehouse ${warehouseId}:`, warehouseError)
+  }
+
+  // Use product acceptance hours if available, otherwise use operating hours, with fallback defaults
+  // product_acceptance_start_time and product_acceptance_end_time are TIME type, so they come as strings like "08:00:00"
+  let productStartTime = warehouse?.product_acceptance_start_time 
+    ? String(warehouse.product_acceptance_start_time).slice(0, 5) // Convert "08:00:00" to "08:00"
+    : operatingHours.open || "08:00"
+  let productEndTime = warehouse?.product_acceptance_end_time
+    ? String(warehouse.product_acceptance_end_time).slice(0, 5) // Convert "18:00:00" to "18:00"
+    : operatingHours.close || "18:00"
+
+  // Ensure we have valid time strings
+  if (!productStartTime || !productEndTime || !productStartTime.match(/^\d{2}:\d{2}$/) || !productEndTime.match(/^\d{2}:\d{2}$/)) {
+    console.warn(`[availability] Invalid time configuration for warehouse ${warehouseId}, using defaults. Start: ${productStartTime}, End: ${productEndTime}`)
+    productStartTime = "08:00"
+    productEndTime = "18:00"
+  }
+
+  // Generate all possible time slots for the day based on product acceptance hours
+  const allSlots = generateTimeSlots(productStartTime, productEndTime)
+  
+  // If no slots generated, log warning and return empty array
+  if (allSlots.length === 0) {
+    console.warn(`[availability] No time slots generated for warehouse ${warehouseId} on ${date} with times ${productStartTime}-${productEndTime}`)
+    console.warn(`[availability] Open time: ${productStartTime}, Close time: ${productEndTime}`)
+    return []
+  }
+  
+  console.log(`[availability] Generated ${allSlots.length} time slots for ${date} (${productStartTime} - ${productEndTime})`)
+
+  // Get bookings with scheduled drop-off times on this date
+  // We need to check all bookings and filter by their scheduled_dropoff_datetime or metadata
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("id, scheduled_dropoff_datetime, metadata, booking_status, start_date")
+    .eq("warehouse_id", warehouseId)
+    .in("booking_status", ["pending", "confirmed", "active", "awaiting_time_slot"])
+
+  // Get bookings with requested drop-in time in metadata
+  const bookingsWithTime: Array<{ time: string; bookingId: string }> = []
+  if (bookings) {
+    bookings.forEach((booking) => {
+      // Check scheduled_dropoff_datetime
+      if (booking.scheduled_dropoff_datetime) {
+        const dropoffDate = new Date(booking.scheduled_dropoff_datetime)
+        const dropoffDateStr = dropoffDate.toISOString().split("T")[0]
+        if (dropoffDateStr === date) {
+          const timeStr = dropoffDate.toTimeString().slice(0, 5) // HH:mm format
+          bookingsWithTime.push({ time: timeStr, bookingId: booking.id })
+        }
+      }
+      // Check metadata.requestedDropInTime
+      if (booking.metadata && typeof booking.metadata === 'object') {
+        const metadata = booking.metadata as Record<string, unknown>
+        if (metadata.requestedDropInDate === date && typeof metadata.requestedDropInTime === 'string') {
+          bookingsWithTime.push({ time: metadata.requestedDropInTime, bookingId: booking.id })
+        }
+      }
+    })
+  }
+
+  // Get warehouse staff tasks (receiving, putaway) scheduled for this date/time
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("id, type, due_date, status")
+    .eq("warehouse_id", warehouseId)
+    .in("type", ["receiving", "putaway"])
+    .in("status", ["pending", "assigned", "in-progress"])
+
+  const tasksWithTime: Array<{ time: string; taskId: string }> = []
+  if (tasks) {
+    tasks.forEach((task) => {
+      if (task.due_date) {
+        const taskDate = new Date(task.due_date)
+        const taskDateStr = taskDate.toISOString().split("T")[0]
+        if (taskDateStr === date) {
+          const timeStr = taskDate.toTimeString().slice(0, 5) // HH:mm format
+          tasksWithTime.push({ time: timeStr, taskId: task.id })
+        }
+      }
+    })
+  }
+
+  // Create sets of occupied times
+  const occupiedTimes = new Set<string>()
+  bookingsWithTime.forEach((b) => occupiedTimes.add(b.time))
+  tasksWithTime.forEach((t) => occupiedTimes.add(t.time))
 
   // For each time slot, check if it's available
   const timeSlots: TimeSlot[] = allSlots.map((time) => {
-    // Simplified: if there are any bookings on this date, mark all slots as potentially unavailable
-    // Full implementation should check actual time slot conflicts
-    // For now, we'll mark slots as available if there are fewer than 3 bookings
-    const isAvailable = conflictingBookings.length < 3
-
+    const isOccupied = occupiedTimes.has(time)
+    
     return {
       time,
-      available: isAvailable,
-      reason: isAvailable
-        ? undefined
-        : `There are ${conflictingBookings.length} booking(s) on this date`,
+      available: !isOccupied,
+      reason: isOccupied
+        ? "Time slot is occupied by another booking or warehouse task"
+        : undefined,
     }
   })
 

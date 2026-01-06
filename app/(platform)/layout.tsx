@@ -1,6 +1,5 @@
 import { ReactNode } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import { Warehouse } from '@/components/icons'
 import { PlatformAuthButtons } from '@/components/platform/platform-auth-buttons'
 

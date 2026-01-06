@@ -174,8 +174,40 @@ export default function FindWarehousesPage() {
   }
 
   const handleClearFilters = () => {
-    setFilters({ page: 1, limit: 20 })
-    router.push("/find-warehouses")
+    // Clear only filters, preserve search criteria
+    const searchCriteria = {
+      city: filters.city,
+      type: filters.type,
+      quantity: filters.quantity,
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+    }
+    
+    const clearedFilters: Partial<WarehouseSearchParams> = {
+      ...searchCriteria,
+      page: 1,
+      limit: 20,
+    }
+    
+    setFilters(clearedFilters)
+    
+    // Update URL - preserve search criteria, remove filter params
+    const params = new URLSearchParams()
+    
+    // Preserve search criteria in URL
+    if (searchCriteria.city) params.set('location', searchCriteria.city)
+    if (searchCriteria.type) params.set('type', searchCriteria.type)
+    if (searchCriteria.start_date) params.set('startDate', searchCriteria.start_date)
+    if (searchCriteria.end_date) params.set('endDate', searchCriteria.end_date)
+    if (searchCriteria.quantity) {
+      if (searchCriteria.type === 'pallet') {
+        params.set('palletCount', searchCriteria.quantity.toString())
+      } else if (searchCriteria.type === 'area-rental') {
+        params.set('areaSqFt', searchCriteria.quantity.toString())
+      }
+    }
+    
+    router.push(`/find-warehouses?${params.toString()}`)
   }
 
   const handleSortChange = (sortBy: string) => {
@@ -232,7 +264,7 @@ export default function FindWarehousesPage() {
         {/* Search Form Section */}
         <section className="bg-gradient-to-br from-primary/10 via-background to-background py-4 border-b">
           <div className="container mx-auto px-4">
-            <div className="max-w-5xl mx-auto">
+            <div className="w-full max-w-full">
               <BookingSearchForm
                 initialValues={{
                   location: initialLocation,
@@ -257,6 +289,13 @@ export default function FindWarehousesPage() {
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
                 onClear={handleClearFilters}
+                searchCriteria={{
+                  city: filters.city,
+                  type: filters.type,
+                  quantity: filters.quantity,
+                  start_date: filters.start_date,
+                  end_date: filters.end_date,
+                }}
               />
             </aside>
 

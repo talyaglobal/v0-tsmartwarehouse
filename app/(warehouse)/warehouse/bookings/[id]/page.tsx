@@ -13,7 +13,7 @@ import { formatDate, formatDateTime, getBookingTypeLabel } from "@/lib/utils/for
 import type { Booking } from "@/types"
 import type { WarehouseSearchResult } from "@/types/marketplace"
 import { api } from "@/lib/api/client"
-import { BookingDateChangeForm } from "@/components/warehouse/booking-date-change-form"
+import { StaffProposeTimeModal } from "@/components/warehouse/staff-propose-time-modal"
 
 export default function WarehouseStaffBookingDetailPage({
   params,
@@ -85,6 +85,32 @@ export default function WarehouseStaffBookingDetailPage({
       return result.success ? result.data : null
     },
     enabled: !!booking?.warehouseId && !!booking?.startDate && booking.status === "pre_order",
+  })
+
+  // Approve booking mutation
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      const result = await api.post(
+        `/api/v1/bookings/${bookingId}/approve`,
+        {},
+        {
+          successMessage: "Booking approved successfully",
+          errorMessage: "Failed to approve booking",
+        }
+      )
+      if (!result.success) {
+        throw new Error(result.error || "Failed to approve booking")
+      }
+      return result.data
+    },
+    onSuccess: () => {
+      // Invalidate and refetch booking data
+      queryClient.invalidateQueries({ queryKey: ["warehouse-staff-booking", bookingId] })
+      queryClient.invalidateQueries({ queryKey: ["warehouse-staff-bookings"] })
+      // Refetch the booking immediately
+      queryClient.refetchQueries({ queryKey: ["warehouse-staff-booking", bookingId] })
+      router.refresh()
+    },
   })
 
   // Set awaiting time slot mutation
@@ -356,7 +382,7 @@ export default function WarehouseStaffBookingDetailPage({
                 <span className="text-sm">
                   {warehouse.address}, {warehouse.city}
                   {warehouse.state && `, ${warehouse.state}`}
-                  {warehouse.zip_code && ` ${warehouse.zip_code}`}
+                  {warehouse.zipCode && ` ${warehouse.zipCode}`}
                 </span>
               </div>
             </div>
@@ -496,17 +522,19 @@ export default function WarehouseStaffBookingDetailPage({
               </Button>
             </div>
 
-            {/* Date Change Form */}
-            {showDateChangeForm && (
-              <BookingDateChangeForm
+            {/* Staff Propose Time Modal */}
+            {warehouse && (
+              <StaffProposeTimeModal
+                open={showDateChangeForm}
+                onOpenChange={setShowDateChangeForm}
+                warehouse={warehouse}
                 bookingId={booking.id}
-                warehouseId={booking.warehouseId}
-                requestedDate={booking.startDate}
+                startDate={booking.startDate}
+                endDate={booking.endDate || booking.startDate}
                 onSuccess={() => {
-                  setShowDateChangeForm(false)
                   queryClient.invalidateQueries({ queryKey: ["warehouse-staff-booking", bookingId] })
+                  queryClient.invalidateQueries({ queryKey: ["warehouse-staff-bookings"] })
                 }}
-                onCancel={() => setShowDateChangeForm(false)}
               />
             )}
           </CardContent>
@@ -534,6 +562,76 @@ export default function WarehouseStaffBookingDetailPage({
               <p className="text-sm text-muted-foreground">
                 Customer needs to select a time slot for the requested date.
               </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Booking Actions */}
+      {booking.status === "pending" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Approve Booking</CardTitle>
+            <CardDescription>
+              Review the customer's requested date and time. If the date and time are available, approve the booking to set it to active.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Show requested date/time from metadata */}
+            {(booking as any).metadata?.requestedDropInTime && (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-1">Customer Requested Drop-in Time:</p>
+                <p className="font-semibold">
+                  {formatDateTime((booking as any).metadata.requestedDropInTime)}
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => approveMutation.mutate()}
+                disabled={approveMutation.isPending}
+                className="flex-1"
+                size="lg"
+              >
+                {approveMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve Booking
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowDateChangeForm(!showDateChangeForm)}
+                className="flex-1"
+                size="lg"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Set Another Time and Date
+              </Button>
+            </div>
+
+            {/* Staff Propose Time Modal */}
+            {warehouse && (
+              <StaffProposeTimeModal
+                open={showDateChangeForm}
+                onOpenChange={setShowDateChangeForm}
+                warehouse={warehouse}
+                bookingId={booking.id}
+                startDate={booking.startDate}
+                endDate={booking.endDate || booking.startDate}
+                onSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: ["warehouse-staff-booking", bookingId] })
+                  queryClient.invalidateQueries({ queryKey: ["warehouse-staff-bookings"] })
+                }}
+              />
             )}
           </CardContent>
         </Card>

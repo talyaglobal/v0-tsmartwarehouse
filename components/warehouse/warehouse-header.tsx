@@ -89,14 +89,14 @@ export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderP
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff']
   const currentTestRole = selectedTestRole || profile?.role || 'warehouse_staff'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
       warehouse_owner: '🟢 Warehouse Owner',
-      company_admin: '🔵 Company Admin',
+      warehouse_admin: '🔵 Warehouse Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
     }
@@ -136,7 +136,7 @@ export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderP
               <Button variant="outline" size="sm" className="gap-1 h-8">
                 <Settings className="h-3 w-3" />
                 <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'company_owner' ? '🟢' : currentTestRole === 'company_admin' ? '🔵' : currentTestRole === 'customer' ? '🟣' : '⚪'}
+                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'warehouse_owner' ? '🟢' : currentTestRole === 'warehouse_admin' ? '🔵' : currentTestRole === 'customer' ? '🟣' : '⚪'}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>

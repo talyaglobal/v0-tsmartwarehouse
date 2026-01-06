@@ -36,8 +36,6 @@ export default function PaymentPage() {
             return
           }
 
-          const booking = bookingData.data
-
           // Get invoice for this booking
           const invoiceResponse = await fetch(`/api/v1/invoices?bookingId=${bookingId}`, {
             credentials: 'include',

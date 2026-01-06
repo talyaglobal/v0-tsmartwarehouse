@@ -1,157 +1,111 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth/api-middleware"
-import { handleApiError } from "@/lib/utils/logger"
+import { NextRequest, NextResponse } from "next/server"
 import { getBookingById } from "@/lib/db/bookings"
-import { confirmBooking } from "@/lib/business-logic/bookings"
-import { generateBookingInvoice } from "@/lib/business-logic/invoices"
+import { handleApiError } from "@/lib/utils/logger"
+import type { ErrorResponse, BookingResponse } from "@/types/api"
+import { getCurrentUser } from "@/lib/auth/utils"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { calculateMembershipTierFromSpend } from "@/lib/business-logic/membership"
-import { getInvoices } from "@/lib/db/invoices"
-import { calculateWarehouseAvailability } from "@/lib/business-logic/capacity-management"
-import type { ErrorResponse } from "@/types/api"
+import { activateBooking } from "@/lib/business-logic/bookings"
 
-/**
- * POST /api/v1/bookings/[id]/approve
- * Approve a pending booking, reserve capacity, and generate invoice
- */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Require authentication
-    const authResult = await requireAuth(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-    const { user } = authResult
-
-    // Check if user is admin or root
-    const supabase = await createServerSupabaseClient()
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .eq('status', true) // Soft delete filter
-      .single()
-
-    if (profileError || !profile) {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: 'Profile not found',
-        statusCode: 404,
-      }
-      return NextResponse.json(errorData, { status: 404 })
-    }
-
-    // Only company_admin or root can approve bookings
-    if (profile.role !== 'company_admin' && profile.role !== 'root') {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: 'Unauthorized. Only admins can approve bookings.',
-        statusCode: 403,
-      }
-      return NextResponse.json(errorData, { status: 403 })
-    }
-
     const { id: bookingId } = await params
+    const currentUser = await getCurrentUser()
 
-    // Get booking to verify it exists and is pending
-    const booking = await getBookingById(bookingId, false) // Don't use cache
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const booking = await getBookingById(bookingId)
     if (!booking) {
       const errorData: ErrorResponse = {
         success: false,
-        error: 'Booking not found',
+        error: "Booking not found",
         statusCode: 404,
       }
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Check if booking is pending
-    // Note: status field in Booking type is the business status (booking_status in DB)
-    // The soft delete status field is separate in the database
-    if (booking.status !== 'pending') {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: `Booking is not pending. Current status: ${booking.status}`,
-        statusCode: 400,
-      }
-      return NextResponse.json(errorData, { status: 400 })
-    }
+    // Verify user is warehouse staff/admin/owner for this warehouse
+    const supabase = createServerSupabaseClient()
+    const { data: warehouse } = await supabase
+      .from("warehouses")
+      .select("owner_company_id")
+      .eq("id", booking.warehouseId)
+      .single()
 
-    // Re-check capacity availability before approving
-    // This ensures capacity is still available at the time of approval
-    const bookingType = booking.type === 'pallet' ? 'pallet' : 'area-rental'
-    const fromDate = booking.startDate
-    const toDate = booking.endDate || booking.startDate // Use startDate as fallback if endDate is null
-
-    try {
-      const availability = await calculateWarehouseAvailability(
-        booking.warehouseId,
-        fromDate,
-        toDate,
-        bookingType
+    if (!warehouse) {
+      return NextResponse.json(
+        { success: false, error: "Warehouse not found" },
+        { status: 404 }
       )
+    }
 
-      // Check if required capacity is available
-      const requiredCapacity = booking.type === 'pallet' 
-        ? (booking.palletCount || 0)
-        : (booking.areaSqFt || 0)
+    // Check if user is warehouse staff, admin, or owner
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("role, company_id")
+      .eq("id", currentUser.id)
+      .single()
 
-      if (availability.available < requiredCapacity) {
-        const errorData: ErrorResponse = {
+    if (!userProfile) {
+      return NextResponse.json(
+        { success: false, error: "User profile not found" },
+        { status: 404 }
+      )
+    }
+
+    const isWarehouseStaff =
+      userProfile.role === "warehouse_staff" ||
+      userProfile.role === "warehouse_admin" ||
+      userProfile.role === "warehouse_owner" ||
+      userProfile.role === "root"
+
+    const isCompanyMember = userProfile.company_id === warehouse.owner_company_id
+
+    if (!isWarehouseStaff || !isCompanyMember) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only warehouse staff can approve bookings" },
+        { status: 403 }
+      )
+    }
+
+    // Check if booking is in pending status
+    if (booking.status !== "pending") {
+      return NextResponse.json(
+        {
           success: false,
-          error: `Insufficient capacity. Required: ${requiredCapacity}, Available: ${availability.available}`,
-          statusCode: 400,
-        }
-        return NextResponse.json(errorData, { status: 400 })
-      }
-    } catch (capacityError) {
-      // Log the error but proceed with approval attempt
-      // confirmBooking will handle capacity reservation and throw if insufficient
-      console.error('Capacity check error (proceeding anyway):', capacityError)
+          error: `Booking is not in pending status. Current status: ${booking.status}`,
+        },
+        { status: 400 }
+      )
     }
 
-    // Confirm booking (reserves capacity and updates status to confirmed)
-    const confirmedBooking = await confirmBooking(bookingId)
+    // Activate the booking
+    const updatedBooking = await activateBooking(bookingId)
 
-    // Get customer's total spend to calculate membership tier
-    const invoices = await getInvoices({
-      customerId: booking.customerId,
-      status: 'paid', // invoice_status = 'paid'
-      useCache: false,
-    })
-    const totalSpend = invoices.reduce((sum, invoice) => sum + invoice.total, 0)
-    const membershipTier = await calculateMembershipTierFromSpend(totalSpend)
-
-    // Generate invoice for the booking
-    const invoiceResult = await generateBookingInvoice({
-      bookingId: bookingId,
-      customerId: booking.customerId,
-      customerName: booking.customerName,
-      invoiceType: 'booking',
-      membershipTier,
-    })
-
-    const responseData = {
+    const responseData: BookingResponse = {
       success: true,
-      data: {
-        booking: confirmedBooking,
-        invoice: invoiceResult.invoice,
-      },
-      message: 'Booking approved and invoice created successfully',
+      data: updatedBooking,
+      message: "Booking approved and activated successfully",
     }
-
-    return NextResponse.json(responseData)
+    return NextResponse.json(responseData, { status: 200 })
   } catch (error) {
-    const errorResponse = handleApiError(error, { context: 'Failed to approve booking' })
+    const { id } = await params
+    const errorResponse = handleApiError(error, {
+      path: `/api/v1/bookings/${id}/approve`,
+      method: "POST",
+    })
     const errorData: ErrorResponse = {
       success: false,
       error: errorResponse.message,
       statusCode: errorResponse.statusCode,
-      ...(errorResponse.code && { code: errorResponse.code }),
     }
     return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }
-

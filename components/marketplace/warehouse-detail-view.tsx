@@ -27,6 +27,7 @@ import {
 import { PhotoGallery } from "./photo-gallery"
 import { RatingStars } from "./rating-stars"
 import { BookingSummary } from "./booking-summary"
+import { BookingTimeSlotModal } from "./booking-time-slot-modal"
 import { createBookingRequest } from "@/features/bookings/actions"
 import type { WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
 
@@ -121,6 +122,7 @@ export function WarehouseDetailView({
   const [isFavorite, setIsFavorite] = useState(false)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showBookingModal, setShowBookingModal] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -252,7 +254,18 @@ export function WarehouseDetailView({
     }
   }
 
-  const handleBookNow = async () => {
+  const handleBookNow = () => {
+    const startDate = (searchParams?.startDate || searchParams?.start_date) as string
+    const endDate = (searchParams?.endDate || searchParams?.end_date) as string
+    
+    if (!searchParams?.type || !startDate || !endDate) {
+      return
+    }
+
+    setShowBookingModal(true)
+  }
+
+  const handleConfirmBooking = async (selectedDate: string, selectedTime: string) => {
     const startDate = (searchParams?.startDate || searchParams?.start_date) as string
     const endDate = (searchParams?.endDate || searchParams?.end_date) as string
     
@@ -277,7 +290,12 @@ export function WarehouseDetailView({
         startDate,
         endDate,
         serviceIds: selectedServices.length > 0 ? selectedServices : undefined,
-        notes: undefined,
+        notes: `Requested drop-off date: ${selectedDate} at ${selectedTime}`,
+        metadata: {
+          requestedDropInTime: `${selectedDate}T${selectedTime}:00`,
+          requestedDropInDate: selectedDate,
+          requestedDropInTimeSlot: selectedTime,
+        },
       })
 
       if (result.success && result.data) {
@@ -458,11 +476,11 @@ export function WarehouseDetailView({
                   onClick={handleBookNow}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "Creating..." : "Request to Book"}
+                  Request to Book
                 </Button>
 
                 <p className="text-xs text-center text-muted-foreground">
-                  This will create a pre-order. Warehouse staff will contact you to finalize the date and time.
+                  Select a date and time for drop-off when booking.
                 </p>
               </>
             ) : (
@@ -926,6 +944,28 @@ export function WarehouseDetailView({
           </Card>
         )}
       </div>
+
+      {/* Booking Time Slot Modal */}
+      {searchParams?.type && (searchParams?.startDate || searchParams?.start_date) && (searchParams?.endDate || searchParams?.end_date) && (
+        <BookingTimeSlotModal
+          open={showBookingModal}
+          onOpenChange={setShowBookingModal}
+          warehouse={warehouse}
+          type={(searchParams.type as "pallet" | "area-rental") || "pallet"}
+          quantity={
+            searchParams?.quantity
+              ? parseInt(searchParams.quantity as string)
+              : (searchParams?.type as string) === "pallet"
+              ? parseInt((searchParams?.palletCount || searchParams?.quantity) as string) || 0
+              : parseInt((searchParams?.areaSqFt || searchParams?.quantity) as string) || 0
+          }
+          startDate={(searchParams?.startDate || searchParams?.start_date) as string}
+          endDate={(searchParams?.endDate || searchParams?.end_date) as string}
+          selectedServices={selectedServices}
+          onServicesChange={setSelectedServices}
+          onConfirm={handleConfirmBooking}
+        />
+      )}
     </div>
   )
 }

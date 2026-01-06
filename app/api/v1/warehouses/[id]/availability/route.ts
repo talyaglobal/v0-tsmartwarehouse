@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth/api-middleware"
 import { getAvailableTimeSlots, checkWarehouseAvailability } from "@/lib/business-logic/availability"
 import type { ErrorResponse } from "@/types/api"
 
@@ -12,12 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Require authentication
-    const authResult = await requireAuth(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
+    // Public endpoint - no authentication required for checking availability
     const { id } = await params
     const warehouseId = id
     const { searchParams } = new URL(request.url)
@@ -57,6 +51,14 @@ export async function GET(
 
     // Otherwise, get all available time slots for the date
     const timeSlots = await getAvailableTimeSlots(warehouseId, date)
+
+    console.log(`[availability] Warehouse ${warehouseId}, Date ${date}: ${timeSlots.length} time slots generated`)
+    if (timeSlots.length > 0) {
+      console.log(`[availability] First few slots:`, timeSlots.slice(0, 5))
+      console.log(`[availability] Available slots:`, timeSlots.filter(s => s.available).length)
+    } else {
+      console.warn(`[availability] No time slots generated for warehouse ${warehouseId} on ${date}`)
+    }
 
     return NextResponse.json({
       success: true,

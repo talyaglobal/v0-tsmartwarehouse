@@ -26,6 +26,7 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
   completed: { label: "Completed", className: "bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400" },
   cancelled: { label: "Cancelled", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  cancel_request: { label: "Cancel Requested", className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" },
   // Task statuses
   assigned: {
     label: "Assigned",

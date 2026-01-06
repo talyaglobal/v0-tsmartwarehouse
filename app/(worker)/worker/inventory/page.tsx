@@ -4,9 +4,11 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Package, Layers, Building2, Loader2 } from "@/components/icons"
+import { Search, Package, Layers, Building2, Loader2, Eye } from "@/components/icons"
+import Link from "next/link"
 import { WAREHOUSE_CONFIG } from "@/lib/constants"
 import { formatNumber } from "@/lib/utils/format"
 import { api } from "@/lib/api/client"
@@ -20,6 +22,7 @@ interface InventoryItem {
   description?: string
   hall_id?: string
   zone_id?: string
+  booking_id?: string
 }
 
 export default function InventoryPage() {
@@ -187,6 +190,7 @@ export default function InventoryPage() {
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -202,6 +206,16 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {item.description || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {item.booking_id && (
+                        <Link href={`/warehouse/bookings/${item.booking_id}`}>
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <Eye className="h-4 w-4" />
+                            Booking Detail
+                          </Button>
+                        </Link>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
