@@ -51,10 +51,16 @@ export function BookingSummary({
         const response = await fetch(`/api/v1/warehouses/${warehouseId}/services`)
         if (response.ok) {
           const data = await response.json()
-          setServices(data.services || [])
+          console.log('[BookingSummary] Services response:', data)
+          // API returns { success: true, data: { services: [...] } }
+          const services = data.data?.services || data.services || data.data || []
+          console.log('[BookingSummary] Parsed services:', services.length)
+          setServices(services)
+        } else {
+          console.error('[BookingSummary] Failed to fetch services:', response.status, response.statusText)
         }
       } catch (error) {
-        console.error("Error fetching services:", error)
+        console.error("[BookingSummary] Error fetching services:", error)
       } finally {
         setLoading(false)
       }
@@ -199,19 +205,17 @@ export function BookingSummary({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Additional Services (Optional)</Label>
-              {services.length > 3 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAllServices(true)}
-                  className="text-xs h-auto py-1"
-                >
-                  Show All
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllServices(true)}
+                className="text-xs h-auto py-1"
+              >
+                Show All
+              </Button>
             </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
-              {services.slice(0, 3).map((service) => (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+              {services.map((service) => (
                 <div
                   key={service.id}
                   className="flex items-start space-x-3 p-2 rounded-md border hover:bg-muted/50"

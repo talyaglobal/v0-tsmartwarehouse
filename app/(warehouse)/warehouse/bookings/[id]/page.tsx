@@ -48,6 +48,10 @@ export default function WarehouseStaffBookingDetailPage({
       return result.success ? result.data : null
     },
     enabled: !!bookingId,
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Always refetch on mount
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchInterval: 10 * 1000, // Refetch every 10 seconds to get latest status
   })
 
   // Fetch warehouse details

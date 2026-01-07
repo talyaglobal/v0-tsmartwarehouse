@@ -204,6 +204,22 @@ export async function processInvoicePayment(
       paidDate: new Date().toISOString().split("T")[0],
     })
 
+    // Update booking status if invoice has a booking
+    if (invoice.bookingId) {
+      const { updateBooking, getBookingById } = await import("@/lib/db/bookings")
+      const booking = await getBookingById(invoice.bookingId, false)
+      if (booking) {
+        // Update booking status to confirmed when payment succeeds via credit balance
+        // Allow status update for: pending, pre_order, payment_pending, awaiting_time_slot
+        const allowedStatuses = ["pending", "pre_order", "payment_pending", "awaiting_time_slot"]
+        if (allowedStatuses.includes(booking.status)) {
+          await updateBooking(invoice.bookingId, {
+            status: "confirmed",
+          })
+        }
+      }
+    }
+
     // Create transaction records
     if (creditBalanceUsed > 0) {
       await createPaymentTransaction({
@@ -289,17 +305,17 @@ export async function confirmPayment(
 
       // Update booking status if invoice has a booking
       if (invoice.bookingId) {
-        const { updateBooking } = await import("@/lib/db/bookings")
+        const { updateBooking, getBookingById } = await import("@/lib/db/bookings")
         const booking = await getBookingById(invoice.bookingId, false)
         if (booking) {
-          // Update booking status based on current status
-          let newStatus: "confirmed" | "payment_pending" = "confirmed"
-          if (booking.status === "pre_order" || booking.status === "payment_pending") {
-            newStatus = "confirmed"
+          // Update booking status to confirmed when payment succeeds
+          // Allow status update for: pending, pre_order, payment_pending, awaiting_time_slot
+          const allowedStatuses = ["pending", "pre_order", "payment_pending", "awaiting_time_slot"]
+          if (allowedStatuses.includes(booking.status)) {
+            await updateBooking(invoice.bookingId, {
+              status: "confirmed",
+            })
           }
-          await updateBooking(invoice.bookingId, {
-            status: newStatus,
-          })
         }
       }
     }

@@ -371,8 +371,8 @@ export default function BookingsPage() {
                       </Link>
                       {isCustomer ? (
                         <>
-                          {/* Time Slot Actions for awaiting_time_slot status */}
-                          {booking.status === 'awaiting_time_slot' && booking.proposedStartDate && booking.proposedStartTime && (
+                          {/* Time Slot Actions for awaiting_time_slot or pending status with proposed time */}
+                          {(booking.status === 'awaiting_time_slot' || booking.status === 'pending') && booking.proposedStartDate && booking.proposedStartTime && (
                             <>
                               <Button
                                 variant="default"

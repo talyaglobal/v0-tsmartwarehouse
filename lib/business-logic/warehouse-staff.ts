@@ -256,10 +256,12 @@ export async function proposeDateChange(
     throw new Error("Staff member does not have access to this warehouse")
   }
 
-  // Verify booking is in pre_order or awaiting_time_slot status
-  if (booking.status !== "pre_order" && booking.status !== "awaiting_time_slot") {
-    console.error(`[proposeDateChange] Invalid status: ${booking.status}, expected: pre_order or awaiting_time_slot`)
-    throw new Error(`Booking must be in 'pre_order' or 'awaiting_time_slot' status to propose date change. Current status: ${booking.status}`)
+  // Verify booking is in a status that allows date change proposals
+  // Allow: pre_order, awaiting_time_slot, and pending (warehouse staff can propose changes for pending bookings)
+  const allowedStatuses: BookingStatus[] = ["pre_order", "awaiting_time_slot", "pending"]
+  if (!allowedStatuses.includes(booking.status)) {
+    console.error(`[proposeDateChange] Invalid status: ${booking.status}, expected: pre_order, awaiting_time_slot, or pending`)
+    throw new Error(`Booking must be in 'pre_order', 'awaiting_time_slot', or 'pending' status to propose date change. Current status: ${booking.status}`)
   }
 
   // Combine date and time into a single datetime

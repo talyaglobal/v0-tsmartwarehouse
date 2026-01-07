@@ -29,6 +29,7 @@ import { RatingStars } from "./rating-stars"
 import { BookingSummary } from "./booking-summary"
 import { BookingTimeSlotModal } from "./booking-time-slot-modal"
 import { createBookingRequest } from "@/features/bookings/actions"
+import { useUser } from "@/lib/hooks/use-user"
 import type { WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
 
 interface WarehouseDetailViewProps {
@@ -119,6 +120,7 @@ export function WarehouseDetailView({
   searchParams 
 }: WarehouseDetailViewProps) {
   const router = useRouter()
+  const { user, isLoading: userLoading } = useUser()
   const [isFavorite, setIsFavorite] = useState(false)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -126,7 +128,26 @@ export function WarehouseDetailView({
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
+  const errorHandlerRef = useRef<((event: ErrorEvent) => boolean) | null>(null)
+  const originalConsoleErrorRef = useRef<typeof console.error | null>(null)
+  const mapErrorListenerRef = useRef<any>(null)
   const [isMapLoading, setIsMapLoading] = useState(false)
+
+  // Check if we should open booking modal after login redirect
+  useEffect(() => {
+    if (!userLoading && user) {
+      const urlParams = new URLSearchParams(window.location.search)
+      const openBookingModal = urlParams.get('openBookingModal')
+      if (openBookingModal === 'true') {
+        // Remove the parameter from URL
+        urlParams.delete('openBookingModal')
+        const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
+        window.history.replaceState({}, '', newUrl)
+        // Open the modal
+        setShowBookingModal(true)
+      }
+    }
+  }, [user, userLoading])
 
   // Initialize Google Maps
   useEffect(() => {
@@ -145,9 +166,44 @@ export function WarehouseDetailView({
 
     setIsMapLoading(true)
 
+    // Suppress Google Maps billing errors globally for this component
+    const originalError = console.error
+    originalConsoleErrorRef.current = originalError
+    
+    const errorHandler = (event: ErrorEvent): boolean => {
+      if (event.message && (
+        event.message.includes('BillingNotEnabled') ||
+        event.message.includes('billing-not-enabled') ||
+        event.message.includes('BillingNotEnabledMapError')
+      )) {
+        event.preventDefault()
+        event.stopPropagation()
+        return false
+      }
+      return true
+    }
+    errorHandlerRef.current = errorHandler
+
+    const consoleErrorOverride = (...args: any[]) => {
+      const errorMessage = args.join(' ')
+      if (errorMessage.includes('BillingNotEnabled') || 
+          errorMessage.includes('billing-not-enabled') ||
+          errorMessage.includes('BillingNotEnabledMapError')) {
+        // Silently ignore billing errors
+        return
+      }
+      originalError.apply(console, args)
+    }
+
+    // Override console.error temporarily
+    console.error = consoleErrorOverride
+    window.addEventListener('error', errorHandler, true)
+
     const timer = setTimeout(() => {
       if (!mapRef.current) {
         setIsMapLoading(false)
+        console.error = originalError
+        window.removeEventListener('error', errorHandler, true)
         return
       }
 
@@ -155,12 +211,16 @@ export function WarehouseDetailView({
         .then(() => {
           if (!mapRef.current) {
             setIsMapLoading(false)
+            console.error = originalError
+            window.removeEventListener('error', errorHandler, true)
             return
           }
 
           if (!window.google?.maps) {
             console.error("[WarehouseDetailView] Google Maps API not available")
             setIsMapLoading(false)
+            console.error = originalError
+            window.removeEventListener('error', errorHandler, true)
             return
           }
 
@@ -169,6 +229,11 @@ export function WarehouseDetailView({
           if (warehouse.latitude && warehouse.longitude) {
             center = { lat: warehouse.latitude, lng: warehouse.longitude }
             initializeMap(center)
+            // Restore console.error after map initialization
+            setTimeout(() => {
+              console.error = originalError
+              window.removeEventListener('error', errorHandler, true)
+            }, 2000)
           } else if (warehouse.address) {
             // Geocode address
             const geocoder = new window.google.maps.Geocoder()
@@ -181,17 +246,30 @@ export function WarehouseDetailView({
                 } else {
                   setIsMapLoading(false)
                 }
+                // Restore console.error
+                setTimeout(() => {
+                  console.error = originalError
+                  window.removeEventListener('error', errorHandler, true)
+                }, 2000)
               }
             )
             return
           } else {
             setIsMapLoading(false)
+            console.error = originalError
+            window.removeEventListener('error', errorHandler, true)
             return
           }
         })
         .catch((error) => {
-          console.error("[WarehouseDetailView] Failed to load Google Maps:", error)
+          // Only log non-billing errors
+          if (!error?.message?.includes('BillingNotEnabled') && 
+              !error?.message?.includes('billing-not-enabled')) {
+            console.error("[WarehouseDetailView] Failed to load Google Maps:", error)
+          }
           setIsMapLoading(false)
+          console.error = originalError
+          window.removeEventListener('error', errorHandler, true)
         })
     }, 100)
 
@@ -201,28 +279,58 @@ export function WarehouseDetailView({
         return
       }
 
-      // Create map
-      const map = new window.google.maps.Map(mapRef.current, {
-        center,
-        zoom: 15,
-        mapTypeControl: true,
-        streetViewControl: true,
-        fullscreenControl: true,
-      })
+      try {
+        // Create map
+        const map = new window.google.maps.Map(mapRef.current, {
+          center,
+          zoom: 15,
+          mapTypeControl: true,
+          streetViewControl: true,
+          fullscreenControl: true,
+        })
 
-      mapInstanceRef.current = map
+        mapInstanceRef.current = map
 
-      // Add marker
-      const marker = new window.google.maps.Marker({
-        position: center,
-        map,
-        title: warehouse.name || "Warehouse Location",
-        animation: window.google.maps.Animation.DROP,
-      })
+        // Suppress billing errors - they don't prevent the map from working
+        // but we don't want to show them to users
+        mapErrorListenerRef.current = window.google.maps.event.addListener(map, 'error', (error: any) => {
+          // Suppress billing-related errors
+          if (error && (
+            error.message?.includes('BillingNotEnabled') ||
+            error.message?.includes('billing-not-enabled') ||
+            error.name === 'BillingNotEnabledMapError'
+          )) {
+            // Silently ignore billing errors - map will still work
+            return
+          }
+          // Log other errors normally
+          console.error('[Google Maps] Error:', error)
+        })
 
-      markerRef.current = marker
+        // Add marker
+        const marker = new window.google.maps.Marker({
+          position: center,
+          map,
+          title: warehouse.name || "Warehouse Location",
+          animation: window.google.maps.Animation.DROP,
+        })
 
-      setIsMapLoading(false)
+        markerRef.current = marker
+
+        setIsMapLoading(false)
+      } catch (error: any) {
+        // Handle initialization errors gracefully
+        // Billing errors don't prevent map from working, so we continue
+        if (error?.message?.includes('BillingNotEnabled') || 
+            error?.message?.includes('billing-not-enabled')) {
+          // Map might still work, so we don't show error
+          console.warn('[WarehouseDetailView] Google Maps billing notice (map may still work)')
+          setIsMapLoading(false)
+        } else {
+          console.error("[WarehouseDetailView] Failed to initialize map:", error)
+          setIsMapLoading(false)
+        }
+      }
     }
 
     return () => {
@@ -231,7 +339,20 @@ export function WarehouseDetailView({
         markerRef.current.setMap(null)
         markerRef.current = null
       }
+      if (mapErrorListenerRef.current && window.google?.maps?.event) {
+        window.google.maps.event.removeListener(mapErrorListenerRef.current)
+        mapErrorListenerRef.current = null
+      }
       mapInstanceRef.current = null
+      // Restore original console.error and remove error handler
+      if (originalConsoleErrorRef.current) {
+        console.error = originalConsoleErrorRef.current
+        originalConsoleErrorRef.current = null
+      }
+      if (errorHandlerRef.current) {
+        window.removeEventListener('error', errorHandlerRef.current, true)
+        errorHandlerRef.current = null
+      }
     }
   }, [warehouse.latitude, warehouse.longitude, warehouse.address, warehouse.city, warehouse.state, warehouse.name])
 
@@ -259,6 +380,17 @@ export function WarehouseDetailView({
     const endDate = (searchParams?.endDate || searchParams?.end_date) as string
     
     if (!searchParams?.type || !startDate || !endDate) {
+      return
+    }
+
+    // Check if user is authenticated
+    if (!user && !userLoading) {
+      // Build return URL with current search params and openBookingModal flag
+      const returnUrl = new URL(window.location.href)
+      returnUrl.searchParams.set('openBookingModal', 'true')
+      
+      // Redirect to login page with return URL
+      router.push(`/login?redirect=${encodeURIComponent(returnUrl.toString())}`)
       return
     }
 

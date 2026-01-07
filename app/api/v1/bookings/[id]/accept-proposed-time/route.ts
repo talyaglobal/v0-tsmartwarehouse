@@ -47,11 +47,13 @@ export async function POST(
       return NextResponse.json(errorData, { status: 403 })
     }
 
-    // Verify booking is in awaiting_time_slot status
-    if (booking.status !== "awaiting_time_slot") {
+    // Verify booking is in a status that allows accepting proposed time
+    // Allow: awaiting_time_slot (normal flow) and pending (when warehouse staff proposes date change for pending booking)
+    const allowedStatuses = ["awaiting_time_slot", "pending"]
+    if (!allowedStatuses.includes(booking.status)) {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Booking must be in awaiting_time_slot status to accept proposed time",
+        error: `Booking must be in 'awaiting_time_slot' or 'pending' status to accept proposed time. Current status: ${booking.status}`,
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })

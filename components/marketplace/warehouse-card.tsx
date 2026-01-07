@@ -41,7 +41,20 @@ export function WarehouseCard({
   ) || warehouse.pricing?.[0]
   
   const price = pricing?.price || warehouse.min_price
-  const unit = formatPricingUnit(pricing?.unit)
+  // For area-rental, ensure unit is displayed as "Per Sqft Per Month"
+  let unit = formatPricingUnit(pricing?.unit)
+  if (selectedType === 'area-rental') {
+    // For area-rental, always show "Per Sqft Per Month"
+    if (unit && unit.toLowerCase().includes('sqft')) {
+      unit = unit.replace(/Per Day/gi, 'Per Month')
+      if (!unit.toLowerCase().includes('per month')) {
+        unit = unit.replace(/Per Sqft/gi, 'Per Sqft Per Month')
+      }
+    } else {
+      // If no unit or unit doesn't contain sqft, default to "Per Sqft Per Month"
+      unit = 'Per Sqft Per Month'
+    }
+  }
 
   // Calculate total price if we have all required params
   useEffect(() => {
@@ -166,15 +179,16 @@ export function WarehouseCard({
                     <div className="text-right">
                       {price ? (
                         <div>
-                          {unit && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {unit}
-                            </p>
-                          )}
                           {totalPrice !== null ? (
-                            <p className="font-bold text-lg text-primary">
-                              Total: {formatCurrency(totalPrice)}
-                            </p>
+                            <>
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {formatCurrency(price)}
+                                {unit && ` / ${unit}`}
+                              </p>
+                              <p className="font-bold text-lg text-primary">
+                                Total: {formatCurrency(totalPrice)}
+                              </p>
+                            </>
                           ) : (
                             <p className="font-bold text-lg">
                               {formatCurrency(price)}
@@ -294,15 +308,16 @@ export function WarehouseCard({
           )}
           {price && (
             <div className="mt-auto pt-3 border-t">
-              {unit && (
-                <p className="text-xs text-muted-foreground mb-1">
-                  {unit}
-                </p>
-              )}
               {totalPrice !== null ? (
-                <p className="font-bold text-lg text-primary">
-                  Total: {formatCurrency(totalPrice)}
-                </p>
+                <>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {formatCurrency(price)}
+                    {unit && ` / ${unit}`}
+                  </p>
+                  <p className="font-bold text-lg text-primary">
+                    Total: {formatCurrency(totalPrice)}
+                  </p>
+                </>
               ) : (
                 <p className="font-bold text-lg">
                   {formatCurrency(price)}

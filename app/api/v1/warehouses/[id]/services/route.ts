@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getWarehouseServices } from "@/lib/services/warehouse-services"
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
@@ -16,11 +16,16 @@ export async function GET(
       )
     }
 
-    const services = await getWarehouseServices(warehouseId)
+    const { searchParams } = new URL(request.url)
+    const includeInactive = searchParams.get('includeInactive') === 'true'
+
+    const services = await getWarehouseServices(warehouseId, includeInactive)
 
     return NextResponse.json({
       success: true,
-      services,
+      data: {
+        services,
+      },
     })
   } catch (error) {
     console.error("Error fetching warehouse services:", error)

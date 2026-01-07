@@ -43,7 +43,7 @@ export function BookingSearchForm({
 
   const [location, setLocation] = useState(initialValues?.location || "")
   const [selectedWarehouseId, _setSelectedWarehouseId] = useState<string | undefined>(initialValues?.warehouseId)
-  const [storageType, setStorageType] = useState<StorageType>(initialValues?.storageType || "pallet")
+  const [storageType, setStorageType] = useState<StorageType>(initialValues?.storageType || "area-rental")
   const [palletCount, setPalletCount] = useState<string>(initialValues?.palletCount?.toString() || "1")
   const [areaSqFt, setAreaSqFt] = useState<string>(initialValues?.areaSqFt?.toString() || "40000")
   const [startDate, setStartDate] = useState(initialValues?.startDate || "")

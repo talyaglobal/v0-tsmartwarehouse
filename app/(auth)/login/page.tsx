@@ -208,7 +208,12 @@ export default function LoginPage() {
         // Determine redirect path based on new role system
         let redirectPath = '/dashboard'
         if (redirect) {
-          redirectPath = redirect
+          // If redirect is a full URL (starts with http:// or https:// or /), use it directly
+          if (redirect.startsWith('http://') || redirect.startsWith('https://') || redirect.startsWith('/')) {
+            redirectPath = redirect
+          } else {
+            redirectPath = redirect
+          }
         } else if (role === 'root') {
           redirectPath = '/admin'
         } else if (role === 'warehouse_staff') {
@@ -246,10 +251,14 @@ export default function LoginPage() {
         // Small additional delay to ensure cookies are fully set
         await new Promise(resolve => setTimeout(resolve, 300))
 
-        // Use router.push instead of window.location to allow middleware to handle redirects
-        // This prevents redirect loops
-        router.push(redirectPath)
-        router.refresh()
+        // Use router.push for relative paths, window.location for full URLs
+        // This ensures proper session handling
+        if (redirectPath.startsWith('http://') || redirectPath.startsWith('https://')) {
+          window.location.href = redirectPath
+        } else {
+          router.push(redirectPath)
+          router.refresh()
+        }
       } else if (data.user && !data.session) {
         // User exists but no session - this shouldn't happen but handle it
         setError('Session could not be established. Please try again.')

@@ -56,7 +56,7 @@ export default function FindWarehousesPage() {
 
   // Extract initial values for BookingSearchForm
   const initialLocation = searchParams.get("location") || ""
-  const initialStorageType = (searchParams.get("type") as "pallet" | "area-rental") || "pallet"
+  const initialStorageType = (searchParams.get("type") as "pallet" | "area-rental") || "area-rental"
   const initialStartDate = searchParams.get("startDate") || ""
   const initialEndDate = searchParams.get("endDate") || ""
   const initialPalletCount = searchParams.get("palletCount") ? parseInt(searchParams.get("palletCount")!) : undefined

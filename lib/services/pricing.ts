@@ -71,10 +71,15 @@ export async function calculatePrice(
     }
 
     // Calculate base total
-    const unit = pricing.unit || 'day'
+    // For area-rental, always use months regardless of unit in database
+    const unit = pricing.unit || (type === 'area-rental' ? 'month' : 'day')
     let units = days
 
-    if (unit === 'month') {
+    if (type === 'area-rental') {
+      // For area-rental, calculate based on months
+      // Calculate months: (end_date - start_date) / 30 days, rounded up
+      units = Math.ceil(days / 30)
+    } else if (unit === 'month') {
       units = Math.ceil(days / 30)
     } else if (unit === 'week') {
       units = Math.ceil(days / 7)

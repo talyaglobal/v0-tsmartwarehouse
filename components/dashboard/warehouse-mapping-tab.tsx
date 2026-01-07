@@ -49,12 +49,14 @@ export function WarehouseMappingTab({
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initialWarehouseId || '')
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set())
   const [mappedServiceIds, setMappedServiceIds] = useState<Set<string>>(new Set())
+  const [mappedServiceMap, setMappedServiceMap] = useState<Map<string, string>>(new Map()) // company_service_id -> warehouse_service_id
   const [isMapping, setIsMapping] = useState(false)
+  const [isUnmapping, setIsUnmapping] = useState(false)
   const { toast } = useToast()
 
   // Set initial warehouse from props
   useEffect(() => {
-    if (initialWarehouseId && !selectedWarehouseId) {
+    if (initialWarehouseId) {
       setSelectedWarehouseId(initialWarehouseId)
     }
   }, [initialWarehouseId])
@@ -65,6 +67,7 @@ export function WarehouseMappingTab({
       fetchMappedServices()
     } else {
       setMappedServiceIds(new Set())
+      setMappedServiceMap(new Map())
     }
   }, [selectedWarehouseId])
 
@@ -77,31 +80,86 @@ export function WarehouseMappingTab({
         { showToast: false }
       )
 
-      if (response.success && response.data.services) {
-        // Extract company_service_id from mapped services
+      console.log('[WarehouseMappingTab] Fetch mapped services response:', response)
+
+      if (response.success) {
+        // API returns { success: true, data: { services: [...] } }
+        const services = response.data?.services || response.data || []
+        console.log('[WarehouseMappingTab] Services found:', services.length)
+        
+        // Extract company_service_id from mapped services and create mapping
         const mappedIds = new Set<string>()
-        response.data.services.forEach((service: any) => {
+        const serviceMap = new Map<string, string>()
+        services.forEach((service: any) => {
+          console.log('[WarehouseMappingTab] Service:', service.service_name, 'company_service_id:', service.company_service_id, 'warehouse_service_id:', service.id)
           if (service.company_service_id) {
             mappedIds.add(service.company_service_id)
+            serviceMap.set(service.company_service_id, service.id)
           }
         })
+        console.log('[WarehouseMappingTab] Mapped service IDs:', Array.from(mappedIds))
         setMappedServiceIds(mappedIds)
+        setMappedServiceMap(serviceMap)
+      } else {
+        console.warn('[WarehouseMappingTab] Failed to fetch mapped services:', response.error)
       }
     } catch (error) {
-      console.error('Failed to fetch mapped services:', error)
+      console.error('[WarehouseMappingTab] Failed to fetch mapped services:', error)
     }
   }
 
-  const handleServiceToggle = (serviceId: string) => {
-    setSelectedServiceIds((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(serviceId)) {
-        newSet.delete(serviceId)
-      } else {
-        newSet.add(serviceId)
+  const handleServiceToggle = async (serviceId: string) => {
+    // If service is already mapped, unmap it
+    if (mappedServiceIds.has(serviceId)) {
+      const warehouseServiceId = mappedServiceMap.get(serviceId)
+      if (!warehouseServiceId) {
+        toast({
+          title: 'Error',
+          description: 'Could not find mapped service to unmap',
+          variant: 'destructive',
+        })
+        return
       }
-      return newSet
-    })
+
+      try {
+        setIsUnmapping(true)
+        const response = await api.delete(
+          `/api/v1/warehouses/${selectedWarehouseId}/services/${warehouseServiceId}`,
+          { showToast: false }
+        )
+
+        if (response.success) {
+          toast({
+            title: 'Success',
+            description: 'Service unmapped successfully',
+          })
+          // Refresh mapped services list
+          await fetchMappedServices()
+          onServicesMapped()
+        } else {
+          throw new Error(response.error || 'Failed to unmap service')
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to unmap service',
+          variant: 'destructive',
+        })
+      } finally {
+        setIsUnmapping(false)
+      }
+    } else {
+      // If service is not mapped, toggle selection
+      setSelectedServiceIds((prev) => {
+        const newSet = new Set(prev)
+        if (newSet.has(serviceId)) {
+          newSet.delete(serviceId)
+        } else {
+          newSet.add(serviceId)
+        }
+        return newSet
+      })
+    }
   }
 
   const handleMapServices = async () => {
@@ -234,6 +292,7 @@ export function WarehouseMappingTab({
                         id={service.id}
                         checked={selectedServiceIds.has(service.id) || mappedServiceIds.has(service.id)}
                         onCheckedChange={() => handleServiceToggle(service.id)}
+                        disabled={isUnmapping || isMapping}
                       />
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
