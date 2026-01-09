@@ -447,28 +447,15 @@ export default function WarehousesPage() {
                     )}
                     <div className="pt-2 space-y-2">
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => {
-                            setPricingWarehouse(warehouse)
-                            // If pricing exists, pre-fill the form with existing values
-                            const existingPricing = (warehouse as any).pricing
-                            if (existingPricing && existingPricing.length > 0) {
-                              const firstPrice = existingPricing[0]
-                              // Map 'area' to 'area-rental' for compatibility
-                              const pricingType = firstPrice.pricing_type === 'area' ? 'area-rental' : firstPrice.pricing_type
-                              setPricingType(pricingType as 'pallet' | 'pallet-monthly' | 'area-rental')
-                              setBasePrice(firstPrice.base_price.toString())
-                            } else {
-                              setPricingType('pallet')
-                              setBasePrice('')
-                            }
-                          }}
-                        >
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Set Price
-                        </Button>
+                        <Link href={`/dashboard/warehouses/${warehouse.id}/edit?step=4`} className="flex-1">
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Set Price
+                          </Button>
+                        </Link>
                         <Link href={`/dashboard/warehouses/${warehouse.id}/edit`} className="flex-1">
                           <Button variant="default" className="w-full">
                             <Edit className="h-4 w-4 mr-2" />
@@ -606,24 +593,11 @@ export default function WarehousesPage() {
                               Edit
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setPricingWarehouse(warehouse)
-                              const existingPricing = (warehouse as any).pricing
-                              if (existingPricing && existingPricing.length > 0) {
-                                const firstPrice = existingPricing[0]
-                                // Map 'area' to 'area-rental' for compatibility
-                              const pricingType = firstPrice.pricing_type === 'area' ? 'area-rental' : firstPrice.pricing_type
-                              setPricingType(pricingType as 'pallet' | 'pallet-monthly' | 'area-rental')
-                                setBasePrice(firstPrice.base_price.toString())
-                              } else {
-                                setPricingType('pallet')
-                                setBasePrice('')
-                              }
-                            }}
-                          >
-                            <DollarSign className="h-4 w-4 mr-2" />
-                            Set Price
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/warehouses/${warehouse.id}/edit?step=4`}>
+                              <DollarSign className="h-4 w-4 mr-2" />
+                              Set Price
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setAssignStaffWarehouse(warehouse)}

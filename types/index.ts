@@ -61,6 +61,49 @@ export interface WarehouseZone {
   availableSqFt?: number
 }
 
+// Time Slot Interface
+export interface TimeSlot {
+  start: string // Time in HH:mm format (e.g., "08:00")
+  end: string // Time in HH:mm format (e.g., "12:00")
+}
+
+// Pallet Pricing Interfaces
+export type PalletType = 'euro' | 'standard' | 'custom'
+export type PricingPeriod = 'day' | 'week' | 'month'
+
+export interface CustomPalletDimensions {
+  length: number // in inches
+  width: number // in inches
+  height: number // in inches
+  unit?: 'cm' | 'in' // Default to 'in' for imperial
+}
+
+export interface HeightRangePricing {
+  id?: string
+  heightMinCm: number // Minimum height in inches (inclusive) - keeping name for backward compatibility
+  heightMaxCm: number // Maximum height in inches (exclusive) - keeping name for backward compatibility
+  pricePerUnit: number // Price per pallet for this height range
+}
+
+export interface WeightRangePricing {
+  id?: string
+  weightMinKg: number // Minimum weight in lbs (inclusive) - keeping name for backward compatibility
+  weightMaxKg: number // Maximum weight in lbs (exclusive) - keeping name for backward compatibility
+  pricePerPallet: number // Additional price per pallet for this weight range
+}
+
+export interface PalletPricing {
+  id?: string
+  warehouseId?: string
+  palletType: PalletType
+  pricingPeriod: PricingPeriod
+  customDimensions?: CustomPalletDimensions // Only for custom pallet type (deprecated - use customSizes instead)
+  customSizes?: CustomPalletSize[] // Multiple sizes for custom pallet type (each with its own height ranges)
+  stackable?: boolean // Stackable or unstackable pallet option
+  heightRanges?: HeightRangePricing[] // Array of height range pricing (for euro/standard pallets, or fallback for custom)
+  weightRanges?: WeightRangePricing[] // Array of weight range pricing
+}
+
 export interface Warehouse {
   id: string
   name: string
@@ -73,11 +116,11 @@ export interface Warehouse {
   availablePalletStorage?: number // Currently available pallet storage for booking
   latitude?: number // Google Maps latitude
   longitude?: number // Google Maps longitude
-  warehouseType?: string[] | string // Single or array of: general, food-and-beverages, dangerous-goods, chemicals, medical, pharma (stored as string in DB)
-  storageTypes?: string[] // For compatibility - read from storage_type column (single value stored as array)
-  storageType?: string // Single storage type: bulk-space, rack-space, individual-unit, lockable-unit, cage, open-yard, closed-yard
+  warehouseType?: string[] // Array of warehouse types (multi-select)
+  storageType?: string[] // Array of storage types (multi-select)
   temperatureTypes?: string[] // ambient-with-ac, ambient-without-ac, chilled, frozen, open-area-with-tent, open-area
   photos?: string[] // Array of photo paths in storage
+  videos?: string[] // Array of video URLs/paths (optional)
   floors: WarehouseFloor[]
   amenities: string[]
   operatingHours: {
@@ -93,17 +136,26 @@ export interface Warehouse {
   maxSqFt?: number // Maximum square feet order requirement
   rentMethods?: string[] // Array of rent methods: pallet, sq_ft
   security?: string[] // Array of security options
-  videoUrl?: string // URL or path to warehouse video (optional)
   accessInfo?: {
-    accessType?: string // 24/7, business-hours, by-appointment, restricted
+    accessType?: string // 24/7, business-hours, by-appointment, gated (restricted removed)
     appointmentRequired?: boolean
     accessControl?: string // e.g., Key card, Biometric, Security code
   }
-  productAcceptanceStartTime?: string // Start time for product acceptance (e.g., 08:00)
-  productAcceptanceEndTime?: string // End time for product acceptance (e.g., 18:00)
+  productAcceptanceTimeSlots?: TimeSlot[] // Array of time slots for product acceptance
+  productDepartureTimeSlots?: TimeSlot[] // Array of time slots for product departure
   workingDays?: string[] // Array of working days (e.g., Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
   warehouseInFee?: number // Warehouse in fee (per unit)
   warehouseOutFee?: number // Warehouse out fee (per unit)
+  overtimePrice?: {
+    afterRegularWorkTime?: {
+      in?: number // Price per pallet for in operations after regular work time
+      out?: number // Price per pallet for out operations after regular work time
+    }
+    holidays?: {
+      in?: number // Price per pallet for in operations on holidays
+      out?: number // Price per pallet for out operations on holidays
+    }
+  }
   ports?: Array<{
     name: string
     container40DC?: number
@@ -124,6 +176,7 @@ export interface Warehouse {
       unit: string
     }
   }
+  palletPricing?: PalletPricing[] // New detailed pallet pricing structure
 }
 
 // Booking Types

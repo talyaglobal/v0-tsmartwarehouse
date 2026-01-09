@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,11 +16,15 @@ import Link from "next/link"
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PhotoUpload } from "@/components/marketplace/photo-upload"
+import { VideoUpload } from "@/components/warehouse/video-upload"
+import { TimeSlotInput } from "@/components/warehouse/time-slot-input"
+import { PalletPricingForm } from "@/components/warehouse/pallet-pricing-form"
 import { MapLocationPicker } from "@/components/ui/map-location-picker"
 import { formatNumber } from "@/lib/utils/format"
 import { TemperatureSelect } from "@/components/warehouse/temperature-select"
 import { Progress } from "@/components/ui/progress"
 import { ArrowRight, CheckCircle2 } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
 
 const WAREHOUSE_TYPES = [
   { value: "general-dry-ambient", label: "General (Dry/Ambient)" },
@@ -64,6 +68,7 @@ const SECURITY_OPTIONS = [
 export default function EditWarehousePage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const warehouseId = params.id as string
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
@@ -72,7 +77,11 @@ export default function EditWarehousePage() {
   const [state, setState] = useState("")
   const [warehousePhotos, setWarehousePhotos] = useState<string[]>([])
   const [showMapPicker, setShowMapPicker] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1)
+  
+  // Initialize currentStep from URL query parameter if present
+  const stepFromUrl = searchParams.get('step')
+  const initialStep = stepFromUrl ? parseInt(stepFromUrl, 10) : 1
+  const [currentStep, setCurrentStep] = useState(initialStep >= 1 && initialStep <= 5 ? initialStep : 1)
 
   const STEPS = [
     { id: 1, title: "Basic Info", description: "Address, location" },
@@ -103,8 +112,8 @@ export default function EditWarehousePage() {
     latitude: "",
     longitude: "",
     amenities: "",
-    warehouseType: "",
-    storageType: "",
+    warehouseType: [] as string[], // Changed to array for multi-select
+    storageType: [] as string[], // Changed to array for multi-select
     temperatureTypes: [] as string[],
     minPallet: "",
     maxPallet: "",
@@ -114,11 +123,29 @@ export default function EditWarehousePage() {
     security: [] as string[],
     accessType: "",
     accessControl: "",
-    productAcceptanceStartTime: "",
-    productAcceptanceEndTime: "",
+    productAcceptanceTimeSlots: [] as Array<{ start: string; end: string }>, // Changed to time slots array
+    productDepartureTimeSlots: [] as Array<{ start: string; end: string }>, // New field
     workingDays: [] as string[],
     warehouseInFee: "",
     warehouseOutFee: "",
+    overtimePrice: {
+      afterRegularWorkTime: {
+        in: "",
+        out: "",
+      },
+      holidays: {
+        in: "",
+        out: "",
+      },
+    }, // New field - object with per-pallet in/out pricing
+    videos: [] as string[], // New field
+    palletPricing: [] as Array<{
+      palletType: string
+      pricingPeriod: string
+      customDimensions?: { length: number; width: number; height: number; unit?: string }
+      heightRanges?: Array<{ heightMinCm: number; heightMaxCm: number; pricePerUnit: number }>
+      weightRanges?: Array<{ weightMinKg: number; weightMaxKg: number; pricePerPallet: number }>
+    }>, // New field
     pricing: [] as Array<{
       pricingType: string
       basePrice: string
@@ -126,6 +153,11 @@ export default function EditWarehousePage() {
       volumeDiscounts: Record<string, string>
     }>,
   })
+
+  // Memoize the pricing change handler to avoid re-renders
+  const handlePricingChange = useCallback((pricing: any[]) => {
+    setFormData((prev) => ({ ...prev, palletPricing: pricing }))
+  }, [])
 
   // Load warehouse data
   useEffect(() => {
@@ -151,24 +183,10 @@ export default function EditWarehousePage() {
           const accessControl = accessInfo?.accessControl || ""
 
           // Extract pricing from warehouse object
+          // Only extract area-rental pricing, pallet pricing is handled by PalletPricingForm
           const pricingArray: Array<{ type: string; price: number; unit: string; volumeDiscounts: Record<string, string> }> = []
           if (warehouse.pricing) {
-            if (warehouse.pricing.pallet) {
-              pricingArray.push({
-                type: 'pallet',
-                price: warehouse.pricing.pallet.basePrice,
-                unit: warehouse.pricing.pallet.unit,
-                volumeDiscounts: (warehouse.pricing.pallet as any).volumeDiscounts || {},
-              })
-            }
-            if (warehouse.pricing.palletMonthly) {
-              pricingArray.push({
-                type: 'pallet-monthly',
-                price: warehouse.pricing.palletMonthly.basePrice,
-                unit: warehouse.pricing.palletMonthly.unit,
-                volumeDiscounts: (warehouse.pricing.palletMonthly as any).volumeDiscounts || {},
-              })
-            }
+            // Skip pallet and pallet-monthly pricing - handled by PalletPricingForm
             if (warehouse.pricing.areaRental) {
               pricingArray.push({
                 type: 'area-rental',
@@ -179,6 +197,26 @@ export default function EditWarehousePage() {
             }
           }
 
+          // Handle warehouseType - can be array or string
+          const warehouseTypeArray = Array.isArray(warehouse.warehouseType) 
+            ? warehouse.warehouseType 
+            : warehouse.warehouseType 
+              ? [warehouse.warehouseType] 
+              : []
+
+          // Handle storageType - can be array or string
+          const storageTypeArray = Array.isArray(warehouse.storageType) 
+            ? warehouse.storageType 
+            : warehouse.storageType 
+              ? [warehouse.storageType] 
+              : warehouse.storageTypes 
+                ? warehouse.storageTypes 
+                : []
+
+          // Handle time slots
+          const acceptanceTimeSlots = warehouse.productAcceptanceTimeSlots || []
+          const departureTimeSlots = warehouse.productDepartureTimeSlots || []
+
           setFormData({
             address: warehouse.address || "",
             city: warehouse.city || "",
@@ -188,18 +226,41 @@ export default function EditWarehousePage() {
             latitude: warehouse.latitude?.toString() || "",
             longitude: warehouse.longitude?.toString() || "",
             amenities: warehouse.amenities?.join(", ") || "",
-            warehouseType: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType[0] : warehouse.warehouseType || "",
-            storageType: warehouse.storageType || warehouse.storageTypes?.[0] || "",
+            warehouseType: warehouseTypeArray,
+            storageType: storageTypeArray,
             temperatureTypes: warehouse.temperatureTypes || [],
             rentMethods: warehouse.rentMethods || [],
             security: warehouse.security || [],
             accessType: accessType,
             accessControl: accessControl,
-            productAcceptanceStartTime: warehouse.productAcceptanceStartTime || "",
-            productAcceptanceEndTime: warehouse.productAcceptanceEndTime || "",
+            productAcceptanceTimeSlots: acceptanceTimeSlots,
+            productDepartureTimeSlots: departureTimeSlots,
             workingDays: warehouse.workingDays || [],
             warehouseInFee: warehouse.warehouseInFee != null ? warehouse.warehouseInFee.toString() : "",
             warehouseOutFee: warehouse.warehouseOutFee != null ? warehouse.warehouseOutFee.toString() : "",
+            overtimePrice: warehouse.overtimePrice && typeof warehouse.overtimePrice === 'object'
+              ? {
+                  afterRegularWorkTime: {
+                    in: warehouse.overtimePrice.afterRegularWorkTime?.in?.toString() || "",
+                    out: warehouse.overtimePrice.afterRegularWorkTime?.out?.toString() || "",
+                  },
+                  holidays: {
+                    in: warehouse.overtimePrice.holidays?.in?.toString() || "",
+                    out: warehouse.overtimePrice.holidays?.out?.toString() || "",
+                  },
+                }
+              : {
+                  afterRegularWorkTime: {
+                    in: "",
+                    out: "",
+                  },
+                  holidays: {
+                    in: "",
+                    out: "",
+                  },
+                },
+            videos: warehouse.videos || [],
+            palletPricing: warehouse.palletPricing || [],
             pricing: pricingArray.map(p => ({
               pricingType: p.type,
               basePrice: p.price.toString(),
@@ -249,7 +310,7 @@ export default function EditWarehousePage() {
         }
         return true
       case 2:
-        if (!formData.warehouseType || !formData.storageType || formData.temperatureTypes.length === 0) {
+        if (formData.warehouseType.length === 0 || formData.storageType.length === 0 || formData.temperatureTypes.length === 0) {
           addNotification({
             type: 'error',
             message: 'Please select warehouse type, storage type, and at least one temperature option',
@@ -321,8 +382,62 @@ export default function EditWarehousePage() {
         address: formData.address,
         city: formData.city,
         state: state,
-        warehouseType: formData.warehouseType,
-        storageType: formData.storageType,
+        warehouseType: formData.warehouseType, // Now an array
+        storageType: formData.storageType, // Now an array
+        videos: formData.videos.length > 0 ? formData.videos : undefined, // New field
+        productAcceptanceTimeSlots: formData.productAcceptanceTimeSlots.length > 0 
+          ? formData.productAcceptanceTimeSlots 
+          : undefined, // New field - time slots array
+        productDepartureTimeSlots: formData.productDepartureTimeSlots.length > 0 
+          ? formData.productDepartureTimeSlots 
+          : undefined, // New field
+        overtimePrice: (() => {
+          const ot = formData.overtimePrice
+          if (!ot) return undefined
+          
+          const hasValue = 
+            (ot.afterRegularWorkTime?.in && ot.afterRegularWorkTime.in !== "") ||
+            (ot.afterRegularWorkTime?.out && ot.afterRegularWorkTime.out !== "") ||
+            (ot.holidays?.in && ot.holidays.in !== "") ||
+            (ot.holidays?.out && ot.holidays.out !== "")
+          
+          if (!hasValue) return undefined
+          
+          const parseValue = (val: string | undefined): number | undefined => {
+            if (!val || val === "") return undefined
+            const parsed = parseFloat(val)
+            return isNaN(parsed) ? undefined : parsed
+          }
+          
+          const result: any = {}
+          
+          if (ot.afterRegularWorkTime?.in || ot.afterRegularWorkTime?.out) {
+            result.afterRegularWorkTime = {}
+            if (ot.afterRegularWorkTime.in !== undefined && ot.afterRegularWorkTime.in !== "") {
+              const parsed = parseValue(ot.afterRegularWorkTime.in)
+              if (parsed !== undefined) result.afterRegularWorkTime.in = parsed
+            }
+            if (ot.afterRegularWorkTime.out !== undefined && ot.afterRegularWorkTime.out !== "") {
+              const parsed = parseValue(ot.afterRegularWorkTime.out)
+              if (parsed !== undefined) result.afterRegularWorkTime.out = parsed
+            }
+          }
+          
+          if (ot.holidays?.in || ot.holidays?.out) {
+            result.holidays = {}
+            if (ot.holidays.in !== undefined && ot.holidays.in !== "") {
+              const parsed = parseValue(ot.holidays.in)
+              if (parsed !== undefined) result.holidays.in = parsed
+            }
+            if (ot.holidays.out !== undefined && ot.holidays.out !== "") {
+              const parsed = parseValue(ot.holidays.out)
+              if (parsed !== undefined) result.holidays.out = parsed
+            }
+          }
+          
+          return Object.keys(result).length > 0 ? result : undefined
+        })(), // New field - object with per-pallet in/out pricing
+        palletPricing: formData.palletPricing.length > 0 ? formData.palletPricing : undefined, // New field
         temperatureTypes: formData.temperatureTypes,
         amenities: amenitiesArray,
         photos: warehousePhotos,
@@ -365,6 +480,10 @@ export default function EditWarehousePage() {
         requestBody.latitude = parseFloat(formData.latitude)
         requestBody.longitude = parseFloat(formData.longitude)
       }
+
+      // Debug: Log overtimePrice before sending
+      console.log('[EDIT FORM] formData.overtimePrice:', JSON.stringify(formData.overtimePrice, null, 2))
+      console.log('[EDIT FORM] requestBody.overtimePrice:', JSON.stringify(requestBody.overtimePrice, null, 2))
 
       const result = await api.put(`/api/v1/warehouses/${warehouseId}`, requestBody, {
         successMessage: 'Warehouse updated successfully!',
@@ -632,42 +751,58 @@ export default function EditWarehousePage() {
           {/* Step 2: Details */}
           {currentStep === 2 && (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="warehouseType">Warehouse Type</Label>
-                <Select
-                  value={formData.warehouseType}
-                  onValueChange={(value) => setFormData({ ...formData, warehouseType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select warehouse type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WAREHOUSE_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
+              <div className="space-y-3">
+                <Label>
+                  Warehouse Type <span className="text-destructive">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {WAREHOUSE_TYPES.map((type) => (
+                    <div key={type.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`warehouse-type-${type.value}`}
+                        checked={formData.warehouseType.includes(type.value)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            warehouseType: checked
+                              ? [...prev.warehouseType, type.value]
+                              : prev.warehouseType.filter((t) => t !== type.value),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`warehouse-type-${type.value}`} className="text-sm font-normal cursor-pointer">
                         {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="storageType">Storage Type</Label>
-                <Select
-                  value={formData.storageType}
-                  onValueChange={(value) => setFormData({ ...formData, storageType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select storage type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STORAGE_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
+              <div className="space-y-3">
+                <Label>
+                  Storage Type <span className="text-destructive">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {STORAGE_TYPES.map((type) => (
+                    <div key={type.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`storage-type-${type.value}`}
+                        checked={formData.storageType.includes(type.value)}
+                        onCheckedChange={(checked) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            storageType: checked
+                              ? [...prev.storageType, type.value]
+                              : prev.storageType.filter((t) => t !== type.value),
+                          }))
+                        }}
+                      />
+                      <Label htmlFor={`storage-type-${type.value}`} className="text-sm font-normal cursor-pointer">
                         {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -746,23 +881,43 @@ export default function EditWarehousePage() {
             </div>
           )}
 
-          {/* Step 3: Photos */}
+          {/* Step 3: Photos & Videos */}
           {currentStep === 3 && (
-            <div className="space-y-4">
-              <PhotoUpload
-                onPhotosChange={setWarehousePhotos}
-                initialPhotos={warehousePhotos}
-                maxPhotos={10}
-                bucket="docs"
-              />
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <Label>Photos <span className="text-destructive">*</span></Label>
+                <PhotoUpload
+                  onPhotosChange={setWarehousePhotos}
+                  initialPhotos={warehousePhotos}
+                  maxPhotos={10}
+                  bucket="docs"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Upload at least 2 photos. The first photo will be used as the primary image.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label>Videos (Optional)</Label>
+                <VideoUpload
+                  onVideosChange={(videos) => setFormData({ ...formData, videos })}
+                  initialVideos={formData.videos}
+                  maxVideos={5}
+                  bucket="docs"
+                />
+              </div>
             </div>
           )}
 
           {/* Step 4: Pricing */}
           {currentStep === 4 && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-3">
-                <Label>Customer Rent Method</Label>
+                <Label>
+                  Customer Rent Method <span className="text-destructive">*</span>
+                </Label>
                 <div className="grid grid-cols-2 gap-2">
                   {RENT_METHODS.map((method) => (
                     <div key={method.value} className="flex items-center space-x-2">
@@ -786,48 +941,67 @@ export default function EditWarehousePage() {
                 </div>
               </div>
 
-              {formData.pricing.map((price, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-3">
-                  <Label>
-                    {price.pricingType === 'pallet' && 'Per Pallet Per Day'}
-                    {price.pricingType === 'pallet-monthly' && 'Per Pallet Per Month'}
-                    {price.pricingType === 'area-rental' && 'Per Square Foot Per Month'}
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={price.basePrice}
-                    onChange={(e) => {
-                      const newPricing = [...formData.pricing]
-                      newPricing[index].basePrice = e.target.value
-                      setFormData({ ...formData, pricing: newPricing })
-                    }}
+              {formData.rentMethods.includes('pallet') && (
+                <>
+                  <Separator />
+                  <PalletPricingForm
+                    onPricingChange={handlePricingChange}
+                    initialPricing={formData.palletPricing}
                   />
-                </div>
-              ))}
+                </>
+              )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="warehouseInFee">Warehouse In Fee (per unit)</Label>
-                  <Input
-                    id="warehouseInFee"
-                    type="number"
-                    step="0.01"
-                    value={formData.warehouseInFee}
-                    onChange={(e) => setFormData({ ...formData, warehouseInFee: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="warehouseOutFee">Warehouse Out Fee (per unit)</Label>
-                  <Input
-                    id="warehouseOutFee"
-                    type="number"
-                    step="0.01"
-                    value={formData.warehouseOutFee}
-                    onChange={(e) => setFormData({ ...formData, warehouseOutFee: e.target.value })}
-                  />
-                </div>
+              <Separator />
+
+              {formData.pricing
+                .filter(p => p.pricingType === 'area-rental') // Only show area-rental pricing
+                .map((price, index) => {
+                  const actualIndex = formData.pricing.findIndex(p => p === price)
+                  return (
+                    <div key={actualIndex} className="p-4 border rounded-lg space-y-3">
+                      <Label>
+                        Per Square Foot Per Month
+                        <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={price.basePrice}
+                        onChange={(e) => {
+                          const newPricing = [...formData.pricing]
+                          newPricing[actualIndex].basePrice = e.target.value
+                          setFormData({ ...formData, pricing: newPricing })
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="warehouseInFee">Warehouse In Fee (per unit)</Label>
+                <Input
+                  id="warehouseInFee"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.warehouseInFee}
+                  onChange={(e) => setFormData({ ...formData, warehouseInFee: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="warehouseOutFee">Warehouse Out Fee (per unit)</Label>
+                <Input
+                  id="warehouseOutFee"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.warehouseOutFee}
+                  onChange={(e) => setFormData({ ...formData, warehouseOutFee: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -883,7 +1057,7 @@ export default function EditWarehousePage() {
                     <SelectItem value="24/7">24/7 Access</SelectItem>
                     <SelectItem value="business-hours">Business Hours</SelectItem>
                     <SelectItem value="by-appointment">By Appointment Only</SelectItem>
-                    <SelectItem value="restricted">Restricted Access</SelectItem>
+                    <SelectItem value="gated">Gated Access</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -898,24 +1072,136 @@ export default function EditWarehousePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="productAcceptanceStartTime">Product Acceptance Start Time</Label>
-                  <Input
-                    id="productAcceptanceStartTime"
-                    type="time"
-                    value={formData.productAcceptanceStartTime}
-                    onChange={(e) => setFormData({ ...formData, productAcceptanceStartTime: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="productAcceptanceEndTime">Product Acceptance End Time</Label>
-                  <Input
-                    id="productAcceptanceEndTime"
-                    type="time"
-                    value={formData.productAcceptanceEndTime}
-                    onChange={(e) => setFormData({ ...formData, productAcceptanceEndTime: e.target.value })}
-                  />
+              <Separator />
+
+              <div className="space-y-4">
+                <Label>Product Acceptance Time Slots</Label>
+                <TimeSlotInput
+                  onTimeSlotsChange={(slots) => setFormData({ ...formData, productAcceptanceTimeSlots: slots })}
+                  initialTimeSlots={formData.productAcceptanceTimeSlots}
+                  label="Acceptance Time Slots"
+                  description="Add time slots when products can be accepted (e.g., 8:00 AM - 12:00 PM, 12:00 PM - 4:00 PM)"
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label>Product Departure Time Slots</Label>
+                <TimeSlotInput
+                  onTimeSlotsChange={(slots) => setFormData({ ...formData, productDepartureTimeSlots: slots })}
+                  initialTimeSlots={formData.productDepartureTimeSlots}
+                  label="Departure Time Slots"
+                  description="Add time slots when products can be picked up/departed"
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Overtime Pricing</Label>
+                <p className="text-sm text-muted-foreground">
+                  Set additional prices per pallet for in/out operations after regular work time and on holidays.
+                </p>
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">After Regular Work Time (per pallet)</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="overtime-after-in">In</Label>
+                        <Input
+                          id="overtime-after-in"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={formData.overtimePrice.afterRegularWorkTime?.in || ""}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            overtimePrice: { 
+                              afterRegularWorkTime: {
+                                ...(formData.overtimePrice?.afterRegularWorkTime || {}),
+                                in: e.target.value 
+                              },
+                              holidays: {
+                                ...(formData.overtimePrice?.holidays || {}),
+                              }
+                            } 
+                          })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="overtime-after-out">Out</Label>
+                        <Input
+                          id="overtime-after-out"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={formData.overtimePrice.afterRegularWorkTime?.out || ""}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            overtimePrice: { 
+                              afterRegularWorkTime: {
+                                ...(formData.overtimePrice?.afterRegularWorkTime || {}),
+                                out: e.target.value 
+                              },
+                              holidays: {
+                                ...(formData.overtimePrice?.holidays || {}),
+                              }
+                            } 
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Holidays (per pallet)</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="overtime-holidays-in">In</Label>
+                        <Input
+                          id="overtime-holidays-in"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={formData.overtimePrice.holidays?.in || ""}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            overtimePrice: { 
+                              afterRegularWorkTime: {
+                                ...(formData.overtimePrice?.afterRegularWorkTime || {}),
+                              },
+                              holidays: {
+                                ...(formData.overtimePrice?.holidays || {}),
+                                in: e.target.value 
+                              }
+                            } 
+                          })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="overtime-holidays-out">Out</Label>
+                        <Input
+                          id="overtime-holidays-out"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={formData.overtimePrice.holidays?.out || ""}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            overtimePrice: { 
+                              afterRegularWorkTime: {
+                                ...(formData.overtimePrice?.afterRegularWorkTime || {}),
+                              },
+                              holidays: {
+                                ...(formData.overtimePrice?.holidays || {}),
+                                out: e.target.value 
+                              }
+                            } 
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
