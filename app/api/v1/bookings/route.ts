@@ -189,6 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { type, palletCount, areaSqFt, hallId, startDate, endDate, notes } = validatedData
+    const selectedServices = body.selectedServices || [] // Array of { serviceId: string, quantity?: number }
 
     // Get customer profile information
     const { createServerSupabaseClient } = await import('@/lib/supabase/server')
@@ -251,7 +252,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate pricing based on warehouse pricing table and date range
-    let totalAmount = 0
+    let baseStorageAmount = 0
 
     // Fetch warehouse pricing
     const { data: pricingData, error: pricingError } = await supabase
@@ -283,13 +284,13 @@ export async function POST(request: NextRequest) {
           const monthlyPricing = pricingData.find(p => p.pricing_type === 'pallet-monthly')
           if (monthlyPricing) {
             pricePerUnit = monthlyPricing.base_price
-            totalAmount = palletCount * pricePerUnit * diffMonths
+            baseStorageAmount = palletCount * pricePerUnit * diffMonths
           } else {
             // Fall back to daily pricing if monthly not available
             const dailyPricing = pricingData.find(p => p.pricing_type === 'pallet')
             if (dailyPricing) {
               pricePerUnit = dailyPricing.base_price
-              totalAmount = palletCount * pricePerUnit * diffDays
+              baseStorageAmount = palletCount * pricePerUnit * diffDays
             }
           }
         } else {
@@ -297,16 +298,16 @@ export async function POST(request: NextRequest) {
           const dailyPricing = pricingData.find(p => p.pricing_type === 'pallet')
           if (dailyPricing) {
             pricePerUnit = dailyPricing.base_price
-            totalAmount = palletCount * pricePerUnit * diffDays
+            baseStorageAmount = palletCount * pricePerUnit * diffDays
           }
         }
       }
 
       // Fallback to old PRICING constant if no pricing found
-      if (totalAmount === 0) {
+      if (baseStorageAmount === 0) {
         const handlingIn = palletCount * PRICING.palletIn
         const storage = palletCount * PRICING.storagePerPalletPerMonth
-        totalAmount = handlingIn + storage
+        baseStorageAmount = handlingIn + storage
       }
     } else if (type === "area-rental" && areaSqFt) {
       if (areaSqFt < PRICING.areaRentalMinSqFt) {
@@ -326,15 +327,82 @@ export async function POST(request: NextRequest) {
           const end = new Date(endDate)
           const diffTime = Math.abs(end.getTime() - start.getTime())
           const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30))
-          totalAmount = areaSqFt * areaPricing.base_price * diffMonths
+          baseStorageAmount = areaSqFt * areaPricing.base_price * diffMonths
         } else {
           // Fallback to old pricing
-          totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
+          baseStorageAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
         }
       } else {
-        totalAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
+        baseStorageAmount = areaSqFt * PRICING.areaRentalPerSqFtPerYear
       }
     }
+
+    // Calculate service prices
+    let servicesAmount = 0
+    const bookingServicesData: Array<{
+      service_id: string
+      service_name: string
+      pricing_type: string
+      base_price: number
+      quantity: number
+      calculated_price: number
+    }> = []
+
+    if (selectedServices.length > 0 && startDate && endDate) {
+      // Fetch selected services
+      const serviceIds = selectedServices.map((s: any) => s.serviceId || s.id).filter(Boolean)
+      if (serviceIds.length > 0) {
+        const { data: services, error: servicesError } = await supabase
+          .from('warehouse_services')
+          .select('*')
+          .eq('warehouse_id', warehouseId)
+          .eq('is_active', true)
+          .in('id', serviceIds)
+
+        if (!servicesError && services) {
+          const start = new Date(startDate)
+          const end = new Date(endDate)
+          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+          const months = Math.ceil(days / 30)
+
+          for (const service of services) {
+            const selectedService = selectedServices.find((s: any) => (s.serviceId || s.id) === service.id)
+            const quantity = selectedService?.quantity || 1
+
+            let calculatedPrice = 0
+            switch (service.pricing_type) {
+              case 'one_time':
+                calculatedPrice = service.base_price
+                break
+              case 'per_pallet':
+                calculatedPrice = service.base_price * (palletCount || 0) * quantity
+                break
+              case 'per_sqft':
+                calculatedPrice = service.base_price * (areaSqFt || 0) * quantity
+                break
+              case 'per_day':
+                calculatedPrice = service.base_price * days * quantity
+                break
+              case 'per_month':
+                calculatedPrice = service.base_price * months * quantity
+                break
+            }
+
+            servicesAmount += calculatedPrice
+            bookingServicesData.push({
+              service_id: service.id,
+              service_name: service.service_name,
+              pricing_type: service.pricing_type,
+              base_price: service.base_price,
+              quantity,
+              calculated_price: calculatedPrice,
+            })
+          }
+        }
+      }
+    }
+
+    const totalAmount = baseStorageAmount + servicesAmount
 
     // Validate hallId if provided (must be UUID format)
     let validHallId: string | undefined = undefined
@@ -365,8 +433,32 @@ export async function POST(request: NextRequest) {
       startDate,
       endDate: endDate || undefined,
       totalAmount,
+      baseStorageAmount,
+      servicesAmount,
       notes: notes || undefined,
     })
+
+    // Create booking_services records if services were selected
+    if (bookingServicesData.length > 0) {
+      const { error: servicesError } = await supabase
+        .from('booking_services')
+        .insert(
+          bookingServicesData.map(bs => ({
+            booking_id: newBooking.id,
+            service_id: bs.service_id,
+            service_name: bs.service_name,
+            pricing_type: bs.pricing_type,
+            base_price: bs.base_price,
+            quantity: bs.quantity,
+            calculated_price: bs.calculated_price,
+          }))
+        )
+
+      if (servicesError) {
+        console.error('Failed to create booking services:', servicesError)
+        // Don't fail the booking creation, just log the error
+      }
+    }
 
     const responseData: BookingResponse = {
       success: true,

@@ -40,6 +40,24 @@ const baseNavigation = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
 ]
 
+const warehouseFinderNavigation = [
+  { name: "Dashboard", href: "/dashboard/warehouse-finder", icon: LayoutDashboard, roles: ['warehouse_finder'] },
+  { name: "Map", href: "/dashboard/warehouse-finder/map", icon: Warehouse, roles: ['warehouse_finder'] },
+  { name: "Contacts", href: "/dashboard/warehouse-finder/contacts", icon: Package, roles: ['warehouse_finder'] },
+  { name: "Visits", href: "/dashboard/warehouse-finder/visits", icon: Calendar, roles: ['warehouse_finder'] },
+  { name: "Performance", href: "/dashboard/warehouse-finder/performance", icon: LayoutDashboard, roles: ['warehouse_finder'] },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['warehouse_finder'] },
+]
+
+const resellerNavigation = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['reseller'] },
+  { name: "Leads", href: "/dashboard/reseller/leads", icon: Package, roles: ['reseller'] },
+  { name: "Communications", href: "/dashboard/reseller/communications", icon: Bell, roles: ['reseller'] },
+  { name: "Proposals", href: "/dashboard/reseller/proposals", icon: Receipt, roles: ['reseller'] },
+  { name: "Performance", href: "/dashboard/reseller/performance", icon: LayoutDashboard, roles: ['reseller'] },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['reseller'] },
+]
+
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 
 export function DashboardSidebar() {
@@ -224,6 +242,10 @@ export function DashboardSidebar() {
         return 'bg-violet-50/95 dark:bg-violet-950/95 border-r border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'
       case 'warehouse_staff':
         return 'bg-slate-100/95 dark:bg-slate-900/95 border-r border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
+      case 'warehouse_finder':
+        return 'bg-amber-50/95 dark:bg-amber-950/95 border-r border-amber-200 dark:border-amber-900 backdrop-blur-sm shadow-md'
+      case 'reseller':
+        return 'bg-indigo-50/95 dark:bg-indigo-950/95 border-r border-indigo-200 dark:border-indigo-900 backdrop-blur-sm shadow-md'
       default:
         return 'bg-slate-200/90 dark:bg-slate-950/98 border-r border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
     }
@@ -256,17 +278,25 @@ export function DashboardSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 mt-4">
-        {baseNavigation
-          .filter((item) => {
-            // Filter navigation items based on user role
-            // If root user has test role selected, use test role; otherwise use actual role
-            let userRole = profile?.role || 'customer'
-            if (profile?.role === 'root' && selectedTestRole) {
-              userRole = selectedTestRole
-            }
-            return item.roles.includes(userRole)
-          })
-          .map((item) => {
+        {(() => {
+          // Determine which navigation array to use
+          let userRole = profile?.role || 'customer'
+          if (profile?.role === 'root' && selectedTestRole) {
+            userRole = selectedTestRole
+          }
+
+          let navigationToUse = baseNavigation
+          if (userRole === 'warehouse_finder') {
+            navigationToUse = warehouseFinderNavigation
+          } else if (userRole === 'reseller') {
+            navigationToUse = resellerNavigation
+          }
+
+          return navigationToUse
+            .filter((item) => {
+              return item.roles.includes(userRole)
+            })
+            .map((item) => {
             // For Dashboard, only match exact path to avoid matching child routes
             // For other items, match exact path or child routes
             const isActive = item.href === "/dashboard"
@@ -305,7 +335,8 @@ export function DashboardSidebar() {
                 )}
               </Link>
             )
-          })}
+          })
+        })()}
       </nav>
 
       {/* My Company Section - Only for Company Admin */}

@@ -230,7 +230,7 @@ export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 
     type: booking.type,
   })
   
-  const bookingRow = {
+  const bookingRow: Record<string, any> = {
     id: bookingId,
     customer_id: booking.customerId,
     customer_name: booking.customerName,
@@ -246,6 +246,14 @@ export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 
     end_date: booking.endDate ?? null,
     total_amount: booking.totalAmount,
     notes: booking.notes ?? null,
+  }
+
+  // Add base_storage_amount and services_amount if provided
+  if ('baseStorageAmount' in booking && booking.baseStorageAmount !== undefined) {
+    bookingRow.base_storage_amount = booking.baseStorageAmount
+  }
+  if ('servicesAmount' in booking && booking.servicesAmount !== undefined) {
+    bookingRow.services_amount = booking.servicesAmount
   }
 
   const { data, error } = await supabase

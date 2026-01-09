@@ -21,6 +21,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [warehouse, setWarehouse] = useState<WarehouseSearchResult | null>(null)
   const [warehouseLoading, setWarehouseLoading] = useState(false)
   const [bookingId, setBookingId] = useState<string>("")
+  const [bookingServices, setBookingServices] = useState<any[]>([])
+  const [servicesLoading, setServicesLoading] = useState(false)
 
   useEffect(() => {
     // Handle both sync and async params
@@ -48,6 +50,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         if (result.data.warehouseId) {
           fetchWarehouse(result.data.warehouseId)
         }
+        // Fetch booking services
+        fetchBookingServices(bookingId)
       } else {
         console.error('Failed to fetch booking:', result.error)
       }
@@ -55,6 +59,20 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       console.error('Failed to fetch booking:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchBookingServices = async (id: string) => {
+    try {
+      setServicesLoading(true)
+      const result = await api.get(`/api/v1/bookings/${id}/services`, { showToast: false })
+      if (result.success && result.data?.services) {
+        setBookingServices(result.data.services)
+      }
+    } catch (error) {
+      console.error('Failed to fetch booking services:', error)
+    } finally {
+      setServicesLoading(false)
     }
   }
 
@@ -210,12 +228,59 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </>
             )}
+            {bookingServices.length > 0 && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Base Storage</span>
+                  <span className="text-sm font-medium">
+                    {formatCurrency((booking as any).baseStorageAmount || booking.totalAmount - ((booking as any).servicesAmount || 0))}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Additional Services</span>
+                  <span className="text-sm font-medium">
+                    {formatCurrency((booking as any).servicesAmount || bookingServices.reduce((sum, s) => sum + (s.calculated_price || 0), 0))}
+                  </span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount</span>
               <span className="text-sm font-semibold">{formatCurrency(booking.totalAmount)}</span>
             </div>
           </CardContent>
         </Card>
+
+        {/* Services Details */}
+        {bookingServices.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Additional Services</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {bookingServices.map((service) => (
+                <div key={service.id} className="flex justify-between items-start p-3 bg-muted rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{service.service_name}</div>
+                    {service.pricing_type && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {service.pricing_type === 'one_time' ? 'One-time fee' :
+                         service.pricing_type === 'per_pallet' ? 'Per pallet' :
+                         service.pricing_type === 'per_sqft' ? 'Per sq ft' :
+                         service.pricing_type === 'per_day' ? 'Per day' :
+                         service.pricing_type === 'per_month' ? 'Per month' : service.pricing_type}
+                        {service.quantity > 1 && ` × ${service.quantity}`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {formatCurrency(service.calculated_price || service.base_price || 0)}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

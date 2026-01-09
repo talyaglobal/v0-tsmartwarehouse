@@ -142,12 +142,18 @@ export default function WarehouseServicesPage() {
               Manage additional services customers can add to their bookings
             </p>
           </div>
-          <Link href="/dashboard/services">
-            <Button>
-              <MapPin className="h-4 w-4 mr-2" />
-              Map Services
+          <div className="flex gap-2">
+            <Button onClick={handleCreateService}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Service
             </Button>
-          </Link>
+            <Link href="/dashboard/services">
+              <Button variant="outline">
+                <MapPin className="h-4 w-4 mr-2" />
+                Map Services
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Services List */}

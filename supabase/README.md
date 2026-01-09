@@ -26,6 +26,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 **See `SUPABASE_MIGRATION_AUTOMATION.md for complete details.**
 
 **Key Points:**
+
 - ✅ AI automatically pushes migrations when created
 - ✅ AI tracks which migrations are applied
 - ✅ AI handles all error recovery
@@ -33,17 +34,32 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 - ❌ Users should NEVER apply migrations via Supabase Dashboard
 
 **The AI will:**
+
 1. Automatically detect new migration files
 2. Check which migrations are already applied
 3. Push only new/unapplied migrations
 4. Handle all errors and retry automatically
 5. Track migration status continuously
 
-### Migration Status
+### Migration Status (Last Updated: 2026-01-09)
 
-- ✅ All migrations 001-107 are applied
-- ✅ Migration 107 (PostGIS + Enhanced Marketplace Tables) - Applied successfully
-- Future migrations will be automatically pushed by the AI
+- ✅ Applied on Remote: 001, 104, 107, 115, 116, 117, 118, 119
+- ⚠️ Missing from Remote: 002-103, 105-106, 108-114, 20260108203024, 20260108203025, 20260109163141
+
+**Migration Tracking Issue:**
+The remote database's migration history is incomplete. Migrations 002-103, 105-106, 108-114 need to be applied but are causing duplicate key errors when using `--include-all` because migration 001 already exists in the schema_migrations table.
+
+**Recommended Solution:**
+
+1. Apply missing migrations manually via Supabase Dashboard SQL Editor in order (002-103, 105-106, 108-114, then timestamped migrations)
+2. OR repair the migration history table to reflect the correct order
+3. The automatic push script will work correctly once the migration history is synchronized
+
+**To check current status:**
+
+```bash
+npx supabase migration list --db-url $DATABASE_URL
+```
 
 **Note**: Users should never run `supabase db push` manually. The AI handles all migration operations automatically.
 
@@ -68,4 +84,3 @@ See `DATABASE_COMPLETE_SETUP.md` Step 4.1 for detailed instructions.
 3. Configure RLS policies
 4. Seed initial data (optional)
 5. Update API routes to use database functions from `lib/db/`
-

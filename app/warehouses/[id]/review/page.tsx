@@ -55,6 +55,8 @@ export default function BookingReviewPage() {
   const [availableSqFt, setAvailableSqFt] = useState<number | null>(null)
   const [availablePallets, setAvailablePallets] = useState<number | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [selectedServices, setSelectedServices] = useState<any[]>([])
+  const [servicesTotal, setServicesTotal] = useState(0)
 
   // Check user auth status
   useEffect(() => {
@@ -83,6 +85,48 @@ export default function BookingReviewPage() {
       console.error('Missing booking parameters, redirecting back to warehouse')
       router.push(`/warehouses/${warehouseId}`)
       return
+    }
+
+    // Fetch selected services details
+    if (serviceIds.length > 0) {
+      fetch(`/api/v1/warehouses/${warehouseId}/services`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data?.services) {
+            const services = data.data.services.filter((s: any) => serviceIds.includes(s.id))
+            setSelectedServices(services)
+            
+            // Calculate services total
+            const start = new Date(startDate)
+            const end = new Date(endDate)
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+            const months = Math.ceil(days / 30)
+            const quantity = parseInt(uomQty || "0")
+            
+            let total = 0
+            services.forEach((service: any) => {
+              switch (service.pricing_type) {
+                case 'one_time':
+                  total += service.base_price
+                  break
+                case 'per_pallet':
+                  total += service.base_price * quantity
+                  break
+                case 'per_sqft':
+                  total += service.base_price * quantity
+                  break
+                case 'per_day':
+                  total += service.base_price * days
+                  break
+                case 'per_month':
+                  total += service.base_price * months
+                  break
+              }
+            })
+            setServicesTotal(total)
+          }
+        })
+        .catch(err => console.error('Failed to fetch services:', err))
     }
 
     // Determine type based on productinfo (4490 = pallet, 4491 = area-rental)
@@ -546,6 +590,53 @@ export default function BookingReviewPage() {
                     </div>
 
                     <Separator />
+
+                    {/* Services */}
+                    {selectedServices.length > 0 && (
+                      <>
+                        <div>
+                          <div className="text-sm font-semibold mb-2">Additional Services</div>
+                          <div className="space-y-2">
+                            {selectedServices.map((service) => {
+                              const start = new Date(bookingDetails.startDate)
+                              const end = new Date(bookingDetails.endDate)
+                              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                              const months = Math.ceil(days / 30)
+                              const quantity = bookingDetails.type === "pallet" 
+                                ? (bookingDetails.palletCount || 0)
+                                : (bookingDetails.areaSqFt || 0)
+                              
+                              let servicePrice = 0
+                              switch (service.pricing_type) {
+                                case 'one_time':
+                                  servicePrice = service.base_price
+                                  break
+                                case 'per_pallet':
+                                  servicePrice = service.base_price * quantity
+                                  break
+                                case 'per_sqft':
+                                  servicePrice = service.base_price * quantity
+                                  break
+                                case 'per_day':
+                                  servicePrice = service.base_price * days
+                                  break
+                                case 'per_month':
+                                  servicePrice = service.base_price * months
+                                  break
+                              }
+                              
+                              return (
+                                <div key={service.id} className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">{service.service_name}</span>
+                                  <span className="font-medium">{formatCurrency(servicePrice)}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        <Separator />
+                      </>
+                    )}
 
                     {/* Total */}
                     <div>

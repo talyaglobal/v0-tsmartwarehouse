@@ -134,7 +134,7 @@ export async function middleware(request: NextRequest) {
         else if (profile.role === 'customer') userRole = 'customer'
         else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner', 'warehouse_finder', 'reseller'].includes(profile.role)) {
           userRole = profile.role
         }
       } else {
@@ -144,7 +144,7 @@ export async function middleware(request: NextRequest) {
         else if (metadataRole === 'customer') userRole = 'customer'
         else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner'].includes(metadataRole)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
           userRole = metadataRole
         }
 
@@ -176,6 +176,10 @@ export async function middleware(request: NextRequest) {
       targetRoute = '/admin'
     } else if (userRole === 'warehouse_staff') {
       targetRoute = '/warehouse'
+    } else if (userRole === 'warehouse_finder') {
+      targetRoute = '/dashboard/warehouse-finder'
+    } else if (userRole === 'reseller') {
+      targetRoute = '/dashboard/reseller'
     } else if (['warehouse_admin', 'customer', 'warehouse_owner'].includes(userRole)) {
       targetRoute = '/dashboard'
     }
@@ -230,7 +234,7 @@ export async function middleware(request: NextRequest) {
         else if (profile.role === 'customer') userRole = 'customer'
         else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(profile.role)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner', 'warehouse_finder', 'reseller'].includes(profile.role)) {
           userRole = profile.role
         }
         
@@ -245,7 +249,7 @@ export async function middleware(request: NextRequest) {
         else if (metadataRole === 'customer') userRole = 'customer'
         else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner'].includes(metadataRole)) {
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
           userRole = metadataRole
         }
         
@@ -261,9 +265,9 @@ export async function middleware(request: NextRequest) {
       else if (metadataRole === 'customer') userRole = 'customer'
       else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner'].includes(metadataRole)) {
-        userRole = metadataRole
-      }
+        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'company_owner', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
+          userRole = metadataRole
+        }
       
       // If root user and test role is set, use test role instead
       if (userRole === 'root' && testRoleCookie && ['company_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
@@ -282,8 +286,20 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Dashboard routes - warehouse_admin, customer, and warehouse_owner can access
-    if (isDashboardRoute && !['warehouse_admin', 'customer', 'warehouse_owner'].includes(userRole)) {
+    // Warehouse Finder routes - only warehouse_finder can access
+    const isWarehouseFinderRoute = pathname.startsWith('/dashboard/warehouse-finder')
+    if (isWarehouseFinderRoute && userRole !== 'warehouse_finder' && userRole !== 'root') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Reseller routes - only reseller can access
+    const isResellerRoute = pathname.startsWith('/dashboard/reseller')
+    if (isResellerRoute && userRole !== 'reseller' && userRole !== 'root') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Dashboard routes - warehouse_admin, customer, warehouse_owner, warehouse_finder, and reseller can access
+    if (isDashboardRoute && !['warehouse_admin', 'customer', 'warehouse_owner', 'warehouse_finder', 'reseller'].includes(userRole)) {
       if (userRole === 'warehouse_staff') {
         return NextResponse.redirect(new URL('/warehouse', request.url))
       } else if (userRole === 'root') {

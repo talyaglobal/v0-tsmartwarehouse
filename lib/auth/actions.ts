@@ -19,7 +19,7 @@ const registerSchema = z.object({
   companyName: z.string().min(2, 'Company name must be at least 2 characters').optional(),
   role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'warehouse_owner']).optional(),
   storageType: z.string().optional(),
-  userType: z.enum(['owner', 'customer']).optional(),
+  userType: z.enum(['owner', 'customer', 'reseller', 'finder']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -28,10 +28,14 @@ const registerSchema = z.object({
   if (data.userType === 'owner') {
     return data.name && data.name.length >= 2 && data.companyName && data.companyName.length >= 2
   }
+  // For resellers and finders, name is required
+  if (data.userType === 'reseller' || data.userType === 'finder') {
+    return data.name && data.name.length >= 2
+  }
   // For customers, name and companyName are not required
   return true
 }, {
-  message: "Name and company name are required for warehouse owners",
+  message: "Name is required for warehouse owners, resellers, and finders",
   path: ['name'],
 })
 
@@ -122,7 +126,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const phone = formData.get('phone') as string | null
     const companyName = formData.get('companyName') as string | null
     const storageType = formData.get('storageType') as string | null
-    const userType = formData.get('userType') as 'owner' | 'customer' | null
+    const userType = formData.get('userType') as 'owner' | 'customer' | 'reseller' | 'finder' | null
 
     // Validate input
     const validation = registerSchema.safeParse({
@@ -183,9 +187,18 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
 
     // Determine user role based on userType
     const isCustomer = validation.data.userType === 'customer'
-    // For warehouse owners, set role to 'warehouse_owner' from the start
-    // For customers, use 'customer' role
-    const defaultRole = isCustomer ? 'customer' : 'warehouse_owner'
+    const isReseller = validation.data.userType === 'reseller'
+    const isFinder = validation.data.userType === 'finder'
+    
+    // Map userType to role
+    let defaultRole = 'warehouse_owner' // Default
+    if (isCustomer) {
+      defaultRole = 'customer'
+    } else if (isReseller) {
+      defaultRole = 'reseller'
+    } else if (isFinder) {
+      defaultRole = 'warehouse_finder'
+    }
 
     // Create user directly with admin API (no email sent)
     console.log('Creating user with email:', validation.data.email, 'User type:', validation.data.userType || 'owner')
@@ -257,18 +270,18 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       // Profile doesn't exist, create it manually
       console.log('Profile not found, creating manually...')
       
-      // For customers, skip company creation
-      if (isCustomer) {
-        // Create profile for customer (no company)
+      // For customers, resellers, and finders, skip company creation
+      if (isCustomer || isReseller || isFinder) {
+        // Create profile for customer/reseller/finder (no company)
         const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
           .from('profiles')
           .upsert({
             id: data.user.id,
             email: validation.data.email,
-            name: null, // Customers don't have name initially
-            role: 'customer',
+            name: (isReseller || isFinder) ? validation.data.name : null, // Resellers and finders have name
+            role: defaultRole,
             phone: validation.data.phone || null,
-            company_id: null, // Customers don't have company_id
+            company_id: null, // No company for these roles
           }, {
             onConflict: 'id'
           })
@@ -289,7 +302,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
             },
           }
         }
-        console.log('Customer profile created:', insertedProfile?.id)
+        console.log(`${defaultRole} profile created:`, insertedProfile?.id)
         return { error: undefined }
       }
 

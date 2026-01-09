@@ -1,21 +1,26 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2, AlertCircle, Calendar } from "@/components/icons"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2, AlertCircle, Calendar, Settings } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
-import type { Booking, Invoice, Claim } from "@/types"
+import type { Booking, Invoice, Claim, UserRole } from "@/types"
 import { api } from "@/lib/api/client"
 import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
 
+const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
+
 export default function CustomerDashboardPage() {
+  const router = useRouter()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
@@ -24,9 +29,40 @@ export default function CustomerDashboardPage() {
   const [userName, setUserName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [selectedBookingForTimeSlot, setSelectedBookingForTimeSlot] = useState<Booking | null>(null)
+  const [isRootUser, setIsRootUser] = useState(false)
+  const [selectedTestRole, setSelectedTestRole] = useState<UserRole | null>(null)
 
   useEffect(() => {
     fetchDashboardData()
+    
+    // Load selected test role from localStorage (only for root users)
+    if (typeof window !== 'undefined') {
+      const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
+      if (savedRole) {
+        setSelectedTestRole(savedRole)
+      }
+      
+      // Listen for storage changes (when role is changed in header)
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === ROOT_ROLE_SELECTOR_KEY) {
+          setSelectedTestRole(e.newValue as UserRole | null)
+        }
+      }
+      
+      // Listen for custom event (for same-tab updates)
+      const handleRoleChange = () => {
+        const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY)
+        setSelectedTestRole(savedRole as UserRole | null)
+      }
+      
+      window.addEventListener('storage', handleStorageChange)
+      window.addEventListener('role-changed', handleRoleChange)
+      
+      return () => {
+        window.removeEventListener('storage', handleStorageChange)
+        window.removeEventListener('role-changed', handleRoleChange)
+      }
+    }
   }, [])
 
   const fetchDashboardData = async () => {
@@ -37,6 +73,7 @@ export default function CustomerDashboardPage() {
       const supabase = createClient()
       const { data: { user: authUser } } = await supabase.auth.getUser()
 
+      let currentUserRole = 'customer'
       if (authUser) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -45,7 +82,17 @@ export default function CustomerDashboardPage() {
           .maybeSingle()
 
         if (profile?.role) {
+          currentUserRole = profile.role
           setUserRole(profile.role)
+          setIsRootUser(profile.role === 'root')
+          
+          // Load selected test role if root user
+          if (profile.role === 'root' && typeof window !== 'undefined') {
+            const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
+            if (savedRole) {
+              setSelectedTestRole(savedRole)
+            }
+          }
         }
         
         // Set user name from profile fullname, fallback to email
@@ -56,10 +103,13 @@ export default function CustomerDashboardPage() {
         }
       }
 
+      const isResellerRole = currentUserRole === 'reseller'
+
+      // Reseller role doesn't have bookings/invoices/claims, so skip those API calls
       const [bookingsData, invoicesData, claimsData, userData] = await Promise.all([
-        api.get('/api/v1/bookings', { showToast: false }),
-        api.get('/api/v1/invoices', { showToast: false }).catch(() => ({ success: false, data: [] })),
-        api.get('/api/v1/claims', { showToast: false }).catch(() => ({ success: false, data: [] })),
+        isResellerRole ? Promise.resolve({ success: false, data: [] }) : api.get('/api/v1/bookings', { showToast: false }).catch(() => ({ success: false, data: [] })),
+        isResellerRole ? Promise.resolve({ success: false, data: [] }) : api.get('/api/v1/invoices', { showToast: false }).catch(() => ({ success: false, data: [] })),
+        isResellerRole ? Promise.resolve({ success: false, data: [] }) : api.get('/api/v1/claims', { showToast: false }).catch(() => ({ success: false, data: [] })),
         api.get('/api/v1/users/me', { showToast: false }).catch(() => ({ success: false, data: null })),
       ])
 
@@ -91,6 +141,7 @@ export default function CustomerDashboardPage() {
   const creditBalance = user?.creditBalance || 0
   const recentClaims = claims.filter((c) => c.status === "submitted" || c.status === "under-review")
   const isCustomer = userRole === 'customer'
+  const isReseller = userRole === 'reseller'
   // Show bookings that need customer action:
   // 1. awaiting_time_slot status (with or without proposed date/time)
   // 2. pending status with proposedStartDate/proposedStartTime (warehouse staff proposed a new time)
@@ -98,6 +149,52 @@ export default function CustomerDashboardPage() {
     b.status === "awaiting_time_slot" || 
     (b.status === "pending" && b.proposedStartDate && b.proposedStartTime)
   )
+
+  const handleRoleChange = async (newRole: UserRole) => {
+    if (typeof window !== 'undefined') {
+      // Save to localStorage for client-side use
+      localStorage.setItem(ROOT_ROLE_SELECTOR_KEY, newRole)
+      setSelectedTestRole(newRole)
+
+      // Set cookie for middleware to read (24 hours expiry)
+      document.cookie = `root-test-role=${newRole}; path=/; max-age=${60 * 60 * 24}`
+
+      // Dispatch custom event for sidebar and header to listen
+      window.dispatchEvent(new Event('role-changed'))
+
+      // Navigate to appropriate dashboard based on role
+      if (newRole === 'root') {
+        router.push('/admin')
+      } else if (newRole === 'warehouse_staff') {
+        router.push('/warehouse')
+      } else if (newRole === 'warehouse_finder') {
+        router.push('/dashboard/warehouse-finder')
+      } else if (newRole === 'reseller') {
+        router.push('/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+
+      // Refresh to apply new role in middleware
+      router.refresh()
+    }
+  }
+
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller']
+  const currentTestRole = selectedTestRole || (userRole as UserRole) || 'customer'
+
+  const getRoleLabel = (role: UserRole) => {
+    const labels: Record<UserRole, string> = {
+      root: '🔴 Root Admin',
+      warehouse_owner: '🟢 Warehouse Owner',
+      warehouse_admin: '🔵 Warehouse Admin',
+      customer: '🟣 Customer',
+      warehouse_staff: '⚪ Warehouse Staff',
+      warehouse_finder: '🟡 Warehouse Finder',
+      reseller: '🟦 Reseller',
+    }
+    return labels[role] || role
+  }
 
   if (loading) {
     return (
@@ -109,20 +206,68 @@ export default function CustomerDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Role Switcher for Root Users */}
+      {isRootUser && (
+        <Card className="border-2 border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <CardTitle className="text-lg">Role Switcher (Root Only)</CardTitle>
+              </div>
+              <Badge variant="destructive">Root Mode</Badge>
+            </div>
+            <CardDescription>
+              Switch between different roles to test the system from different perspectives
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Select Role</label>
+                <Select
+                  value={currentTestRole}
+                  onValueChange={(value) => handleRoleChange(value as UserRole)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRoles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {getRoleLabel(role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground mt-auto">
+                Current: <span className="font-medium">{getRoleLabel(currentTestRole)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-muted-foreground">
-              {userName ? `Welcome back, ${userName}. Here's an overview of your warehouse activity.` : "Welcome back. Here's an overview of your warehouse activity."}
+              {isReseller 
+                ? (userName ? `Welcome back, ${userName}. Manage your leads and sales pipeline.` : "Welcome back. Manage your leads and sales pipeline.")
+                : (userName ? `Welcome back, ${userName}. Here's an overview of your warehouse activity.` : "Welcome back. Here's an overview of your warehouse activity.")
+              }
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/bookings/new">
-            <Button>New Booking</Button>
-          </Link>
-        </div>
+        {!isReseller && (
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/bookings/new">
+              <Button>New Booking</Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Pending Actions Section - Only for customers */}
@@ -152,96 +297,175 @@ export default function CustomerDashboardPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Active Bookings"
-          value={activeBookings.length}
-          icon={Package}
-          trend={{ value: 12, isPositive: true }}
-          subtitle="from last month"
-        />
-        <StatCard
-          title="Total Bookings"
-          value={bookings.length}
-          icon={Package}
-          subtitle="all time"
-        />
-        {isCustomer ? (
-          <>
-            <StatCard
-              title="Active Claims"
-              value={recentClaims.length}
-              icon={AlertCircle}
-              subtitle="pending review"
-            />
-            <StatCard
-              title="Upcoming Events"
-              value={0}
-              icon={Calendar}
-              subtitle="this month"
-            />
-          </>
-        ) : (
-          <>
-            <StatCard
-              title="Pending Invoices"
-              value={pendingInvoices.length}
-              icon={FileText}
-              subtitle={formatCurrency(pendingInvoices.reduce((sum, i) => sum + i.total, 0))}
-            />
-            <StatCard
-              title="Membership Credits"
-              value={formatCurrency(creditBalance)}
-              icon={DollarSign}
-              trend={{ value: 5, isPositive: true }}
-              subtitle={`${membershipTier.charAt(0).toUpperCase() + membershipTier.slice(1)} tier benefits`}
-            />
-          </>
-        )}
-      </div>
+      {isReseller ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Leads"
+            value={0}
+            icon={Package}
+            subtitle="all time"
+          />
+          <StatCard
+            title="Active Proposals"
+            value={0}
+            icon={FileText}
+            subtitle="in progress"
+          />
+          <StatCard
+            title="Converted"
+            value={0}
+            icon={DollarSign}
+            subtitle="this month"
+          />
+          <StatCard
+            title="Commission"
+            value={formatCurrency(0)}
+            icon={DollarSign}
+            subtitle="total earned"
+          />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Active Bookings"
+            value={activeBookings.length}
+            icon={Package}
+            trend={{ value: 12, isPositive: true }}
+            subtitle="from last month"
+          />
+          <StatCard
+            title="Total Bookings"
+            value={bookings.length}
+            icon={Package}
+            subtitle="all time"
+          />
+          {isCustomer ? (
+            <>
+              <StatCard
+                title="Active Claims"
+                value={recentClaims.length}
+                icon={AlertCircle}
+                subtitle="pending review"
+              />
+              <StatCard
+                title="Upcoming Events"
+                value={0}
+                icon={Calendar}
+                subtitle="this month"
+              />
+            </>
+          ) : (
+            <>
+              <StatCard
+                title="Pending Invoices"
+                value={pendingInvoices.length}
+                icon={FileText}
+                subtitle={formatCurrency(pendingInvoices.reduce((sum, i) => sum + i.total, 0))}
+              />
+              <StatCard
+                title="Membership Credits"
+                value={formatCurrency(creditBalance)}
+                icon={DollarSign}
+                trend={{ value: 5, isPositive: true }}
+                subtitle={`${membershipTier.charAt(0).toUpperCase() + membershipTier.slice(1)} tier benefits`}
+              />
+            </>
+          )}
+        </div>
+      )}
 
       {/* Recent Bookings & Invoices */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Bookings */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Bookings</CardTitle>
-              <CardDescription>Your latest warehouse bookings</CardDescription>
-            </div>
-            <Link href="/dashboard/bookings">
-              <Button variant="ghost" size="sm" className="gap-1">
-                View All <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {bookings.slice(0, 3).map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                      {booking.type === "pallet" ? (
-                        <Package className="h-5 w-5 text-primary" />
-                      ) : (
-                        <Building2 className="h-5 w-5 text-primary" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">
-                        {booking.type === "pallet"
-                          ? `${booking.palletCount} Pallets`
-                          : `${booking.areaSqFt?.toLocaleString()} sq ft Area`}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{formatDate(booking.startDate)}</p>
-                    </div>
-                  </div>
-                  <StatusBadge status={booking.status} />
+      {isReseller ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Leads</CardTitle>
+                <CardDescription>Your latest customer leads</CardDescription>
+              </div>
+              <Link href="/dashboard/reseller/leads">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View All <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No leads yet</p>
+                  <Link href="/dashboard/reseller/leads">
+                    <Button variant="outline" className="mt-4">Create New Lead</Button>
+                  </Link>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Proposals</CardTitle>
+                <CardDescription>Your latest proposals</CardDescription>
+              </div>
+              <Link href="/dashboard/reseller/proposals">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View All <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No proposals yet</p>
+                  <Link href="/dashboard/reseller/proposals">
+                    <Button variant="outline" className="mt-4">Create New Proposal</Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Recent Bookings */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Bookings</CardTitle>
+                <CardDescription>Your latest warehouse bookings</CardDescription>
+              </div>
+              <Link href="/dashboard/bookings">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View All <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {bookings.slice(0, 3).map((booking) => (
+                  <div key={booking.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        {booking.type === "pallet" ? (
+                          <Package className="h-5 w-5 text-primary" />
+                        ) : (
+                          <Building2 className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {booking.type === "pallet"
+                            ? `${booking.palletCount} Pallets`
+                            : `${booking.areaSqFt?.toLocaleString()} sq ft Area`}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{formatDate(booking.startDate)}</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={booking.status} />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
         {/* Recent Invoices or Claims based on role */}
         {isCustomer ? (
@@ -318,10 +542,11 @@ export default function CustomerDashboardPage() {
             </CardContent>
           </Card>
         )}
-      </div>
+        </div>
+      )}
 
-      {/* Membership Card - Only for company staff */}
-      {!isCustomer && (
+      {/* Membership Card - Only for company staff, not reseller */}
+      {!isCustomer && !isReseller && (
         <Card className="bg-gradient-to-r from-amber-500 to-amber-600 text-white">
           <CardContent className="flex items-center justify-between p-6">
             <div>

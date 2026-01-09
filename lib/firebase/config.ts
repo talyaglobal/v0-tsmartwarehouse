@@ -3,13 +3,13 @@ import { getMessaging, Messaging, isSupported } from 'firebase/messaging'
 import { getAnalytics, Analytics } from 'firebase/analytics'
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDgo3Ze9RyS48BKiUKTbLAEOtG07RQ0mO0",
-  authDomain: "kolaystartup.firebaseapp.com",
-  projectId: "kolaystartup",
-  storageBucket: "kolaystartup.firebasestorage.app",
-  messagingSenderId: "885378959790",
-  appId: "1:885378959790:web:946bdd5eb631fb0017203f",
-  measurementId: "G-Y3XR7Y9XRL"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || ""
 }
 
 let app: FirebaseApp

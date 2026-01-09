@@ -4,15 +4,23 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js')
 
 // Initialize Firebase in the service worker
-firebase.initializeApp({
-  apiKey: "AIzaSyDgo3Ze9RyS48BKiUKTbLAEOtG07RQ0mO0",
-  authDomain: "kolaystartup.firebaseapp.com",
-  projectId: "kolaystartup",
-  storageBucket: "kolaystartup.firebasestorage.app",
-  messagingSenderId: "885378959790",
-  appId: "1:885378959790:web:946bdd5eb631fb0017203f",
-  measurementId: "G-Y3XR7Y9XRL"
-})
+// Note: Service workers are static files, so we need to get config from the main app
+// The main app should set window.__FIREBASE_CONFIG__ before registering the service worker
+const firebaseConfig = self.__FIREBASE_CONFIG__ || {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+  measurementId: ""
+}
+
+if (!firebaseConfig.apiKey) {
+  console.error('Firebase config not found. Please set window.__FIREBASE_CONFIG__ in your app.')
+}
+
+firebase.initializeApp(firebaseConfig)
 
 const messaging = firebase.messaging()
 

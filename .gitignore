@@ -4,14 +4,9 @@
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
 # testing
 /coverage
-/.nyc_output
-/playwright-report
-/test-results
-/playwright/.cache
 
 # next.js
 /.next/
@@ -31,7 +26,10 @@ yarn-error.log*
 
 # local env files
 .env*.local
-.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -41,21 +39,40 @@ yarn-error.log*
 next-env.d.ts
 
 # IDE
-.vscode
-.idea
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+dist/
+build/
+
 # Supabase
-.supabase
-supabase/README.md
+.supabase/
 
-# Documentation with sensitive information
-SMS_README.md
-
-# Other sensitive files
-*.secret
+# Sensitive files
 *.key
+*.pem
 *.p12
 *.pfx
+secrets/
+.env
+.env.production
+
+# Debug files
+docs/DEBUG_*.md
+**/DEBUG_*.md

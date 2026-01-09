@@ -38,7 +38,9 @@ console.log('Using DATABASE_URL:', dbUrl ? dbUrl.replace(/(:).*@(.*)/, ':*****@$
 
 // Use shell: true for Windows compatibility
 const cmd = process.platform === 'win32' ? 'npx' : 'npx';
-const args = ['supabase', 'db', 'push', '--db-url', dbUrl];
+// Use --yes to auto-approve, but don't use --include-all to avoid duplicate key errors
+// The push command should automatically detect which migrations need to be applied
+const args = ['supabase', 'db', 'push', '--yes', '--db-url', dbUrl];
 
 const res = spawnSync(cmd, args, { 
   stdio: 'inherit',

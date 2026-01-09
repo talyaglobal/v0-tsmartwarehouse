@@ -9,7 +9,8 @@
     <input id="autocomplete" type="text" placeholder="Enter a city" style="width: 400px; padding: 10px; margin-top: 20px;">
 
     <script>
-        const apiKey = 'AIzaSyAwz8Ut2C--xb5xrEP2MXELmf1rT6YxipM';
+        // Get API key from environment variable or prompt user
+        const apiKey = prompt('Enter your Google Maps API Key:') || '';
 
         function loadScript() {
             const script = document.createElement('script');

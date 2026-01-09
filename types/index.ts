@@ -1,7 +1,7 @@
 // Core Types for TSmart Warehouse Management System
 
 // User Types
-export type UserRole = "root" | "warehouse_owner" | "warehouse_admin" | "customer" | "warehouse_staff"
+export type UserRole = "root" | "warehouse_owner" | "warehouse_admin" | "customer" | "warehouse_staff" | "warehouse_finder" | "reseller"
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
 export interface User {
@@ -627,4 +627,188 @@ export interface AccessLog {
   checkedOutBy?: string
   createdAt: string
   updatedAt: string
+}
+
+// =====================================================
+// CRM Types
+// =====================================================
+
+export type ContactType = 'warehouse_supplier' | 'customer_lead'
+export type ActivityType = 'visit' | 'call' | 'email' | 'meeting' | 'note' | 'task' | 'proposal_sent' | 'contract_sent' | 'follow_up'
+export type ContactStatus = 'active' | 'approved' | 'rejected' | 'converted' | 'inactive' | 'archived'
+export type ContactPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type CompanySize = 'startup' | 'small' | 'medium' | 'large' | 'enterprise'
+export type ActivityOutcome = 'successful' | 'needs_follow_up' | 'not_interested' | 'callback_requested'
+export type PropertyCondition = 'excellent' | 'good' | 'fair' | 'poor'
+export type InterestLevel = 'very_interested' | 'interested' | 'neutral' | 'not_interested'
+
+export interface CRMContact {
+  id: string
+  createdBy: string
+  assignedTo?: string
+  companyId?: string
+  contactType: ContactType
+  contactName: string
+  companyName?: string
+  email?: string
+  phone?: string
+  secondaryPhone?: string
+  address?: string
+  city?: string
+  state?: string
+  country?: string
+  postalCode?: string
+  location?: {
+    latitude: number
+    longitude: number
+  }
+  // Warehouse Details (for warehouse_supplier)
+  warehouseSizeSqm?: number
+  warehouseType?: string[]
+  availableServices?: string[]
+  estimatedCapacity?: number
+  currentUtilizationPercent?: number
+  // Customer Details (for customer_lead)
+  industry?: string
+  companySize?: CompanySize
+  estimatedSpaceNeedSqm?: number
+  budgetRange?: string
+  decisionMakerName?: string
+  decisionMakerTitle?: string
+  // Pipeline
+  pipelineStage: number // 0-100
+  pipelineMilestone: string
+  // Status
+  status: ContactStatus
+  priority: ContactPriority
+  // Admin Approval
+  requiresApproval: boolean
+  approvalRequestedAt?: string
+  approvedBy?: string
+  approvedAt?: string
+  approvalNotes?: string
+  // Conversion Tracking
+  convertedToWarehouseId?: string
+  convertedToCustomerId?: string
+  firstTransactionDate?: string
+  firstTransactionAmount?: number
+  // Metadata
+  tags?: string[]
+  customFields?: Record<string, any>
+  // Timestamps
+  createdAt: string
+  updatedAt: string
+  lastContactDate?: string
+  nextFollowUpDate?: string
+}
+
+export interface CRMActivity {
+  id: string
+  contactId: string
+  createdBy: string
+  companyId?: string
+  activityType: ActivityType
+  subject: string
+  description?: string
+  outcome?: ActivityOutcome
+  // Visit Specific
+  visitDate?: string
+  visitLocation?: string
+  visitDurationMinutes?: number
+  visitNotes?: string
+  visitPhotos?: string[]
+  propertyCondition?: PropertyCondition
+  ownerInterestLevel?: InterestLevel
+  // Call/Email Specific
+  callDurationMinutes?: number
+  callRecordingUrl?: string
+  emailSentAt?: string
+  emailOpened?: boolean
+  emailClicked?: boolean
+  // Task Management
+  isTask?: boolean
+  taskDueDate?: string
+  taskCompleted?: boolean
+  taskCompletedAt?: string
+  // Pipeline Impact
+  movedToStage?: number
+  stageChangeReason?: string
+  // Metadata
+  attachments?: Array<{ url: string; name: string; type: string }>
+  tags?: string[]
+  // Timestamps
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PipelineMilestone {
+  id: string
+  pipelineType: ContactType
+  stageNumber: number // 1-10
+  stagePercentage: number // 10, 20, 30, ..., 100
+  milestoneName: string
+  milestoneDescription?: string
+  requiredActivities?: string[]
+  typicalDurationDays?: number
+  autoAdvanceConditions?: Record<string, any>
+  notificationTemplate?: string
+  icon?: string
+  color?: string
+  displayOrder?: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CRMPerformanceMetrics {
+  id: string
+  userId: string
+  companyId?: string
+  metricDate: string
+  metricMonth: string
+  metricQuarter: string
+  metricYear: number
+  // Activity Metrics
+  contactsCreated: number
+  callsMade: number
+  emailsSent: number
+  visitsConducted: number
+  meetingsHeld: number
+  // Pipeline Metrics
+  contactsInPipeline: number
+  contactsMovedForward: number
+  contactsMovedBackward: number
+  contactsConverted: number
+  averagePipelineStage?: number
+  // Conversion Metrics
+  conversionRate?: number
+  averageDaysToConvert?: number
+  totalRevenueGenerated?: number
+  // Quality Metrics
+  adminApprovalsRequested: number
+  adminApprovalsGranted: number
+  adminApprovalRate?: number
+  // Timestamps
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PipelineOverview {
+  stage: number
+  percentage: number
+  milestoneName: string
+  contactCount: number
+  contacts: CRMContact[]
+}
+
+export interface WarehouseDiscoveryResult {
+  id: string
+  name: string
+  address: string
+  city: string
+  latitude: number
+  longitude: number
+  totalSqFt: number
+  distanceKm: number
+  inCrm: boolean // Whether this warehouse is already in user's CRM
 }

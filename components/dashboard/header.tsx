@@ -30,7 +30,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+      if (savedRole && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -111,6 +111,14 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         label: 'Warehouse Staff',
         className: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700',
       },
+      warehouse_finder: {
+        label: 'Warehouse Finder',
+        className: 'bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
+      },
+      reseller: {
+        label: 'Reseller',
+        className: 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800',
+      },
     }
 
     const config = roleConfig[role]
@@ -152,6 +160,10 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         router.push('/admin')
       } else if (newRole === 'warehouse_staff') {
         router.push('/warehouse')
+      } else if (newRole === 'warehouse_finder') {
+        router.push('/dashboard/warehouse-finder')
+      } else if (newRole === 'reseller') {
+        router.push('/dashboard')
       } else {
         router.push('/dashboard')
       }
@@ -162,7 +174,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller']
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
@@ -172,6 +184,8 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       warehouse_admin: '🔵 Warehouse Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
+      warehouse_finder: '🟡 Warehouse Finder',
+      reseller: '🟦 Reseller',
     }
     return labels[role] || role
   }
@@ -192,6 +206,10 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         return 'bg-violet-50/95 dark:bg-violet-950/95 border-b border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'
       case 'warehouse_staff':
         return 'bg-slate-100/95 dark:bg-slate-900/95 border-b border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
+      case 'warehouse_finder':
+        return 'bg-amber-50/95 dark:bg-amber-950/95 border-b border-amber-200 dark:border-amber-900 backdrop-blur-sm shadow-md'
+      case 'reseller':
+        return 'bg-indigo-50/95 dark:bg-indigo-950/95 border-b border-indigo-200 dark:border-indigo-900 backdrop-blur-sm shadow-md'
       default:
         return 'bg-slate-200/90 dark:bg-slate-950/98 border-b border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
     }

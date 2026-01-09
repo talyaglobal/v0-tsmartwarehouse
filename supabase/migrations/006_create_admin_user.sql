@@ -50,12 +50,12 @@ $$;
 -- Grant execute permission to authenticated users (though this function requires service role)
 GRANT EXECUTE ON FUNCTION create_admin_user(TEXT, TEXT, TEXT) TO authenticated;
 
--- Example usage (commented out):
--- SELECT create_admin_user('volkan@tsmart.ai', 'password123', 'Volkan Admin');
+-- Example usage (commented out - NEVER use real passwords in code):
+-- SELECT create_admin_user('admin@example.com', 'CHANGE_THIS_PASSWORD', 'Admin Name');
 
 -- Note: To actually create a user in Supabase Auth, you need to:
 -- 1. Use the Supabase Admin API with service role key (recommended)
 -- 2. Use the create-admin-user.js script
 -- 3. Use the Supabase Dashboard to manually create the user, then run:
---    SELECT create_admin_user('volkan@tsmart.ai', 'password123', 'Volkan Admin');
+--    SELECT create_admin_user('admin@example.com', 'CHANGE_THIS_PASSWORD', 'Admin Name');
 

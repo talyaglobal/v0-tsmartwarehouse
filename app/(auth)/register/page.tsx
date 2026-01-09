@@ -11,11 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Check, Building2 } from "@/components/icons"
-import { User } from "lucide-react"
-import { Eye } from "@/components/icons"
-import { EyeOff } from "lucide-react"
+import { Loader2, Check, Building2, Eye } from "@/components/icons"
+import { User, EyeOff } from "lucide-react"
 import { PhoneInput } from 'react-international-phone'
 import 'react-international-phone/style.css'
 import { signUp } from "@/lib/auth/actions"
@@ -28,10 +25,31 @@ export default function RegisterPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const invitationToken = searchParams.get('invitation')
+  const roleParam = searchParams.get('role') as "owner" | "renter" | "reseller" | "finder" | null
   const addNotification = useUIStore((state) => state.addNotification)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"owner" | "customer">("owner")
+  
+  // Get activeTab from URL, default to owner
+  const activeTab: "owner" | "renter" | "reseller" | "finder" = 
+    roleParam && ['owner', 'renter', 'reseller', 'finder'].includes(roleParam) ? roleParam : "owner"
+  
+  // Handler to update URL when tab changes
+  const handleTabChange = (tab: "owner" | "renter" | "reseller" | "finder") => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('role', tab)
+    router.push(`/register?${params.toString()}`, { scroll: false })
+  }
+  
+  // Ensure URL has role parameter on mount
+  useEffect(() => {
+    if (!roleParam) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('role', 'owner')
+      router.replace(`/register?${params.toString()}`, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount to set initial role
   
   // Warehouse Owner form data
   const [ownerFormData, setOwnerFormData] = useState({
@@ -45,8 +63,28 @@ export default function RegisterPage() {
     acceptTerms: false,
   })
   
-  // Customer form data
-  const [customerFormData, setCustomerFormData] = useState({
+  // Warehouse Renter (Customer) form data
+  const [renterFormData, setRenterFormData] = useState({
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    acceptTerms: false,
+  })
+
+  // Reseller form data
+  const [resellerFormData, setResellerFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    acceptTerms: false,
+  })
+
+  // Warehouse Finder form data
+  const [finderFormData, setFinderFormData] = useState({
+    name: "",
     email: "",
     phone: "",
     password: "",
@@ -56,8 +94,12 @@ export default function RegisterPage() {
   
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [showCustomerPassword, setShowCustomerPassword] = useState(false)
-  const [showCustomerConfirmPassword, setShowCustomerConfirmPassword] = useState(false)
+  const [showRenterPassword, setShowRenterPassword] = useState(false)
+  const [showRenterConfirmPassword, setShowRenterConfirmPassword] = useState(false)
+  const [showResellerPassword, setShowResellerPassword] = useState(false)
+  const [showResellerConfirmPassword, setShowResellerConfirmPassword] = useState(false)
+  const [showFinderPassword, setShowFinderPassword] = useState(false)
+  const [showFinderConfirmPassword, setShowFinderConfirmPassword] = useState(false)
   const [companySuggestions, setCompanySuggestions] = useState<Array<{ id: string; name: string }>>([])
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false)
   const [isSearchingCompanies, setIsSearchingCompanies] = useState(false)
@@ -75,7 +117,9 @@ export default function RegisterPage() {
           
           if (data.success && data.data) {
             // Pre-fill email from invitation and force owner tab (invitations are for company members)
-            setActiveTab("owner")
+            const params = new URLSearchParams(searchParams.toString())
+            params.set('role', 'owner')
+            router.replace(`/register?${params.toString()}`, { scroll: false })
             setOwnerFormData(prev => ({
               ...prev,
               email: data.data.email || prev.email,
@@ -88,15 +132,23 @@ export default function RegisterPage() {
       
       loadInvitation()
     }
-  }, [invitationToken])
+  }, [invitationToken, searchParams, router])
 
   // Memoize phone change handler to prevent re-renders
   const handleOwnerPhoneChange = useCallback((value: string) => {
     setOwnerFormData((prev) => ({ ...prev, phone: value }))
   }, [])
 
-  const handleCustomerPhoneChange = useCallback((value: string) => {
-    setCustomerFormData((prev) => ({ ...prev, phone: value }))
+  const handleRenterPhoneChange = useCallback((value: string) => {
+    setRenterFormData((prev) => ({ ...prev, phone: value }))
+  }, [])
+
+  const handleResellerPhoneChange = useCallback((value: string) => {
+    setResellerFormData((prev) => ({ ...prev, phone: value }))
+  }, [])
+
+  const handleFinderPhoneChange = useCallback((value: string) => {
+    setFinderFormData((prev) => ({ ...prev, phone: value }))
   }, [])
 
   // Search companies
@@ -241,12 +293,12 @@ export default function RegisterPage() {
     }
   }
 
-  const handleCustomerSubmit = async (e: React.FormEvent) => {
+  const handleRenterSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
-    if (customerFormData.password !== customerFormData.confirmPassword) {
+    if (renterFormData.password !== renterFormData.confirmPassword) {
       setError("Passwords don't match")
       addNotification({
         type: 'error',
@@ -258,10 +310,10 @@ export default function RegisterPage() {
     }
 
     const formDataToSubmit = new FormData()
-    formDataToSubmit.append('email', customerFormData.email)
-    formDataToSubmit.append('password', customerFormData.password)
-    formDataToSubmit.append('confirmPassword', customerFormData.confirmPassword)
-    if (customerFormData.phone) formDataToSubmit.append('phone', customerFormData.phone)
+    formDataToSubmit.append('email', renterFormData.email)
+    formDataToSubmit.append('password', renterFormData.password)
+    formDataToSubmit.append('confirmPassword', renterFormData.confirmPassword)
+    if (renterFormData.phone) formDataToSubmit.append('phone', renterFormData.phone)
     formDataToSubmit.append('userType', 'customer')
 
     const result = await signUp(formDataToSubmit)
@@ -275,7 +327,107 @@ export default function RegisterPage() {
       })
       setIsLoading(false)
     } else {
-      await handleSuccessfulRegistration(customerFormData.email, customerFormData.password)
+      await handleSuccessfulRegistration(renterFormData.email, renterFormData.password)
+    }
+  }
+
+  const handleResellerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    if (resellerFormData.password !== resellerFormData.confirmPassword) {
+      setError("Passwords don't match")
+      addNotification({
+        type: 'error',
+        message: "Passwords don't match",
+        duration: 5000,
+      })
+      setIsLoading(false)
+      return
+    }
+
+    if (!resellerFormData.name || resellerFormData.name.trim().length < 2) {
+      setError("Name is required and must be at least 2 characters")
+      addNotification({
+        type: 'error',
+        message: "Name is required",
+        duration: 5000,
+      })
+      setIsLoading(false)
+      return
+    }
+
+    const formDataToSubmit = new FormData()
+    formDataToSubmit.append('email', resellerFormData.email)
+    formDataToSubmit.append('password', resellerFormData.password)
+    formDataToSubmit.append('confirmPassword', resellerFormData.confirmPassword)
+    formDataToSubmit.append('name', resellerFormData.name)
+    if (resellerFormData.phone) formDataToSubmit.append('phone', resellerFormData.phone)
+    formDataToSubmit.append('userType', 'reseller')
+
+    const result = await signUp(formDataToSubmit)
+    
+    if (result?.error) {
+      setError(result.error.message)
+      addNotification({
+        type: 'error',
+        message: result.error.message,
+        duration: 5000,
+      })
+      setIsLoading(false)
+    } else {
+      await handleSuccessfulRegistration(resellerFormData.email, resellerFormData.password)
+    }
+  }
+
+  const handleFinderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    if (finderFormData.password !== finderFormData.confirmPassword) {
+      setError("Passwords don't match")
+      addNotification({
+        type: 'error',
+        message: "Passwords don't match",
+        duration: 5000,
+      })
+      setIsLoading(false)
+      return
+    }
+
+    if (!finderFormData.name || finderFormData.name.trim().length < 2) {
+      setError("Name is required and must be at least 2 characters")
+      addNotification({
+        type: 'error',
+        message: "Name is required",
+        duration: 5000,
+      })
+      setIsLoading(false)
+      return
+    }
+
+    const formDataToSubmit = new FormData()
+    formDataToSubmit.append('email', finderFormData.email)
+    formDataToSubmit.append('password', finderFormData.password)
+    formDataToSubmit.append('confirmPassword', finderFormData.confirmPassword)
+    formDataToSubmit.append('name', finderFormData.name)
+    if (finderFormData.phone) formDataToSubmit.append('phone', finderFormData.phone)
+    formDataToSubmit.append('userType', 'finder')
+
+    const result = await signUp(formDataToSubmit)
+    
+    if (result?.error) {
+      setError(result.error.message)
+      addNotification({
+        type: 'error',
+        message: result.error.message,
+        duration: 5000,
+      })
+      setIsLoading(false)
+    } else {
+      await handleSuccessfulRegistration(finderFormData.email, finderFormData.password)
     }
   }
 
@@ -313,10 +465,18 @@ export default function RegisterPage() {
 
         // Determine redirect path based on role
         let redirectPath = '/dashboard'
-        if (role === 'super_admin') {
+        if (role === 'super_admin' || role === 'root') {
           redirectPath = '/admin'
-        } else if (role === 'worker') {
-          redirectPath = '/worker'
+        } else if (role === 'worker' || role === 'warehouse_staff') {
+          redirectPath = '/warehouse'
+        } else if (role === 'warehouse_finder') {
+          redirectPath = '/dashboard/warehouse-finder'
+        } else if (role === 'reseller') {
+          redirectPath = '/dashboard/reseller'
+        } else if (role === 'warehouse_owner' || role === 'warehouse_admin') {
+          redirectPath = '/dashboard'
+        } else if (role === 'customer') {
+          redirectPath = '/dashboard'
         }
 
         // Show success message
@@ -407,59 +567,209 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl">Create an account</CardTitle>
-        <CardDescription>Get started with TSmart Warehouse today</CardDescription>
-      </CardHeader>
-      
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "owner" | "customer")} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="owner" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Warehouse Owner
-          </TabsTrigger>
-          <TabsTrigger value="customer" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Warehouse Renter
-          </TabsTrigger>
-        </TabsList>
+    <div className="w-full">
+      {/* Mobile Role Selector */}
+      <div className="lg:hidden mb-4">
+        <div className="space-y-2 mb-4">
+          <h1 className="text-2xl font-bold tracking-tight">Select Your Role</h1>
+          <p className="text-muted-foreground text-xs leading-relaxed">Choose the role that best describes you</p>
+        </div>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => handleTabChange("owner")}
+            className={cn(
+              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
+              activeTab === "owner"
+                ? "border-primary bg-primary/10 shadow-lg"
+                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
+            )}
+          >
+            <div className={cn(
+              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
+              activeTab === "owner" 
+                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
+                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
+            )}>
+              <Building2 className={cn("h-5 w-5 transition-transform duration-200", activeTab === "owner" ? "scale-110" : "group-hover:scale-110")} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className={cn(
+                "font-bold transition-colors duration-200",
+                activeTab === "owner" ? "text-primary text-base" : "text-sm group-hover:text-primary"
+              )}>Warehouse Owner</div>
+              <div className="text-xs text-muted-foreground mt-0.5">List and manage warehouse spaces</div>
+            </div>
+            {activeTab === "owner" && (
+              <div className="flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
+                  <Check className="h-4 w-4 text-primary-foreground" />
+                </div>
+              </div>
+            )}
+          </button>
 
-        {/* Warehouse Owner Tab */}
-        <TabsContent value="owner" className="mt-4">
-          <form onSubmit={handleOwnerSubmit}>
-            <CardContent className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleTabChange("renter")}
+            className={cn(
+              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
+              activeTab === "renter"
+                ? "border-primary bg-primary/10 shadow-lg"
+                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
+            )}
+          >
+            <div className={cn(
+              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
+              activeTab === "renter" 
+                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
+                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
+            )}>
+              <User className={cn("h-5 w-5 transition-transform duration-200", activeTab === "renter" ? "scale-110" : "group-hover:scale-110")} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className={cn(
+                "font-bold transition-colors duration-200",
+                activeTab === "renter" ? "text-primary text-base" : "text-sm group-hover:text-primary"
+              )}>Warehouse Renter</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Find and book warehouse storage</div>
+            </div>
+            {activeTab === "renter" && (
+              <div className="flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
+                  <Check className="h-4 w-4 text-primary-foreground" />
+                </div>
+              </div>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("reseller")}
+            className={cn(
+              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
+              activeTab === "reseller"
+                ? "border-primary bg-primary/10 shadow-lg"
+                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
+            )}
+          >
+            <div className={cn(
+              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
+              activeTab === "reseller" 
+                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
+                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
+            )}>
+              <User className={cn("h-5 w-5 transition-transform duration-200", activeTab === "reseller" ? "scale-110" : "group-hover:scale-110")} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className={cn(
+                "font-bold transition-colors duration-200",
+                activeTab === "reseller" ? "text-primary text-base" : "text-sm group-hover:text-primary"
+              )}>Warehouse Reseller</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Acquire customers for the platform</div>
+            </div>
+            {activeTab === "reseller" && (
+              <div className="flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
+                  <Check className="h-4 w-4 text-primary-foreground" />
+                </div>
+              </div>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("finder")}
+            className={cn(
+              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
+              activeTab === "finder"
+                ? "border-primary bg-primary/10 shadow-lg"
+                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
+            )}
+          >
+            <div className={cn(
+              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
+              activeTab === "finder" 
+                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
+                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
+            )}>
+              <Building2 className={cn("h-5 w-5 transition-transform duration-200", activeTab === "finder" ? "scale-110" : "group-hover:scale-110")} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className={cn(
+                "font-bold transition-colors duration-200",
+                activeTab === "finder" ? "text-primary text-base" : "text-sm group-hover:text-primary"
+              )}>Warehouse Finder</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Discover and onboard new warehouses</div>
+            </div>
+            {activeTab === "finder" && (
+              <div className="flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
+                  <Check className="h-4 w-4 text-primary-foreground" />
+                </div>
+              </div>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Registration Form */}
+      <div className="w-full max-w-4xl mx-auto">
+        <Card className="border-2 shadow-xl bg-background/50 backdrop-blur-sm">
+          <CardHeader className="space-y-2 pb-4 border-b bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+              Create Your Account
+            </CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Fill in your details to get started with TSmart Warehouse
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="pt-4 space-y-4">
+
+        {/* Warehouse Owner Form */}
+        {activeTab === "owner" && (
+          <form id="owner-form" onSubmit={handleOwnerSubmit} className="space-y-4">
               {error && (
-                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md border border-destructive/20">
-                  {error}
+                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
+                  <div className="font-semibold mb-1">Error</div>
+                  <div>{error}</div>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="owner-name">Full Name</Label>
-                <Input
-                  id="owner-name"
-                  placeholder="John Doe"
-                  value={ownerFormData.name}
-                  onChange={(e) => setOwnerFormData({ ...ownerFormData, name: e.target.value })}
-                  required
-                  disabled={isLoading}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2.5">
+                  <Label htmlFor="owner-name" className="text-sm font-semibold flex items-center gap-2">
+                    Full Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="owner-name"
+                    placeholder="John Doe"
+                    value={ownerFormData.name}
+                    onChange={(e) => setOwnerFormData({ ...ownerFormData, name: e.target.value })}
+                    required
+                    disabled={isLoading}
+                    className="h-10 transition-all focus-visible:ring-2 focus-visible:ring-primary/20"
+                  />
+                </div>
+                <div className="space-y-2.5">
+                  <Label htmlFor="owner-email" className="text-sm font-semibold flex items-center gap-2">
+                    Email Address <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="owner-email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={ownerFormData.email}
+                    onChange={(e) => setOwnerFormData({ ...ownerFormData, email: e.target.value })}
+                    required
+                    autoComplete="email"
+                    disabled={isLoading}
+                    className="h-10 transition-all focus-visible:ring-2 focus-visible:ring-primary/20"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="owner-email">Email</Label>
-                <Input
-                  id="owner-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={ownerFormData.email}
-                  onChange={(e) => setOwnerFormData({ ...ownerFormData, email: e.target.value })}
-                  required
-                  autoComplete="email"
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner-phone">Phone Number</Label>
+                <Label htmlFor="owner-phone" className="text-sm font-semibold">Phone Number</Label>
                 <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
                   <PhoneInput
                     defaultCountry="us"
@@ -481,7 +791,7 @@ export default function RegisterPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="owner-companyName">Company Name</Label>
+                <Label htmlFor="owner-companyName" className="text-sm font-semibold">Company Name</Label>
                 <div className="relative">
                   <div className="relative">
                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -546,7 +856,7 @@ export default function RegisterPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="owner-storageType">Storage Interest</Label>
+                <Label htmlFor="owner-storageType" className="text-sm font-semibold">Storage Interest</Label>
                 <Select
                   value={ownerFormData.storageType}
                   onValueChange={(value) => setOwnerFormData((prev) => ({ ...prev, storageType: value }))}
@@ -562,9 +872,9 @@ export default function RegisterPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 relative">
-                  <Label htmlFor="owner-password">Password</Label>
+                  <Label htmlFor="owner-password" className="text-sm font-semibold">Password</Label>
                   <Input
                     id="owner-password"
                     type={showPassword ? 'text' : 'password'}
@@ -580,7 +890,7 @@ export default function RegisterPage() {
                   </button>
                 </div>
                 <div className="space-y-2 relative">
-                  <Label htmlFor="owner-confirmPassword">Confirm Password</Label>
+                  <Label htmlFor="owner-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
                   <Input
                     id="owner-confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -596,68 +906,65 @@ export default function RegisterPage() {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+            <div className="pt-4 border-t">
+              <div className="flex items-start space-x-3 pt-2">
                 <Checkbox
                   id="owner-terms"
                   checked={ownerFormData.acceptTerms}
                   onCheckedChange={(checked) => setOwnerFormData({ ...ownerFormData, acceptTerms: checked as boolean })}
                   required
                   disabled={isLoading}
+                  className="mt-1"
                 />
-                <Label htmlFor="owner-terms" className="text-sm">
-                  I agree to the{" "}
-                  <Link href="/terms" className="text-primary hover:underline">
+                <Label htmlFor="owner-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
+                  By creating an account, you agree to our{" "}
+                  <Link href="/terms" className="text-primary hover:underline font-medium">
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline">
+                  <Link href="/privacy" className="text-primary hover:underline font-medium">
                     Privacy Policy
                   </Link>
                 </Label>
               </div>
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading || !ownerFormData.acceptTerms}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Account
-              </Button>
-            </CardFooter>
+            </div>
           </form>
-        </TabsContent>
+        )}
 
-        {/* Warehouse Renter (Customer) Tab */}
-        <TabsContent value="customer" className="mt-4">
-          <form onSubmit={handleCustomerSubmit}>
-            <CardContent className="space-y-4">
+        {/* Warehouse Renter Form */}
+        {activeTab === "renter" && (
+          <form id="renter-form" onSubmit={handleRenterSubmit} className="space-y-4">
               {error && (
-                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md border border-destructive/20">
-                  {error}
+                <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
+                  <div className="font-semibold mb-1">Error</div>
+                  <div>{error}</div>
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="customer-email">Email</Label>
+                <Label htmlFor="renter-email" className="text-sm font-semibold">Email Address</Label>
                 <Input
-                  id="customer-email"
+                  id="renter-email"
                   type="email"
                   placeholder="name@example.com"
-                  value={customerFormData.email}
-                  onChange={(e) => setCustomerFormData({ ...customerFormData, email: e.target.value })}
+                  value={renterFormData.email}
+                  onChange={(e) => setRenterFormData({ ...renterFormData, email: e.target.value })}
                   required
                   autoComplete="email"
                   disabled={isLoading}
+                  className="h-11"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customer-phone">Phone Number (Optional)</Label>
+                <Label htmlFor="renter-phone" className="text-sm font-semibold">Phone Number <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                 <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
                   <PhoneInput
                     defaultCountry="us"
-                    value={customerFormData.phone}
-                    onChange={handleCustomerPhoneChange}
+                    value={renterFormData.phone}
+                    onChange={handleRenterPhoneChange}
                     disabled={isLoading}
                     inputProps={{
                       name: 'phone',
-                      id: 'customer-phone',
+                      id: 'renter-phone',
                       required: false,
                       autoFocus: false,
                       autoComplete: 'tel',
@@ -669,78 +976,328 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 relative">
-                  <Label htmlFor="customer-password">Password</Label>
+                  <Label htmlFor="renter-password" className="text-sm font-semibold">Password</Label>
                   <Input
-                    id="customer-password"
-                    type={showCustomerPassword ? 'text' : 'password'}
+                    id="renter-password"
+                    type={showRenterPassword ? 'text' : 'password'}
                     placeholder="Create password"
-                    value={customerFormData.password}
-                    onChange={(e) => setCustomerFormData({ ...customerFormData, password: e.target.value })}
+                    value={renterFormData.password}
+                    onChange={(e) => setRenterFormData({ ...renterFormData, password: e.target.value })}
                     required
                     autoComplete="new-password"
                     disabled={isLoading}
                   />
-                  <button type="button" aria-label="toggle password" onClick={() => setShowCustomerPassword(s => !s)} className="absolute right-3 top-9">
-                    {showCustomerPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  <button type="button" aria-label="toggle password" onClick={() => setShowRenterPassword(s => !s)} className="absolute right-3 top-9">
+                    {showRenterPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                   </button>
                 </div>
                 <div className="space-y-2 relative">
-                  <Label htmlFor="customer-confirmPassword">Confirm Password</Label>
+                  <Label htmlFor="renter-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
                   <Input
-                    id="customer-confirmPassword"
-                    type={showCustomerConfirmPassword ? 'text' : 'password'}
+                    id="renter-confirmPassword"
+                    type={showRenterConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm password"
-                    value={customerFormData.confirmPassword}
-                    onChange={(e) => setCustomerFormData({ ...customerFormData, confirmPassword: e.target.value })}
+                    value={renterFormData.confirmPassword}
+                    onChange={(e) => setRenterFormData({ ...renterFormData, confirmPassword: e.target.value })}
                     required
                     autoComplete="new-password"
                     disabled={isLoading}
                   />
-                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowCustomerConfirmPassword(s => !s)} className="absolute right-3 top-9">
-                    {showCustomerConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowRenterConfirmPassword(s => !s)} className="absolute right-3 top-9">
+                    {showRenterConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                   </button>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+            <div className="pt-4 border-t">
+              <div className="flex items-start space-x-3 pt-2">
                 <Checkbox
-                  id="customer-terms"
-                  checked={customerFormData.acceptTerms}
-                  onCheckedChange={(checked) => setCustomerFormData({ ...customerFormData, acceptTerms: checked as boolean })}
+                  id="renter-terms"
+                  checked={renterFormData.acceptTerms}
+                  onCheckedChange={(checked) => setRenterFormData({ ...renterFormData, acceptTerms: checked as boolean })}
                   required
                   disabled={isLoading}
+                  className="mt-1"
                 />
-                <Label htmlFor="customer-terms" className="text-sm">
-                  I agree to the{" "}
-                  <Link href="/terms" className="text-primary hover:underline">
+                <Label htmlFor="renter-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
+                  By creating an account, you agree to our{" "}
+                  <Link href="/terms" className="text-primary hover:underline font-medium">
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline">
+                  <Link href="/privacy" className="text-primary hover:underline font-medium">
                     Privacy Policy
                   </Link>
                 </Label>
               </div>
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading || !customerFormData.acceptTerms}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Account
-              </Button>
-            </CardFooter>
+            </div>
           </form>
-        </TabsContent>
-      </Tabs>
-      
-      <CardFooter className="pt-0">
-        <p className="text-sm text-center text-muted-foreground w-full">
-          Already have an account?{" "}
-          <Link href="/login" className="text-primary hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </CardFooter>
-    </Card>
+        )}
+
+        {/* Warehouse Reseller Form */}
+        {activeTab === "reseller" && (
+          <form id="reseller-form" onSubmit={handleResellerSubmit} className="space-y-4">
+              {error && (
+                <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
+                  <div className="font-semibold mb-1">Error</div>
+                  <div>{error}</div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reseller-name" className="text-sm font-semibold">Full Name</Label>
+                <Input
+                  id="reseller-name"
+                  placeholder="John Doe"
+                  value={resellerFormData.name}
+                  onChange={(e) => setResellerFormData({ ...resellerFormData, name: e.target.value })}
+                  required
+                  disabled={isLoading}
+                  className="h-11"
+                />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reseller-email" className="text-sm font-semibold">Email Address</Label>
+                <Input
+                  id="reseller-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={resellerFormData.email}
+                  onChange={(e) => setResellerFormData({ ...resellerFormData, email: e.target.value })}
+                  required
+                  autoComplete="email"
+                  disabled={isLoading}
+                  className="h-11"
+                />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reseller-phone" className="text-sm font-semibold">Phone Number <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+                  <PhoneInput
+                    defaultCountry="us"
+                    value={resellerFormData.phone}
+                    onChange={handleResellerPhoneChange}
+                    disabled={isLoading}
+                    inputProps={{
+                      name: 'phone',
+                      id: 'reseller-phone',
+                      required: false,
+                      autoFocus: false,
+                      autoComplete: 'tel',
+                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                    }}
+                    countrySelectorStyleProps={{
+                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 relative">
+                  <Label htmlFor="reseller-password" className="text-sm font-semibold">Password</Label>
+                  <Input
+                    id="reseller-password"
+                    type={showResellerPassword ? 'text' : 'password'}
+                    placeholder="Create password"
+                    value={resellerFormData.password}
+                    onChange={(e) => setResellerFormData({ ...resellerFormData, password: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                  />
+                  <button type="button" aria-label="toggle password" onClick={() => setShowResellerPassword(s => !s)} className="absolute right-3 top-9">
+                    {showResellerPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </div>
+                <div className="space-y-2 relative">
+                  <Label htmlFor="reseller-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
+                  <Input
+                    id="reseller-confirmPassword"
+                    type={showResellerConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    value={resellerFormData.confirmPassword}
+                    onChange={(e) => setResellerFormData({ ...resellerFormData, confirmPassword: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                  />
+                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowResellerConfirmPassword(s => !s)} className="absolute right-3 top-9">
+                    {showResellerConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </div>
+              </div>
+            <div className="pt-4 border-t">
+              <div className="flex items-start space-x-3 pt-2">
+                <Checkbox
+                  id="reseller-terms"
+                  checked={resellerFormData.acceptTerms}
+                  onCheckedChange={(checked) => setResellerFormData({ ...resellerFormData, acceptTerms: checked as boolean })}
+                  required
+                  disabled={isLoading}
+                  className="mt-1"
+                />
+                <Label htmlFor="reseller-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
+                  By creating an account, you agree to our{" "}
+                  <Link href="/terms" className="text-primary hover:underline font-medium">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-primary hover:underline font-medium">
+                    Privacy Policy
+                  </Link>
+                </Label>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* Warehouse Finder Form */}
+        {activeTab === "finder" && (
+          <form id="finder-form" onSubmit={handleFinderSubmit} className="space-y-4">
+              {error && (
+                <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
+                  <div className="font-semibold mb-1">Error</div>
+                  <div>{error}</div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="finder-name" className="text-sm font-semibold">Full Name</Label>
+                <Input
+                  id="finder-name"
+                  placeholder="John Doe"
+                  value={finderFormData.name}
+                  onChange={(e) => setFinderFormData({ ...finderFormData, name: e.target.value })}
+                  required
+                  disabled={isLoading}
+                  className="h-11"
+                />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="finder-email" className="text-sm font-semibold">Email Address</Label>
+                <Input
+                  id="finder-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={finderFormData.email}
+                  onChange={(e) => setFinderFormData({ ...finderFormData, email: e.target.value })}
+                  required
+                  autoComplete="email"
+                  disabled={isLoading}
+                  className="h-11"
+                />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="finder-phone" className="text-sm font-semibold">Phone Number <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+                  <PhoneInput
+                    defaultCountry="us"
+                    value={finderFormData.phone}
+                    onChange={handleFinderPhoneChange}
+                    disabled={isLoading}
+                    inputProps={{
+                      name: 'phone',
+                      id: 'finder-phone',
+                      required: false,
+                      autoFocus: false,
+                      autoComplete: 'tel',
+                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                    }}
+                    countrySelectorStyleProps={{
+                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 relative">
+                  <Label htmlFor="finder-password" className="text-sm font-semibold">Password</Label>
+                  <Input
+                    id="finder-password"
+                    type={showFinderPassword ? 'text' : 'password'}
+                    placeholder="Create password"
+                    value={finderFormData.password}
+                    onChange={(e) => setFinderFormData({ ...finderFormData, password: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                  />
+                  <button type="button" aria-label="toggle password" onClick={() => setShowFinderPassword(s => !s)} className="absolute right-3 top-9">
+                    {showFinderPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </div>
+                <div className="space-y-2 relative">
+                  <Label htmlFor="finder-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
+                  <Input
+                    id="finder-confirmPassword"
+                    type={showFinderConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    value={finderFormData.confirmPassword}
+                    onChange={(e) => setFinderFormData({ ...finderFormData, confirmPassword: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                  />
+                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowFinderConfirmPassword(s => !s)} className="absolute right-3 top-9">
+                    {showFinderConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </div>
+              </div>
+            <div className="pt-4 border-t">
+              <div className="flex items-start space-x-3 pt-2">
+                <Checkbox
+                  id="finder-terms"
+                  checked={finderFormData.acceptTerms}
+                  onCheckedChange={(checked) => setFinderFormData({ ...finderFormData, acceptTerms: checked as boolean })}
+                  required
+                  disabled={isLoading}
+                  className="mt-1"
+                />
+                <Label htmlFor="finder-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
+                  By creating an account, you agree to our{" "}
+                  <Link href="/terms" className="text-primary hover:underline font-medium">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-primary hover:underline font-medium">
+                    Privacy Policy
+                  </Link>
+                </Label>
+              </div>
+            </div>
+          </form>
+        )}
+          </CardContent>
+          
+          <CardFooter className="pt-6 border-t flex flex-col gap-4">
+            <Button 
+              type="submit"
+              form={activeTab === "owner" ? "owner-form" : activeTab === "renter" ? "renter-form" : activeTab === "reseller" ? "reseller-form" : "finder-form"}
+              className="w-full h-12 text-base font-semibold" 
+              size="lg" 
+              disabled={isLoading || (activeTab === "owner" && !ownerFormData.acceptTerms) || (activeTab === "renter" && !renterFormData.acceptTerms) || (activeTab === "reseller" && !resellerFormData.acceptTerms) || (activeTab === "finder" && !finderFormData.acceptTerms)}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
+            <p className="text-sm text-center text-muted-foreground w-full">
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary hover:underline font-semibold">
+                Sign in
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
   )
 }

@@ -61,6 +61,18 @@ const requiredEnvVars = {
     example: 'pk_test_...',
     note: 'Required for payment UI. Get from: https://dashboard.stripe.com/apikeys',
   },
+  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: {
+    required: false,
+    description: 'Google Maps API key (for Maps, Places, Geocoding)',
+    example: 'AIzaSy...',
+    note: 'Required for map features. Get from: https://console.cloud.google.com/apis/credentials',
+  },
+  GOOGLE_API_SECRET: {
+    required: false,
+    description: 'Google API Secret (for server-side operations)',
+    example: '...',
+    note: 'Optional, for server-side Google API operations',
+  },
 }
 
 function checkEnvVars() {

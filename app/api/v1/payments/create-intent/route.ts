@@ -303,6 +303,74 @@ export async function POST(request: NextRequest) {
 
     console.log('[create-intent] Booking created successfully:', booking.id)
 
+    // Create booking_services records if services were selected
+    if (body.bookingDetails.serviceIds && body.bookingDetails.serviceIds.length > 0) {
+      try {
+        // Fetch selected services
+        const { data: services, error: servicesError } = await supabase
+          .from('warehouse_services')
+          .select('*')
+          .eq('warehouse_id', body.warehouseId)
+          .eq('is_active', true)
+          .in('id', body.bookingDetails.serviceIds)
+
+        if (!servicesError && services && services.length > 0) {
+          const start = new Date(body.bookingDetails.startDate)
+          const end = new Date(body.bookingDetails.endDate)
+          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+          const months = Math.ceil(days / 30)
+          const quantity = body.bookingDetails.type === "pallet"
+            ? (body.bookingDetails.palletCount || 0)
+            : (body.bookingDetails.areaSqFt || 0)
+
+          const bookingServicesData = services.map((service: any) => {
+            let calculatedPrice = 0
+            switch (service.pricing_type) {
+              case 'one_time':
+                calculatedPrice = service.base_price
+                break
+              case 'per_pallet':
+                calculatedPrice = service.base_price * quantity
+                break
+              case 'per_sqft':
+                calculatedPrice = service.base_price * quantity
+                break
+              case 'per_day':
+                calculatedPrice = service.base_price * days
+                break
+              case 'per_month':
+                calculatedPrice = service.base_price * months
+                break
+            }
+
+            return {
+              booking_id: booking.id,
+              service_id: service.id,
+              service_name: service.service_name,
+              pricing_type: service.pricing_type,
+              base_price: service.base_price,
+              quantity: 1,
+              calculated_price: calculatedPrice,
+            }
+          })
+
+          const { error: bookingServicesError } = await supabase
+            .from('booking_services')
+            .insert(bookingServicesData)
+
+          if (bookingServicesError) {
+            console.error('[create-intent] Failed to create booking services:', bookingServicesError)
+            // Don't fail the payment, just log the error
+          } else {
+            console.log('[create-intent] Created booking services:', bookingServicesData.length)
+          }
+        }
+      } catch (error) {
+        console.error('[create-intent] Error creating booking services:', error)
+        // Don't fail the payment, just log the error
+      }
+    }
+
     return NextResponse.json({
       success: true,
       clientSecret: paymentIntent.client_secret,
