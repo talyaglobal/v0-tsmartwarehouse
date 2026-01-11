@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { ErrorBoundaryWrapper } from '@/components/error-boundary-wrapper'
 import { ToastContainer } from '@/components/ui/toast'
+import { CookieConsentBanner } from '@/components/ui/cookie-consent-banner'
 import { QueryProvider } from '@/lib/providers/query-provider'
 import './globals.css'
 
@@ -52,6 +53,7 @@ export default function RootLayout({
           </QueryProvider>
         </ErrorBoundaryWrapper>
         <ToastContainer />
+        <CookieConsentBanner />
         <Analytics />
       </body>
     </html>

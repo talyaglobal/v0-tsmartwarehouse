@@ -158,6 +158,7 @@ import {
   ShoppingCart,
   Car,
   Bot,
+  Cookie,
   type LucideIcon,
 } from "lucide-react"
 
@@ -321,6 +322,7 @@ export {
   ShoppingCart,
   Car,
   Bot,
+  Cookie,
   type LucideIcon,
 }
 
@@ -416,4 +418,5 @@ export const iconMap: Record<string, LucideIcon> = {
   "shopping-cart": ShoppingCart,
   car: Car,
   bot: Bot,
+  cookie: Cookie,
 }

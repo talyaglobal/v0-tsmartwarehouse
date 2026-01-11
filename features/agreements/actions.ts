@@ -149,6 +149,22 @@ export async function acceptUserAgreement(
     // Get request info for IP and user agent from metadata
     const ip = input.metadata?.ip;
     const userAgent = input.metadata?.userAgent;
+    const timestamp = new Date().toISOString();
+
+    // Enhanced metadata with all tracking information
+    const enhancedMetadata = {
+      ...(input.metadata || {}),
+      ip,
+      userAgent,
+      timestamp,
+      version: latestVersion.version,
+      agreementType: input.agreementType,
+      acceptanceMethod: 'web',
+      deviceInfo: userAgent ? {
+        browser: userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+        isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent),
+      } : undefined,
+    };
 
     // Insert user agreement
     const { data: userAgreement, error } = await supabase
@@ -161,7 +177,7 @@ export async function acceptUserAgreement(
         acceptance_method: 'web',
         signature_text: input.signatureText,
         signature_method: input.signatureMethod || 'typed',
-        metadata: input.metadata || {},
+        metadata: enhancedMetadata,
       })
       .select()
       .single();
@@ -169,15 +185,30 @@ export async function acceptUserAgreement(
     if (error) {
       // If already exists, update it
       if (error.code === '23505') {
+        const timestamp = new Date().toISOString();
+        const enhancedMetadata = {
+          ...(input.metadata || {}),
+          ip,
+          userAgent,
+          timestamp,
+          version: latestVersion.version,
+          agreementType: input.agreementType,
+          acceptanceMethod: 'web',
+          deviceInfo: userAgent ? {
+            browser: userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+            isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent),
+          } : undefined,
+        };
+
         const { data: updated, error: updateError } = await supabase
           .from('user_agreements')
           .update({
-            accepted_at: new Date().toISOString(),
+            accepted_at: timestamp,
             accepted_ip: ip,
             accepted_user_agent: userAgent,
             signature_text: input.signatureText,
             signature_method: input.signatureMethod || 'typed',
-            metadata: input.metadata || {},
+            metadata: enhancedMetadata,
           })
           .eq('user_id', input.userId)
           .eq('agreement_version_id', latestVersion.id)
@@ -242,6 +273,23 @@ export async function acceptWarehouseAgreement(
     // Get request info from metadata
     const ip = input.metadata?.ip;
     const userAgent = input.metadata?.userAgent;
+    const timestamp = new Date().toISOString();
+
+    // Enhanced metadata with all tracking information
+    const enhancedMetadata = {
+      ...(input.metadata || {}),
+      ip,
+      userAgent,
+      timestamp,
+      version: latestVersion.version,
+      agreementType: input.agreementType,
+      acceptanceMethod: 'web',
+      warehouseId: input.warehouseId,
+      deviceInfo: userAgent ? {
+        browser: userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+        isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent),
+      } : undefined,
+    };
 
     // Insert warehouse agreement
     const { data: warehouseAgreement, error } = await supabase
@@ -254,7 +302,7 @@ export async function acceptWarehouseAgreement(
         accepted_user_agent: userAgent,
         signature_text: input.signatureText,
         signature_method: input.signatureMethod || 'typed',
-        metadata: input.metadata || {},
+        metadata: enhancedMetadata,
       })
       .select()
       .single();
@@ -262,16 +310,32 @@ export async function acceptWarehouseAgreement(
     if (error) {
       if (error.code === '23505') {
         // Update if exists
+        const timestamp = new Date().toISOString();
+        const enhancedMetadata = {
+          ...(input.metadata || {}),
+          ip,
+          userAgent,
+          timestamp,
+          version: latestVersion.version,
+          agreementType: input.agreementType,
+          acceptanceMethod: 'web',
+          warehouseId: input.warehouseId,
+          deviceInfo: userAgent ? {
+            browser: userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+            isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent),
+          } : undefined,
+        };
+
         const { data: updated, error: updateError } = await supabase
           .from('warehouse_agreements')
           .update({
-            accepted_at: new Date().toISOString(),
+            accepted_at: timestamp,
             accepted_by: input.userId,
             accepted_ip: ip,
             accepted_user_agent: userAgent,
             signature_text: input.signatureText,
             signature_method: input.signatureMethod || 'typed',
-            metadata: input.metadata || {},
+            metadata: enhancedMetadata,
           })
           .eq('warehouse_id', input.warehouseId)
           .eq('agreement_version_id', latestVersion.id)
@@ -335,6 +399,23 @@ export async function acceptBookingAgreement(
     // Get request info from metadata
     const ip = input.metadata?.ip;
     const userAgent = input.metadata?.userAgent;
+    const timestamp = new Date().toISOString();
+
+    // Enhanced metadata with all tracking information
+    const enhancedMetadata = {
+      ...(input.metadata || {}),
+      ip,
+      userAgent,
+      timestamp,
+      version: latestVersion.version,
+      agreementType: input.agreementType,
+      acceptanceMethod: 'web',
+      bookingId: input.bookingId,
+      deviceInfo: userAgent ? {
+        browser: userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+        isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent),
+      } : undefined,
+    };
 
     // Insert booking agreement
     const { data: bookingAgreement, error } = await supabase
@@ -347,7 +428,7 @@ export async function acceptBookingAgreement(
         accepted_user_agent: userAgent,
         signature_text: input.signatureText,
         signature_method: input.signatureMethod || 'typed',
-        metadata: input.metadata || {},
+        metadata: enhancedMetadata,
       })
       .select()
       .single();
@@ -355,16 +436,32 @@ export async function acceptBookingAgreement(
     if (error) {
       if (error.code === '23505') {
         // Update if exists
+        const timestamp = new Date().toISOString();
+        const enhancedMetadata = {
+          ...(input.metadata || {}),
+          ip,
+          userAgent,
+          timestamp,
+          version: latestVersion.version,
+          agreementType: input.agreementType,
+          acceptanceMethod: 'web',
+          bookingId: input.bookingId,
+          deviceInfo: userAgent ? {
+            browser: userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+            isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent),
+          } : undefined,
+        };
+
         const { data: updated, error: updateError } = await supabase
           .from('booking_agreements')
           .update({
-            accepted_at: new Date().toISOString(),
+            accepted_at: timestamp,
             accepted_by: input.userId,
             accepted_ip: ip,
             accepted_user_agent: userAgent,
             signature_text: input.signatureText,
             signature_method: input.signatureMethod || 'typed',
-            metadata: input.metadata || {},
+            metadata: enhancedMetadata,
           })
           .eq('booking_id', input.bookingId)
           .eq('agreement_version_id', latestVersion.id)
