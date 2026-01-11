@@ -16,7 +16,7 @@ import {
   SignatureStatus,
   UpdateContactInput,
 } from './types';
-import { KolaySignService, initializeKolaySignService } from './api/kolaysign-service';
+import { initializeKolaySignService } from './api/kolaysign-service';
 
 /**
  * Helper to map Contact to crm_contacts format

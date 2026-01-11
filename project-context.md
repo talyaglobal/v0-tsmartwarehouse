@@ -3,7 +3,7 @@
 ## Project Overview
 **Name**: TSmart Warehouse Management System
 **Description**: Enterprise-grade warehouse management platform.
-**Location**: `c:\IT\Projects\v0-tsmartwarehouse`
+**Location**: `c:\IT\Projects\v0-Warebnb`
 
 ## Technology Stack
 - **Framework**: Next.js 16.0.7 (App Router)

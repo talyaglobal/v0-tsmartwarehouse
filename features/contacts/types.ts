@@ -131,7 +131,7 @@ export interface KolaySignConfig {
 }
 
 export interface KolaySignDocument {
-  id: string;
+  id?: string;
   name: string;
   content: string;
   signers: Array<{

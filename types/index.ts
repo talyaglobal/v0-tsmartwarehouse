@@ -92,6 +92,12 @@ export interface WeightRangePricing {
   pricePerPallet: number // Additional price per pallet for this weight range
 }
 
+export interface CustomPalletSize {
+  length: number // in inches
+  width: number // in inches
+  heightRanges: HeightRangePricing[] // Height ranges specific to this custom size
+}
+
 export interface PalletPricing {
   id?: string
   warehouseId?: string
@@ -202,6 +208,8 @@ export interface Booking {
   startDate: string
   endDate?: string
   totalAmount: number
+  baseStorageAmount?: number
+  servicesAmount?: number
   notes?: string
   // Time slot fields (for pre-orders)
   scheduledDropoffDatetime?: string

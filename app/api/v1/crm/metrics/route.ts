@@ -162,7 +162,11 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    return handleApiError(error, "Failed to fetch CRM metrics")
+    const errorResult = handleApiError(error, { action: "Failed to fetch CRM metrics" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

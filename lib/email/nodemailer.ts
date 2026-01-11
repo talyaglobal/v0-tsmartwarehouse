@@ -14,8 +14,8 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     const smtpSecure = process.env.SMTP_SECURE === 'true'
     const smtpUser = process.env.SMTP_USER
     const smtpPassword = process.env.SMTP_PASSWORD
-    const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@tsmartwarehouse.com'
-    const smtpFromName = process.env.SMTP_FROM_NAME || 'tsmartWarehouse'
+    const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@Warebnb.com'
+    const smtpFromName = process.env.SMTP_FROM_NAME || 'Warebnb'
 
     if (!smtpHost || !smtpUser || !smtpPassword) {
       const missingVars = []
@@ -71,7 +71,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     console.log('Email subject:', options.subject)
     
     // Generate Message-ID
-    const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 9)}@${smtpFromEmail.split('@')[1] || 'tsmartwarehouse.com'}>`
+    const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 9)}@${smtpFromEmail.split('@')[1] || 'Warebnb.com'}>`
     
     const sendPromise = transporter.sendMail({
       from: `"${smtpFromName}" <${smtpFromEmail}>`,
@@ -87,7 +87,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
         'X-Priority': '3',
         'X-MSMail-Priority': 'Normal',
         'Importance': 'normal',
-        'X-Mailer': 'tsmartWarehouse',
+        'X-Mailer': 'Warebnb',
       },
       // Add reply-to
       replyTo: smtpFromEmail,

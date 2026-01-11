@@ -92,7 +92,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: milestones || [] })
   } catch (error) {
-    return handleApiError(error, "Failed to fetch pipeline milestones")
+    const errorResult = handleApiError(error, { action: "Failed to fetch pipeline milestones" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

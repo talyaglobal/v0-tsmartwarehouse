@@ -2,7 +2,7 @@
 
 **Enterprise-grade warehouse management platform built with Next.js 16+**
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/tsmarts-projects/v0-tsmartwarehouse)
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/tsmarts-projects/v0-Warebnb)
 [![Next.js](https://img.shields.io/badge/Next.js-16.0-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
 
@@ -195,6 +195,6 @@ PROPRIETARY - TSmart Team
 
 ## 🔗 Links
 
-- **Deployment:** [Vercel Dashboard](https://vercel.com/tsmarts-projects/v0-tsmartwarehouse)
+- **Deployment:** [Vercel Dashboard](https://vercel.com/tsmarts-projects/v0-Warebnb)
 - **Documentation:** See `/docs` folder
 - **API Docs:** [API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md)

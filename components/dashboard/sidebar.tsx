@@ -272,7 +272,7 @@ export function DashboardSidebar() {
           <Warehouse className="h-6 w-6 text-primary" />
         )}
         <span className="font-bold">
-          {profile?.company || (actualRole === 'customer' ? 'tsmartWarehouse' : 'TSmart')}
+          {profile?.company || (actualRole === 'customer' ? 'Warebnb' : 'TSmart')}
         </span>
       </div>
 

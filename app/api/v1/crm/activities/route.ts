@@ -155,7 +155,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: activities })
   } catch (error) {
-    return handleApiError(error, "Failed to fetch CRM activities")
+    const errorResult = handleApiError(error, { action: "Failed to fetch CRM activities" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 
@@ -309,7 +313,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: activity }, { status: 201 })
   } catch (error) {
-    return handleApiError(error, "Failed to create CRM activity")
+    const errorResult = handleApiError(error, { action: "Failed to create CRM activity" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

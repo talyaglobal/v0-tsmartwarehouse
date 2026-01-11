@@ -1,15 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, Calendar, Loader2, MapPin, Building2 } from "@/components/icons"
+import { Plus, Search, Calendar, Loader2 } from "@/components/icons"
 import { api } from "@/lib/api/client"
-import { formatDate } from "@/lib/utils/format"
 import { ActivityTimeline } from "@/components/crm/ActivityTimeline"
 import type { CRMActivity } from "@/types"
 

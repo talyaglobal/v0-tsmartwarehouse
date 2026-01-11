@@ -390,7 +390,7 @@ export default function HomePage() {
                 <CardContent className="pt-6">
                   <Mail className="h-8 w-8 text-primary mx-auto mb-4" />
                   <h3 className="font-semibold">Email</h3>
-                  <p className="text-sm text-muted-foreground mt-2">info@tsmartwarehouse.com</p>
+                  <p className="text-sm text-muted-foreground mt-2">info@Warebnb.com</p>
                 </CardContent>
               </Card>
             </div>

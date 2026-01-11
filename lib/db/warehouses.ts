@@ -155,7 +155,7 @@ export async function createWarehouse(
       latitude: warehouse.latitude,
       longitude: warehouse.longitude,
       warehouse_type: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : [warehouse.warehouseType || 'general-dry-ambient'], // Now array
-      storage_type: Array.isArray(warehouse.storageTypes) ? warehouse.storageTypes : (warehouse.storageTypes?.[0] ? [warehouse.storageTypes[0]] : (warehouse.storageType ? [warehouse.storageType] : ['rack-space'])), // Now array
+      storage_type: Array.isArray(warehouse.storageType) ? warehouse.storageType : (warehouse.storageType ? [warehouse.storageType] : ['rack-space']), // Now array
       temperature_types: warehouse.temperatureTypes,
       photos: warehouse.photos,
       videos: (warehouse as any).videos || [], // New field - videos array

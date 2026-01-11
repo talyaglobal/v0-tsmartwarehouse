@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatCard } from "@/components/ui/stat-card"
-import { TrendingUp, Calendar, Building2, Target, DollarSign, Users } from "@/components/icons"
-import { api } from "@/lib/api/client"
+import { TrendingUp, Calendar, Building2, Users } from "@/components/icons"
 import type { CRMPerformanceMetrics } from "@/types"
 
 export default function WarehouseFinderPerformancePage() {
@@ -120,7 +119,7 @@ export default function WarehouseFinderPerformancePage() {
               <div className="text-sm text-muted-foreground mt-1">Converted</div>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-3xl font-bold">{metrics.conversionRate.toFixed(1)}%</div>
+              <div className="text-3xl font-bold">{(metrics.conversionRate ?? 0).toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground mt-1">Conversion Rate</div>
             </div>
           </div>

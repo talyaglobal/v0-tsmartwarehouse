@@ -1,0 +1,14 @@
+{
+  "github": {
+    "silent": true
+  },
+  "env": {
+    "BETA_PASSWORD": "@beta-password",
+    "BETA_COOKIE_SECRET": "@beta-cookie-secret"
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_SITE_URL": "https://beta.warebnb.co"
+    }
+  }
+}

@@ -1,15 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Search, FileText, Loader2, Eye, Edit, Send } from "@/components/icons"
-import { api } from "@/lib/api/client"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 
 interface Proposal {
@@ -127,7 +124,7 @@ export default function ResellerProposalsPage() {
                     <TableCell>{proposal.leadName}</TableCell>
                     <TableCell>{formatCurrency(proposal.amount)}</TableCell>
                     <TableCell>
-                      <StatusBadge status={proposal.status} />
+                      <Badge variant={proposal.status === "accepted" ? "default" : proposal.status === "rejected" ? "destructive" : "secondary"}>{proposal.status}</Badge>
                     </TableCell>
                     <TableCell>{formatDate(proposal.createdAt)}</TableCell>
                     <TableCell className="text-right">

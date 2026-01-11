@@ -397,8 +397,8 @@ Create a compelling investment pitch deck for **TSmart Warehouse**, a B2B market
 **Join Us in Revolutionizing Warehouse Storage**
 
 **Contact:**
-- Email: [founder@tsmartwarehouse.com]
-- Website: [www.tsmartwarehouse.com]
+- Email: [founder@Warebnb.com]
+- Website: [www.Warebnb.com]
 - Demo: [Schedule a demo]
 
 **Next Steps:**

@@ -15,6 +15,7 @@ import { MapPin, Building2, Warehouse as WarehouseIcon, ArrowLeft, AlertCircle, 
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { createClient } from "@/lib/supabase/client"
 import { AgreementModal } from "@/features/agreements/components/AgreementModal"
+import { AgreementType } from "@/features/agreements/types"
 
 interface Warehouse {
   id: string
@@ -58,7 +59,6 @@ export default function BookingReviewPage() {
   const [availablePallets, setAvailablePallets] = useState<number | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [selectedServices, setSelectedServices] = useState<any[]>([])
-  const [servicesTotal, setServicesTotal] = useState(0)
   const [agreementAccepted, setAgreementAccepted] = useState(false)
   const [showAgreementModal, setShowAgreementModal] = useState(false)
 
@@ -127,7 +127,7 @@ export default function BookingReviewPage() {
                   break
               }
             })
-            setServicesTotal(total)
+            // Services total calculated but UI uses selectedServices directly
           }
         })
         .catch(err => console.error('Failed to fetch services:', err))
@@ -256,7 +256,7 @@ export default function BookingReviewPage() {
         `- Wire Transfer\n` +
         `- ACH Payment\n` +
         `- Multiple Installment Payments\n\n` +
-        `Email: billing@tsmartwarehouse.com\n` +
+        `Email: billing@Warebnb.com\n` +
         `Phone: (555) 123-4567`
       )
       return
@@ -774,19 +774,12 @@ export default function BookingReviewPage() {
 
       {/* Agreement Modal */}
       <AgreementModal
-        agreementType="customer_booking"
-        isOpen={showAgreementModal}
-        onClose={() => setShowAgreementModal(false)}
+        agreementType={AgreementType.CUSTOMER_BOOKING}
+        open={showAgreementModal}
+        onOpenChange={(open) => setShowAgreementModal(open)}
         onAccept={handleAgreementAccept}
-        userId={user?.id}
-        metadata={{
-          warehouseId: warehouse?.id,
-          warehouseName: warehouse?.name,
-          bookingType: bookingDetails?.type,
-          startDate: bookingDetails?.startDate,
-          endDate: bookingDetails?.endDate,
-          totalAmount: bookingDetails?.totalAmount,
-        }}
+        userId={user?.id || ""}
+        warehouseId={warehouse?.id}
       />
     </div>
   )

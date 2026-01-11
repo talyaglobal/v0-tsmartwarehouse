@@ -22,7 +22,6 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [warehouseLoading, setWarehouseLoading] = useState(false)
   const [bookingId, setBookingId] = useState<string>("")
   const [bookingServices, setBookingServices] = useState<any[]>([])
-  const [servicesLoading, setServicesLoading] = useState(false)
 
   useEffect(() => {
     // Handle both sync and async params
@@ -64,15 +63,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   const fetchBookingServices = async (id: string) => {
     try {
-      setServicesLoading(true)
       const result = await api.get(`/api/v1/bookings/${id}/services`, { showToast: false })
       if (result.success && result.data?.services) {
         setBookingServices(result.data.services)
       }
     } catch (error) {
       console.error('Failed to fetch booking services:', error)
-    } finally {
-      setServicesLoading(false)
     }
   }
 

@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
       latitude: validated.latitude,
       longitude: validated.longitude,
       warehouseType: validated.warehouseType, // Now an array
-      storageTypes: validated.storageType, // Now an array
+      storageType: validated.storageType, // Now an array
       temperatureTypes: validated.temperatureTypes,
       amenities: validated.amenities || [],
       photos: validated.photos, // Store photo paths

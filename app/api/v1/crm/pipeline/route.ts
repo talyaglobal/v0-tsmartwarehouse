@@ -137,7 +137,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: pipelineOverview })
   } catch (error) {
-    return handleApiError(error, "Failed to fetch pipeline overview")
+    const errorResult = handleApiError(error, { action: "Failed to fetch pipeline overview" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

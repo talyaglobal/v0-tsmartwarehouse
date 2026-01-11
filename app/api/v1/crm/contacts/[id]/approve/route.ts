@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { requireAuth, requireRole } from "@/lib/auth/api-middleware"
+import { requireAuth } from "@/lib/auth/api-middleware"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
@@ -158,7 +158,11 @@ export async function POST(
 
     return NextResponse.json({ success: true, data: updatedContact })
   } catch (error) {
-    return handleApiError(error, "Failed to process approval request")
+    const errorResult = handleApiError(error, { action: "Failed to process approval request" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

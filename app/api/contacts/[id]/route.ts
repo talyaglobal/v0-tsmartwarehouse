@@ -12,10 +12,11 @@ import { getContact, updateContact, deleteContact } from '@/features/contacts/ac
  * Get a specific contact by ID
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     
     // Get authenticated user
@@ -27,7 +28,7 @@ export async function GET(
       );
     }
 
-    const result = await getContact(params.id);
+    const result = await getContact(id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -52,9 +53,10 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     
     // Get authenticated user
@@ -67,7 +69,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const result = await updateContact(params.id, body, user.id);
+    const result = await updateContact(id, body, user.id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -91,10 +93,11 @@ export async function PUT(
  * Delete a contact
  */
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     
     // Get authenticated user
@@ -106,7 +109,7 @@ export async function DELETE(
       );
     }
 
-    const result = await deleteContact(params.id);
+    const result = await deleteContact(id);
 
     if (!result.success) {
       return NextResponse.json(

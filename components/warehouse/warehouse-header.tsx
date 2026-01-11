@@ -99,6 +99,8 @@ export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderP
       warehouse_admin: '🔵 Warehouse Admin',
       customer: '🟣 Customer',
       warehouse_staff: '⚪ Warehouse Staff',
+      warehouse_finder: '🔍 Warehouse Finder',
+      reseller: '💼 Reseller',
     }
     return labels[role] || role
   }

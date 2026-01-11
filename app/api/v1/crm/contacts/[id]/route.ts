@@ -113,7 +113,11 @@ export async function GET(
 
     return NextResponse.json({ success: true, data: contact })
   } catch (error) {
-    return handleApiError(error, "Failed to fetch CRM contact")
+    const errorResult = handleApiError(error, { action: "Failed to fetch CRM contact" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 
@@ -255,7 +259,11 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, data: contact })
   } catch (error) {
-    return handleApiError(error, "Failed to update CRM contact")
+    const errorResult = handleApiError(error, { action: "Failed to update CRM contact" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 
@@ -339,7 +347,11 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Contact archived successfully" })
   } catch (error) {
-    return handleApiError(error, "Failed to delete CRM contact")
+    const errorResult = handleApiError(error, { action: "Failed to delete CRM contact" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

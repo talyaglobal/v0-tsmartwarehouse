@@ -1,6 +1,6 @@
 export function getPasswordResetEmailTemplate(resetUrl: string, userName?: string): { subject: string; html: string; text: string } {
   // Use a more professional subject line that's less likely to be marked as spam
-  const subject = 'Password Reset Request - tsmartWarehouse'
+  const subject = 'Password Reset Request - Warebnb'
   
   const html = `
 <!DOCTYPE html>
@@ -30,7 +30,7 @@ export function getPasswordResetEmailTemplate(resetUrl: string, userName?: strin
               </p>
               
               <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
-                We received a request to reset your password for your <strong>tsmartWarehouse</strong> account.
+                We received a request to reset your password for your <strong>Warebnb</strong> account.
               </p>
               
               <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.6;">
@@ -65,7 +65,7 @@ export function getPasswordResetEmailTemplate(resetUrl: string, userName?: strin
               
               <p style="margin: 30px 0 0; color: #333333; font-size: 16px; line-height: 1.6;">
                 Best regards,<br>
-                <strong>The tsmartWarehouse Team</strong>
+                <strong>The Warebnb Team</strong>
               </p>
             </td>
           </tr>
@@ -75,7 +75,7 @@ export function getPasswordResetEmailTemplate(resetUrl: string, userName?: strin
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;">
                 This is an automated message. Please do not reply to this email.<br>
-                © ${new Date().getFullYear()} tsmartWarehouse. All rights reserved.
+                © ${new Date().getFullYear()} Warebnb. All rights reserved.
               </p>
             </td>
           </tr>
@@ -88,11 +88,11 @@ export function getPasswordResetEmailTemplate(resetUrl: string, userName?: strin
   `.trim()
 
   const text = `
-Reset Your tsmartWarehouse Password
+Reset Your Warebnb Password
 
 Hello${userName ? ` ${userName}` : ''},
 
-We received a request to reset your password for your tsmartWarehouse account.
+We received a request to reset your password for your Warebnb account.
 
 Click the link below to reset your password. This link will expire in 24 hours.
 
@@ -101,11 +101,11 @@ ${resetUrl}
 Security Notice: If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
 
 Best regards,
-The tsmartWarehouse Team
+The Warebnb Team
 
 ---
 This is an automated message. Please do not reply to this email.
-© ${new Date().getFullYear()} tsmartWarehouse. All rights reserved.
+© ${new Date().getFullYear()} Warebnb. All rights reserved.
   `.trim()
 
   return { subject, html, text }

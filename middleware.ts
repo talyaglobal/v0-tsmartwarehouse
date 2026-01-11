@@ -3,6 +3,23 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { applySecurityHeaders } from '@/lib/security/headers'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  
+  // Beta protection check - only for beta.warebnb.co domain
+  if (process.env.NEXT_PUBLIC_SITE_URL?.includes("beta.warebnb.co")) {
+    // Public paths that don't require beta password
+    const publicPaths = ["/beta-login", "/api/beta-auth"]
+    const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
+    
+    if (!isPublicPath) {
+      const betaAccess = request.cookies.get("beta-access")
+      
+      if (!betaAccess || betaAccess.value !== "granted") {
+        return NextResponse.redirect(new URL("/beta-login", request.url))
+      }
+    }
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -87,8 +104,6 @@ export async function middleware(request: NextRequest) {
     // This allows the build to complete
     console.warn('Auth check failed in middleware:', error)
   }
-
-  const pathname = request.nextUrl.pathname
 
   // Auth routes (login, register, admin-login, accept-invitation) - redirect if already authenticated
   const authRoutes = ['/login', '/register', '/admin-login']

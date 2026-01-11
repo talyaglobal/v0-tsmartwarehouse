@@ -17,6 +17,18 @@ import {
   AgreementStatus,
 } from './types';
 
+// Type for RPC result
+interface AgreementVersionRpcResult {
+  id: string;
+  agreement_type: string;
+  version: string;
+  title: string;
+  content: string;
+  pdf_url: string | null;
+  is_major_version: boolean;
+  effective_date: string;
+}
+
 /**
  * Get latest agreement version
  */
@@ -32,7 +44,7 @@ export async function getLatestAgreementVersion(
         p_agreement_type: agreementType,
         p_language: language,
       })
-      .single();
+      .single<AgreementVersionRpcResult>();
 
     if (error) {
       throw error;
@@ -48,10 +60,10 @@ export async function getLatestAgreementVersion(
       version: data.version,
       title: data.title,
       content: data.content,
-      pdfUrl: data.pdf_url,
+      pdfUrl: data.pdf_url ?? undefined,
       isMajorVersion: data.is_major_version,
       effectiveDate: new Date(data.effective_date),
-      expiryDate: data.expiry_date ? new Date(data.expiry_date) : undefined,
+      expiryDate: undefined,
       language: language,
       isActive: true,
       isDraft: false,

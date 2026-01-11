@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.parse(body);
-    const { event, requestId, kolaySignRequestId, documentId, signedAt, signedDocumentUrl, reason } = payload;
+    const { event, kolaySignRequestId, documentId, signedAt, signedDocumentUrl, reason } = payload;
 
     // Find signature request by KolaySign request ID
     const { data: signatureRequest, error: fetchError } = await supabase

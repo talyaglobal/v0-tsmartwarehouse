@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -805,8 +805,8 @@ export default function NewWarehousePage() {
                 <>
                   <Separator />
                   <PalletPricingForm
-                    onPricingChange={handlePricingChange}
-                    initialPricing={formData.palletPricing}
+                    onPricingChange={(pricing) => setFormData((prev) => ({ ...prev, palletPricing: pricing }))}
+                    initialPricing={formData.palletPricing as any}
                   />
                 </>
               )}
@@ -815,7 +815,7 @@ export default function NewWarehousePage() {
 
               {formData.pricing
                 .filter(p => p.pricingType === 'area-rental') // Only show area-rental pricing
-                .map((price, index) => {
+                .map((price) => {
                   const actualIndex = formData.pricing.findIndex(p => p === price)
                   return (
                     <div key={actualIndex} className="p-4 border rounded-lg space-y-3">

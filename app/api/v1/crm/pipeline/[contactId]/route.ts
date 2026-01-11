@@ -146,7 +146,11 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, data: updatedContact })
   } catch (error) {
-    return handleApiError(error, "Failed to move contact to new stage")
+    const errorResult = handleApiError(error, { action: "Failed to move contact to new stage" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

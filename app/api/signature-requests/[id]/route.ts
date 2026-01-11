@@ -18,10 +18,11 @@ import { SignatureStatus } from '@/features/contacts/types';
  * Get a specific signature request by ID
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     
     // Get authenticated user
@@ -33,7 +34,7 @@ export async function GET(
       );
     }
 
-    const result = await getSignatureRequest(params.id);
+    const result = await getSignatureRequest(id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -58,9 +59,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     
     // Get authenticated user
@@ -76,7 +78,7 @@ export async function POST(
     const action = searchParams.get('action');
 
     if (action === 'cancel') {
-      const result = await cancelSignatureRequest(params.id);
+      const result = await cancelSignatureRequest(id);
       if (!result.success) {
         return NextResponse.json(
           { error: result.error },
@@ -87,7 +89,7 @@ export async function POST(
     }
 
     if (action === 'resend') {
-      const result = await resendSigningInvitation(params.id);
+      const result = await resendSigningInvitation(id);
       if (!result.success) {
         return NextResponse.json(
           { error: result.error },
@@ -103,7 +105,7 @@ export async function POST(
       const signedDocumentUrl = body.signedDocumentUrl;
 
       const result = await updateSignatureRequestStatus(
-        params.id,
+        id,
         status,
         signedDocumentUrl
       );

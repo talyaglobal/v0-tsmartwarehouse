@@ -7,10 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, X, Trash2 } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import { PalletPricing, PalletType, PricingPeriod, HeightRangePricing, WeightRangePricing, CustomPalletDimensions, CustomPalletSize } from "@/types"
-import { cn } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface PalletPricingFormProps {
@@ -109,27 +107,6 @@ export function PalletPricingForm({
     // Don't call onPricingChange here - let useEffect handle it
   }
 
-  const getOrCreatePalletPricing = (palletType: PalletType, period: PricingPeriod): PalletPricing => {
-    const existing = pricing.find(
-      (p) => p.palletType === palletType && p.pricingPeriod === period
-    )
-    if (existing) return existing
-
-    const newPricing: PalletPricing = {
-      palletType,
-      pricingPeriod: period,
-      heightRanges: [],
-      weightRanges: [],
-    }
-    if (palletType === "custom") {
-      newPricing.customDimensions = { length: 0, width: 0, height: 0, unit: "in" }
-    }
-
-    const updated = [...pricing, newPricing]
-    updatePricing(updated)
-    return newPricing
-  }
-
   const updatePalletPricing = (palletType: PalletType, period: PricingPeriod, updates: Partial<PalletPricing>) => {
     let updated = [...pricing]
     const existingIndex = updated.findIndex(
@@ -164,7 +141,7 @@ export function PalletPricingForm({
     updatePricing(updated)
   }
 
-  const addHeightRange = (palletType: PalletType, period: PricingPeriod) => {
+  const addHeightRange = (palletType: PalletType, _period: PricingPeriod) => {
     const newRange: HeightRangePricing = {
       heightMinCm: 0,
       heightMaxCm: 200,
@@ -334,7 +311,7 @@ export function PalletPricingForm({
     updatePricing(updatedPricing)
   }
 
-  const addWeightRange = (palletType: PalletType, period: PricingPeriod) => {
+  const addWeightRange = (palletType: PalletType, _period: PricingPeriod) => {
     const newRange: WeightRangePricing = {
       weightMinKg: 0,
       weightMaxKg: 1000,
@@ -505,7 +482,7 @@ export function PalletPricingForm({
   }
 
   // Helper functions for custom pallet sizes
-  const addCustomPalletSize = (palletType: PalletType, period: PricingPeriod) => {
+  const addCustomPalletSize = (palletType: PalletType, _period: PricingPeriod) => {
     if (palletType !== 'custom') return
     
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
@@ -548,7 +525,7 @@ export function PalletPricingForm({
     updatePricing(updatedPricing)
   }
 
-  const removeCustomPalletSize = (palletType: PalletType, period: PricingPeriod, sizeIndex: number) => {
+  const removeCustomPalletSize = (palletType: PalletType, _period: PricingPeriod, sizeIndex: number) => {
     if (palletType !== 'custom') return
     
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
@@ -570,7 +547,7 @@ export function PalletPricingForm({
 
   const updateCustomPalletSize = (
     palletType: PalletType,
-    period: PricingPeriod,
+    _period: PricingPeriod,
     sizeIndex: number,
     field: 'length' | 'width',
     value: number | string
@@ -602,7 +579,7 @@ export function PalletPricingForm({
 
   const addHeightRangeToCustomSize = (
     palletType: PalletType,
-    period: PricingPeriod,
+    _period: PricingPeriod,
     sizeIndex: number
   ) => {
     if (palletType !== 'custom') return
@@ -637,7 +614,7 @@ export function PalletPricingForm({
 
   const removeHeightRangeFromCustomSize = (
     palletType: PalletType,
-    period: PricingPeriod,
+    _period: PricingPeriod,
     sizeIndex: number,
     rangeIndex: number
   ) => {
@@ -669,7 +646,7 @@ export function PalletPricingForm({
 
   const updateHeightRangeInCustomSize = (
     palletType: PalletType,
-    period: PricingPeriod,
+    _period: PricingPeriod,
     sizeIndex: number,
     rangeIndex: number,
     field: keyof HeightRangePricing,
@@ -706,36 +683,6 @@ export function PalletPricingForm({
     updatePricing(updatedPricing)
   }
 
-  // Legacy function for backward compatibility (deprecated - use customSizes instead)
-  const updateCustomDimensions = (
-    palletType: PalletType,
-    period: PricingPeriod,
-    field: keyof CustomPalletDimensions,
-    value: number | string
-  ) => {
-    // Only update if pallet type is custom
-    if (palletType !== 'custom') return
-    
-    // Get existing custom dimensions from any period (they should be the same)
-    const existingCustomPricing = pricing.find(
-      (p) => p.palletType === 'custom' && p.customDimensions
-    )
-    const baseDimensions = existingCustomPricing?.customDimensions || { length: 0, width: 0, height: 0, unit: "in" }
-    
-    // Update dimensions for the specified field
-    const numValue = typeof value === 'string' ? (value === '' ? 0 : Number(value)) : value
-    const updatedDimensions = {
-      ...baseDimensions,
-      [field]: numValue,
-    } as CustomPalletDimensions
-    
-    // Update for all periods to keep them in sync
-    const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
-    allPeriods.forEach(p => {
-      updatePalletPricing(palletType, p, { customDimensions: updatedDimensions })
-    })
-  }
-
   const renderPalletTypeSection = (palletType: PalletType) => {
     const palletTypeLabel = {
       euro: "Euro Pallet (47.24\" x 31.50\")",
@@ -758,10 +705,7 @@ export function PalletPricingForm({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const dayPricing = pricing.find(p => p.palletType === palletType && p.pricingPeriod === "day")
-                    addCustomPalletSize(palletType, "day")
-                  }}
+                  onClick={() => addCustomPalletSize(palletType, "day")}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Size

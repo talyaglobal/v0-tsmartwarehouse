@@ -140,9 +140,9 @@ export default function EditWarehousePage() {
     }, // New field - object with per-pallet in/out pricing
     videos: [] as string[], // New field
     palletPricing: [] as Array<{
-      palletType: string
-      pricingPeriod: string
-      customDimensions?: { length: number; width: number; height: number; unit?: string }
+      palletType: 'euro' | 'standard' | 'custom'
+      pricingPeriod: 'day' | 'week' | 'month'
+      customDimensions?: { length: number; width: number; height: number; unit?: 'cm' | 'in' }
       heightRanges?: Array<{ heightMinCm: number; heightMaxCm: number; pricePerUnit: number }>
       weightRanges?: Array<{ weightMinKg: number; weightMaxKg: number; pricePerPallet: number }>
     }>, // New field
@@ -449,8 +449,6 @@ export default function EditWarehousePage() {
               accessControl: formData.accessControl || undefined,
             }
           : undefined,
-        productAcceptanceStartTime: formData.productAcceptanceStartTime || undefined,
-        productAcceptanceEndTime: formData.productAcceptanceEndTime || undefined,
         workingDays: formData.workingDays.length > 0 ? formData.workingDays : undefined,
         warehouseInFee: formData.warehouseInFee ? parseFloat(formData.warehouseInFee) : undefined,
         warehouseOutFee: formData.warehouseOutFee ? parseFloat(formData.warehouseOutFee) : undefined,
@@ -955,7 +953,7 @@ export default function EditWarehousePage() {
 
               {formData.pricing
                 .filter(p => p.pricingType === 'area-rental') // Only show area-rental pricing
-                .map((price, index) => {
+                .map((price) => {
                   const actualIndex = formData.pricing.findIndex(p => p === price)
                   return (
                     <div key={actualIndex} className="p-4 border rounded-lg space-y-3">

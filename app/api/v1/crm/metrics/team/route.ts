@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { requireAuth, requireRole } from "@/lib/auth/api-middleware"
+import { requireRole } from "@/lib/auth/api-middleware"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
@@ -163,7 +163,11 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    return handleApiError(error, "Failed to fetch team metrics")
+    const errorResult = handleApiError(error, { action: "Failed to fetch team metrics" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 

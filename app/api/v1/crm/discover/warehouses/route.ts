@@ -120,7 +120,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: enrichedWarehouses })
   } catch (error) {
-    return handleApiError(error, "Failed to discover warehouses")
+    const errorResult = handleApiError(error, { action: "Failed to discover warehouses" })
+    return NextResponse.json(
+      { success: false, error: errorResult.message, code: errorResult.code },
+      { status: errorResult.statusCode }
+    )
   }
 }
 
