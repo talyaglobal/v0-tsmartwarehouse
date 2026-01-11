@@ -10,9 +10,11 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { MapPin, Building2, Warehouse as WarehouseIcon, ArrowLeft, AlertCircle } from "@/components/icons"
+import { Checkbox } from "@/components/ui/checkbox"
+import { MapPin, Building2, Warehouse as WarehouseIcon, ArrowLeft, AlertCircle, FileText } from "@/components/icons"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { createClient } from "@/lib/supabase/client"
+import { AgreementModal } from "@/features/agreements/components/AgreementModal"
 
 interface Warehouse {
   id: string
@@ -57,6 +59,8 @@ export default function BookingReviewPage() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [selectedServices, setSelectedServices] = useState<any[]>([])
   const [servicesTotal, setServicesTotal] = useState(0)
+  const [agreementAccepted, setAgreementAccepted] = useState(false)
+  const [showAgreementModal, setShowAgreementModal] = useState(false)
 
   // Check user auth status
   useEffect(() => {
@@ -227,8 +231,19 @@ export default function BookingReviewPage() {
     }
   }, [userLoading, user, guestEmail, bookingDetails, warehouseId, router])
 
+  const handleAgreementAccept = () => {
+    setAgreementAccepted(true)
+    setShowAgreementModal(false)
+  }
+
   const handlePayNow = async () => {
     if (!bookingDetails) return
+
+    // Check agreement acceptance
+    if (!agreementAccepted) {
+      alert("Please accept the Customer Booking Agreement to continue.")
+      return
+    }
 
     // Stripe maximum transaction limit
     const STRIPE_MAX_AMOUNT = 999999.99
@@ -552,6 +567,53 @@ export default function BookingReviewPage() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Agreement Acceptance */}
+                <Card className="border-amber-200 bg-amber-50/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <FileText className="h-5 w-5 text-amber-600" />
+                      Terms & Conditions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      <p className="mb-3">
+                        By proceeding with this booking, you agree to our Customer Booking Agreement, 
+                        which covers payment terms, cancellation policy, liability, and storage conditions.
+                      </p>
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-amber-700 hover:text-amber-900"
+                        onClick={() => setShowAgreementModal(true)}
+                      >
+                        View Customer Booking Agreement →
+                      </Button>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="agreement"
+                        checked={agreementAccepted}
+                        onCheckedChange={(checked) => setAgreementAccepted(checked === true)}
+                        className="mt-1"
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <label
+                          htmlFor="agreement"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          I accept the Customer Booking Agreement
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          You must accept the agreement to proceed with payment
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Sidebar - Summary */}
@@ -676,7 +738,7 @@ export default function BookingReviewPage() {
                       size="lg"
                       className="w-full h-14 text-lg font-semibold mt-6"
                       onClick={handlePayNow}
-                      disabled={isProcessing || (!user && !guestEmail)}
+                      disabled={isProcessing || (!user && !guestEmail) || !agreementAccepted}
                     >
                       {isProcessing ? "Processing..." : "Pay Now"}
                     </Button>
@@ -684,6 +746,12 @@ export default function BookingReviewPage() {
                     {!user && !guestEmail && (
                       <p className="text-xs text-muted-foreground text-center">
                         Please enter your email to continue
+                      </p>
+                    )}
+                    
+                    {(user || guestEmail) && !agreementAccepted && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        Please accept the agreement to continue
                       </p>
                     )}
 
@@ -703,6 +771,23 @@ export default function BookingReviewPage() {
           </div>
         </div>
       </main>
+
+      {/* Agreement Modal */}
+      <AgreementModal
+        agreementType="customer_booking"
+        isOpen={showAgreementModal}
+        onClose={() => setShowAgreementModal(false)}
+        onAccept={handleAgreementAccept}
+        userId={user?.id}
+        metadata={{
+          warehouseId: warehouse?.id,
+          warehouseName: warehouse?.name,
+          bookingType: bookingDetails?.type,
+          startDate: bookingDetails?.startDate,
+          endDate: bookingDetails?.endDate,
+          totalAmount: bookingDetails?.totalAmount,
+        }}
+      />
     </div>
   )
 }
