@@ -236,6 +236,7 @@ export function WarehouseDetailView({
   const originalConsoleErrorRef = useRef<typeof console.error | null>(null)
   const mapErrorListenerRef = useRef<any>(null)
   const [isMapLoading, setIsMapLoading] = useState(false)
+  
 
   // Check if we should open booking modal after login redirect
   useEffect(() => {
@@ -252,6 +253,7 @@ export function WarehouseDetailView({
       }
     }
   }, [user, userLoading])
+
 
   // Initialize Google Maps
   useEffect(() => {
@@ -579,10 +581,41 @@ export function WarehouseDetailView({
         </Button>
       </Link>
 
-      {/* Photo Gallery and Booking Summary Side by Side */}
+      {/* Mobile Booking Summary - Shows at top on mobile */}
+      <div className="lg:hidden">
+        {(searchParams?.type || searchParams?.startDate || searchParams?.endDate) && (
+          <div className="space-y-4 mb-6">
+            <BookingSummary
+              warehouseId={warehouse.id}
+              type={(searchParams?.type as "pallet" | "area-rental") || "pallet"}
+              quantity={
+                searchParams?.quantity
+                  ? parseInt(searchParams.quantity as string)
+                  : (searchParams?.type as string) === "pallet"
+                  ? parseInt((searchParams?.palletCount || searchParams?.quantity) as string) || 0
+                  : parseInt((searchParams?.areaSqFt || searchParams?.quantity) as string) || 0
+              }
+              startDate={(searchParams?.startDate || searchParams?.start_date) as string}
+              endDate={(searchParams?.endDate || searchParams?.end_date) as string}
+            />
+            {searchParams?.type && (searchParams?.startDate || searchParams?.start_date) && (searchParams?.endDate || searchParams?.end_date) && (
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={handleBookNow}
+                disabled={isSubmitting}
+              >
+                Request to Book
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Main Layout - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Photo Gallery and Warehouse Info - Left Side */}
-        <div className="lg:col-span-2 space-y-4">
+        {/* Left Column - All Content */}
+        <div className="lg:col-span-2 space-y-6">
           {/* Photos - Always shown by default */}
           {warehouse.photos && warehouse.photos.length > 0 ? (
             <PhotoGallery photos={warehouse.photos} alt={warehouse.name} />
@@ -644,133 +677,85 @@ export function WarehouseDetailView({
                 </Button>
               </div>
             </div>
+          </div>
 
-            {/* Location - Below warehouse name */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Location</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {warehouse.address}, {warehouse.city}
-                  {warehouse.state && `, ${warehouse.state}`}
-                  {warehouse.distance_km && (
-                    <span> • {warehouse.distance_km.toFixed(1)} km away</span>
-                  )}
-                </p>
-                {/* Google Maps - Interactive Map */}
-                {warehouse.latitude && warehouse.longitude ? (
-                  <div className="w-full h-96 rounded-lg overflow-hidden border relative">
-                    {isMapLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
-                        <p className="text-muted-foreground">Loading map...</p>
-                      </div>
-                    )}
-                    <div ref={mapRef} className="w-full h-full" />
-                    <a
-                      href={`https://www.google.com/maps?q=${warehouse.latitude},${warehouse.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute bottom-4 right-4 z-10 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg border hover:bg-background transition-colors"
-                      aria-label="Open in Google Maps"
-                    >
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-primary" />
-                        Open in Google Maps
-                      </p>
-                    </a>
-                  </div>
-                ) : warehouse.address ? (
-                  <div className="w-full h-96 rounded-lg overflow-hidden border relative">
-                    {isMapLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
-                        <p className="text-muted-foreground">Loading map...</p>
-                      </div>
-                    )}
-                    <div ref={mapRef} className="w-full h-full" />
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${warehouse.address}, ${warehouse.city}${warehouse.state ? `, ${warehouse.state}` : ''}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute bottom-4 right-4 z-10 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg border hover:bg-background transition-colors"
-                      aria-label="Open in Google Maps"
-                    >
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-primary" />
-                        Open in Google Maps
-                      </p>
-                    </a>
-                  </div>
-                ) : (
-                  <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center">
-                    <p className="text-muted-foreground">Location data not available</p>
-                  </div>
+          <Separator />
+
+          {/* Description */}
+          <div>
+            <h2 className="text-xl font-semibold mb-2">About this warehouse</h2>
+            <p className="text-muted-foreground">
+              {/* Description would come from warehouse.description if available */}
+              Professional warehouse space available for rent. Located in {warehouse.city} with easy access to major transportation routes.
+            </p>
+          </div>
+
+          {/* Location */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Location</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                {warehouse.address}, {warehouse.city}
+                {warehouse.state && `, ${warehouse.state}`}
+                {warehouse.distance_km && (
+                  <span> • {warehouse.distance_km.toFixed(1)} km away</span>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Booking Summary Sidebar - Right Side */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4 space-y-4">
-            {(searchParams?.type || searchParams?.startDate || searchParams?.endDate) && (
-              <BookingSummary
-                warehouseId={warehouse.id}
-                type={(searchParams?.type as "pallet" | "area-rental") || "pallet"}
-                quantity={
-                  searchParams?.quantity
-                    ? parseInt(searchParams.quantity as string)
-                    : (searchParams?.type as string) === "pallet"
-                    ? parseInt((searchParams?.palletCount || searchParams?.quantity) as string) || 0
-                    : parseInt((searchParams?.areaSqFt || searchParams?.quantity) as string) || 0
-                }
-                startDate={(searchParams?.startDate || searchParams?.start_date) as string}
-                endDate={(searchParams?.endDate || searchParams?.end_date) as string}
-              />
-            )}
-
-
-            {/* Book Button */}
-            {searchParams?.type && (searchParams?.startDate || searchParams?.start_date) && (searchParams?.endDate || searchParams?.end_date) ? (
-              <>
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handleBookNow}
-                  disabled={isSubmitting}
-                >
-                  Request to Book
-                </Button>
-
-                <p className="text-xs text-center text-muted-foreground">
-                  Select a date and time for drop-off when booking.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-center text-muted-foreground p-4 border rounded-lg">
-                Please select dates and quantity from the search page to book this warehouse.
               </p>
-            )}
-          </div>
-        </div>
-      </div>
+              {/* Google Maps - Interactive Map */}
+              {warehouse.latitude && warehouse.longitude ? (
+                <div className="w-full h-96 rounded-lg overflow-hidden border relative">
+                  {isMapLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+                      <p className="text-muted-foreground">Loading map...</p>
+                    </div>
+                  )}
+                  <div ref={mapRef} className="w-full h-full" />
+                  <a
+                    href={`https://www.google.com/maps?q=${warehouse.latitude},${warehouse.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-4 right-4 z-10 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg border hover:bg-background transition-colors"
+                    aria-label="Open in Google Maps"
+                  >
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      Open in Google Maps
+                    </p>
+                  </a>
+                </div>
+              ) : warehouse.address ? (
+                <div className="w-full h-96 rounded-lg overflow-hidden border relative">
+                  {isMapLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+                      <p className="text-muted-foreground">Loading map...</p>
+                    </div>
+                  )}
+                  <div ref={mapRef} className="w-full h-full" />
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${warehouse.address}, ${warehouse.city}${warehouse.state ? `, ${warehouse.state}` : ''}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-4 right-4 z-10 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg border hover:bg-background transition-colors"
+                    aria-label="Open in Google Maps"
+                  >
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      Open in Google Maps
+                    </p>
+                  </a>
+                </div>
+              ) : (
+                <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-muted-foreground">Location data not available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Main Content - Full Width Below */}
-      <div className="space-y-6">
-        <Separator />
-
-        {/* Description */}
-        <div>
-          <h2 className="text-xl font-semibold mb-2">About this warehouse</h2>
-          <p className="text-muted-foreground">
-            {/* Description would come from warehouse.description if available */}
-            Professional warehouse space available for rent. Located in {warehouse.city} with easy access to major transportation routes.
-          </p>
-        </div>
-
-        {/* Capacity */}
-        <Card>
+          {/* Capacity */}
+          <Card>
             <CardHeader>
               <CardTitle>Capacity</CardTitle>
             </CardHeader>
@@ -1193,6 +1178,50 @@ export function WarehouseDetailView({
               </CardContent>
           </Card>
         )}
+        </div>
+
+        {/* Booking Summary Sidebar - Right Side (Sticky) */}
+        <div className="hidden lg:block lg:col-span-1">
+          <div className="sticky top-24 space-y-4">
+            {(searchParams?.type || searchParams?.startDate || searchParams?.endDate) && (
+              <BookingSummary
+                warehouseId={warehouse.id}
+                type={(searchParams?.type as "pallet" | "area-rental") || "pallet"}
+                quantity={
+                  searchParams?.quantity
+                    ? parseInt(searchParams.quantity as string)
+                    : (searchParams?.type as string) === "pallet"
+                    ? parseInt((searchParams?.palletCount || searchParams?.quantity) as string) || 0
+                    : parseInt((searchParams?.areaSqFt || searchParams?.quantity) as string) || 0
+                }
+                startDate={(searchParams?.startDate || searchParams?.start_date) as string}
+                endDate={(searchParams?.endDate || searchParams?.end_date) as string}
+              />
+            )}
+
+            {/* Book Button */}
+            {searchParams?.type && (searchParams?.startDate || searchParams?.start_date) && (searchParams?.endDate || searchParams?.end_date) ? (
+              <>
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={handleBookNow}
+                  disabled={isSubmitting}
+                >
+                  Request to Book
+                </Button>
+
+                <p className="text-xs text-center text-muted-foreground">
+                  Select a date and time for drop-off when booking.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-center text-muted-foreground p-4 border rounded-lg">
+                Please select dates and quantity from the search page to book this warehouse.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Booking Time Slot Modal */}

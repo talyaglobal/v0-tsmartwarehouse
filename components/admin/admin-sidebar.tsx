@@ -34,7 +34,6 @@ import {
   Car,
 } from "@/components/icons"
 import { Button } from "@/components/ui/button"
-import { PerformanceMenuItem } from "@/components/admin/performance-menu-item"
 
 interface NavItem {
   name: string
@@ -88,7 +87,6 @@ const navSections: NavSection[] = [
   {
     title: "Analytics & Reports",
     items: [
-      { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
       { name: "Revenue", href: "/admin/revenue", icon: TrendingUp },
       { name: "Utilization", href: "/admin/utilization", icon: PieChart },
       { name: "Performance", href: "/admin/performance", icon: LineChart },
@@ -230,34 +228,6 @@ export function AdminSidebar() {
                 <div className="mt-1 space-y-0.5">
                   {section.items.map((item) => {
                     const itemActive = isActive(item.href)
-                    
-                    // Special handling for Performance menu item
-                    if (item.name === "Performance") {
-                      return (
-                        <div key={item.name} className="space-y-1">
-                          <Link
-                            href={item.href}
-                            className={cn(
-                              "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                              itemActive
-                                ? "bg-primary text-primary-foreground shadow-sm"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                          >
-                            <item.icon
-                              className={cn(
-                                "h-4 w-4 transition-transform group-hover:scale-110",
-                                itemActive && "text-primary-foreground"
-                              )}
-                            />
-                            <span className="flex-1">{item.name}</span>
-                          </Link>
-                          <div className="px-3 pb-2">
-                            <PerformanceMenuItem compact />
-                          </div>
-                        </div>
-                      )
-                    }
                     
                     return (
                       <Link

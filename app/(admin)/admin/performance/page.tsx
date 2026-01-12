@@ -2,303 +2,298 @@
 
 import { useState, useEffect } from "react"
 import { PageHeader } from "@/components/ui/page-header"
-import { StatCard } from "@/components/ui/stat-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { LineChart, Target, TrendingUp, Download, Loader2, AlertCircle } from "@/components/icons"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { 
+  Target, Download, Loader2, AlertCircle,
+  CheckCircle, Clock, Package, Building2
+} from "@/components/icons"
 import { formatNumber } from "@/lib/utils/format"
-import { PerformanceMenuItem } from "@/components/admin/performance-menu-item"
-import { api } from "@/lib/api/client"
-import type { PerformanceMetrics, Broker, CustomerGroup } from "@/lib/db/performance"
 import { cn } from "@/lib/utils"
 
-type FilterType = "all" | "floor" | "warehouse" | "customer" | "broker" | "customer_group"
+interface PerformanceData {
+  overview: {
+    targetUtilization: number
+    currentUtilization: number
+    totalCapacity: number
+    usedCapacity: number
+    availableCapacity: number
+  }
+  bookingMetrics: {
+    totalBookings: number
+    confirmedBookings: number
+    pendingBookings: number
+    averageProcessingTime: number // in hours
+    confirmationRate: number
+  }
+  warehousePerformance: Array<{
+    id: string
+    name: string
+    city: string
+    utilization: number
+    bookingCount: number
+    status: boolean
+  }>
+}
 
 export default function PerformancePage() {
   const [loading, setLoading] = useState(true)
-  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null)
-  const [, setBrokers] = useState<Broker[]>([])
-  const [, setCustomerGroups] = useState<CustomerGroup[]>([])
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all")
-  const [filterValue, setFilterValue] = useState<string | number | null>(null)
-  const [selectedFloor, setSelectedFloor] = useState<number | null>(null)
+  const [data, setData] = useState<PerformanceData | null>(null)
 
   useEffect(() => {
     fetchPerformanceData()
-    fetchBrokersAndGroups()
-  }, [activeFilter, filterValue, selectedFloor])
+  }, [])
 
   const fetchPerformanceData = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      const queryParams = new URLSearchParams()
-      
-      if (activeFilter === "floor" && selectedFloor) {
-        queryParams.set("floor", String(selectedFloor))
-      } else if (activeFilter === "warehouse" && filterValue) {
-        queryParams.set("warehouseId", String(filterValue))
-      } else if (activeFilter === "customer" && filterValue) {
-        queryParams.set("customerId", String(filterValue))
-      } else if (activeFilter === "broker" && filterValue) {
-        queryParams.set("brokerId", String(filterValue))
-      } else if (activeFilter === "customer_group" && filterValue) {
-        queryParams.set("customerGroupId", String(filterValue))
-      }
+      const response = await fetch('/api/v1/admin/performance')
+      const result = await response.json()
 
-      const url = `/api/v1/performance?${queryParams.toString()}`
-      const result = await api.get<PerformanceMetrics>(url, { showToast: false })
-      
-      if (result.success && result.data) {
-        setMetrics(result.data)
+      if (result.success) {
+        setData(result.data)
       }
     } catch (error) {
-      console.error('Failed to fetch performance data:', error)
+      console.error("Failed to fetch performance data:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchBrokersAndGroups = async () => {
-    try {
-      const [brokersResult, groupsResult] = await Promise.all([
-        api.get<Broker[]>('/api/v1/performance?type=brokers', { showToast: false }),
-        api.get<CustomerGroup[]>('/api/v1/performance?type=groups', { showToast: false }),
-      ])
-
-      if (brokersResult.success && brokersResult.data) {
-        setBrokers(brokersResult.data)
-      }
-      if (groupsResult.success && groupsResult.data) {
-        setCustomerGroups(groupsResult.data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch brokers and groups:', error)
-    }
+  const getUtilizationColor = (current: number, target: number) => {
+    if (current > target) return "text-red-600"
+    if (current > target * 0.9) return "text-amber-600"
+    return "text-green-600"
   }
 
-  const handleFilterClick = (filter: FilterType, value?: string | number) => {
-    if (activeFilter === filter && filterValue === value) {
-      setActiveFilter("all")
-      setFilterValue(null)
-      setSelectedFloor(null)
-    } else {
-      setActiveFilter(filter)
-      setFilterValue(value || null)
-      if (filter === "floor") {
-        setSelectedFloor(value as number)
-      } else {
-        setSelectedFloor(null)
-      }
-    }
+  const getUtilizationStatus = (current: number, target: number) => {
+    if (current > target) return { label: "Over Target", variant: "destructive" as const }
+    if (current > target * 0.9) return { label: "Near Target", variant: "outline" as const }
+    return { label: "On Track", variant: "secondary" as const }
   }
-
-  const targetCapacity = metrics?.targetCapacity || 80
-  const utilization = metrics?.currentUtilization || 0
-  const isOverTarget = utilization > targetCapacity
-  const isNearTarget = utilization > targetCapacity * 0.9
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Performance"
-        description="Target capacity and utilization metrics with detailed analytics"
+        title="Performance Analytics"
+        description="Monitor warehouse performance and operational metrics"
       >
-        <Button variant="outline">
+        <Button variant="outline" onClick={fetchPerformanceData}>
           <Download className="mr-2 h-4 w-4" />
           Export Report
         </Button>
       </PageHeader>
 
-      {/* Filter Badges */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter performance metrics by different criteria</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: "All Warehouse", filter: "all" as FilterType },
-              { label: "Floor 1", filter: "floor" as FilterType, value: 1 },
-              { label: "Floor 2", filter: "floor" as FilterType, value: 2 },
-              { label: "Floor 3", filter: "floor" as FilterType, value: 3 },
-              { label: "Customer", filter: "customer" as FilterType },
-              { label: "Broker", filter: "broker" as FilterType },
-              { label: "Customer Groups", filter: "customer_group" as FilterType },
-            ].map(({ label, filter, value }) => {
-              const isActive = activeFilter === filter && (filter === "floor" ? selectedFloor === value : filterValue === value)
-
-              return (
-                <Badge
-                  key={label}
-                  variant={isActive ? "default" : "outline"}
-                  className={cn(
-                    "cursor-pointer px-3 py-1",
-                    isActive && "bg-primary text-primary-foreground"
-                  )}
-                  onClick={() => handleFilterClick(filter, value)}
-                >
-                  {label}
-                </Badge>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
       {loading ? (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : metrics ? (
+      ) : data ? (
         <>
-          {/* Key Metrics */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <StatCard
-              title="Target Capacity"
-              value={`${targetCapacity}%`}
-              icon={Target}
-              subtitle="Configured target"
-            />
-            <StatCard
-              title="Current Utilization"
-              value={`${utilization.toFixed(1)}%`}
-              icon={TrendingUp}
-              subtitle={isOverTarget ? "Over target" : isNearTarget ? "Near target" : "Below target"}
-              trend={{
-                value: Math.abs(utilization - targetCapacity),
-                isPositive: !isOverTarget,
-              }}
-            />
-            <StatCard
-              title="Total Capacity"
-              value={formatNumber(metrics.totalCapacity)}
-              icon={LineChart}
-              subtitle="sq ft"
-            />
-            <StatCard
-              title="Available"
-              value={formatNumber(metrics.availableCapacity)}
-              icon={LineChart}
-              subtitle="sq ft"
-            />
-          </div>
-
-          {/* Detailed Metrics */}
-          <div className="grid gap-6 lg:grid-cols-2">
+          {/* Target vs Actual */}
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Capacity Overview</CardTitle>
-                <CardDescription>Current capacity breakdown</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Utilization Target
+                </CardTitle>
+                <CardDescription>Current performance against target</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total Capacity</span>
-                    <span className="font-medium">{formatNumber(metrics.totalCapacity)} sq ft</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Occupied</span>
-                    <span className="font-medium text-orange-600">
-                      {formatNumber(metrics.occupiedCapacity)} sq ft
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Available</span>
-                    <span className="font-medium text-green-600">
-                      {formatNumber(metrics.availableCapacity)} sq ft
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Utilization</span>
-                      <span
-                        className={cn(
-                          "text-lg font-bold",
-                          isOverTarget ? "text-destructive" : isNearTarget ? "text-amber-600" : "text-green-600"
-                        )}
-                      >
-                        {utilization.toFixed(1)}%
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className={cn(
+                        "text-4xl font-bold",
+                        getUtilizationColor(data.overview.currentUtilization, data.overview.targetUtilization)
+                      )}>
+                        {data.overview.currentUtilization.toFixed(1)}%
                       </span>
+                      <span className="text-muted-foreground ml-2">/ {data.overview.targetUtilization}% target</span>
                     </div>
-                    <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full transition-all",
-                          isOverTarget ? "bg-destructive" : isNearTarget ? "bg-amber-500" : "bg-green-500"
-                        )}
-                        style={{ width: `${Math.min(utilization, 100)}%` }}
+                    <Badge {...getUtilizationStatus(data.overview.currentUtilization, data.overview.targetUtilization)}>
+                      {getUtilizationStatus(data.overview.currentUtilization, data.overview.targetUtilization).label}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Progress 
+                      value={data.overview.currentUtilization} 
+                      className={cn(
+                        "h-3",
+                        data.overview.currentUtilization > data.overview.targetUtilization && "[&>div]:bg-red-500",
+                        data.overview.currentUtilization > data.overview.targetUtilization * 0.9 && 
+                        data.overview.currentUtilization <= data.overview.targetUtilization && "[&>div]:bg-amber-500"
+                      )}
+                    />
+                    <div className="relative">
+                      <div 
+                        className="absolute w-0.5 h-4 bg-primary -top-1"
+                        style={{ left: `${data.overview.targetUtilization}%` }}
                       />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="font-semibold">{formatNumber(data.overview.totalCapacity)} sq ft</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Used</p>
+                      <p className="font-semibold text-orange-600">{formatNumber(data.overview.usedCapacity)} sq ft</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Available</p>
+                      <p className="font-semibold text-green-600">{formatNumber(data.overview.availableCapacity)} sq ft</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Target vs Actual</CardTitle>
-                <CardDescription>Performance against target</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Booking Performance
+                </CardTitle>
+                <CardDescription>Booking processing metrics</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Target Capacity</span>
-                    <span className="font-medium">{targetCapacity}%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Current Utilization</span>
-                    <span
-                      className={cn(
-                        "font-medium",
-                        isOverTarget ? "text-destructive" : "text-green-600"
-                      )}
-                    >
-                      {utilization.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Difference</span>
-                      <span
-                        className={cn(
-                          "text-lg font-bold",
-                          isOverTarget ? "text-destructive" : "text-green-600"
-                        )}
-                      >
-                        {isOverTarget ? "+" : ""}
-                        {(utilization - targetCapacity).toFixed(1)}%
-                      </span>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        Confirmation Rate
+                      </div>
+                      <p className="text-2xl font-bold text-green-600 mt-1">
+                        {data.bookingMetrics.confirmationRate.toFixed(1)}%
+                      </p>
                     </div>
-                    {isOverTarget && (
-                      <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-md text-sm text-destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>Utilization exceeds target capacity</span>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                        Avg. Processing
                       </div>
-                    )}
-                    {isNearTarget && !isOverTarget && (
-                      <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-md text-sm text-amber-700 dark:text-amber-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>Utilization approaching target capacity</span>
-                      </div>
-                    )}
+                      <p className="text-2xl font-bold text-blue-600 mt-1">
+                        {data.bookingMetrics.averageProcessingTime.toFixed(1)}h
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="font-semibold">{formatNumber(data.bookingMetrics.totalBookings)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Confirmed</p>
+                      <p className="font-semibold text-green-600">{formatNumber(data.bookingMetrics.confirmedBookings)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Pending</p>
+                      <p className="font-semibold text-amber-600">{formatNumber(data.bookingMetrics.pendingBookings)}</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Performance Menu Item Preview */}
+          {/* Warehouse Performance Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Sidebar Preview</CardTitle>
-              <CardDescription>How this appears in the sidebar menu</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Warehouse Performance
+              </CardTitle>
+              <CardDescription>Individual warehouse performance metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <PerformanceMenuItem />
+              {data.warehousePerformance.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Warehouse</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Utilization</TableHead>
+                      <TableHead className="text-right">Bookings</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.warehousePerformance.map((warehouse) => (
+                      <TableRow key={warehouse.id}>
+                        <TableCell className="font-medium">{warehouse.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{warehouse.city}</TableCell>
+                        <TableCell>
+                          {warehouse.status ? (
+                            <Badge className="bg-green-100 text-green-700 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-red-100 text-red-700 border-red-200">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Inactive
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress 
+                              value={warehouse.utilization} 
+                              className={cn("w-24 h-2", warehouse.utilization >= 90 && "[&>div]:bg-red-500")}
+                            />
+                            <span className={cn(
+                              "text-sm font-medium",
+                              warehouse.utilization >= 90 ? "text-red-600" : 
+                              warehouse.utilization >= 70 ? "text-amber-600" : "text-green-600"
+                            )}>
+                              {warehouse.utilization.toFixed(0)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatNumber(warehouse.bookingCount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">
+                  No warehouse performance data available
+                </p>
+              )}
             </CardContent>
           </Card>
+
+          {/* Performance Alerts */}
+          {data.overview.currentUtilization > data.overview.targetUtilization && (
+            <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  <div>
+                    <p className="font-medium text-red-700 dark:text-red-400">
+                      Utilization exceeds target capacity
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-500">
+                      Current utilization ({data.overview.currentUtilization.toFixed(1)}%) is above the target ({data.overview.targetUtilization}%). 
+                      Consider expanding capacity or optimizing space allocation.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : (
         <Card>
@@ -310,4 +305,3 @@ export default function PerformancePage() {
     </div>
   )
 }
-

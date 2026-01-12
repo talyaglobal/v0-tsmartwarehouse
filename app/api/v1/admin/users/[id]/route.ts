@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/auth/utils'
 
 export const dynamic = 'force-dynamic'
@@ -94,8 +95,24 @@ export async function PATCH(
       )
     }
 
-    // Build update object
-    const updateData: Record<string, any> = {
+    // Only root can change email addresses
+    if (body.email !== undefined && user.role !== 'root') {
+      return NextResponse.json(
+        { success: false, error: 'Only root users can change email addresses' },
+        { status: 403 }
+      )
+    }
+
+    // Only root can change passwords
+    if (body.password !== undefined && user.role !== 'root') {
+      return NextResponse.json(
+        { success: false, error: 'Only root users can change passwords' },
+        { status: 403 }
+      )
+    }
+
+    // Build update object for profiles table
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
 
@@ -105,6 +122,73 @@ export async function PATCH(
 
     if (body.role !== undefined) {
       updateData.role = body.role
+    }
+
+    // Handle email change (only for root users)
+    if (body.email !== undefined && user.role === 'root') {
+      const newEmail = body.email?.trim()
+      
+      if (!newEmail || !newEmail.includes('@')) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid email address' },
+          { status: 400 }
+        )
+      }
+
+      // Get current user email to check if it changed
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', id)
+        .single()
+
+      if (currentProfile && currentProfile.email !== newEmail) {
+        // Update email in Supabase Auth using Admin API
+        const adminClient = createAdminClient()
+        
+        const { error: authError } = await adminClient.auth.admin.updateUserById(id, {
+          email: newEmail,
+          email_confirm: true, // Auto-confirm the new email
+        })
+
+        if (authError) {
+          console.error('Error updating auth email:', authError)
+          return NextResponse.json(
+            { success: false, error: `Failed to update email in Auth: ${authError.message}` },
+            { status: 500 }
+          )
+        }
+
+        // Also update email in profiles table
+        updateData.email = newEmail
+      }
+    }
+
+    // Handle password change (only for root users)
+    if (body.password !== undefined && user.role === 'root') {
+      const newPassword = body.password?.trim()
+      
+      if (!newPassword || newPassword.length < 6) {
+        return NextResponse.json(
+          { success: false, error: 'Password must be at least 6 characters' },
+          { status: 400 }
+        )
+      }
+
+      // Update password in Supabase Auth using Admin API
+      const adminClient = createAdminClient()
+      
+      const { error: authError } = await adminClient.auth.admin.updateUserById(id, {
+        password: newPassword,
+      })
+
+      if (authError) {
+        console.error('Error updating auth password:', authError)
+        return NextResponse.json(
+          { success: false, error: `Failed to update password: ${authError.message}` },
+          { status: 500 }
+        )
+      }
     }
 
     // Update user profile
