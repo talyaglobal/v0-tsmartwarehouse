@@ -71,7 +71,7 @@ export async function GET(
     }
 
     // Get contact
-    let query = supabase
+    const query = supabase
       .from("crm_contacts")
       .select("*")
       .eq("id", contactId)

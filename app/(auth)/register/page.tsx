@@ -48,7 +48,6 @@ export default function RegisterPage() {
       params.set('role', 'owner')
       router.replace(`/register?${params.toString()}`, { scroll: false })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run once on mount to set initial role
   
   // Warehouse Owner form data

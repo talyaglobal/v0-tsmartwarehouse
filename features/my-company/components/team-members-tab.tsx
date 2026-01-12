@@ -55,6 +55,7 @@ export interface TeamMembersTabRef {
   openAddMemberDialog?: (role?: string) => void
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-types
 export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) => {
   const { user } = useUser()
   const queryClient = useQueryClient()

@@ -22,7 +22,7 @@ export default function WarehouseCapacityPage({
   const { data: capacityData = [], isLoading } = useQuery({
     queryKey: ['warehouse-capacity', warehouseId, level],
     queryFn: async () => {
-      let url = `/api/v1/warehouses/${warehouseId}/capacity?level=${level}`
+      const url = `/api/v1/warehouses/${warehouseId}/capacity?level=${level}`
       const result = await api.get<CapacityUtilization[]>(url, { showToast: false })
       return result.success ? (result.data || []) : []
     },

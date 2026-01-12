@@ -49,8 +49,8 @@ export async function GET(request: Request) {
     // Get member counts for each company
     const companyIds = companies?.map(c => c.id) || []
     
-    let memberCounts: Record<string, number> = {}
-    let warehouseCounts: Record<string, number> = {}
+    const memberCounts: Record<string, number> = {}
+    const warehouseCounts: Record<string, number> = {}
 
     if (companyIds.length > 0) {
       // Get member counts

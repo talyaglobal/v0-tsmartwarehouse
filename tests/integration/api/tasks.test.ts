@@ -148,7 +148,7 @@ describe('/api/v1/tasks', () => {
       })
 
       const response = await POST(request)
-      const data = await response.json()
+      await response.json() // Parse response to verify it's valid JSON
 
       expect(response.status).toBe(200)
       expect(mockCreateTask).toHaveBeenCalledWith(

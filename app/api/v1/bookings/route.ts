@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
       // Determine if we should use daily or monthly pricing
       // If booking is >= 30 days, use monthly pricing if available
       let pricePerUnit = 0
-      let useMonthly = diffDays >= 30
+      const useMonthly = diffDays >= 30
 
       if (pricingData && pricingData.length > 0) {
         if (useMonthly) {

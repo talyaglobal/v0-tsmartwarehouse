@@ -83,7 +83,7 @@ export async function GET(request: Request) {
 
     // Get booking counts for each warehouse
     const warehouseIds = warehouses?.map(w => w.id) || []
-    let bookingCounts: Record<string, number> = {}
+    const bookingCounts: Record<string, number> = {}
 
     if (warehouseIds.length > 0) {
       const { data: bookings } = await supabase

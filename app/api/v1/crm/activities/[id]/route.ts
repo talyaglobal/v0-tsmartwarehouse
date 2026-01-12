@@ -106,7 +106,7 @@ export async function GET(
     }
 
     // Remove nested contact data
-    const { crm_contacts, ...activityData } = activity as any
+    const { crm_contacts: _crm_contacts, ...activityData } = activity as any
 
     return NextResponse.json({ success: true, data: activityData })
   } catch (error) {

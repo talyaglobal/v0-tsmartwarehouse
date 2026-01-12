@@ -362,7 +362,7 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
 
   useEffect(() => {
     const supabase = createClient()
-    let channels: RealtimeChannel[] = []
+    const channels: RealtimeChannel[] = []
 
     const calculateUtilization = async () => {
       try {

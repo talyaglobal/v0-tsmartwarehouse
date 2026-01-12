@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
 
     // Flatten the response (remove nested contact data)
     const activities = (data || []).map((activity: any) => {
-      const { crm_contacts, ...rest } = activity
+      const { crm_contacts: _crm_contacts, ...rest } = activity
       return rest
     })
 

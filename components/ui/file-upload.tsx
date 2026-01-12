@@ -59,7 +59,7 @@ export function FileUpload({
         setFiles(value)
       }
     }
-  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value])
 
   const updateFiles = useCallback((newFiles: UploadedFile[]) => {
     setFiles(newFiles)

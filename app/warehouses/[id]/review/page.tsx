@@ -107,27 +107,27 @@ export default function BookingReviewPage() {
             const months = Math.ceil(days / 30)
             const quantity = parseInt(uomQty || "0")
             
-            let total = 0
+            // Calculate services total (currently not used as UI uses selectedServices directly)
+            let _servicesTotal = 0
             services.forEach((service: any) => {
               switch (service.pricing_type) {
                 case 'one_time':
-                  total += service.base_price
+                  _servicesTotal += service.base_price
                   break
                 case 'per_pallet':
-                  total += service.base_price * quantity
+                  _servicesTotal += service.base_price * quantity
                   break
                 case 'per_sqft':
-                  total += service.base_price * quantity
+                  _servicesTotal += service.base_price * quantity
                   break
                 case 'per_day':
-                  total += service.base_price * days
+                  _servicesTotal += service.base_price * days
                   break
                 case 'per_month':
-                  total += service.base_price * months
+                  _servicesTotal += service.base_price * months
                   break
               }
             })
-            // Services total calculated but UI uses selectedServices directly
           }
         })
         .catch(err => console.error('Failed to fetch services:', err))

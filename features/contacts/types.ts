@@ -26,9 +26,9 @@ export enum ContactStatus {
   CONVERTED = 'converted',
   INACTIVE = 'inactive',
   ARCHIVED = 'archived',
-  // Contact Management Statuses (mapped to CRM)
-  PENDING = 'active', // Maps to active
-  BLOCKED = 'inactive', // Maps to inactive
+  // Contact Management Statuses (distinct values)
+  PENDING = 'pending',
+  BLOCKED = 'blocked',
 }
 
 export enum SignatureStatus {

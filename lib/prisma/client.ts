@@ -12,16 +12,16 @@
 // Import will be available after running: npx prisma generate
 // For now, we use a type-safe approach that works once schema is generated
 // Note: Prisma is not currently in use - this file is for future migration
-// @ts-ignore - Prisma types will be available after generation
 import type { PrismaClient as PrismaClientType } from '@prisma/client'
 
 // Dynamic import to handle cases where Prisma hasn't been generated yet
 let PrismaClient: typeof PrismaClientType
 
 try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const prismaModule = require('@/lib/generated/prisma')
   PrismaClient = prismaModule.PrismaClient
-} catch (error) {
+} catch {
   // Prisma not generated yet - will fail at runtime with helpful error
   console.warn('[Prisma] Prisma client not generated yet. Run: npx prisma generate')
 }

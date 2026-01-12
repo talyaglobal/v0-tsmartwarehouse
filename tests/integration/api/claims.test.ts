@@ -91,7 +91,7 @@ describe('/api/v1/claims', () => {
         'http://localhost:3000/api/v1/claims?status=submitted'
       )
       const response = await GET(request)
-      const data = await response.json()
+      await response.json() // Parse response to verify it's valid JSON
 
       expect(response.status).toBe(200)
       expect(mockGetClaims).toHaveBeenCalledWith(
@@ -196,7 +196,7 @@ describe('/api/v1/claims', () => {
       })
 
       const response = await POST(request)
-      const data = await response.json()
+      await response.json() // Parse response to verify it's valid JSON
 
       expect(response.status).toBe(200)
       expect(mockCreateClaim).toHaveBeenCalledWith(

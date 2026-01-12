@@ -108,7 +108,7 @@ export function PalletPricingForm({
   }
 
   const updatePalletPricing = (palletType: PalletType, period: PricingPeriod, updates: Partial<PalletPricing>) => {
-    let updated = [...pricing]
+    const updated = [...pricing]
     const existingIndex = updated.findIndex(
       (p) => p.palletType === palletType && p.pricingPeriod === period
     )
@@ -281,7 +281,7 @@ export function PalletPricingForm({
       allPeriods.forEach(p => {
         if (p === period) return // Skip current period
         
-        let pricingForPeriod = updatedPricing.find(
+        const pricingForPeriod = updatedPricing.find(
           (pr) => pr.palletType === palletType && pr.pricingPeriod === p
         )
         
@@ -451,7 +451,7 @@ export function PalletPricingForm({
       allPeriods.forEach(p => {
         if (p === period) return // Skip current period
         
-        let pricingForPeriod = updatedPricing.find(
+        const pricingForPeriod = updatedPricing.find(
           (pr) => pr.palletType === palletType && pr.pricingPeriod === p
         )
         
