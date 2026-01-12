@@ -138,6 +138,104 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+    const { user } = authResult
+
+    const resolvedParams = params instanceof Promise ? await params : params
+    const warehouseId = resolvedParams.id
+
+    if (!warehouseId) {
+      return NextResponse.json(
+        { success: false, error: "Warehouse ID is required" },
+        { status: 400 }
+      )
+    }
+
+    // Check authorization
+    const warehouse = await getWarehouseByIdFromDb(warehouseId)
+    if (!warehouse) {
+      return NextResponse.json(
+        { success: false, error: "Warehouse not found" },
+        { status: 404 }
+      )
+    }
+
+    if (user.role !== 'root') {
+      const userCompanyId = await getUserCompanyId(user.id)
+      if (!userCompanyId || (warehouse as any).ownerCompanyId !== userCompanyId) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden: You can only update your own company's warehouses" },
+          { status: 403 }
+        )
+      }
+
+      const isAdmin = await isCompanyAdmin(user.id, userCompanyId)
+      if (!isAdmin) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden: Only company admins can update warehouses" },
+          { status: 403 }
+        )
+      }
+    }
+
+    const body = await request.json()
+    const supabase = createServerSupabaseClient()
+
+    // Build update object with only provided fields
+    const updateFields: Record<string, any> = {}
+    
+    if (body.name !== undefined) updateFields.name = body.name
+    if (body.address !== undefined) updateFields.address = body.address
+    if (body.city !== undefined) updateFields.city = body.city
+    if (body.country !== undefined) updateFields.country = body.country
+    if (body.zip_code !== undefined) updateFields.zip_code = body.zip_code
+    if (body.total_sq_ft !== undefined) updateFields.total_sq_ft = body.total_sq_ft
+    if (body.total_pallet_storage !== undefined) updateFields.total_pallet_storage = body.total_pallet_storage
+    if (body.available_sq_ft !== undefined) updateFields.available_sq_ft = body.available_sq_ft
+    if (body.available_pallet_storage !== undefined) updateFields.available_pallet_storage = body.available_pallet_storage
+    if (body.status !== undefined) updateFields.status = body.status
+    if (body.latitude !== undefined) updateFields.latitude = body.latitude
+    if (body.longitude !== undefined) updateFields.longitude = body.longitude
+    
+    updateFields.updated_at = new Date().toISOString()
+
+    const { data, error } = await supabase
+      .from('warehouses')
+      .update(updateFields)
+      .eq('id', warehouseId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating warehouse:', error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to update warehouse', details: error.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data,
+      message: 'Warehouse updated successfully',
+    })
+  } catch (error) {
+    console.error("Error updating warehouse:", error)
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
@@ -431,5 +529,83 @@ export async function PUT(
       statusCode: errorResponse.statusCode,
     }
     return NextResponse.json(errorData, { status: errorResponse.statusCode })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+    const { user } = authResult
+
+    const resolvedParams = params instanceof Promise ? await params : params
+    const warehouseId = resolvedParams.id
+
+    if (!warehouseId) {
+      return NextResponse.json(
+        { success: false, error: "Warehouse ID is required" },
+        { status: 400 }
+      )
+    }
+
+    // Only root users can delete warehouses from admin panel
+    // Or company admins can delete their own warehouses
+    const warehouse = await getWarehouseByIdFromDb(warehouseId)
+    if (!warehouse) {
+      return NextResponse.json(
+        { success: false, error: "Warehouse not found" },
+        { status: 404 }
+      )
+    }
+
+    if (user.role !== 'root') {
+      const userCompanyId = await getUserCompanyId(user.id)
+      if (!userCompanyId || (warehouse as any).ownerCompanyId !== userCompanyId) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden: You can only delete your own company's warehouses" },
+          { status: 403 }
+        )
+      }
+
+      const isAdmin = await isCompanyAdmin(user.id, userCompanyId)
+      if (!isAdmin) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden: Only company admins can delete warehouses" },
+          { status: 403 }
+        )
+      }
+    }
+
+    const supabase = createServerSupabaseClient()
+
+    // Soft delete the warehouse by setting status to false
+    const { error } = await supabase
+      .from('warehouses')
+      .update({ status: false, updated_at: new Date().toISOString() })
+      .eq('id', warehouseId)
+
+    if (error) {
+      console.error('Error deleting warehouse:', error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete warehouse', details: error.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Warehouse deleted successfully',
+    })
+  } catch (error) {
+    console.error("Error deleting warehouse:", error)
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    )
   }
 }

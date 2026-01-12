@@ -23,7 +23,7 @@ interface CompanyMember {
   company_id: string
   email: string
   name: string | null
-  role: 'warehouse_owner' | 'company_admin' | 'warehouse_staff' | 'customer'
+  role: 'warehouse_admin' | 'warehouse_supervisor' | 'company_admin' | 'warehouse_staff' | 'warehouse_client'
   avatar: string | null
   phone: string | null
   invited_by: string | null
@@ -35,7 +35,7 @@ interface Invitation {
   id: string
   company_id: string
   email: string
-  role: 'warehouse_owner' | 'company_admin' | 'member'
+  role: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client'
   invited_by?: string
   token: string
   expires_at: string
@@ -263,13 +263,13 @@ export default function TeamMembersPage() {
     switch (role) {
       case 'root':
         return 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800'
-      case 'warehouse_owner':
+      case 'warehouse_admin':
         return 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800'
       case 'company_admin':
         return 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800'
       case 'warehouse_staff':
         return 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700'
-      case 'customer':
+      case 'warehouse_client':
         return 'bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800'
       default:
         return 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700'
@@ -313,7 +313,7 @@ export default function TeamMembersPage() {
         .select('role, company_id')
         .eq('id', user.id)
         .eq('company_id', companyId)
-        .in('role', ['warehouse_owner', 'company_admin'])
+        .in('role', ['warehouse_admin', 'warehouse_supervisor'])
         .maybeSingle()
       
       return !error && !!data
@@ -537,7 +537,7 @@ export default function TeamMembersPage() {
                     </TableCell>
                     <TableCell>
                       <Badge className={getRoleBadgeColor(member.role)}>
-                        {member.role === 'customer' ? 'Customer' : member.role === 'company_admin' ? 'Company Admin' : member.role === 'warehouse_staff' ? 'Warehouse Staff' : member.role === 'warehouse_owner' ? 'Warehouse Owner' : member.role}
+                        {member.role === 'warehouse_client' ? 'Warehouse Client' : member.role === 'company_admin' ? 'Company Admin' : member.role === 'warehouse_staff' ? 'Warehouse Staff' : member.role === 'warehouse_admin' ? 'Warehouse Admin' : member.role === 'warehouse_supervisor' ? 'Warehouse Supervisor' : member.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -565,7 +565,7 @@ export default function TeamMembersPage() {
                           <DropdownMenuItem
                             onClick={() => handleDelete(member)}
                             className="text-destructive"
-                            disabled={member.role === 'warehouse_owner'}
+                            disabled={member.role === 'warehouse_admin'}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Remove
@@ -596,7 +596,7 @@ export default function TeamMembersPage() {
               <Select
                 value={editForm.role}
                 onValueChange={(value) => setEditForm({ ...editForm, role: value as 'company_admin' | 'warehouse_staff' })}
-                disabled={selectedMember?.role === 'warehouse_owner'}
+                disabled={selectedMember?.role === 'warehouse_admin'}
               >
                 <SelectTrigger>
                   <SelectValue />

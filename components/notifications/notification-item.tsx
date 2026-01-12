@@ -1,5 +1,18 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+import { useRealtimeNotifications } from '@/lib/realtime/hooks'
+import { cn } from '@/lib/utils'
+import type { Notification } from '@/types'
+import {
+  Bell,
+  FileText,
+  Package,
+  AlertTriangle,
+  Settings,
+  CheckCircle2,
+} from 'lucide-react'
+
 // Simple time ago formatter
 function formatTimeAgo(date: Date): string {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
@@ -10,16 +23,6 @@ function formatTimeAgo(date: Date): string {
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
   return `${Math.floor(seconds / 604800)}w ago`
 }
-import { useRealtimeNotifications } from '@/lib/realtime/hooks'
-import { cn } from '@/lib/utils'
-import type { Notification } from '@/types'
-import {
-  Bell,
-  FileText,
-  Package,
-  AlertTriangle,
-  Settings,
-} from 'lucide-react'
 
 interface NotificationItemProps {
   notification: Notification
@@ -33,15 +36,38 @@ const typeIcons = {
   system: Settings,
 }
 
+// Get navigation URL based on notification type
+function getNavigationUrl(notification: Notification): string {
+  switch (notification.type) {
+    case 'booking':
+      return '/dashboard/bookings'
+    case 'invoice':
+      return '/dashboard/invoices'
+    case 'task':
+      return '/warehouse/tasks'
+    case 'incident':
+      return '/dashboard/claims'
+    case 'system':
+    default:
+      return '/dashboard/notifications'
+  }
+}
+
 export function NotificationItem({ notification }: NotificationItemProps) {
+  const router = useRouter()
   const { markAsRead } = useRealtimeNotifications(notification.userId)
 
   const Icon = typeIcons[notification.type] || Bell
 
-  const handleClick = () => {
+  const handleClick = async () => {
+    // Mark as read if not already read
     if (!notification.read) {
-      markAsRead(notification.id)
+      await markAsRead(notification.id)
     }
+    
+    // Navigate to the relevant page
+    const url = getNavigationUrl(notification)
+    router.push(url)
   }
 
   const timeAgo = formatTimeAgo(new Date(notification.createdAt))
@@ -75,7 +101,9 @@ export function NotificationItem({ notification }: NotificationItemProps) {
             >
               {notification.title}
             </h4>
-            {!notification.read && (
+            {notification.read ? (
+              <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+            ) : (
               <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />
             )}
           </div>
@@ -88,4 +116,3 @@ export function NotificationItem({ notification }: NotificationItemProps) {
     </div>
   )
 }
-

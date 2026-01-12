@@ -24,7 +24,7 @@ export function RevenueChartContent({ data }: RevenueChartContentProps) {
           <XAxis dataKey="month" className="text-xs" />
           <YAxis className="text-xs" tickFormatter={(value) => `$${value / 1000}k`} />
           <Tooltip
-            formatter={(value: number) => formatCurrency(value)}
+            formatter={(value) => formatCurrency(value as number)}
             contentStyle={{
               backgroundColor: "hsl(var(--card))",
               border: "1px solid hsl(var(--border))",

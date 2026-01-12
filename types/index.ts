@@ -207,6 +207,7 @@ export interface Booking {
   customerName: string
   customerEmail: string
   warehouseId: string
+  warehouseName?: string
   type: BookingType
   status: BookingStatus
   // Pallet booking fields

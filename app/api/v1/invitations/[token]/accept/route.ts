@@ -167,7 +167,7 @@ export async function POST(
           email_confirm: true,
           user_metadata: {
             name: profile.name || profile.email.split('@')[0],
-            role: profile.role || 'member',
+            role: profile.role || 'warehouse_client',
           },
         })
 

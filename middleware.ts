@@ -214,24 +214,15 @@ export async function middleware(request: NextRequest) {
     }
 
     // Determine target route based on role
+    // All roles go to /dashboard except root (goes to /admin) and warehouse_staff (goes to /warehouse)
     let targetRoute = '/dashboard'
     if (userRole === 'root') {
       targetRoute = '/admin'
     } else if (userRole === 'warehouse_staff') {
       targetRoute = '/warehouse'
-    } else if (userRole === 'warehouse_finder') {
-      targetRoute = '/dashboard/warehouse-finder'
-    } else if (userRole === 'warehouse_broker') {
-      targetRoute = '/dashboard/reseller'
-    } else if (userRole === 'end_delivery_party') {
-      targetRoute = '/dashboard/end-delivery'
-    } else if (userRole === 'local_transport') {
-      targetRoute = '/dashboard/local-transport'
-    } else if (userRole === 'international_transport') {
-      targetRoute = '/dashboard/international-transport'
-    } else if (['warehouse_admin', 'warehouse_supervisor', 'warehouse_client'].includes(userRole)) {
-      targetRoute = '/dashboard'
     }
+    // All other roles (warehouse_admin, warehouse_supervisor, warehouse_client, warehouse_finder, 
+    // warehouse_broker, end_delivery_party, local_transport, international_transport) go to /dashboard
 
     // Only redirect if we're not already going to the target route
     // This prevents redirect loops
@@ -357,9 +348,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Warehouse Broker (reseller) routes - only warehouse_broker can access
-    const isResellerRoute = pathname.startsWith('/dashboard/reseller')
-    if (isResellerRoute && userRole !== 'warehouse_broker' && userRole !== 'root') {
+    // Warehouse Broker routes - only warehouse_broker can access
+    const isBrokerRoute = pathname.startsWith('/dashboard/broker')
+    if (isBrokerRoute && userRole !== 'warehouse_broker' && userRole !== 'root') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
@@ -382,7 +373,9 @@ export async function middleware(request: NextRequest) {
     }
 
     // Dashboard routes - these roles can access dashboard
+    // NOTE: Root users can also access dashboard routes (for testing and management)
     const dashboardRoles = [
+      'root', // Root can access all dashboard routes
       'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 
       'warehouse_finder', 'warehouse_broker',
       'end_delivery_party', 'local_transport', 'international_transport'
@@ -390,8 +383,6 @@ export async function middleware(request: NextRequest) {
     if (isDashboardRoute && !dashboardRoles.includes(userRole)) {
       if (userRole === 'warehouse_staff') {
         return NextResponse.redirect(new URL('/warehouse', request.url))
-      } else if (userRole === 'root') {
-        return NextResponse.redirect(new URL('/admin', request.url))
       } else {
         console.warn(`User ${user.id} with role "${userRole}" accessing dashboard route ${pathname}`)
       }

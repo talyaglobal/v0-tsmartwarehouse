@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
 
     const { searchParams } = new URL(request.url)
-    const role = searchParams.get("role") as "root" | "member" | "warehouse_staff" | "company_admin" | null
+    const role = searchParams.get("role") as "root" | "warehouse_client" | "warehouse_staff" | "warehouse_supervisor" | null
     const companyId = searchParams.get("companyId")
 
     const supabase = createServerSupabaseClient()

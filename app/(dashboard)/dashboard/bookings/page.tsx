@@ -17,6 +17,8 @@ import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
 import { useRouter } from "next/navigation"
+import { RootTestDataIndicator } from "@/components/ui/root-test-data-badge"
+import { getRootUserIds, isTestDataSync } from "@/lib/utils/test-data"
 
 export default function BookingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -28,6 +30,12 @@ export default function BookingsPage() {
   const { user, isLoading: userLoading } = useUser()
   const queryClient = useQueryClient()
   const router = useRouter()
+  const [rootUserIds, setRootUserIds] = useState<string[]>([])
+
+  // Fetch root user IDs for test data detection
+  useEffect(() => {
+    getRootUserIds().then(setRootUserIds)
+  }, [])
 
   // Get user's role and company ID
   const { data: userProfile } = useQuery({
@@ -45,7 +53,7 @@ export default function BookingsPage() {
     enabled: !!user?.id,
   })
 
-  const isCustomer = userProfile?.role === 'customer'
+  const isCustomer = userProfile?.role === 'warehouse_client'
   const userCompanyId = userProfile?.company_id
 
   // Fetch bookings based on user role
@@ -240,12 +248,14 @@ export default function BookingsPage() {
         title="Bookings"
         description={isCustomer ? "View and manage your bookings" : "Manage bookings to your company warehouses"}
       >
-        <Link href="/dashboard/bookings/new">
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Booking
-          </Button>
-        </Link>
+        {isCustomer && (
+          <Link href="/dashboard/bookings/new">
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Booking
+            </Button>
+          </Link>
+        )}
       </PageHeader>
 
       <Card>
@@ -289,7 +299,14 @@ export default function BookingsPage() {
                   
                   return (
                 <TableRow key={booking.id}>
-                  <TableCell className="font-medium">{booking.id}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {booking.id}
+                      {isTestDataSync(booking.customerId, rootUserIds) && (
+                        <RootTestDataIndicator />
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {booking.type === "pallet" ? (

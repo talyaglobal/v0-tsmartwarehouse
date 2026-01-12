@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     if (!contactType) {
       if (profile.role === "warehouse_finder") {
         contactType = "warehouse_supplier"
-      } else if (profile.role === "reseller") {
+      } else if (profile.role === "warehouse_broker") {
         contactType = "customer_lead"
       }
     }

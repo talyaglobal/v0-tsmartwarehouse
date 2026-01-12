@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
  * Check if user is a warehouse admin or warehouse owner (using profiles.role)
+ * Supports both old and new role names for backward compatibility
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
   const supabase = createServerSupabaseClient()
@@ -10,7 +11,7 @@ export async function isCompanyAdmin(userId: string, companyId?: string): Promis
     .from('profiles')
     .select('role, company_id')
     .eq('id', userId)
-    .in('role', ['warehouse_owner', 'warehouse_admin'])
+    .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
   
   if (companyId) {
     query = query.eq('company_id', companyId)
@@ -46,8 +47,9 @@ export async function getUserCompanyId(userId: string): Promise<string | null> {
 
 /**
  * Get user's company member role (using profiles.role)
+ * Maps new role names to old format for backward compatibility
  */
-export async function getUserCompanyRole(userId: string, companyId: string): Promise<'warehouse_owner' | 'warehouse_admin' | 'warehouse_staff' | null> {
+export async function getUserCompanyRole(userId: string, companyId: string): Promise<'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_staff' | null> {
   const supabase = createServerSupabaseClient()
   
   const { data: profile, error } = await supabase
@@ -61,15 +63,16 @@ export async function getUserCompanyRole(userId: string, companyId: string): Pro
     return null
   }
   
-  // Map profile role to company role
-  if (profile.role === 'warehouse_owner') return 'warehouse_owner'
+  // Map profile role to company role (new role names)
   if (profile.role === 'warehouse_admin') return 'warehouse_admin'
+  if (profile.role === 'warehouse_supervisor') return 'warehouse_supervisor'
   if (profile.role === 'warehouse_staff') return 'warehouse_staff'
   return null
 }
 
 /**
  * Get all company IDs where user is admin or owner (using profiles.role)
+ * Supports both old and new role names for backward compatibility
  */
 export async function getUserAdminCompanies(userId: string): Promise<string[]> {
   const supabase = createServerSupabaseClient()
@@ -78,7 +81,7 @@ export async function getUserAdminCompanies(userId: string): Promise<string[]> {
     .from('profiles')
     .select('company_id')
     .eq('id', userId)
-    .in('role', ['warehouse_owner', 'warehouse_admin'])
+    .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
     .not('company_id', 'is', null)
   
   if (error || !profiles) {

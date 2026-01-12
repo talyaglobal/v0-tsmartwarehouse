@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     let teamQuery = supabase
       .from("profiles")
       .select("id, name, email, role")
-      .in("role", ["warehouse_finder", "reseller"])
+      .in("role", ["warehouse_finder", "warehouse_broker"])
 
     if (profile.role !== "root" && profile.company_id) {
       teamQuery = teamQuery.eq("company_id", profile.company_id)

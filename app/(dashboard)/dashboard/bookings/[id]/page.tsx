@@ -13,6 +13,8 @@ import Link from "next/link"
 import type { Booking } from "@/types"
 import type { WarehouseSearchResult } from "@/types/marketplace"
 import { api } from "@/lib/api/client"
+import { RootTestDataBadge } from "@/components/ui/root-test-data-badge"
+import { getRootUserIds, isTestDataSync } from "@/lib/utils/test-data"
 
 export default function BookingDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
@@ -22,6 +24,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [warehouseLoading, setWarehouseLoading] = useState(false)
   const [bookingId, setBookingId] = useState<string>("")
   const [bookingServices, setBookingServices] = useState<any[]>([])
+  const [rootUserIds, setRootUserIds] = useState<string[]>([])
+
+  useEffect(() => {
+    getRootUserIds().then(setRootUserIds)
+  }, [])
 
   useEffect(() => {
     // Handle both sync and async params
@@ -122,7 +129,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">Booking Details</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">Booking Details</h1>
+            {isTestDataSync(booking.customerId, rootUserIds) && (
+              <RootTestDataBadge size="sm" />
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">Booking ID: {booking.id}</p>
         </div>
         <StatusBadge status={booking.status} />

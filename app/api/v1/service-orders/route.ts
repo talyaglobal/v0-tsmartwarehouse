@@ -43,21 +43,17 @@ export async function GET(request: NextRequest) {
       bookingId?: string
     } = {}
 
-    // Map legacy roles to new roles
-    const mappedRole = userRole === "warehouse_client" ? "member" : 
-                      userRole === "super_admin" ? "root" : 
-                      userRole === "worker" ? "warehouse_staff" : userRole
-
-    if (mappedRole === "member") {
-      // Members can only see their own orders
+    // Role-based filtering
+    if (userRole === "warehouse_client") {
+      // Warehouse clients can only see their own orders
       filters.customerId = user.id
-    } else if (customerId && mappedRole === "root") {
+    } else if (customerId && userRole === "root") {
       // Root admins can filter by customerId
       filters.customerId = customerId
-    } else if (mappedRole === "root") {
+    } else if (userRole === "root") {
       // Root admins can see all orders (no customerId filter)
     } else {
-      // For other roles, default to member behavior
+      // For other roles, default to warehouse_client behavior
       filters.customerId = user.id
     }
 

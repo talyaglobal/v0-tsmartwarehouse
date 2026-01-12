@@ -66,7 +66,7 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role || user.user_metadata?.role || 'customer'
+    const role = profile?.role || user.user_metadata?.role || 'warehouse_client'
     
     const url = request.nextUrl.clone()
     if (role === 'super_admin') {
@@ -87,7 +87,7 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role || user.user_metadata?.role || 'customer'
+    const role = profile?.role || user.user_metadata?.role || 'warehouse_client'
     const pathname = request.nextUrl.pathname
 
     // Admin routes - only accessible by super admin

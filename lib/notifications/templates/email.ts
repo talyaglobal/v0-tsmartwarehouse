@@ -420,11 +420,11 @@ Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboa
     html: (data: EmailTemplateData) => {
       const content = `
         <p>Dear ${data.invitedName || "User"},</p>
-        <p>You've been invited by <strong>${data.invitedBy || "an admin"}</strong> to join <strong>${data.companyName || "a company"}</strong> on Warebnb as a <strong>${data.role || "member"}</strong>.</p>
+        <p>You've been invited by <strong>${data.invitedBy || "an admin"}</strong> to join <strong>${data.companyName || "a company"}</strong> on Warebnb as a <strong>${data.role || "team member"}</strong>.</p>
         <p><strong>Invitation Details:</strong></p>
         <ul>
           <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
-          <li><strong>Role:</strong> ${data.role || "member"}</li>
+          <li><strong>Role:</strong> ${data.role || "team member"}</li>
           <li><strong>Invited by:</strong> ${data.invitedBy || "Admin"}</li>
           <li><strong>Expires:</strong> ${data.expiresAt || "7 days"}</li>
         </ul>
@@ -439,11 +439,11 @@ You've been invited to join ${data.companyName || "a company"} on Warebnb
 
 Dear ${data.invitedName || "User"},
 
-You've been invited by ${data.invitedBy || "an admin"} to join ${data.companyName || "a company"} on Warebnb as a ${data.role || "member"}.
+You've been invited by ${data.invitedBy || "an admin"} to join ${data.companyName || "a company"} on Warebnb as a ${data.role || "team member"}.
 
 Invitation Details:
 - Company: ${data.companyName || "N/A"}
-- Role: ${data.role || "member"}
+- Role: ${data.role || "team member"}
 - Invited by: ${data.invitedBy || "Admin"}
 - Expires: ${data.expiresAt || "7 days"}
 
@@ -471,7 +471,7 @@ Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/acce
         <ul>
           <li><strong>Full Name:</strong> ${data.fullName || data.invitedName || "N/A"}</li>
           <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
-          <li><strong>Role:</strong> ${data.role || "member"}</li>
+          <li><strong>Role:</strong> ${data.role || "team member"}</li>
           <li><strong>Invited by:</strong> ${data.invitedBy || "Admin"}</li>
         </ul>
         ${passwordSection}
@@ -499,7 +499,7 @@ Welcome to ${data.companyName || "Warebnb"}! You've been invited to join our tea
 Your Invitation Details:
 - Full Name: ${data.fullName || data.invitedName || "N/A"}
 - Company: ${data.companyName || "N/A"}
-- Role: ${data.role || "member"}
+- Role: ${data.role || "team member"}
 - Invited by: ${data.invitedBy || "Admin"}
 
 ${passwordSection}
@@ -526,7 +526,7 @@ Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data
         <ul>
           <li><strong>Full Name:</strong> ${data.fullName || "N/A"}</li>
           <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
-          <li><strong>Role:</strong> ${data.role || "member"}</li>
+          <li><strong>Role:</strong> ${data.role || "team member"}</li>
         </ul>
         <p>You can now log in to your account using the credentials above.</p>
         <p><strong>Important:</strong> For security reasons, please change your password after your first login.</p>
@@ -549,7 +549,7 @@ Your Login Credentials:
 Account Details:
 - Full Name: ${data.fullName || "N/A"}
 - Company: ${data.companyName || "N/A"}
-- Role: ${data.role || "member"}
+- Role: ${data.role || "team member"}
 
 You can now log in to your account using the credentials above.
 

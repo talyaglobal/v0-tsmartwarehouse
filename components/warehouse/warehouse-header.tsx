@@ -28,7 +28,7 @@ export function WarehouseHeader({ title = "Warebnb" }: WarehouseHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['root', 'company_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+      if (savedRole && ['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 'warehouse_staff'].includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -108,13 +108,13 @@ export function WarehouseHeader({ title = "Warebnb" }: WarehouseHeaderProps) {
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      warehouse_admin: '🟢 Warehouse Admin',
+      warehouse_admin: '🟢 Warehouse Admin (Owner)',
       warehouse_supervisor: '🔵 Warehouse Supervisor',
       warehouse_client: '🟣 Warehouse Client',
       warehouse_staff: '⚪ Warehouse Staff',
       warehouse_finder: '🟡 Warehouse Finder',
       warehouse_broker: '🟠 Warehouse Broker',
-      end_delivery_party: '🟤 End Delivery Party',
+      end_delivery_party: '📦 End Delivery Party',
       local_transport: '🚚 Local Transport',
       international_transport: '✈️ International Transport',
     }
@@ -154,7 +154,7 @@ export function WarehouseHeader({ title = "Warebnb" }: WarehouseHeaderProps) {
               <Button variant="outline" size="sm" className="gap-1 h-8">
                 <Settings className="h-3 w-3" />
                 <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'warehouse_owner' ? '🟢' : currentTestRole === 'warehouse_admin' ? '🔵' : currentTestRole === 'customer' ? '🟣' : '⚪'}
+                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'warehouse_admin' ? '🟢' : currentTestRole === 'warehouse_supervisor' ? '🔵' : currentTestRole === 'warehouse_client' ? '🟣' : '⚪'}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>

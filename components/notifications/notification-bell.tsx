@@ -19,7 +19,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({ className }: NotificationBellProps) {
   const { user } = useUser()
-  const { unreadCount, isConnected } = useRealtimeNotifications(user?.id || '')
+  const { unreadCount } = useRealtimeNotifications(user?.id || '')
 
   if (!user) {
     return null
@@ -42,9 +42,6 @@ export function NotificationBell({ className }: NotificationBellProps) {
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           )}
-          {!isConnected && (
-            <span className="absolute -bottom-1 -right-1 h-2 w-2 bg-yellow-500 rounded-full" />
-          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
@@ -53,4 +50,3 @@ export function NotificationBell({ className }: NotificationBellProps) {
     </DropdownMenu>
   )
 }
-

@@ -23,7 +23,7 @@ export function UtilizationChartContent({ data }: UtilizationChartContentProps) 
           <XAxis dataKey="month" className="text-xs" />
           <YAxis className="text-xs" tickFormatter={(value) => `${value}%`} />
           <Tooltip
-            formatter={(value: number) => `${value}%`}
+            formatter={(value) => `${value}%`}
             contentStyle={{
               backgroundColor: "hsl(var(--card))",
               border: "1px solid hsl(var(--border))",

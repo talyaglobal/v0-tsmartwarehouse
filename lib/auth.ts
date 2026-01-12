@@ -80,7 +80,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       if (metadataRole === 'super_admin') userRole = 'root'
       else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'warehouse_owner', 'company_admin', 'warehouse_staff'].includes(metadataRole)) {
+      else if (metadataRole === 'warehouse_owner') userRole = 'warehouse_admin'
+      else if (metadataRole === 'company_admin') userRole = 'warehouse_supervisor'
+      else if (metadataRole === 'reseller') userRole = 'warehouse_broker'
+      else if ([
+        'root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client',
+        'warehouse_staff', 'warehouse_finder', 'warehouse_broker',
+        'end_delivery_party', 'local_transport', 'international_transport'
+      ].includes(metadataRole)) {
         userRole = metadataRole as UserRole
       }
 

@@ -32,7 +32,7 @@ export function ServiceBreakdownChartContent({ data }: ServiceBreakdownChartCont
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => `${value}%`}
+              formatter={(value) => `${value}%`}
               contentStyle={{
                 backgroundColor: "hsl(var(--card))",
                 border: "1px solid hsl(var(--border))",

@@ -58,7 +58,7 @@ export async function GET(
           .eq('id', user.id)
           .single()
 
-        const isCompanyAdmin = profile?.company_id === warehouse.company_id && profile?.role === 'company_admin'
+        const isCompanyAdmin = profile?.company_id === warehouse.company_id && (profile?.role === 'warehouse_admin' || profile?.role === 'warehouse_supervisor')
         if (!isCompanyAdmin) {
           const errorData: ErrorResponse = {
             success: false,

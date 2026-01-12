@@ -32,7 +32,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(savedRole)) {
+      if (savedRole && ['warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker', 'end_delivery_party', 'local_transport', 'international_transport'].includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -94,19 +94,19 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     
     const roleConfig: Record<string, { label: string; className: string }> = {
       root: {
-        label: 'Root',
+        label: 'Root Admin',
         className: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
-      },
-      warehouse_owner: {
-        label: 'Warehouse Owner',
-        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
       },
       warehouse_admin: {
         label: 'Warehouse Admin',
+        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
+      },
+      warehouse_supervisor: {
+        label: 'Warehouse Supervisor',
         className: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
       },
-      customer: {
-        label: 'Customer',
+      warehouse_client: {
+        label: 'Warehouse Client',
         className: 'bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800',
       },
       warehouse_staff: {
@@ -117,9 +117,21 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         label: 'Warehouse Finder',
         className: 'bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
       },
-      reseller: {
-        label: 'Reseller',
-        className: 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800',
+      warehouse_broker: {
+        label: 'Warehouse Broker',
+        className: 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
+      },
+      end_delivery_party: {
+        label: 'End Delivery Party',
+        className: 'bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800',
+      },
+      local_transport: {
+        label: 'Local Transport',
+        className: 'bg-teal-100 text-teal-700 border border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800',
+      },
+      international_transport: {
+        label: 'International Transport',
+        className: 'bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800',
       },
     }
 
@@ -158,20 +170,11 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       window.dispatchEvent(new Event('role-changed'))
 
       // Navigate to appropriate dashboard based on role
+      // All roles go to /dashboard except root (goes to /admin) and warehouse_staff (goes to /warehouse)
       if (newRole === 'root') {
         router.push('/admin')
       } else if (newRole === 'warehouse_staff') {
         router.push('/warehouse')
-      } else if (newRole === 'warehouse_finder') {
-        router.push('/dashboard/warehouse-finder')
-      } else if (newRole === 'warehouse_broker') {
-        router.push('/dashboard/reseller')
-      } else if (newRole === 'end_delivery_party') {
-        router.push('/dashboard/end-delivery')
-      } else if (newRole === 'local_transport') {
-        router.push('/dashboard/local-transport')
-      } else if (newRole === 'international_transport') {
-        router.push('/dashboard/international-transport')
       } else {
         router.push('/dashboard')
       }
@@ -298,7 +301,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                       Root → {getRoleLabel(selectedTestRole as UserRole).replace(/^[🔴🟢🔵🟣⚪]\s/, '')}
                     </span>
                   </div>
-                ) : profile?.role && profile.role !== 'customer' && (
+                ) : profile?.role && profile.role !== 'warehouse_client' && (
                   <div className="flex items-center">
                     {getRoleBadge(profile.role)}
                   </div>

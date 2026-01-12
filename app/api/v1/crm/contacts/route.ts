@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has permission to create contacts
-    if (!["warehouse_finder", "reseller", "root", "warehouse_admin"].includes(profile.role)) {
+    if (!["warehouse_finder", "warehouse_broker", "root", "warehouse_admin"].includes(profile.role)) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Forbidden",

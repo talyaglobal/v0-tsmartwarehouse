@@ -66,7 +66,7 @@ export default function MyCompanyPage() {
         .maybeSingle()
       
       if (!profile || !profile.company_id) return false
-      return ['warehouse_owner', 'company_admin'].includes(profile.role)
+      return ['warehouse_admin', 'warehouse_supervisor'].includes(profile.role)
     },
     enabled: !!user,
   })

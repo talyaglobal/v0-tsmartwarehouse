@@ -179,8 +179,8 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Validate role - only company_admin and warehouse_staff are allowed for team members
-    const validRoles = ['company_admin', 'warehouse_staff']
+    // Validate role - only warehouse_supervisor and warehouse_staff are allowed for team members
+    const validRoles = ['warehouse_supervisor', 'warehouse_staff']
     if (!validRoles.includes(role)) {
       const errorData: ErrorResponse = {
         success: false,

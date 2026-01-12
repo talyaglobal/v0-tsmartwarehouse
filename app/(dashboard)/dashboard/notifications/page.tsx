@@ -1,20 +1,23 @@
 "use client"
 
 import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/ui/page-header"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Bell, Package, FileText, AlertCircle, CheckCircle, Mail, Smartphone, Settings, Wifi, WifiOff } from "@/components/icons"
+import { Bell, Package, FileText, AlertCircle, CheckCircle, Mail, Smartphone, Settings } from "@/components/icons"
+import { CheckCircle2 } from "lucide-react"
 import { useRealtimeNotifications } from "@/lib/realtime"
 import { useUser } from "@/lib/hooks/use-user"
 import { formatDate } from "@/lib/utils/format"
+import type { Notification, NotificationType } from "@/types"
+import { Button } from "@/components/ui/button"
 
-const notificationIcons = {
+const notificationIcons: Record<NotificationType, React.ElementType> = {
   booking: Package,
   invoice: FileText,
   task: CheckCircle,
@@ -22,39 +25,49 @@ const notificationIcons = {
   system: Bell,
 }
 
+// Get navigation URL based on notification type
+function getNavigationUrl(type: NotificationType): string {
+  switch (type) {
+    case 'booking':
+      return '/dashboard/bookings'
+    case 'invoice':
+      return '/dashboard/invoices'
+    case 'task':
+      return '/warehouse/tasks'
+    case 'incident':
+      return '/dashboard/claims'
+    case 'system':
+    default:
+      return '/dashboard/notifications'
+  }
+}
+
 export default function NotificationsPage() {
+  const router = useRouter()
   const { user } = useUser()
-  const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead } = useRealtimeNotifications(user?.id || "")
+  const { notifications, unreadCount, markAsRead } = useRealtimeNotifications(user?.id || "")
 
   const unreadNotifications = useMemo(() => {
     return notifications.filter((n) => !n.read)
   }, [notifications])
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if not already read
+    if (!notification.read) {
+      await markAsRead(notification.id)
+    }
+    
+    // Navigate to the relevant page
+    const url = getNavigationUrl(notification.type)
+    router.push(url)
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Notifications"
-        description={
-          <div className="flex items-center gap-2">
-            <span>Manage your alerts and preferences</span>
-            {isConnected ? (
-              <span title="Real-time connected">
-                <Wifi className="h-4 w-4 text-green-500" />
-              </span>
-            ) : (
-              <span title="Real-time disconnected">
-                <WifiOff className="h-4 w-4 text-muted-foreground" />
-              </span>
-            )}
-          </div>
-        }
-      >
-        {unreadCount > 0 && (
-          <Button variant="outline" onClick={markAllAsRead}>
-            Mark All as Read
-          </Button>
-        )}
-      </PageHeader>
+        description="Manage your alerts and preferences"
+      />
 
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
@@ -83,7 +96,8 @@ export default function NotificationsPage() {
                   return (
                     <div
                       key={notification.id}
-                      className={`flex items-start gap-4 p-4 rounded-lg transition-colors ${
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`flex items-start gap-4 p-4 rounded-lg transition-colors cursor-pointer hover:bg-accent ${
                         notification.read ? "bg-muted/30" : "bg-primary/5 border border-primary/20"
                       }`}
                     >
@@ -95,15 +109,17 @@ export default function NotificationsPage() {
                           <p className={`text-sm font-medium ${notification.read ? "" : "text-primary"}`}>
                             {notification.title}
                           </p>
-                          <span className="text-xs text-muted-foreground">{formatDate(notification.createdAt)}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{formatDate(notification.createdAt)}</span>
+                            {notification.read ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <div className="h-2 w-2 bg-primary rounded-full" />
+                            )}
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground">{notification.message}</p>
                       </div>
-                      {!notification.read && (
-                        <Button variant="ghost" size="sm" onClick={() => markAsRead(notification.id)}>
-                          Mark Read
-                        </Button>
-                      )}
                     </div>
                   )
                 })
@@ -130,18 +146,19 @@ export default function NotificationsPage() {
                       return (
                         <div
                           key={notification.id}
-                          className="flex items-start gap-4 p-4 rounded-lg bg-primary/5 border border-primary/20"
+                          onClick={() => handleNotificationClick(notification)}
+                          className="flex items-start gap-4 p-4 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer hover:bg-accent transition-colors"
                         >
                           <div className="rounded-full p-2 bg-primary/10">
                             <Icon className="h-4 w-4 text-primary" />
                           </div>
                           <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium text-primary">{notification.title}</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-primary">{notification.title}</p>
+                              <div className="h-2 w-2 bg-primary rounded-full" />
+                            </div>
                             <p className="text-sm text-muted-foreground">{notification.message}</p>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => markAsRead(notification.id)}>
-                            Mark Read
-                          </Button>
                         </div>
                       )
                     })}
@@ -174,7 +191,7 @@ export default function NotificationsPage() {
                       <Mail className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="font-medium">Email</p>
-                        <p className="text-sm text-muted-foreground">customer@example.com</p>
+                        <p className="text-sm text-muted-foreground">Receive notifications via email</p>
                       </div>
                     </div>
                     <Switch defaultChecked />

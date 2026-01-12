@@ -93,8 +93,8 @@ export async function PATCH(
     
     // Update role (map to new role system)
     if (role !== undefined) {
-      // Only allow company_admin and warehouse_staff for team members
-      const validRoles = ['company_admin', 'warehouse_staff']
+      // Only allow warehouse_supervisor and warehouse_staff for team members
+      const validRoles = ['warehouse_supervisor', 'warehouse_staff']
       if (!validRoles.includes(role)) {
         const errorData: ErrorResponse = {
           success: false,

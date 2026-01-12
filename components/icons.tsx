@@ -14,6 +14,7 @@ import {
   Play,
   Check,
   CheckCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -42,6 +43,7 @@ import {
   MoreHorizontal,
   MoreVertical,
   Package,
+  Package2,
   Phone,
   Plus,
   Minus,
@@ -159,6 +161,7 @@ import {
   Car,
   Bot,
   Cookie,
+  FlaskConical,
   type LucideIcon,
 } from "lucide-react"
 
@@ -178,6 +181,7 @@ export {
   Play,
   Check,
   CheckCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -206,6 +210,7 @@ export {
   MoreHorizontal,
   MoreVertical,
   Package,
+  Package2,
   Phone,
   Plus,
   Minus,
@@ -323,6 +328,7 @@ export {
   Car,
   Bot,
   Cookie,
+  FlaskConical,
   type LucideIcon,
 }
 
@@ -343,6 +349,7 @@ export const iconMap: Record<string, LucideIcon> = {
   play: Play,
   check: Check,
   "check-circle": CheckCircle,
+  "check-circle-2": CheckCircle2,
   clock: Clock,
   dashboard: LayoutDashboard,
   dollar: DollarSign,
@@ -419,4 +426,5 @@ export const iconMap: Record<string, LucideIcon> = {
   car: Car,
   bot: Bot,
   cookie: Cookie,
+  "flask-conical": FlaskConical,
 }

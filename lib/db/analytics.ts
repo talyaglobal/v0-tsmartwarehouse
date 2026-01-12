@@ -355,7 +355,7 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
   const { data: customers, error: customersError } = await supabase
     .from('profiles')
     .select('id')
-    .eq('role', 'customer')
+    .eq('role', 'warehouse_client')
 
   if (customersError) {
     throw new Error(`Failed to fetch customers: ${customersError.message}`)

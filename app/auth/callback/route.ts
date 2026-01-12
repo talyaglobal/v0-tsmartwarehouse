@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
           .eq('id', user.id)
           .maybeSingle()
 
-        const role = profile?.role || user.user_metadata?.role || 'member'
+        const role = profile?.role || user.user_metadata?.role || 'warehouse_client'
 
         // Determine redirect based on role
         if (role === 'root' || role === 'super_admin') {

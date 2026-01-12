@@ -3,23 +3,21 @@
 import { useRealtimeNotifications } from '@/lib/realtime/hooks'
 import { useUser } from '@/lib/hooks/use-user'
 import { NotificationItem } from './notification-item'
-import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Inbox } from 'lucide-react'
+
 // ScrollArea component (simple implementation)
 const ScrollArea = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <div className={className} style={{ overflowY: 'auto' }}>
     {children}
   </div>
 )
-import { Separator } from '@/components/ui/separator'
-import { Inbox } from 'lucide-react'
 
 export function NotificationCenter() {
   const { user } = useUser()
   const {
     notifications,
     unreadCount,
-    isConnected,
-    markAllAsRead,
   } = useRealtimeNotifications(user?.id || '')
 
   if (!user) {
@@ -40,20 +38,7 @@ export function NotificationCenter() {
               ({unreadCount} unread)
             </span>
           )}
-          {!isConnected && (
-            <span className="text-xs text-yellow-600">Disconnected</span>
-          )}
         </div>
-        {unreadCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={markAllAsRead}
-            className="text-xs"
-          >
-            Mark all as read
-          </Button>
-        )}
       </div>
 
       {/* Notifications List */}
@@ -98,4 +83,3 @@ export function NotificationCenter() {
     </div>
   )
 }
-

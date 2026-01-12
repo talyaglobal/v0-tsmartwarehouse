@@ -84,20 +84,11 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
       window.dispatchEvent(new Event('role-changed'))
 
       // Navigate to appropriate dashboard based on role
+      // All roles go to /dashboard except root (goes to /admin) and warehouse_staff (goes to /warehouse)
       if (newRole === 'root') {
         router.push('/admin')
       } else if (newRole === 'warehouse_staff') {
         router.push('/warehouse')
-      } else if (newRole === 'warehouse_finder') {
-        router.push('/dashboard/warehouse-finder')
-      } else if (newRole === 'warehouse_broker') {
-        router.push('/dashboard/reseller')
-      } else if (newRole === 'end_delivery_party') {
-        router.push('/dashboard/end-delivery')
-      } else if (newRole === 'local_transport') {
-        router.push('/dashboard/local-transport')
-      } else if (newRole === 'international_transport') {
-        router.push('/dashboard/international-transport')
       } else {
         router.push('/dashboard')
       }

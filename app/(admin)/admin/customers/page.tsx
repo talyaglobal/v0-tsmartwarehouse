@@ -19,7 +19,7 @@ const tierColors: Record<MembershipTier, string> = {
   platinum: "bg-purple-100 text-purple-800",
 }
 
-type CustomerWithRole = User & { companyRole?: 'warehouse_owner' | 'company_admin' | 'member' | null }
+type CustomerWithRole = User & { companyRole?: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client' | null }
 
 export default function CustomersPage() {
   const [search, setSearch] = useState("")
@@ -147,7 +147,7 @@ export default function CustomersPage() {
                   <TableCell>{customer.companyName || "-"}</TableCell>
                   <TableCell>
                     {(() => {
-                      const role: 'warehouse_owner' | 'company_admin' | 'member' | null | undefined = customer.companyRole
+                      const role: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client' | null | undefined = customer.companyRole
                       if (!role) {
                         return <span className="text-muted-foreground">-</span>
                       }
@@ -156,13 +156,16 @@ export default function CustomersPage() {
                       let label: string
                       let showCrown = false
                       
-                      if (role === 'warehouse_owner') {
+                      if (role === 'warehouse_admin') {
                         className = 'bg-purple-100 text-purple-800'
-                        label = 'Warehouse Owner'
+                        label = 'Warehouse Admin'
                         showCrown = true
-                      } else if (role === 'company_admin') {
+                      } else if (role === 'warehouse_supervisor') {
                         className = 'bg-blue-100 text-blue-800'
-                        label = 'Company Admin'
+                        label = 'Warehouse Supervisor'
+                      } else if (role === 'warehouse_client') {
+                        className = 'bg-green-100 text-green-800'
+                        label = 'Warehouse Client'
                       } else {
                         className = 'bg-gray-100 text-gray-800'
                         label = role

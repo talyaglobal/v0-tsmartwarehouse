@@ -314,7 +314,7 @@ export default function RegisterPage() {
     formDataToSubmit.append('password', renterFormData.password)
     formDataToSubmit.append('confirmPassword', renterFormData.confirmPassword)
     if (renterFormData.phone) formDataToSubmit.append('phone', renterFormData.phone)
-    formDataToSubmit.append('userType', 'customer')
+    formDataToSubmit.append('userType', 'warehouse_client')
 
     const result = await signUp(formDataToSubmit)
     
@@ -364,7 +364,7 @@ export default function RegisterPage() {
     formDataToSubmit.append('confirmPassword', resellerFormData.confirmPassword)
     formDataToSubmit.append('name', resellerFormData.name)
     if (resellerFormData.phone) formDataToSubmit.append('phone', resellerFormData.phone)
-    formDataToSubmit.append('userType', 'reseller')
+    formDataToSubmit.append('userType', 'warehouse_broker')
 
     const result = await signUp(formDataToSubmit)
     
@@ -461,7 +461,7 @@ export default function RegisterPage() {
           .eq('id', signInData.user.id)
           .single()
 
-        const role = profile?.role || signInData.user.user_metadata?.role || 'customer'
+        const role = profile?.role || signInData.user.user_metadata?.role || 'warehouse_client'
 
         // Determine redirect path based on role
         let redirectPath = '/dashboard'
@@ -471,11 +471,11 @@ export default function RegisterPage() {
           redirectPath = '/warehouse'
         } else if (role === 'warehouse_finder') {
           redirectPath = '/dashboard/warehouse-finder'
-        } else if (role === 'reseller') {
-          redirectPath = '/dashboard/reseller'
-        } else if (role === 'warehouse_owner' || role === 'warehouse_admin') {
+        } else if (role === 'warehouse_broker') {
           redirectPath = '/dashboard'
-        } else if (role === 'customer') {
+        } else if (role === 'warehouse_admin' || role === 'warehouse_supervisor') {
+          redirectPath = '/dashboard'
+        } else if (role === 'warehouse_client') {
           redirectPath = '/dashboard'
         }
 

@@ -61,7 +61,7 @@ export async function getAuthUser(request: NextRequest) {
         else if (profile.role === 'warehouse_client') userRole = 'warehouse_client'
         else if (profile.role === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(profile.role)) {
+        else if (['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker'].includes(profile.role)) {
           userRole = profile.role as UserRole
         }
       } else {
@@ -72,7 +72,7 @@ export async function getAuthUser(request: NextRequest) {
         else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
         else if (metadataRole === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
+        else if (['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker'].includes(metadataRole)) {
           userRole = metadataRole as UserRole
         }
       }
@@ -84,7 +84,7 @@ export async function getAuthUser(request: NextRequest) {
       else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
       else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
+      else if (['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker'].includes(metadataRole)) {
         userRole = metadataRole as UserRole
       }
     }

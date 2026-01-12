@@ -162,13 +162,13 @@ export default function SettingsPage() {
       }
       
       // Get company role from profiles.role
-      let companyRole: 'warehouse_owner' | 'company_admin' | 'member' | null = null
-      if (profileData.role === 'warehouse_owner') {
-        companyRole = 'warehouse_owner'
-      } else if (profileData.role === 'company_admin') {
-        companyRole = 'company_admin'
-      } else if (profileData.role === 'customer') {
-        companyRole = 'member'
+      let companyRole: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client' | null = null
+      if (profileData.role === 'warehouse_admin') {
+        companyRole = 'warehouse_admin'
+      } else if (profileData.role === 'warehouse_supervisor') {
+        companyRole = 'warehouse_supervisor'
+      } else if (profileData.role === 'warehouse_client') {
+        companyRole = 'warehouse_client'
       }
       
       const result = {
@@ -176,7 +176,7 @@ export default function SettingsPage() {
         company_id: companyId || profileData.company_id,
         companies: company,
         companyRole,
-        canChangeEmail: companyRole === 'warehouse_owner', // Only warehouse owners can change email
+        canChangeEmail: companyRole === 'warehouse_admin', // Only warehouse admins can change email
       }
       
       console.log('Final profile result:', result)

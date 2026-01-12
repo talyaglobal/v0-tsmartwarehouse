@@ -171,7 +171,7 @@ export default function LoginPage() {
           const userMetadata = data.user.user_metadata || {}
           const userEmail = data.user.email || email
           const userName = userMetadata.name || userEmail.split('@')[0]
-          const userRole = userMetadata.role || 'customer'
+          const userRole = userMetadata.role || 'warehouse_client'
 
           // Call API to create profile (server-side to use admin client)
           const createProfileResponse = await fetch('/api/v1/profile/create', {
@@ -198,11 +198,12 @@ export default function LoginPage() {
         }
 
         // Get role from profile and map legacy roles to new roles
-        let role = profile?.role || data.user.user_metadata?.role || 'member'
+        let role = profile?.role || data.user.user_metadata?.role || 'warehouse_client'
         
         // Map legacy roles to new roles
         if (role === 'super_admin') role = 'root'
-        else if (role === 'customer') role = 'member'
+        else if (role === 'customer') role = 'warehouse_client'
+        else if (role === 'member') role = 'warehouse_client'
         else if (role === 'worker') role = 'warehouse_staff'
 
         // Determine redirect path based on new role system
@@ -218,7 +219,7 @@ export default function LoginPage() {
           redirectPath = '/admin'
         } else if (role === 'warehouse_staff') {
           redirectPath = '/warehouse'
-        } else if (['company_admin', 'customer', 'company_owner'].includes(role)) {
+        } else if (['warehouse_supervisor', 'warehouse_client', 'warehouse_admin'].includes(role)) {
           redirectPath = '/dashboard'
         }
 

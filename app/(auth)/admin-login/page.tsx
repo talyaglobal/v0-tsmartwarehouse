@@ -75,7 +75,7 @@ export default function AdminLoginPage() {
           return
         }
 
-        const role = profile?.role || data.user.user_metadata?.role || 'customer'
+        const role = profile?.role || data.user.user_metadata?.role || 'warehouse_client'
 
         // Verify user is an admin
         if (role !== 'super_admin') {

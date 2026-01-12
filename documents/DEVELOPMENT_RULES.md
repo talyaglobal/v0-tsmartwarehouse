@@ -56,7 +56,28 @@ node scripts/push-supabase.js
 - ✅ Mevcut kod pattern'lerine uyulmalıdır
 - ✅ Error handling kapsamlı olmalıdır
 
-### 5. Test ve Kalite
+### 5. Build Doğrulaması (ZORUNLU)
+
+**Her değişiklik sonrası `npm run build` OTOMATİK olarak çalıştırılmalı ve hatalar düzeltilmelidir.**
+
+- ✅ Kod değişiklikleri tamamlandıktan sonra **mutlaka** `npm run build` çalıştırılmalıdır
+- ✅ Build hataları varsa, hatalar düzeltilmeli ve tekrar build edilmelidir
+- ✅ Build başarılı olana kadar işlem tamamlanmış sayılmamalıdır
+- ❌ Kullanıcıdan "npm run build yap" demesini beklememeli, otomatik yapılmalıdır
+- ❌ Build hataları kullanıcıya bırakılmamalıdır
+
+**Build Doğrulama Akışı:**
+```
+1. Kod değişiklikleri tamamlandı
+   ↓
+2. Otomatik olarak `npm run build` çalıştır
+   ↓
+3. Hata varsa → Düzelt → Tekrar build et
+   ↓
+4. ✅ Build başarılı → İşlem tamamlandı
+```
+
+### 6. Test ve Kalite
 
 - ✅ Yeni feature'lar için test yazılmalıdır (mümkünse)
 - ✅ Linter hataları düzeltilmelidir
@@ -80,7 +101,12 @@ node scripts/push-supabase.js
    - Type safety'yi koru
    - Error handling ekle
 
-4. **Dokümantasyon**
+4. **Build Doğrulama**
+   - `npm run build` çalıştır
+   - Hatalar varsa düzelt
+   - Build başarılı olana kadar tekrarla
+
+5. **Dokümantasyon**
    - Önemli değişiklikler için dokümantasyon güncelle
    - Plan dosyalarını güncelle (varsa)
 
@@ -99,9 +125,57 @@ node scripts/push-supabase.js
 ## ⚠️ Önemli Notlar
 
 - **Migration'lar asla manuel push beklenmemeli, otomatik olarak yapılmalıdır**
+- **Build doğrulaması her değişiklik sonrası otomatik yapılmalı, hatalar düzeltilmelidir**
 - **Dokümantasyon dosyaları sadece `documents/` klasörüne kaydedilmelidir**
 - **Geliştirme öncesi `documents/` klasöründeki ilgili dosyalar okunmalıdır**
 - **Kod yazmadan önce mevcut pattern'leri anlamak için codebase search yapılmalıdır**
+
+## 🧪 Root User Test Modu (Development)
+
+### Amaç
+
+Root kullanıcı, sistemdeki tüm rolleri gerçek zamanlı olarak test edebilmelidir. Bu sayede:
+- Her rol tipinin UI'ını ve işlevselliğini test edebilir
+- Gerçek kullanıcı deneyimini simüle edebilir
+- Demo ve test verileri oluşturabilir
+
+### Nasıl Çalışır?
+
+1. **Role Switcher**: Root kullanıcı `/admin` veya `/dashboard` sayfasında role switcher ile farklı rollere geçiş yapabilir
+2. **Test Data İşaretleme**: Root kullanıcının oluşturduğu tüm veriler `is_test_data: true` veya `created_by_root: true` flag'i ile işaretlenir
+3. **Test Data Badge**: Diğer kullanıcılar root tarafından oluşturulan verileri görüntülediğinde "Test Data" badge'i gösterilir
+
+### Test Data Badge Gösterimi
+
+Root kullanıcının oluşturduğu veriler için şu yerlerde badge gösterilir:
+- Booking listesi ve detay sayfası
+- Invoice listesi ve detay sayfası  
+- Warehouse listesi ve detay sayfası
+- Lead/Contact listesi
+
+**Badge Görünümü:**
+```
+🧪 Test Data - Created by Root for testing purposes
+```
+
+### Teknik Uygulama
+
+1. **Profiles tablosunda `is_root` kontrolü**: `profiles.role = 'root'` olan kullanıcılar
+2. **Veri oluşturma sırasında işaretleme**: `created_by` alanı root user id ise test data olarak kabul edilir
+3. **UI'da badge gösterimi**: `RootTestDataBadge` komponenti kullanılır
+
+### Önemli Notlar
+
+- ⚠️ Root test verileri production'da temizlenmeli veya gizlenmelidir
+- ⚠️ Bu özellik SADECE development ve test ortamları içindir
+- ⚠️ Root kullanıcı her rol tipinde CRUD işlemleri yapabilir
+- ⚠️ Test verileri gerçek iş akışlarını etkilememelidir
+
+### İlgili Dosyalar
+
+- `components/ui/root-test-data-badge.tsx` - Test data badge komponenti
+- `lib/utils/test-data.ts` - Test data yardımcı fonksiyonları
+- `middleware.ts` - Role switching middleware
 
 ## 📚 İlgili Dosyalar
 

@@ -1,4 +1,4 @@
-# Cursor AI Rules for TSmart Warehouse Project
+# Cursor AI Rules for Warebnb Project
 
 ## Supabase Migration Auto-Push Policy
 
@@ -12,6 +12,17 @@ When creating or modifying Supabase migration files:
    - Attempt to push again automatically
 4. **Never ask the user to manually push migrations** - handle this automatically
 
+## Build Verification Policy (MANDATORY)
+
+After completing any code changes:
+1. **Automatically run** `npm run build` to verify the build
+2. If build errors occur:
+   - Fix all TypeScript/compilation errors
+   - Run build again
+   - Repeat until build succeeds
+3. **Never leave code in a broken state** - build must pass
+4. **Never ask user to run build or fix errors** - handle this automatically
+
 ## General Development Rules
 
 - Always use TypeScript with strict type checking
@@ -21,3 +32,28 @@ When creating or modifying Supabase migration files:
 - Write comprehensive error handling
 - Update relevant documentation when making significant changes
 
+## Root User Test Mode (Development Feature)
+
+Root kullanıcı, sistemdeki tüm rolleri gerçek zamanlı olarak test edebilir:
+
+1. **Role Switcher**: `/admin` veya `/dashboard` sayfasında role switcher ile farklı rollere geçiş yapabilir
+2. **Test Data İşaretleme**: Root kullanıcının oluşturduğu veriler için "🧪 Test Data" badge gösterilir
+3. **Test Data Badge**: Diğer kullanıcılar root tarafından oluşturulan verileri görüntülediğinde badge gösterilir
+
+### İlgili Dosyalar:
+- `components/ui/root-test-data-badge.tsx` - Test data badge komponenti
+- `lib/utils/test-data.ts` - Test data yardımcı fonksiyonları
+- `documents/DEVELOPMENT_RULES.md` - Detaylı dokümantasyon
+
+### Kullanım:
+```tsx
+import { RootTestDataBadge, RootTestDataIndicator } from "@/components/ui/root-test-data-badge"
+import { getRootUserIds, isTestDataSync } from "@/lib/utils/test-data"
+
+// Komponentte:
+const [rootUserIds, setRootUserIds] = useState<string[]>([])
+useEffect(() => { getRootUserIds().then(setRootUserIds) }, [])
+
+// Badge gösterimi:
+{isTestDataSync(item.customerId, rootUserIds) && <RootTestDataIndicator />}
+```

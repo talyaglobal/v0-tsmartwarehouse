@@ -45,14 +45,14 @@ export function RoleBasedMainContent({ children }: RoleBasedMainContentProps) {
         .select('role')
         .eq('id', user.id)
         .maybeSingle()
-      return profileData?.role || 'customer'
+      return profileData?.role || 'warehouse_client'
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
   })
 
   // Determine actual role (considering root test role)
-  let actualRole = profile || 'customer'
+  let actualRole = profile || 'warehouse_client'
   if (profile === 'root' && selectedTestRole) {
     actualRole = selectedTestRole
   }
@@ -62,11 +62,11 @@ export function RoleBasedMainContent({ children }: RoleBasedMainContentProps) {
     switch (role) {
       case 'root':
         return 'bg-gradient-to-br from-red-50/80 via-white to-red-50/40 dark:from-red-950 dark:via-red-900 dark:to-red-900/50'
-      case 'warehouse_owner':
+      case 'warehouse_admin':
         return 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/40 dark:from-emerald-950 dark:via-emerald-900 dark:to-emerald-900/50'
       case 'company_admin':
         return 'bg-gradient-to-br from-blue-50/80 via-white to-blue-50/40 dark:from-blue-950 dark:via-blue-900 dark:to-blue-900/50'
-      case 'customer':
+      case 'warehouse_client':
         return 'bg-white dark:bg-slate-950'
       case 'warehouse_staff':
         return 'bg-gradient-to-br from-slate-50/80 via-white to-slate-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800/50'

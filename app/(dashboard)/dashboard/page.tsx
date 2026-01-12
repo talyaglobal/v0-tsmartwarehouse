@@ -9,13 +9,15 @@ import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2, AlertCircle, Calendar, Settings } from "@/components/icons"
+import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2, AlertCircle, Calendar, Settings, Truck, MapPin, Users, TrendingUp } from "@/components/icons"
 import { formatCurrency, formatDate } from "@/lib/utils/format"
 import type { Booking, Invoice, Claim, UserRole } from "@/types"
 import { api } from "@/lib/api/client"
 import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
+import { RootTestDataIndicator } from "@/components/ui/root-test-data-badge"
+import { getRootUserIds, isTestDataSync } from "@/lib/utils/test-data"
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 
@@ -25,12 +27,18 @@ export default function CustomerDashboardPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
   const [user, setUser] = useState<{ membershipTier?: string; creditBalance?: number } | null>(null)
-  const [userRole, setUserRole] = useState<string>('customer')
+  const [userRole, setUserRole] = useState<string>('warehouse_client')
   const [userName, setUserName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [selectedBookingForTimeSlot, setSelectedBookingForTimeSlot] = useState<Booking | null>(null)
   const [isRootUser, setIsRootUser] = useState(false)
   const [selectedTestRole, setSelectedTestRole] = useState<UserRole | null>(null)
+  const [rootUserIds, setRootUserIds] = useState<string[]>([])
+
+  // Fetch root user IDs for test data detection
+  useEffect(() => {
+    getRootUserIds().then(setRootUserIds)
+  }, [])
 
   useEffect(() => {
     fetchDashboardData()
@@ -73,7 +81,7 @@ export default function CustomerDashboardPage() {
       const supabase = createClient()
       const { data: { user: authUser } } = await supabase.auth.getUser()
 
-      let currentUserRole = 'customer'
+      let currentUserRole = 'warehouse_client'
       if (authUser) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -103,7 +111,7 @@ export default function CustomerDashboardPage() {
         }
       }
 
-      const isResellerRole = currentUserRole === 'reseller'
+      const isResellerRole = currentUserRole === 'warehouse_broker'
 
       // Reseller role doesn't have bookings/invoices/claims, so skip those API calls
       const [bookingsData, invoicesData, claimsData, userData] = await Promise.all([
@@ -140,8 +148,13 @@ export default function CustomerDashboardPage() {
   const membershipTier = user?.membershipTier || "bronze"
   const creditBalance = user?.creditBalance || 0
   const recentClaims = claims.filter((c) => c.status === "submitted" || c.status === "under-review")
-  const isCustomer = userRole === 'customer'
-  const isReseller = userRole === 'reseller'
+  const isCustomer = userRole === 'warehouse_client'
+  const isReseller = userRole === 'warehouse_broker'
+  const isWarehouseFinder = userRole === 'warehouse_finder'
+  const isEndDelivery = userRole === 'end_delivery_party'
+  const isLocalTransport = userRole === 'local_transport'
+  const isInternationalTransport = userRole === 'international_transport'
+  const isWarehouseOwner = userRole === 'warehouse_admin' || userRole === 'warehouse_supervisor'
   // Show bookings that need customer action:
   // 1. awaiting_time_slot status (with or without proposed date/time)
   // 2. pending status with proposedStartDate/proposedStartTime (warehouse staff proposed a new time)
@@ -163,20 +176,11 @@ export default function CustomerDashboardPage() {
       window.dispatchEvent(new Event('role-changed'))
 
       // Navigate to appropriate dashboard based on role
+      // All roles go to /dashboard except root (goes to /admin) and warehouse_staff (goes to /warehouse)
       if (newRole === 'root') {
         router.push('/admin')
       } else if (newRole === 'warehouse_staff') {
         router.push('/warehouse')
-      } else if (newRole === 'warehouse_finder') {
-        router.push('/dashboard/warehouse-finder')
-      } else if (newRole === 'warehouse_broker') {
-        router.push('/dashboard/reseller')
-      } else if (newRole === 'end_delivery_party') {
-        router.push('/dashboard/end-delivery')
-      } else if (newRole === 'local_transport') {
-        router.push('/dashboard/local-transport')
-      } else if (newRole === 'international_transport') {
-        router.push('/dashboard/international-transport')
       } else {
         router.push('/dashboard')
       }
@@ -276,12 +280,22 @@ export default function CustomerDashboardPage() {
             <p className="text-muted-foreground">
               {isReseller 
                 ? (userName ? `Welcome back, ${userName}. Manage your leads and sales pipeline.` : "Welcome back. Manage your leads and sales pipeline.")
+                : isWarehouseFinder
+                ? (userName ? `Welcome back, ${userName}. Find and add new warehouses to earn commissions.` : "Welcome back. Find and add new warehouses to earn commissions.")
+                : isEndDelivery
+                ? (userName ? `Welcome back, ${userName}. Track your deliveries and shipments.` : "Welcome back. Track your deliveries and shipments.")
+                : isLocalTransport
+                ? (userName ? `Welcome back, ${userName}. Manage your local transport operations.` : "Welcome back. Manage your local transport operations.")
+                : isInternationalTransport
+                ? (userName ? `Welcome back, ${userName}. Manage your international shipments.` : "Welcome back. Manage your international shipments.")
+                : isWarehouseOwner
+                ? (userName ? `Welcome back, ${userName}. Manage your warehouses and bookings.` : "Welcome back. Manage your warehouses and bookings.")
                 : (userName ? `Welcome back, ${userName}. Here's an overview of your warehouse activity.` : "Welcome back. Here's an overview of your warehouse activity.")
               }
             </p>
           </div>
         </div>
-        {!isReseller && (
+        {isCustomer && (
           <div className="flex items-center gap-2">
             <Link href="/dashboard/bookings/new">
               <Button>New Booking</Button>
@@ -316,33 +330,41 @@ export default function CustomerDashboardPage() {
         </Card>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Role Specific */}
       {isReseller ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Leads"
-            value={0}
-            icon={Package}
-            subtitle="all time"
-          />
-          <StatCard
-            title="Active Proposals"
-            value={0}
-            icon={FileText}
-            subtitle="in progress"
-          />
-          <StatCard
-            title="Converted"
-            value={0}
-            icon={DollarSign}
-            subtitle="this month"
-          />
-          <StatCard
-            title="Commission"
-            value={formatCurrency(0)}
-            icon={DollarSign}
-            subtitle="total earned"
-          />
+          <StatCard title="Total Leads" value={0} icon={Users} subtitle="all time" />
+          <StatCard title="Active Proposals" value={0} icon={FileText} subtitle="in progress" />
+          <StatCard title="Converted" value={0} icon={TrendingUp} subtitle="this month" />
+          <StatCard title="Commission" value={formatCurrency(0)} icon={DollarSign} subtitle="total earned" />
+        </div>
+      ) : isWarehouseFinder ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Total Contacts" value={0} icon={Users} subtitle="warehouse suppliers" />
+          <StatCard title="Active Leads" value={0} icon={TrendingUp} subtitle="in progress" />
+          <StatCard title="Warehouses Added" value={0} icon={Building2} subtitle="converted" />
+          <StatCard title="Commission" value={formatCurrency(0)} icon={DollarSign} subtitle="earned" />
+        </div>
+      ) : isEndDelivery ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Pending Deliveries" value={0} icon={Truck} subtitle="awaiting pickup" />
+          <StatCard title="In Transit" value={0} icon={Truck} subtitle="on the way" />
+          <StatCard title="Delivered" value={0} icon={Package} subtitle="this month" />
+          <StatCard title="Total Shipments" value={0} icon={Package} subtitle="all time" />
+        </div>
+      ) : isLocalTransport ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Active Jobs" value={0} icon={Truck} subtitle="in progress" />
+          <StatCard title="Pending Pickups" value={0} icon={Package} subtitle="scheduled" />
+          <StatCard title="Completed Today" value={0} icon={Package} subtitle="deliveries" />
+          <StatCard title="Total Revenue" value={formatCurrency(0)} icon={DollarSign} subtitle="this month" />
+        </div>
+      ) : isInternationalTransport ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Active Shipments" value={0} icon={Truck} subtitle="in transit" />
+          <StatCard title="Customs Pending" value={0} icon={AlertCircle} subtitle="awaiting clearance" />
+          <StatCard title="Delivered" value={0} icon={Package} subtitle="this month" />
+          <StatCard title="Total Revenue" value={formatCurrency(0)} icon={DollarSign} subtitle="this month" />
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -353,26 +375,11 @@ export default function CustomerDashboardPage() {
             trend={{ value: 12, isPositive: true }}
             subtitle="from last month"
           />
-          <StatCard
-            title="Total Bookings"
-            value={bookings.length}
-            icon={Package}
-            subtitle="all time"
-          />
+          <StatCard title="Total Bookings" value={bookings.length} icon={Package} subtitle="all time" />
           {isCustomer ? (
             <>
-              <StatCard
-                title="Active Claims"
-                value={recentClaims.length}
-                icon={AlertCircle}
-                subtitle="pending review"
-              />
-              <StatCard
-                title="Upcoming Events"
-                value={0}
-                icon={Calendar}
-                subtitle="this month"
-              />
+              <StatCard title="Active Claims" value={recentClaims.length} icon={AlertCircle} subtitle="pending review" />
+              <StatCard title="Upcoming Events" value={0} icon={Calendar} subtitle="this month" />
             </>
           ) : (
             <>
@@ -394,7 +401,7 @@ export default function CustomerDashboardPage() {
         </div>
       )}
 
-      {/* Recent Bookings & Invoices */}
+      {/* Recent Activities - Role Specific */}
       {isReseller ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
@@ -403,20 +410,18 @@ export default function CustomerDashboardPage() {
                 <CardTitle>Recent Leads</CardTitle>
                 <CardDescription>Your latest customer leads</CardDescription>
               </div>
-              <Link href="/dashboard/reseller/leads">
+              <Link href="/dashboard/broker/leads">
                 <Button variant="ghost" size="sm" className="gap-1">
                   View All <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No leads yet</p>
-                  <Link href="/dashboard/reseller/leads">
-                    <Button variant="outline" className="mt-4">Create New Lead</Button>
-                  </Link>
-                </div>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No leads yet</p>
+                <Link href="/dashboard/broker/leads">
+                  <Button variant="outline" className="mt-4">Create New Lead</Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -426,20 +431,161 @@ export default function CustomerDashboardPage() {
                 <CardTitle>Recent Proposals</CardTitle>
                 <CardDescription>Your latest proposals</CardDescription>
               </div>
-              <Link href="/dashboard/reseller/proposals">
+              <Link href="/dashboard/broker/proposals">
                 <Button variant="ghost" size="sm" className="gap-1">
                   View All <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No proposals yet</p>
-                  <Link href="/dashboard/reseller/proposals">
-                    <Button variant="outline" className="mt-4">Create New Proposal</Button>
-                  </Link>
-                </div>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No proposals yet</p>
+                <Link href="/dashboard/broker/proposals">
+                  <Button variant="outline" className="mt-4">Create New Proposal</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : isWarehouseFinder ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Contacts</CardTitle>
+                <CardDescription>Your warehouse supplier contacts</CardDescription>
+              </div>
+              <Link href="/dashboard/warehouse-finder/contacts">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View All <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No contacts yet</p>
+                <Link href="/dashboard/warehouse-finder/contacts">
+                  <Button variant="outline" className="mt-4">Add New Contact</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Navigate to key sections</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <Link href="/dashboard/warehouse-finder/contacts">
+                <Button variant="outline" className="w-full h-20 flex flex-col justify-center">
+                  <Users className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Contacts</span>
+                </Button>
+              </Link>
+              <Link href="/dashboard/warehouse-finder/map">
+                <Button variant="outline" className="w-full h-20 flex flex-col justify-center">
+                  <MapPin className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Map View</span>
+                </Button>
+              </Link>
+              <Link href="/dashboard/warehouse-finder/visits">
+                <Button variant="outline" className="w-full h-20 flex flex-col justify-center">
+                  <Calendar className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Visits</span>
+                </Button>
+              </Link>
+              <Link href="/dashboard/warehouse-finder/performance">
+                <Button variant="outline" className="w-full h-20 flex flex-col justify-center">
+                  <TrendingUp className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Performance</span>
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      ) : isEndDelivery ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Pending Deliveries</CardTitle>
+                <CardDescription>Items awaiting pickup</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No pending deliveries</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Shipments</CardTitle>
+                <CardDescription>Your latest shipments</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No shipments yet</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : isLocalTransport ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Active Jobs</CardTitle>
+                <CardDescription>Current transport jobs</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No active jobs</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Upcoming Pickups</CardTitle>
+                <CardDescription>Scheduled pickups</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No scheduled pickups</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : isInternationalTransport ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Active Shipments</CardTitle>
+                <CardDescription>International shipments in transit</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No active shipments</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Customs Status</CardTitle>
+                <CardDescription>Shipments pending clearance</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No customs pending</p>
               </div>
             </CardContent>
           </Card>
@@ -472,10 +618,13 @@ export default function CustomerDashboardPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium">
+                        <p className="font-medium flex items-center gap-2">
                           {booking.type === "pallet"
                             ? `${booking.palletCount} Pallets`
                             : `${booking.areaSqFt?.toLocaleString()} sq ft Area`}
+                          {isTestDataSync(booking.customerId, rootUserIds) && (
+                            <RootTestDataIndicator />
+                          )}
                         </p>
                         <p className="text-sm text-muted-foreground">{formatDate(booking.startDate)}</p>
                       </div>

@@ -22,13 +22,13 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
         .select('role')
         .eq('id', user.id)
         .maybeSingle()
-      return profileData?.role || 'customer'
+      return profileData?.role || 'warehouse_client'
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
   })
 
-  const userRole = profile || 'customer'
+  const userRole = profile || 'warehouse_client'
 
   // Get role-based colors
   const getRoleColors = (role: string) => {
@@ -39,7 +39,7 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
           header: 'bg-red-50/95 dark:bg-red-950/95 border-red-200 dark:border-red-900',
           background: 'bg-gradient-to-br from-red-50/80 via-white to-red-50/40 dark:from-red-950 dark:via-red-900 dark:to-red-900/50',
         }
-      case 'warehouse_owner':
+      case 'warehouse_admin':
         return {
           sidebar: 'bg-emerald-50/95 dark:bg-emerald-950/95 border-emerald-200 dark:border-emerald-900',
           header: 'bg-emerald-50/95 dark:bg-emerald-950/95 border-emerald-200 dark:border-emerald-900',
@@ -51,7 +51,7 @@ export function RoleBasedLayout({ children }: RoleBasedLayoutProps) {
           header: 'bg-blue-50/95 dark:bg-blue-950/95 border-blue-200 dark:border-blue-900',
           background: 'bg-gradient-to-br from-blue-50/80 via-white to-blue-50/40 dark:from-blue-950 dark:via-blue-900 dark:to-blue-900/50',
         }
-      case 'customer':
+      case 'warehouse_client':
         return {
           sidebar: 'bg-violet-50/95 dark:bg-violet-950/95 border-violet-200 dark:border-violet-900',
           header: 'bg-violet-50/95 dark:bg-violet-950/95 border-violet-200 dark:border-violet-900',

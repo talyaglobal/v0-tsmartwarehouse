@@ -24,7 +24,7 @@ interface CompanyMember {
   company_id: string
   email: string
   name: string | null
-  role: 'root' | 'company_admin' | 'member' | 'warehouse_staff' | 'warehouse_owner'
+  role: 'root' | 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client' | 'warehouse_staff'
   avatar_url: string | null
   avatar: string | null
   phone: string | null
@@ -39,7 +39,7 @@ interface Invitation {
   id: string
   company_id: string
   email: string
-  role: 'warehouse_owner' | 'company_admin' | 'member'
+  role: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client'
   invited_by?: string
   token: string
   expires_at: string
@@ -82,7 +82,7 @@ export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) =>
     name: "",
     email: "",
     phone: "",
-    role: "member" as "root" | "company_admin" | "member" | "warehouse_staff" | "warehouse_owner",
+    role: "warehouse_client" as "root" | "warehouse_admin" | "warehouse_supervisor" | "warehouse_client" | "warehouse_staff",
     avatarUrl: "",
     password: "",
   })
@@ -893,7 +893,7 @@ export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) =>
                 <Label htmlFor="edit-role">Role</Label>
                 <Select
                   value={editForm.role}
-                  onValueChange={(value: "root" | "company_admin" | "member" | "warehouse_staff" | "warehouse_owner") =>
+                  onValueChange={(value: "root" | "warehouse_admin" | "warehouse_supervisor" | "warehouse_client" | "warehouse_staff") =>
                     setEditForm({ ...editForm, role: value })
                   }
                 >
@@ -904,7 +904,7 @@ export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) =>
                     <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="company_admin">Company Admin</SelectItem>
                     <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
-                    <SelectItem value="warehouse_owner">Warehouse Owner</SelectItem>
+                    <SelectItem value="warehouse_admin">Warehouse Admin</SelectItem>
                     {selectedMember?.role === 'root' && (
                       <SelectItem value="root">System Admin</SelectItem>
                     )}

@@ -95,6 +95,25 @@ export async function GET() {
       console.error('Error fetching published warehouse count:', publishedError)
     }
 
+    // Get total bookings count
+    const { count: totalBookingsCount, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+
+    if (bookingsError) {
+      console.error('Error fetching bookings count:', bookingsError)
+    }
+
+    // Get confirmed/completed bookings count
+    const { count: completedBookingsCount, error: completedBookingsError } = await supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['confirmed', 'completed'])
+
+    if (completedBookingsError) {
+      console.error('Error fetching completed bookings count:', completedBookingsError)
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -110,6 +129,10 @@ export async function GET() {
           warehouse_owners: ownerCount || 0,
         },
         transport_companies: transportCount || 0,
+        bookings: {
+          total: totalBookingsCount || 0,
+          confirmed: completedBookingsCount || 0,
+        },
       },
       timestamp: new Date().toISOString(),
     })

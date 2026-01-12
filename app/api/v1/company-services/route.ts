@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
       } as ErrorResponse, { status: 404 })
     }
 
-    // Check if user is company admin, warehouse owner, or root
-    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_admin') {
+    // Check if user is warehouse_admin, warehouse_supervisor, or root
+    if (profile.role !== 'root' && profile.role !== 'warehouse_supervisor' && profile.role !== 'warehouse_admin') {
       return NextResponse.json({
         success: false,
         error: "Only company admins and warehouse owners can create company services",

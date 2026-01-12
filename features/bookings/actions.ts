@@ -243,7 +243,7 @@ export async function createBookingRequest(input: {
       .from('profiles')
       .select('id, email, name')
       .eq('company_id', warehouse.owner_company_id)
-      .in('role', ['warehouse_owner', 'warehouse_admin'])
+      .in('role', ['warehouse_admin', 'warehouse_supervisor'])
 
     if (companyUsers) {
       for (const user of companyUsers) {

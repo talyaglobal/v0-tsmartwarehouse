@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
     }
     const { user } = authResult
 
-    // Check if user is warehouse_owner (or owner), company_admin, or root
-    const allowedRoles = ['warehouse_admin', 'owner', 'company_admin', 'root']
+    // Check if user is warehouse_admin, warehouse_supervisor, or root
+    const allowedRoles = ['warehouse_admin', 'warehouse_supervisor', 'root']
     if (!allowedRoles.includes(user.role)) {
       const errorData: ErrorResponse = {
         success: false,

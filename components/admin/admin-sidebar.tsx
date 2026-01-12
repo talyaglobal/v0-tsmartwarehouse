@@ -15,11 +15,9 @@ import {
   Settings,
   LogOut,
   ClipboardList,
-  AlertCircle,
   BarChart3,
   Building2,
   DollarSign,
-  Layers,
   Bell,
   Shield,
   ChevronDown,
@@ -30,8 +28,6 @@ import {
   PieChart,
   LineChart,
   UserCheck,
-  CreditCard,
-  Receipt,
   HelpCircle,
   Truck,
   User,
@@ -67,33 +63,25 @@ const navSections: NavSection[] = [
       { name: "Bookings", href: "/admin/bookings", icon: Package },
       { name: "Availability", href: "/admin/availability", icon: Calendar },
       { name: "Capacity", href: "/admin/capacity", icon: Boxes },
-      { name: "Tasks", href: "/admin/tasks", icon: ClipboardList },
-      { name: "Incidents", href: "/admin/incidents", icon: AlertCircle },
-    ],
-    defaultOpen: true,
-  },
-  {
-    title: "Access Logs",
-    items: [
-      { name: "Vehicles", href: "/admin/access-logs/vehicles", icon: Car },
-      { name: "Staff", href: "/admin/access-logs/staff", icon: UserCheck },
-      { name: "Customers", href: "/admin/access-logs/customers", icon: Users },
-      { name: "Visitors", href: "/admin/access-logs/visitors", icon: User },
-      { name: "Family & Friends", href: "/admin/access-logs/family-friends", icon: User },
-      { name: "Delivery/Drivers", href: "/admin/access-logs/delivery-drivers", icon: Truck },
-      { name: "Others", href: "/admin/access-logs/others", icon: HelpCircle },
     ],
     defaultOpen: true,
   },
   {
     title: "Management",
     items: [
-      { name: "Customers", href: "/admin/customers", icon: Users },
-      { name: "Workers", href: "/admin/workers", icon: UserCheck },
-      { name: "Warehouses", href: "/admin/warehouses", icon: Building2 },
-      { name: "Layout", href: "/admin/layout", icon: Layers },
-      { name: "Invoices", href: "/admin/invoices", icon: Receipt },
-      { name: "Payments", href: "/admin/payments", icon: CreditCard },
+      { name: "All Users", href: "/admin/users", icon: Users },
+      { name: "Root Admins", href: "/admin/users/by-role/root", icon: Shield },
+      { name: "Warehouse Admins", href: "/admin/users/by-role/warehouse-admin", icon: Building2 },
+      { name: "Warehouse Supervisors", href: "/admin/users/by-role/warehouse-supervisor", icon: UserCheck },
+      { name: "Warehouse Clients", href: "/admin/users/by-role/warehouse-client", icon: User },
+      { name: "Warehouse Staff", href: "/admin/users/by-role/warehouse-staff", icon: ClipboardList },
+      { name: "Warehouse Finders", href: "/admin/users/by-role/warehouse-finder", icon: BarChart3 },
+      { name: "Warehouse Brokers", href: "/admin/users/by-role/warehouse-broker", icon: DollarSign },
+      { name: "End Delivery Party", href: "/admin/users/by-role/end-delivery-party", icon: Truck },
+      { name: "Local Transport", href: "/admin/users/by-role/local-transport", icon: Car },
+      { name: "Intl. Transport", href: "/admin/users/by-role/international-transport", icon: Truck },
+      { name: "Companies", href: "/admin/companies", icon: Building2 },
+      { name: "Warehouses", href: "/admin/warehouses", icon: Warehouse },
     ],
     defaultOpen: true,
   },
@@ -178,6 +166,14 @@ export function AdminSidebar() {
   const isActive = (href: string) => {
     if (href === "/admin") {
       return pathname === "/admin"
+    }
+    // For /admin/users, only match exact path (not nested routes like /admin/users/by-role/warehouse-client)
+    if (href === "/admin/users") {
+      return pathname === "/admin/users"
+    }
+    // For role-specific user pages, check exact match or startsWith for nested pages
+    if (href.startsWith("/admin/users/by-role/")) {
+      return pathname === href || pathname.startsWith(href + "/")
     }
     return pathname.startsWith(href)
   }

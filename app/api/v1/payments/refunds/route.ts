@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult
 
-    // Only root and company admins can create refunds
-    if (!['root', 'company_admin'].includes(user?.role || '')) {
+    // Only root, warehouse admins and supervisors can create refunds
+    if (!['root', 'warehouse_admin', 'warehouse_supervisor'].includes(user?.role || '')) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Only root and company admins can create refunds",

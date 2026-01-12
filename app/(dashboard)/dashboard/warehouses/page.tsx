@@ -65,7 +65,7 @@ export default function WarehousesPage() {
               })
             }
 
-            // Fetch pricing for this warehouse
+            // Fetch pricing for this warehouse (from warehouse_pricing table)
             let pricing = null
             try {
               const pricingResult = await api.get<any[]>(`/api/v1/warehouses/${warehouse.id}/pricing`, { showToast: false })
@@ -76,7 +76,20 @@ export default function WarehousesPage() {
               console.error('Failed to fetch pricing for warehouse:', warehouse.id, err)
             }
 
-            return { ...warehouse, photos: photoUrls, pricing } as Warehouse
+            // Fetch detailed warehouse data to get palletPricing and rentMethods
+            let palletPricing = null
+            let rentMethods: string[] = (warehouse as any).rentMethods || []
+            try {
+              const detailResult = await api.get<any>(`/api/v1/warehouses/${warehouse.id}`, { showToast: false })
+              if (detailResult.success && detailResult.data) {
+                palletPricing = detailResult.data.palletPricing || null
+                rentMethods = detailResult.data.rentMethods || []
+              }
+            } catch (err) {
+              console.error('Failed to fetch warehouse details:', warehouse.id, err)
+            }
+
+            return { ...warehouse, photos: photoUrls, pricing, palletPricing, rentMethods } as Warehouse
           })
         )
 
@@ -102,26 +115,67 @@ export default function WarehousesPage() {
     return true
   })
 
-  // Check for missing pricing
-  const requiredPricingTypes: ('pallet' | 'pallet-monthly' | 'area-rental')[] = ['pallet', 'pallet-monthly', 'area-rental']
-  const pricingTypeLabels: Record<string, string> = {
-    'pallet': 'Pallet (per day)',
-    'pallet-monthly': 'Pallet (per month)',
-    'area-rental': 'Area Rental (per sqft/month)'
+  // Check for missing pricing based on rent methods
+  // - If rentMethods contains 'pallet': Check if pallet pricing exists (from warehouse_pallet_pricing)
+  // - If rentMethods contains 'sq_ft': Check if area-rental pricing exists (from warehouse_pricing)
+  // - If rentMethods is empty: Show warning to configure rent methods
+  
+  type PricingIssue = {
+    type: 'no_rent_methods' | 'missing_pallet_pricing' | 'missing_area_pricing'
+    label: string
   }
 
   const warehousesWithMissingPricing = filteredWarehouses.map(warehouse => {
+    const rentMethods = (warehouse as any).rentMethods || []
     const pricingArray = (warehouse as any).pricing as any[] | null | undefined
-    const existingPricingTypes = (pricingArray || []).map((p: any) => {
-      // Map 'area' to 'area-rental' for compatibility
-      return p.pricing_type === 'area' ? 'area-rental' : p.pricing_type
-    })
-    const missingTypes = requiredPricingTypes.filter(type => !existingPricingTypes.includes(type))
+    const palletPricingData = (warehouse as any).palletPricing as any[] | null | undefined
+    
+    const issues: PricingIssue[] = []
+    
+    // Check if rent methods are set
+    if (!rentMethods || rentMethods.length === 0) {
+      issues.push({
+        type: 'no_rent_methods',
+        label: 'Rent methods not configured'
+      })
+    } else {
+      // Check pallet pricing if 'pallet' is in rent methods
+      if (rentMethods.includes('pallet')) {
+        // Check if there's pallet pricing in warehouse_pallet_pricing (palletPricingData)
+        // OR old-style pricing in warehouse_pricing with type 'pallet' or 'pallet-monthly'
+        const hasPalletPricing = (palletPricingData && palletPricingData.length > 0) ||
+          (pricingArray && pricingArray.some((p: any) => 
+            p.pricing_type === 'pallet' || p.pricing_type === 'pallet-monthly'
+          ))
+        
+        if (!hasPalletPricing) {
+          issues.push({
+            type: 'missing_pallet_pricing',
+            label: 'Pallet pricing not configured'
+          })
+        }
+      }
+      
+      // Check area pricing if 'sq_ft' is in rent methods
+      if (rentMethods.includes('sq_ft')) {
+        const hasAreaPricing = pricingArray && pricingArray.some((p: any) => 
+          p.pricing_type === 'area' || p.pricing_type === 'area-rental'
+        )
+        
+        if (!hasAreaPricing) {
+          issues.push({
+            type: 'missing_area_pricing',
+            label: 'Area rental pricing not configured'
+          })
+        }
+      }
+    }
+    
     return {
       warehouse,
-      missingTypes
+      issues
     }
-  }).filter(item => item.missingTypes.length > 0)
+  }).filter(item => item.issues.length > 0)
 
   const hasMissingPricing = warehousesWithMissingPricing.length > 0
 
@@ -222,18 +276,27 @@ export default function WarehousesPage() {
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-semibold text-red-900 dark:text-red-100 mb-2">
-                  Please set pricing for all warehouses
+                  Please configure pricing for all warehouses
                 </h3>
                 <p className="text-sm text-red-800 dark:text-red-200 mb-3">
-                  Some warehouses are missing required pricing information. Please configure pricing for the following warehouses:
+                  Some warehouses are missing required pricing configuration. Please complete the setup for the following warehouses:
                 </p>
                 <div className="space-y-2">
-                  {warehousesWithMissingPricing.map(({ warehouse, missingTypes }) => (
-                    <div key={warehouse.id} className="text-sm">
+                  {warehousesWithMissingPricing.map(({ warehouse, issues }) => (
+                    <div key={warehouse.id} className="text-sm flex items-center gap-2">
                       <span className="font-medium text-red-900 dark:text-red-100">{warehouse.name}:</span>
-                      <span className="text-red-700 dark:text-red-300 ml-2">
-                        Missing {missingTypes.map(type => pricingTypeLabels[type]).join(', ')}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {issues.map((issue, idx) => (
+                          <Badge key={idx} variant="outline" className="text-red-700 dark:text-red-300 border-red-300 dark:border-red-700 text-xs">
+                            {issue.label}
+                          </Badge>
+                        ))}
+                      </div>
+                      <Link href={`/dashboard/warehouses/${warehouse.id}/edit?step=4`} className="ml-auto">
+                        <Button variant="outline" size="sm" className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20">
+                          Configure
+                        </Button>
+                      </Link>
                     </div>
                   ))}
                 </div>

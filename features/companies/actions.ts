@@ -15,7 +15,7 @@ import { getSiteUrl } from '@/lib/utils/site-url'
 export async function inviteTeamMember(input: {
   companyId: string
   email: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client'
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     const supabase = await createServerSupabaseClient()
@@ -35,7 +35,7 @@ export async function inviteTeamMember(input: {
       .select('role, company_id')
       .eq('id', user.id)
       .eq('company_id', input.companyId)
-      .in('role', ['owner', 'admin'])
+      .in('role', ['warehouse_admin', 'warehouse_supervisor'])
       .maybeSingle()
 
     if (!profile) {
@@ -350,7 +350,7 @@ export async function acceptInvitation(
       memberId: user.id,
       companyId: targetCompanyId || updatedProfile.company_id,
       userId: user.id,
-      role: updatedProfile.role || invitationProfile.role || 'member',
+      role: updatedProfile.role || invitationProfile.role || 'warehouse_client',
       timestamp: new Date().toISOString(),
     })
 

@@ -54,11 +54,11 @@ const warehouseFinderNavigation = [
 ]
 
 const brokerNavigation = [
-  { name: "Dashboard", href: "/dashboard/reseller", icon: LayoutDashboard, roles: ['warehouse_broker'] },
-  { name: "Leads", href: "/dashboard/reseller/leads", icon: Package, roles: ['warehouse_broker'] },
-  { name: "Communications", href: "/dashboard/reseller/communications", icon: Bell, roles: ['warehouse_broker'] },
-  { name: "Proposals", href: "/dashboard/reseller/proposals", icon: Receipt, roles: ['warehouse_broker'] },
-  { name: "Performance", href: "/dashboard/reseller/performance", icon: LayoutDashboard, roles: ['warehouse_broker'] },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['warehouse_broker'] },
+  { name: "Leads", href: "/dashboard/broker/leads", icon: Package, roles: ['warehouse_broker'] },
+  { name: "Communications", href: "/dashboard/broker/communications", icon: Bell, roles: ['warehouse_broker'] },
+  { name: "Proposals", href: "/dashboard/broker/proposals", icon: Receipt, roles: ['warehouse_broker'] },
+  { name: "Performance", href: "/dashboard/broker/performance", icon: LayoutDashboard, roles: ['warehouse_broker'] },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['warehouse_broker'] },
 ]
 
@@ -205,7 +205,7 @@ export function DashboardSidebar() {
         company: company?.name || null,
         companyLogo: company?.logo_url || null,
         companyId: companyId,
-        role: profileData?.role || 'customer',
+        role: profileData?.role || 'warehouse_client',
       }
     },
     enabled: !!user,
@@ -237,8 +237,8 @@ export function DashboardSidebar() {
         return false
       }
       
-      // Check if user is warehouse_admin (owner) or warehouse_supervisor
-      if (!['warehouse_admin', 'warehouse_supervisor', 'warehouse_owner', 'company_admin'].includes(profileData.role)) {
+      // Check if user is warehouse_admin or warehouse_supervisor
+      if (!['warehouse_admin', 'warehouse_supervisor'].includes(profileData.role)) {
         return false
       }
       
@@ -286,7 +286,7 @@ export function DashboardSidebar() {
   }
 
   // Determine actual role (considering root test role)
-  let actualRole = profile?.role || 'customer'
+  let actualRole = profile?.role || 'warehouse_client'
   if (profile?.role === 'root' && selectedTestRole) {
     actualRole = selectedTestRole
   }
@@ -306,7 +306,7 @@ export function DashboardSidebar() {
           <Warehouse className="h-6 w-6 text-primary" />
         )}
         <span className="font-bold">
-          {profile?.company || (actualRole === 'customer' ? 'Warebnb' : 'TSmart')}
+          {profile?.company || (actualRole === 'warehouse_client' ? 'Warebnb' : 'Warebnb')}
         </span>
       </div>
 
@@ -382,11 +382,11 @@ export function DashboardSidebar() {
       {/* My Company Section - Only for Company Admin */}
       {(() => {
         // Determine if My Company should be shown based on role
-        let userRole = profile?.role || 'customer'
+        let userRole = profile?.role || 'warehouse_client'
         if (profile?.role === 'root' && selectedTestRole) {
           userRole = selectedTestRole
         }
-        const showMyCompany = isCompanyAdmin || ['warehouse_owner', 'company_admin'].includes(userRole)
+        const showMyCompany = isCompanyAdmin || ['warehouse_admin', 'warehouse_supervisor'].includes(userRole)
 
         return showMyCompany && (
           <div className="border-t p-4">

@@ -17,9 +17,9 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   phone: z.string().optional(),
   companyName: z.string().min(2, 'Company name must be at least 2 characters').optional(),
-  role: z.enum(['member', 'root', 'warehouse_staff', 'company_admin', 'warehouse_owner']).optional(),
+  role: z.enum(['warehouse_client', 'root', 'warehouse_staff', 'warehouse_supervisor', 'warehouse_admin']).optional(),
   storageType: z.string().optional(),
-  userType: z.enum(['owner', 'customer', 'reseller', 'finder']).optional(),
+  userType: z.enum(['owner', 'warehouse_client', 'warehouse_broker', 'warehouse_finder']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -28,14 +28,14 @@ const registerSchema = z.object({
   if (data.userType === 'owner') {
     return data.name && data.name.length >= 2 && data.companyName && data.companyName.length >= 2
   }
-  // For resellers and finders, name is required
-  if (data.userType === 'reseller' || data.userType === 'finder') {
+  // For brokers and finders, name is required
+  if (data.userType === 'warehouse_broker' || data.userType === 'warehouse_finder') {
     return data.name && data.name.length >= 2
   }
   // For customers, name and companyName are not required
   return true
 }, {
-  message: "Name is required for warehouse owners, resellers, and finders",
+  message: "Name is required for warehouse owners, brokers, and finders",
   path: ['name'],
 })
 
@@ -91,7 +91,7 @@ export async function signIn(formData: FormData): Promise<{ error?: AuthError }>
     // Email verification check removed - users can login immediately
 
     // Determine redirect based on user role
-    const userRole = data.user.user_metadata?.role || 'member'
+    const userRole = data.user.user_metadata?.role || 'warehouse_client'
     let redirectPath = '/dashboard'
 
     if (redirectTo && !redirectTo.startsWith('/login') && !redirectTo.startsWith('/register')) {
@@ -126,7 +126,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const phone = formData.get('phone') as string | null
     const companyName = formData.get('companyName') as string | null
     const storageType = formData.get('storageType') as string | null
-    const userType = formData.get('userType') as 'owner' | 'customer' | 'reseller' | 'finder' | null
+    const userType = formData.get('userType') as 'owner' | 'warehouse_client' | 'warehouse_broker' | 'warehouse_finder' | null
 
     // Validate input
     const validation = registerSchema.safeParse({
@@ -186,16 +186,16 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     }
 
     // Determine user role based on userType
-    const isCustomer = validation.data.userType === 'customer'
-    const isReseller = validation.data.userType === 'reseller'
-    const isFinder = validation.data.userType === 'finder'
+    const isCustomer = validation.data.userType === 'warehouse_client'
+    const isReseller = validation.data.userType === 'warehouse_broker'
+    const isFinder = validation.data.userType === 'warehouse_finder'
     
     // Map userType to role
-    let defaultRole = 'warehouse_owner' // Default
+    let defaultRole = 'warehouse_admin' // Default
     if (isCustomer) {
-      defaultRole = 'customer'
+      defaultRole = 'warehouse_client'
     } else if (isReseller) {
-      defaultRole = 'reseller'
+      defaultRole = 'warehouse_broker'
     } else if (isFinder) {
       defaultRole = 'warehouse_finder'
     }
@@ -270,15 +270,15 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       // Profile doesn't exist, create it manually
       console.log('Profile not found, creating manually...')
       
-      // For customers, resellers, and finders, skip company creation
+      // For warehouse clients, brokers, and finders, skip company creation
       if (isCustomer || isReseller || isFinder) {
-        // Create profile for customer/reseller/finder (no company)
+        // Create profile for warehouse client/broker/finder (no company)
         const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
           .from('profiles')
           .upsert({
             id: data.user.id,
             email: validation.data.email,
-            name: (isReseller || isFinder) ? validation.data.name : null, // Resellers and finders have name
+            name: (isReseller || isFinder) ? validation.data.name : null, // Brokers and finders have name
             role: defaultRole,
             phone: validation.data.phone || null,
             company_id: null, // No company for these roles
@@ -341,7 +341,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       ) || null
       
       let companyId: string
-      let finalRole: 'warehouse_owner' | 'warehouse_admin' = 'warehouse_owner'
+      let finalRole: 'warehouse_admin' | 'warehouse_supervisor' = 'warehouse_admin'
 
       if (existingCompany) {
         // Exact match found - but this should not happen in normal flow
@@ -418,7 +418,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         }
         companyId = newCompany.id
         console.log('Created new company:', newCompany.name)
-        finalRole = 'warehouse_owner' // New warehouse owner gets warehouse_owner role
+        finalRole = 'warehouse_admin' // New warehouse owner gets warehouse_admin role
         
         // Update profile with company_id and warehouse_owner role
         const { error: profileUpdateError } = await supabaseAdmin
@@ -658,11 +658,11 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
       .single()
 
     // Map legacy roles to new roles
-    let role = profile?.role || user.user_metadata?.role || 'customer'
+    let role = profile?.role || user.user_metadata?.role || 'warehouse_client'
     if (role === 'super_admin') role = 'root'
-    else if (role === 'customer') role = 'customer'
+    else if (role === 'customer') role = 'warehouse_client'
     else if (role === 'worker') role = 'warehouse_staff'
-    else if (role === 'member') role = 'customer'
+    else if (role === 'member') role = 'warehouse_client'
 
     // Determine redirect path based on role
     let redirectPath = '/dashboard'
@@ -670,7 +670,7 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
       redirectPath = '/admin'
     } else if (role === 'warehouse_staff') {
       redirectPath = '/warehouse'
-    } else if (['company_admin', 'customer', 'warehouse_owner'].includes(role)) {
+    } else if (['warehouse_supervisor', 'warehouse_client', 'warehouse_admin'].includes(role)) {
       redirectPath = '/dashboard'
     }
 

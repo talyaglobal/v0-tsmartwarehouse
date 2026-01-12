@@ -74,16 +74,16 @@ export async function isWarehouseStaff(userId: string, companyId?: string): Prom
 }
 
 /**
- * Check if user is Member (Customer)
+ * Check if user is Warehouse Client (Customer)
  */
-export async function isMember(userId: string, companyId?: string): Promise<boolean> {
+export async function isWarehouseClient(userId: string, companyId?: string): Promise<boolean> {
   const supabase = createServerSupabaseClient()
   
   let query = supabase
     .from('profiles')
     .select('role, company_id')
     .eq('id', userId)
-    .eq('role', 'member')
+    .eq('role', 'warehouse_client')
   
   if (companyId) {
     query = query.eq('company_id', companyId)
