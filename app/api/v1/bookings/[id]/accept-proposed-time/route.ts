@@ -71,7 +71,10 @@ export async function POST(
 
     // Combine proposed date and time into datetime
     const proposedDate = new Date(booking.proposedStartDate).toISOString().split("T")[0]
-    const scheduledDatetime = `${proposedDate}T${booking.proposedStartTime}:00`
+    // Normalize time - ensure it has exactly HH:MM:SS format
+    const timeParts = booking.proposedStartTime.split(':')
+    const normalizedTime = timeParts.length >= 2 ? `${timeParts[0]}:${timeParts[1]}:00` : `${booking.proposedStartTime}:00`
+    const scheduledDatetime = `${proposedDate}T${normalizedTime}`
 
     // Update booking: accept proposed time, clear proposal fields, move to payment_pending
     const updatedBooking = await updateBooking(bookingId, {

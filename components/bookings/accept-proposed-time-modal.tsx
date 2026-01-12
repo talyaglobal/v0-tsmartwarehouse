@@ -63,17 +63,22 @@ export function AcceptProposedTimeModal({
   if (booking.proposedStartDate && booking.proposedStartTime) {
     // Check if proposedStartDate is already a full datetime string
     const proposedDateStr = booking.proposedStartDate
+    // Normalize the time - remove seconds if present, then add :00
+    const timeStr = booking.proposedStartTime
+    const timeParts = timeStr.split(':')
+    const normalizedTime = timeParts.length >= 2 ? `${timeParts[0]}:${timeParts[1]}:00` : `${timeStr}:00`
+    
     if (proposedDateStr.includes('T') || proposedDateStr.includes(' ')) {
       // It's already a datetime, use it directly
       const date = new Date(proposedDateStr)
       if (!isNaN(date.getTime())) {
         // Extract date part and combine with time
         const dateOnly = date.toISOString().split("T")[0]
-        proposedDateTime = `${dateOnly}T${booking.proposedStartTime}:00`
+        proposedDateTime = `${dateOnly}T${normalizedTime}`
       }
     } else {
       // It's just a date string, combine with time
-      proposedDateTime = `${proposedDateStr}T${booking.proposedStartTime}:00`
+      proposedDateTime = `${proposedDateStr}T${normalizedTime}`
     }
   }
 
