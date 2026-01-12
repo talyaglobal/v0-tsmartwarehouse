@@ -124,8 +124,8 @@ describe('Incidents Feature', () => {
     })
 
     it('should not allow regular users to resolve incidents', () => {
-      const userRole = 'customer'
-      const canResolve = userRole === 'super_admin'
+      const userRole: string = 'customer'
+      const canResolve = userRole === 'super_admin' || userRole === 'root'
       expect(canResolve).toBe(false)
     })
   })

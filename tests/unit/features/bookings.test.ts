@@ -184,8 +184,8 @@ describe('Bookings Feature', () => {
     })
 
     it('should not allow workers to approve bookings', () => {
-      const userRole = 'worker'
-      const canApprove = userRole === 'super_admin'
+      const userRole: string = 'worker'
+      const canApprove = userRole === 'super_admin' || userRole === 'root'
       expect(canApprove).toBe(false)
     })
   })

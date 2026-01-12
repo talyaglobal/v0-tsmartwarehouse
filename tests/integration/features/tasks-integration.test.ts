@@ -76,8 +76,8 @@ describe('Tasks Integration Tests', () => {
 
   describe('Task Authorization', () => {
     it('should enforce admin-only operations', async () => {
-      const userRole = 'customer'
-      const canDelete = userRole === 'super_admin'
+      const userRole: string = 'customer'
+      const canDelete = userRole === 'super_admin' || userRole === 'root'
       expect(canDelete).toBe(false)
     })
 

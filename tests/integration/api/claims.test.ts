@@ -36,7 +36,7 @@ const mockClaim = {
   customerId: 'user-123',
   customerName: 'Test User',
   bookingId: 'booking-123',
-  incidentId: null,
+  incidentId: undefined,
   type: 'damage',
   description: 'Test claim',
   amount: 1000,

@@ -154,8 +154,8 @@ describe('Claims Feature', () => {
     })
 
     it('should not allow customer to approve their own claims', () => {
-      const userRole = 'customer'
-      const canApprove = userRole === 'super_admin'
+      const userRole: string = 'customer'
+      const canApprove = userRole === 'super_admin' || userRole === 'root'
       expect(canApprove).toBe(false)
     })
 
