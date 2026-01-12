@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Local env
+.env*.local
+
+# Supabase local
+.supabase
+
+# Build cache (Vercel handles this)
+.next
+
+# Documentation
+*.md
+!README.md
+
+# Git
+.git
+.gitignore

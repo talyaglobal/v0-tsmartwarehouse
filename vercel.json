@@ -1,11 +1,9 @@
 {
-  "env": {
-    "BETA_PASSWORD": "@beta-password",
-    "BETA_COOKIE_SECRET": "@beta-cookie-secret"
-  },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_SITE_URL": "https://beta.warebnb.co"
-    }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "git": {
+    "deploymentEnabled": true
   }
 }
