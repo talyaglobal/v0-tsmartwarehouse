@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Plus, Edit, Trash2, DollarSign, Loader2 } from '@/components/icons'
 import { api } from '@/lib/api/client'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/lib/hooks/use-toast'
 import { CompanyServiceDialog } from './company-service-dialog'
 import {
   AlertDialog,

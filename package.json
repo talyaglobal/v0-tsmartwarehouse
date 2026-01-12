@@ -1,8 +1,8 @@
 {
-  "name": "tsmart-warehouse-system",
+  "name": "warebnb",
   "version": "1.0.0",
-  "description": "TSmart Warehouse Management System - Enterprise warehouse operations platform",
-  "author": "TSmart Team",
+  "description": "Warebnb - The Marketplace for Warehouse Space",
+  "author": "Warebnb Team",
   "license": "PROPRIETARY",
   "private": true,
   "engines": {
@@ -28,12 +28,6 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run type-check && npm run lint && npm run test && npm run test:e2e",
-    "check-env": "node scripts/check-env.js",
-    "create-admin": "node scripts/create-admin-user.js",
-    "supabase:push": "node scripts/push-supabase.js",
-    "db:migrate": "node scripts/push-all-migrations.js",
-    "db:setup": "npm run supabase:push && prisma generate",
-    "prisma:setup": "node scripts/setup-prisma.js",
     "prisma:pull": "prisma db pull",
     "prisma:generate": "prisma generate"
   },

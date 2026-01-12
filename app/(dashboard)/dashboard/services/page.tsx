@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Wrench, MapPin, Loader2 } from '@/components/icons'
 import { api } from '@/lib/api'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/lib/hooks/use-toast'
 import { CompanyServicesTab } from '@/components/dashboard/company-services-tab'
 import { WarehouseMappingTab } from '@/components/dashboard/warehouse-mapping-tab'
 

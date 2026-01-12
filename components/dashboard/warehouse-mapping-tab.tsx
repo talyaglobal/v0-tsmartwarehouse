@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Building2, MapPin, Loader2, CheckCircle } from '@/components/icons'
 import { api } from '@/lib/api/client'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/lib/hooks/use-toast'
 
 interface CompanyService {
   id: string

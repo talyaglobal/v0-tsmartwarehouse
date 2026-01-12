@@ -23,7 +23,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Loader2 } from '@/components/icons'
 import { api } from '@/lib/api/client'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/lib/hooks/use-toast'
 
 interface CompanyService {
   id: string
