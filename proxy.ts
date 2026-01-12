@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { applySecurityHeaders } from '@/lib/security/headers'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // Beta protection check - enabled via BETA_PROTECTION_ENABLED env var

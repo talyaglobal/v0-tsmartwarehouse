@@ -3,7 +3,6 @@
  */
 
 import jsPDF from 'jspdf'
-import * as XLSX from 'xlsx'
 import type { WarehouseService } from '@/types/services'
 
 const categoryLabels: Record<string, string> = {
@@ -45,18 +44,18 @@ export function exportServicesToPDF(services: WarehouseService[]): void {
 
   // Header
   doc.setFontSize(18)
-  doc.setFont(undefined, 'bold')
+  doc.setFont('helvetica', 'bold')
   doc.text('Warehouse Services Price List', margin, currentY)
   currentY += 10
 
   doc.setFontSize(10)
-  doc.setFont(undefined, 'normal')
+  doc.setFont('helvetica', 'normal')
   doc.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, currentY)
   currentY += 15
 
   // Table headers
   doc.setFontSize(10)
-  doc.setFont(undefined, 'bold')
+  doc.setFont('helvetica', 'bold')
   const headers = ['Service Name', 'Category', 'Unit Type', 'Price']
   const colWidths = [70, 50, 45, 25]
   let startX = margin
@@ -73,7 +72,7 @@ export function exportServicesToPDF(services: WarehouseService[]): void {
   currentY += 5
 
   // Table rows
-  doc.setFont(undefined, 'normal')
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
 
   services.forEach((service) => {
@@ -138,45 +137,3 @@ export function exportServicesToPDF(services: WarehouseService[]): void {
   // Save the PDF
   doc.save(`services-price-list-${new Date().toISOString().split('T')[0]}.pdf`)
 }
-
-/**
- * Export services price list to Excel
- */
-export function exportServicesToExcel(services: WarehouseService[]): void {
-  // Prepare data for Excel
-  const excelData = services.map((service) => ({
-    'Service Code': service.code,
-    'Service Name': service.name,
-    Description: service.description || '',
-    Category: categoryLabels[service.category] || service.category,
-    'Unit Type': unitTypeLabels[service.unitType] || service.unitType,
-    Price: service.basePrice,
-    'Minimum Quantity': service.minQuantity,
-    Status: service.isActive ? 'Active' : 'Inactive',
-  }))
-
-  // Create workbook and worksheet
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.json_to_sheet(excelData)
-
-  // Set column widths
-  const colWidths = [
-    { wch: 15 }, // Service Code
-    { wch: 30 }, // Service Name
-    { wch: 50 }, // Description
-    { wch: 20 }, // Category
-    { wch: 15 }, // Unit Type
-    { wch: 12 }, // Price
-    { wch: 18 }, // Minimum Quantity
-    { wch: 12 }, // Status
-  ]
-  ws['!cols'] = colWidths
-
-  // Add the worksheet to workbook
-  XLSX.utils.book_append_sheet(wb, ws, 'Services Price List')
-
-  // Generate Excel file and download
-  const filename = `services-price-list-${new Date().toISOString().split('T')[0]}.xlsx`
-  XLSX.writeFile(wb, filename)
-}
-

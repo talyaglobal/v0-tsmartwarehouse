@@ -9,10 +9,6 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
-  
   // Server external packages
   serverExternalPackages: ['@supabase/supabase-js'],
   

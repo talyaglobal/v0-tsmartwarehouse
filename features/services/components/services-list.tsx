@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Wrench, DollarSign, Plus, Grid, List, FileText, Download } from '@/components/icons'
+import { Wrench, DollarSign, Plus, Grid, List, FileText } from '@/components/icons'
 import Link from 'next/link'
-import { exportServicesToPDF, exportServicesToExcel } from '@/lib/utils/services-export'
+import { exportServicesToPDF } from '@/lib/utils/services-export'
 import type { WarehouseService, ServiceCategory } from '@/types'
 
 interface ServicesListProps {
@@ -68,10 +68,6 @@ export function ServicesList({ services }: ServicesListProps) {
     exportServicesToPDF(services)
   }
 
-  const handleExportExcel = () => {
-    exportServicesToExcel(services)
-  }
-
   return (
     <div className="space-y-6">
       {/* Category Filter, View Switcher, and Export Buttons */}
@@ -120,14 +116,10 @@ export function ServicesList({ services }: ServicesListProps) {
               </Button>
             </div>
 
-            {/* Export Buttons */}
+            {/* Export Button */}
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               <FileText className="h-4 w-4 mr-2" />
               Print Price List PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Excel
             </Button>
           </div>
         </div>
