@@ -15,7 +15,7 @@ export default function LegalLayout({
           <div className="container mx-auto flex h-16 items-center justify-between px-4">
             <Link href="/" className="flex items-center gap-2">
               <Warehouse className="h-6 w-6 text-primary" />
-              <span className="font-bold">TSmart Warehouse</span>
+              <span className="font-bold">Warebnb</span>
             </Link>
             <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
@@ -33,7 +33,7 @@ export default function LegalLayout({
                 </Link>
               </div>
               <div className="text-center">
-                &copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.
+                &copy; {new Date().getFullYear()} Warebnb. All rights reserved.
               </div>
             </div>
           </div>

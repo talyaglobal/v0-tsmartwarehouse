@@ -38,7 +38,7 @@ function baseEmailTemplate(title: string, content: string, actionUrl?: string, a
 <body>
   <div class="container">
     <div class="header">
-      <h1>TSmart Warehouse</h1>
+      <h1>Warebnb</h1>
     </div>
     <div class="content">
       <h2>${title}</h2>
@@ -46,7 +46,7 @@ function baseEmailTemplate(title: string, content: string, actionUrl?: string, a
       ${actionUrl && actionText ? `<p><a href="${actionUrl}" class="button">${actionText}</a></p>` : ""}
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} TSmart Warehouse. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} Warebnb. All rights reserved.</p>
       <p>This is an automated notification. Please do not reply to this email.</p>
     </div>
   </div>
@@ -416,11 +416,11 @@ Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboa
   },
 
   "team-invitation": {
-    subject: (data: EmailTemplateData) => `You've been invited to join ${data.companyName || "a company"} on TSmart Warehouse`,
+    subject: (data: EmailTemplateData) => `You've been invited to join ${data.companyName || "a company"} on Warebnb`,
     html: (data: EmailTemplateData) => {
       const content = `
         <p>Dear ${data.invitedName || "User"},</p>
-        <p>You've been invited by <strong>${data.invitedBy || "an admin"}</strong> to join <strong>${data.companyName || "a company"}</strong> on TSmart Warehouse as a <strong>${data.role || "member"}</strong>.</p>
+        <p>You've been invited by <strong>${data.invitedBy || "an admin"}</strong> to join <strong>${data.companyName || "a company"}</strong> on Warebnb as a <strong>${data.role || "member"}</strong>.</p>
         <p><strong>Invitation Details:</strong></p>
         <ul>
           <li><strong>Company:</strong> ${data.companyName || "N/A"}</li>
@@ -435,11 +435,11 @@ Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboa
     },
     text: (data: EmailTemplateData) => {
       return `
-You've been invited to join ${data.companyName || "a company"} on TSmart Warehouse
+You've been invited to join ${data.companyName || "a company"} on Warebnb
 
 Dear ${data.invitedName || "User"},
 
-You've been invited by ${data.invitedBy || "an admin"} to join ${data.companyName || "a company"} on TSmart Warehouse as a ${data.role || "member"}.
+You've been invited by ${data.invitedBy || "an admin"} to join ${data.companyName || "a company"} on Warebnb as a ${data.role || "member"}.
 
 Invitation Details:
 - Company: ${data.companyName || "N/A"}
@@ -453,7 +453,7 @@ Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/acce
   },
 
   "welcome-invitation": {
-    subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "TSmart Warehouse"}!`,
+    subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "Warebnb"}!`,
     html: (data: EmailTemplateData) => {
       const passwordSection = data.password ? `
         <p><strong>Your Login Credentials:</strong></p>
@@ -466,7 +466,7 @@ Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/acce
       
       const content = `
         <p>Dear ${data.fullName || data.invitedName || "User"},</p>
-        <p>Welcome to <strong>${data.companyName || "TSmart Warehouse"}</strong>! You've been invited to join our team.</p>
+        <p>Welcome to <strong>${data.companyName || "Warebnb"}</strong>! You've been invited to join our team.</p>
         <p><strong>Your Invitation Details:</strong></p>
         <ul>
           <li><strong>Full Name:</strong> ${data.fullName || data.invitedName || "N/A"}</li>
@@ -478,7 +478,7 @@ Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/acce
         <p>Click the button below to accept the invitation and automatically log in to your account.</p>
       `
       const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
-      return baseEmailTemplate("Welcome to TSmart Warehouse", content, actionUrl, "Accept Invitation & Login")
+      return baseEmailTemplate("Welcome to Warebnb", content, actionUrl, "Accept Invitation & Login")
     },
     text: (data: EmailTemplateData) => {
       const passwordSection = data.password ? `
@@ -490,11 +490,11 @@ Important: Please save this password. You can change it after logging in.
       ` : ''
       
       return `
-Welcome to ${data.companyName || "TSmart Warehouse"}!
+Welcome to ${data.companyName || "Warebnb"}!
 
 Dear ${data.fullName || data.invitedName || "User"},
 
-Welcome to ${data.companyName || "TSmart Warehouse"}! You've been invited to join our team.
+Welcome to ${data.companyName || "Warebnb"}! You've been invited to join our team.
 
 Your Invitation Details:
 - Full Name: ${data.fullName || data.invitedName || "N/A"}
@@ -512,11 +512,11 @@ Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data
   },
 
   "welcome-member": {
-    subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "TSmart Warehouse"}!`,
+    subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "Warebnb"}!`,
     html: (data: EmailTemplateData) => {
       const content = `
         <p>Dear ${data.fullName || "User"},</p>
-        <p>Welcome to ${data.companyName || "TSmart Warehouse"}! Your account has been created successfully.</p>
+        <p>Welcome to ${data.companyName || "Warebnb"}! Your account has been created successfully.</p>
         <p><strong>Your Login Credentials:</strong></p>
         <ul>
           <li><strong>Email:</strong> ${data.email || "N/A"}</li>
@@ -532,15 +532,15 @@ Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data
         <p><strong>Important:</strong> For security reasons, please change your password after your first login.</p>
       `
       const actionUrl = data.dashboardUrl || `${getSiteUrl()}/login`
-      return baseEmailTemplate("Welcome to TSmart Warehouse!", content, actionUrl, "Login to Dashboard")
+      return baseEmailTemplate("Welcome to Warebnb!", content, actionUrl, "Login to Dashboard")
     },
     text: (data: EmailTemplateData) => {
       return `
-Welcome to ${data.companyName || "TSmart Warehouse"}!
+Welcome to ${data.companyName || "Warebnb"}!
 
 Dear ${data.fullName || "User"},
 
-Welcome to ${data.companyName || "TSmart Warehouse"}! Your account has been created successfully.
+Welcome to ${data.companyName || "Warebnb"}! Your account has been created successfully.
 
 Your Login Credentials:
 - Email: ${data.email || "N/A"}

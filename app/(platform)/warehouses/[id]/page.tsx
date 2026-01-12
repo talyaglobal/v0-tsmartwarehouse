@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   return {
-    title: `${warehouse.name} - Warehouse Rental | TSmart Warehouse`,
+    title: `${warehouse.name} - Warehouse Rental | Warebnb`,
     description: `Rent warehouse space in ${warehouse.city}. ${warehouse.total_sq_ft?.toLocaleString()} sq ft available. ${warehouse.amenities?.join(', ') || ''}`,
   }
 }

@@ -26,18 +26,22 @@ import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
 
+// NEW ROLE SYSTEM (2026-01-11):
+// warehouse_admin (owner), warehouse_supervisor, warehouse_client, warehouse_staff,
+// warehouse_finder, warehouse_broker, end_delivery_party, local_transport, international_transport
+
 const baseNavigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Services", href: "/dashboard/services", icon: Wrench, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Bookings", href: "/dashboard/bookings", icon: Package, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Membership", href: "/dashboard/membership", icon: CreditCard, roles: ['warehouse_owner', 'company_admin', 'warehouse_staff'] },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['customer', 'warehouse_owner', 'company_admin', 'warehouse_staff'] },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Warehouses", href: "/dashboard/warehouses", icon: Warehouse, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Services", href: "/dashboard/services", icon: Wrench, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Bookings", href: "/dashboard/bookings", icon: Package, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Calendar", href: "/dashboard/calendar", icon: Calendar, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Claims", href: "/dashboard/claims", icon: AlertCircle, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Membership", href: "/dashboard/membership", icon: CreditCard, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
 ]
 
 const warehouseFinderNavigation = [
@@ -49,13 +53,37 @@ const warehouseFinderNavigation = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['warehouse_finder'] },
 ]
 
-const resellerNavigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['reseller'] },
-  { name: "Leads", href: "/dashboard/reseller/leads", icon: Package, roles: ['reseller'] },
-  { name: "Communications", href: "/dashboard/reseller/communications", icon: Bell, roles: ['reseller'] },
-  { name: "Proposals", href: "/dashboard/reseller/proposals", icon: Receipt, roles: ['reseller'] },
-  { name: "Performance", href: "/dashboard/reseller/performance", icon: LayoutDashboard, roles: ['reseller'] },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['reseller'] },
+const brokerNavigation = [
+  { name: "Dashboard", href: "/dashboard/reseller", icon: LayoutDashboard, roles: ['warehouse_broker'] },
+  { name: "Leads", href: "/dashboard/reseller/leads", icon: Package, roles: ['warehouse_broker'] },
+  { name: "Communications", href: "/dashboard/reseller/communications", icon: Bell, roles: ['warehouse_broker'] },
+  { name: "Proposals", href: "/dashboard/reseller/proposals", icon: Receipt, roles: ['warehouse_broker'] },
+  { name: "Performance", href: "/dashboard/reseller/performance", icon: LayoutDashboard, roles: ['warehouse_broker'] },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['warehouse_broker'] },
+]
+
+const endDeliveryNavigation = [
+  { name: "Dashboard", href: "/dashboard/end-delivery", icon: LayoutDashboard, roles: ['end_delivery_party'] },
+  { name: "Shipments", href: "/dashboard/end-delivery/shipments", icon: Package, roles: ['end_delivery_party'] },
+  { name: "History", href: "/dashboard/end-delivery/history", icon: Calendar, roles: ['end_delivery_party'] },
+  { name: "Settings", href: "/dashboard/end-delivery/settings", icon: Settings, roles: ['end_delivery_party'] },
+]
+
+const localTransportNavigation = [
+  { name: "Dashboard", href: "/dashboard/local-transport", icon: LayoutDashboard, roles: ['local_transport'] },
+  { name: "Jobs", href: "/dashboard/local-transport/jobs", icon: Package, roles: ['local_transport'] },
+  { name: "Drivers", href: "/dashboard/local-transport/drivers", icon: Building2, roles: ['local_transport'] },
+  { name: "Vehicles", href: "/dashboard/local-transport/vehicles", icon: Warehouse, roles: ['local_transport'] },
+  { name: "Schedule", href: "/dashboard/local-transport/schedule", icon: Calendar, roles: ['local_transport'] },
+  { name: "Settings", href: "/dashboard/local-transport/settings", icon: Settings, roles: ['local_transport'] },
+]
+
+const internationalTransportNavigation = [
+  { name: "Dashboard", href: "/dashboard/international-transport", icon: LayoutDashboard, roles: ['international_transport'] },
+  { name: "Shipments", href: "/dashboard/international-transport/shipments", icon: Package, roles: ['international_transport'] },
+  { name: "Customs", href: "/dashboard/international-transport/customs", icon: AlertCircle, roles: ['international_transport'] },
+  { name: "Documents", href: "/dashboard/international-transport/documents", icon: Receipt, roles: ['international_transport'] },
+  { name: "Settings", href: "/dashboard/international-transport/settings", icon: Settings, roles: ['international_transport'] },
 ]
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
@@ -209,8 +237,8 @@ export function DashboardSidebar() {
         return false
       }
       
-      // Check if user is warehouse owner or company_admin
-      if (!['warehouse_owner', 'company_admin'].includes(profileData.role)) {
+      // Check if user is warehouse_admin (owner) or warehouse_supervisor
+      if (!['warehouse_admin', 'warehouse_supervisor', 'warehouse_owner', 'company_admin'].includes(profileData.role)) {
         return false
       }
       
@@ -229,23 +257,29 @@ export function DashboardSidebar() {
     setLogoError(false)
   }, [profile?.companyLogo])
 
-  // Get role-based sidebar colors
+  // Get role-based sidebar colors (NEW ROLE SYSTEM 2026-01-11)
   const getSidebarColors = (role: string | undefined) => {
     switch (role) {
       case 'root':
         return 'bg-red-50/95 dark:bg-red-950/95 border-r border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
-      case 'warehouse_owner':
+      case 'warehouse_admin': // Formerly warehouse_owner
         return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-r border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
-      case 'company_admin':
+      case 'warehouse_supervisor': // Formerly warehouse_admin/company_admin
         return 'bg-blue-50/95 dark:bg-blue-950/95 border-r border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
-      case 'customer':
+      case 'warehouse_client': // Formerly customer
         return 'bg-violet-50/95 dark:bg-violet-950/95 border-r border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'
       case 'warehouse_staff':
         return 'bg-slate-100/95 dark:bg-slate-900/95 border-r border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
       case 'warehouse_finder':
         return 'bg-amber-50/95 dark:bg-amber-950/95 border-r border-amber-200 dark:border-amber-900 backdrop-blur-sm shadow-md'
-      case 'reseller':
+      case 'warehouse_broker': // Formerly reseller
         return 'bg-indigo-50/95 dark:bg-indigo-950/95 border-r border-indigo-200 dark:border-indigo-900 backdrop-blur-sm shadow-md'
+      case 'end_delivery_party':
+        return 'bg-cyan-50/95 dark:bg-cyan-950/95 border-r border-cyan-200 dark:border-cyan-900 backdrop-blur-sm shadow-md'
+      case 'local_transport':
+        return 'bg-orange-50/95 dark:bg-orange-950/95 border-r border-orange-200 dark:border-orange-900 backdrop-blur-sm shadow-md'
+      case 'international_transport':
+        return 'bg-sky-50/95 dark:bg-sky-950/95 border-r border-sky-200 dark:border-sky-900 backdrop-blur-sm shadow-md'
       default:
         return 'bg-slate-200/90 dark:bg-slate-950/98 border-r border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
     }
@@ -280,7 +314,7 @@ export function DashboardSidebar() {
       <nav className="flex-1 space-y-1 px-3 mt-4">
         {(() => {
           // Determine which navigation array to use
-          let userRole = profile?.role || 'customer'
+          let userRole = profile?.role || 'warehouse_client'
           if (profile?.role === 'root' && selectedTestRole) {
             userRole = selectedTestRole
           }
@@ -288,8 +322,14 @@ export function DashboardSidebar() {
           let navigationToUse = baseNavigation
           if (userRole === 'warehouse_finder') {
             navigationToUse = warehouseFinderNavigation
-          } else if (userRole === 'reseller') {
-            navigationToUse = resellerNavigation
+          } else if (userRole === 'warehouse_broker') {
+            navigationToUse = brokerNavigation
+          } else if (userRole === 'end_delivery_party') {
+            navigationToUse = endDeliveryNavigation
+          } else if (userRole === 'local_transport') {
+            navigationToUse = localTransportNavigation
+          } else if (userRole === 'international_transport') {
+            navigationToUse = internationalTransportNavigation
           }
 
           return navigationToUse

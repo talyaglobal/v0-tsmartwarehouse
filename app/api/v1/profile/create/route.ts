@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         id: userId,
         email: email?.toLowerCase().trim() || user.email,
         name: name || email?.split('@')[0] || user.email?.split('@')[0],
-        role: role || 'customer',
+        role: role || 'warehouse_client',
         phone: phone || null,
         company: company || null,
       })

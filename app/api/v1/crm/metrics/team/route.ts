@@ -14,7 +14,7 @@ const teamMetricsQuerySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Require admin role
-    const authResult = await requireRole(request, ["root", "warehouse_admin", "warehouse_owner"])
+    const authResult = await requireRole(request, ["root", "warehouse_admin", "warehouse_admin"])
     if (authResult instanceof NextResponse) {
       return authResult
     }

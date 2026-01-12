@@ -46,7 +46,7 @@ export async function getAuthUser(request: NextRequest) {
     }
 
     // Get role from profiles table for accurate role checking
-    let userRole: UserRole = 'customer' // Default role
+    let userRole: UserRole = 'warehouse_client' // Default role
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -57,22 +57,22 @@ export async function getAuthUser(request: NextRequest) {
       if (profile?.role) {
         // Map legacy roles to new roles
         if (profile.role === 'super_admin') userRole = 'root'
-        else if (profile.role === 'owner') userRole = 'warehouse_owner' // Map 'owner' to 'warehouse_owner'
-        else if (profile.role === 'customer') userRole = 'customer'
-        else if (profile.role === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
+        else if (profile.role === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
+        else if (profile.role === 'warehouse_client') userRole = 'warehouse_client'
+        else if (profile.role === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
         else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(profile.role)) {
+        else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(profile.role)) {
           userRole = profile.role as UserRole
         }
       } else {
         // Fallback to user_metadata if profile doesn't exist
         const metadataRole = user.user_metadata?.role as string
         if (metadataRole === 'super_admin') userRole = 'root'
-        else if (metadataRole === 'owner') userRole = 'warehouse_owner' // Map 'owner' to 'warehouse_owner'
-        else if (metadataRole === 'customer') userRole = 'customer'
-        else if (metadataRole === 'member') userRole = 'customer' // Map legacy 'member' to 'customer'
+        else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
+        else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
+        else if (metadataRole === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
         else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
+        else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
           userRole = metadataRole as UserRole
         }
       }
@@ -81,10 +81,10 @@ export async function getAuthUser(request: NextRequest) {
       // Fallback to user_metadata
       const metadataRole = user.user_metadata?.role as string
       if (metadataRole === 'super_admin') userRole = 'root'
-      else if (metadataRole === 'owner') userRole = 'warehouse_owner' // Map 'owner' to 'warehouse_owner'
-      else if (metadataRole === 'customer') userRole = 'customer'
+      else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
+      else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'warehouse_owner', 'warehouse_admin', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
+      else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_staff', 'warehouse_finder', 'reseller'].includes(metadataRole)) {
         userRole = metadataRole as UserRole
       }
     }

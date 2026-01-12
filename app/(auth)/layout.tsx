@@ -11,6 +11,28 @@ import { cn } from "@/lib/utils"
 
 // Note: This is a client component, so dynamic export is not needed
 
+interface PlatformStats {
+  warehouseCount: number
+  cityCount: number
+}
+
+// Format stats with thresholds: 50+, 100+, 250+, 500+, 1000+, 2500+, 5000+, 10000+
+// Below threshold shows exact number
+function formatStatWithThreshold(value: number): string {
+  if (value <= 0) return '—'
+  
+  const thresholds = [10000, 5000, 2500, 1000, 500, 250, 100, 50]
+  
+  for (const threshold of thresholds) {
+    if (value >= threshold) {
+      return `${threshold.toLocaleString()}+`
+    }
+  }
+  
+  // Below 50, show exact number
+  return value.toString()
+}
+
 export default function AuthLayout({
   children,
 }: {
@@ -29,6 +51,28 @@ export default function AuthLayout({
   // Collapsible state - default to true so first role is expanded
   const [isExpanded, setIsExpanded] = useState(true)
   const [lastActiveTab, setLastActiveTab] = useState<"owner" | "renter" | "reseller" | "finder">(activeTab)
+  
+  // Platform stats state
+  const [platformStats, setPlatformStats] = useState<PlatformStats>({
+    warehouseCount: 0,
+    cityCount: 0,
+  })
+
+  // Fetch platform stats
+  useEffect(() => {
+    async function fetchPlatformStats() {
+      try {
+        const response = await fetch('/api/v1/platform/stats')
+        const result = await response.json()
+        if (result.success && result.data) {
+          setPlatformStats(result.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch platform stats:', error)
+      }
+    }
+    fetchPlatformStats()
+  }, [])
 
   // Reset expanded state when role changes
   useEffect(() => {
@@ -119,7 +163,7 @@ export default function AuthLayout({
                 <div className="p-2 rounded-lg bg-primary-foreground/10 group-hover:bg-primary-foreground/20 transition-colors">
                   <Warehouse className="h-5 w-5" />
                 </div>
-                <span className="text-lg font-bold">TSmart Warehouse</span>
+                <span className="text-lg font-bold">Warebnb</span>
               </Link>
               
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -386,7 +430,7 @@ export default function AuthLayout({
               </div>
             
             <div className="relative z-10 pt-3 border-t border-primary-foreground/20 flex-shrink-0">
-              <p className="text-xs opacity-70">&copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.</p>
+              <p className="text-xs opacity-70">&copy; {new Date().getFullYear()} Warebnb. All rights reserved.</p>
             </div>
             </div>
           </div>
@@ -394,45 +438,50 @@ export default function AuthLayout({
           <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 flex-col justify-between text-primary-foreground">
             <Link href="/" className="flex items-center gap-2">
               <Warehouse className="h-8 w-8" />
-              <span className="text-xl font-bold">TSmart Warehouse</span>
+              <span className="text-xl font-bold">Warebnb</span>
             </Link>
             <div className="space-y-4">
-              <h1 className="text-4xl font-bold">Professional Warehouse Storage Solutions</h1>
+              <h1 className="text-4xl font-bold">The Marketplace for Warehouse Space</h1>
               <p className="text-lg opacity-90">
-                240,000 sq ft of secure, climate-controlled storage space. Flexible pallet storage and dedicated area
-                rentals.
+                Discover and book warehouse storage from verified owners across multiple locations. Compare prices, amenities, and find the perfect space for your business.
               </p>
               <div className="grid grid-cols-3 gap-4 pt-8">
                 <div>
-                  <div className="text-3xl font-bold">$5</div>
-                  <div className="text-sm opacity-80">Pallet In</div>
+                  <div className="text-3xl font-bold">
+                    {formatStatWithThreshold(platformStats.warehouseCount)}
+                  </div>
+                  <div className="text-sm opacity-80">Warehouses</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold">$17.50</div>
-                  <div className="text-sm opacity-80">Per Pallet/Mo</div>
+                  <div className="text-3xl font-bold">
+                    {formatStatWithThreshold(platformStats.cityCount)}
+                  </div>
+                  <div className="text-sm opacity-80">Cities</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold">$20</div>
-                  <div className="text-sm opacity-80">Sq Ft/Year</div>
+                  <div className="text-3xl font-bold">24/7</div>
+                  <div className="text-sm opacity-80">Support</div>
                 </div>
               </div>
             </div>
-            <p className="text-sm opacity-70">&copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.</p>
+            <p className="text-sm opacity-70">&copy; {new Date().getFullYear()} Warebnb. All rights reserved.</p>
           </div>
         )}
 
         {/* Right Panel - Auth Form */}
-        <div className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden h-full">
-          <div className="w-full max-w-7xl h-full flex flex-col">
+        <div className="flex-1 flex items-center justify-center px-8 md:px-16 lg:px-20 py-8 overflow-hidden h-full">
+          <div className="w-full max-w-md h-full flex flex-col">
             {/* Mobile Logo */}
-            <div className="lg:hidden mb-4 text-center flex-shrink-0">
+            <div className="lg:hidden mb-6 text-center flex-shrink-0">
               <Link href="/" className="inline-flex items-center gap-2">
                 <Warehouse className="h-7 w-7 text-primary" />
-                <span className="text-lg font-bold">TSmart Warehouse</span>
+                <span className="text-lg font-bold">Warebnb</span>
               </Link>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              {children}
+            <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center">
+              <div className="w-full">
+                {children}
+              </div>
             </div>
           </div>
         </div>

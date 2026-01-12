@@ -37,7 +37,7 @@ export default function SettingsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Company Name</Label>
-                  <Input defaultValue="TSmart Warehouse" />
+                  <Input defaultValue="Warebnb" />
                 </div>
                 <div className="space-y-2">
                   <Label>Contact Email</Label>

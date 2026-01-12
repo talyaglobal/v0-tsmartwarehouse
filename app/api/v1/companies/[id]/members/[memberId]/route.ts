@@ -69,7 +69,7 @@ export async function PATCH(
     }
 
     // Prevent changing warehouse owner role (only one owner should exist)
-    if (role && role !== 'warehouse_owner' && member.role === 'warehouse_owner') {
+    if (role && role !== 'warehouse_admin' && member.role === 'warehouse_admin') {
       const errorData: ErrorResponse = {
         success: false,
         error: "Cannot change warehouse owner role. Transfer ownership first.",
@@ -316,12 +316,12 @@ export async function DELETE(
     }
 
     // Prevent deleting the last warehouse owner
-    if (member.role === 'warehouse_owner') {
+    if (member.role === 'warehouse_admin') {
       const { data: owners } = await supabase
         .from('profiles')
         .select('id')
         .eq('company_id', companyId)
-        .eq('role', 'warehouse_owner')
+        .eq('role', 'warehouse_admin')
 
       if (owners && owners.length <= 1) {
         const errorData: ErrorResponse = {

@@ -93,7 +93,7 @@ export default function PaymentSuccessPage() {
         <div className="container mx-auto flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <WarehouseIcon className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">TSmart Warehouse</span>
+            <span className="text-xl font-bold">Warebnb</span>
           </Link>
         </div>
       </header>

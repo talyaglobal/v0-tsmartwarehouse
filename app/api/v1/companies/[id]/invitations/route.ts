@@ -350,7 +350,7 @@ export async function POST(
           email_confirm: true, // Auto-confirm email
           user_metadata: {
             name: fullName.trim(),
-            role: 'customer', // Default role
+            role: 'warehouse_client', // Default role
           },
         })
 
@@ -372,7 +372,7 @@ export async function POST(
           email_confirm: true, // Auto-confirm email
           user_metadata: {
             name: fullName.trim(),
-            role: 'customer', // Default role
+            role: 'warehouse_client', // Default role
           },
         })
 

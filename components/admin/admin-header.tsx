@@ -30,7 +30,12 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRole = localStorage.getItem(ROOT_ROLE_SELECTOR_KEY) as UserRole | null
-      if (savedRole && ['root', 'warehouse_owner', 'company_admin', 'customer', 'warehouse_staff'].includes(savedRole)) {
+      const validRoles = [
+        'root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 
+        'warehouse_staff', 'warehouse_finder', 'warehouse_broker',
+        'end_delivery_party', 'local_transport', 'international_transport'
+      ]
+      if (savedRole && validRoles.includes(savedRole)) {
         setSelectedTestRole(savedRole)
       }
     }
@@ -83,6 +88,16 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
         router.push('/admin')
       } else if (newRole === 'warehouse_staff') {
         router.push('/warehouse')
+      } else if (newRole === 'warehouse_finder') {
+        router.push('/dashboard/warehouse-finder')
+      } else if (newRole === 'warehouse_broker') {
+        router.push('/dashboard/reseller')
+      } else if (newRole === 'end_delivery_party') {
+        router.push('/dashboard/end-delivery')
+      } else if (newRole === 'local_transport') {
+        router.push('/dashboard/local-transport')
+      } else if (newRole === 'international_transport') {
+        router.push('/dashboard/international-transport')
       } else {
         router.push('/dashboard')
       }
@@ -93,18 +108,33 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff']
+  // All available roles for testing (NEW ROLE SYSTEM 2026-01-11)
+  const availableRoles: UserRole[] = [
+    'root', 
+    'warehouse_admin',       // Warehouse Owner (full access)
+    'warehouse_supervisor',  // Warehouse Manager (booking/service only)
+    'warehouse_client',      // Customer (rents space)
+    'warehouse_staff',       // Personnel
+    'warehouse_finder',      // Warehouse Scout
+    'warehouse_broker',      // Reseller
+    'end_delivery_party',    // End Delivery Company
+    'local_transport',       // Local Transport
+    'international_transport' // International Transport
+  ]
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      warehouse_owner: '🟢 Warehouse Owner',
-      warehouse_admin: '🔵 Warehouse Admin',
-      customer: '🟣 Customer',
+      warehouse_admin: '🟢 Warehouse Admin (Owner)',
+      warehouse_supervisor: '🔵 Warehouse Supervisor',
+      warehouse_client: '🟣 Warehouse Client',
       warehouse_staff: '⚪ Warehouse Staff',
       warehouse_finder: '🟡 Warehouse Finder',
-      reseller: '🟠 Reseller',
+      warehouse_broker: '🟠 Warehouse Broker',
+      end_delivery_party: '📦 End Delivery Party',
+      local_transport: '🚚 Local Transport',
+      international_transport: '✈️ International Transport',
     }
     return labels[role] || role
   }
@@ -153,7 +183,16 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
                 <Settings className="h-4 w-4" />
                 Test Role
                 <Badge variant="secondary" className="ml-1">
-                  {currentTestRole === 'root' ? '🔴' : currentTestRole === 'warehouse_owner' ? '🟢' : currentTestRole === 'company_admin' ? '🔵' : currentTestRole === 'customer' ? '🟣' : '⚪'}
+                  {currentTestRole === 'root' ? '🔴' : 
+                   currentTestRole === 'warehouse_admin' ? '🟢' : 
+                   currentTestRole === 'warehouse_supervisor' ? '🔵' : 
+                   currentTestRole === 'warehouse_client' ? '🟣' : 
+                   currentTestRole === 'warehouse_staff' ? '⚪' :
+                   currentTestRole === 'warehouse_finder' ? '🟡' :
+                   currentTestRole === 'warehouse_broker' ? '🟠' :
+                   currentTestRole === 'end_delivery_party' ? '📦' :
+                   currentTestRole === 'local_transport' ? '🚚' :
+                   currentTestRole === 'international_transport' ? '✈️' : '⚪'}
                 </Badge>
               </Button>
             </DropdownMenuTrigger>

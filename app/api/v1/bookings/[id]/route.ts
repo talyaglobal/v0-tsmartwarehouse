@@ -112,8 +112,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Customers cannot delete bookings - they can only cancel
-    if (currentUser.role === 'customer') {
+    // Warehouse clients cannot delete bookings - they can only cancel
+    if (currentUser.role === 'warehouse_client') {
       return NextResponse.json(
         {
           success: false,
@@ -124,7 +124,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     }
 
     // Only company staff (warehouse_owner, warehouse_admin, warehouse_staff) can delete
-    if (!['warehouse_owner', 'warehouse_admin', 'warehouse_staff', 'root'].includes(currentUser.role)) {
+    if (!['warehouse_admin', 'warehouse_admin', 'warehouse_staff', 'root'].includes(currentUser.role)) {
       return NextResponse.json(
         { success: false, error: "Forbidden: Insufficient permissions" },
         { status: 403 }

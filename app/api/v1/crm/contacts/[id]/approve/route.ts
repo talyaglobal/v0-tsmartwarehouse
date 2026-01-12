@@ -94,7 +94,7 @@ export async function POST(
       }
     } else if (validatedData.action === "approve") {
       // Admin approving
-      if (!["root", "warehouse_admin", "warehouse_owner"].includes(profile.role)) {
+      if (!["root", "warehouse_admin", "warehouse_admin"].includes(profile.role)) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },
           { status: 403 }
@@ -118,7 +118,7 @@ export async function POST(
       }
     } else if (validatedData.action === "reject") {
       // Admin rejecting
-      if (!["root", "warehouse_admin", "warehouse_owner"].includes(profile.role)) {
+      if (!["root", "warehouse_admin", "warehouse_admin"].includes(profile.role)) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },
           { status: 403 }

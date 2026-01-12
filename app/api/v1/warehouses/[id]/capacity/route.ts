@@ -21,7 +21,7 @@ export async function GET(
 
     if (level === 'zone' && zoneId) {
       capacityData = await getCapacityUtilization(resolvedParams.id, zoneId)
-    } else if (level === 'customer' && customerId) {
+    } else if (level === 'warehouse_client' && customerId) {
       capacityData = await getCapacityUtilization(resolvedParams.id, undefined, customerId)
     } else {
       // Warehouse level

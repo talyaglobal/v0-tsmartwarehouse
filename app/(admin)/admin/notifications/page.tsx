@@ -116,7 +116,7 @@ Details:
 - Start Date: {{start_date}}
 - Amount: {{total_amount}}
 
-Thank you for choosing TSmart Warehouse!`}
+Thank you for choosing Warebnb!`}
                   />
                 </div>
 

@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     // Apply role-based filtering
     if (profile.role === "root") {
       // Root can see all contacts
-    } else if (["warehouse_admin", "warehouse_owner"].includes(profile.role) && profile.company_id) {
+    } else if (["warehouse_admin", "warehouse_admin"].includes(profile.role) && profile.company_id) {
       // Admins can see contacts in their company
       query = query.eq("company_id", profile.company_id)
     } else {

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       id: user.id,
       email: profile?.email || authUser?.email || '',
       name: profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || authUser?.email?.split('@')[0] || 'User',
-      role: profile?.role || 'customer',
+      role: profile?.role || 'warehouse_client',
       companyId: profile?.company_id || null,
       membershipTier: profile?.membership_tier || 'bronze',
       creditBalance: parseFloat(profile?.credit_balance || '0') || 0,

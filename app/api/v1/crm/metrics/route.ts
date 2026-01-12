@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     // If admin requesting team metrics
     if (validatedParams.user_id) {
-      if (!["root", "warehouse_admin", "warehouse_owner"].includes(profile.role)) {
+      if (!["root", "warehouse_admin", "warehouse_admin"].includes(profile.role)) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },
           { status: 403 }

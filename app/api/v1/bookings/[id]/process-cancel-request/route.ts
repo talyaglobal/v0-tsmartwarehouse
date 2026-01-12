@@ -86,7 +86,7 @@ export async function POST(
     }
 
     const isAdmin = await isCompanyAdmin(currentUser.id, warehouse.owner_company_id)
-    if (!isAdmin && currentUser.role !== 'warehouse_owner') {
+    if (!isAdmin && currentUser.role !== 'warehouse_admin') {
       return NextResponse.json(
         { success: false, error: "Only warehouse owner or admin can process cancel requests" },
         { status: 403 }

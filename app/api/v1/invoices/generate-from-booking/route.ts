@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
 
     // Only customers can generate invoices for their own bookings
-    if (user.role !== "customer") {
+    if (user.role !== "warehouse_client") {
       const errorData: ErrorResponse = {
         success: false,
         error: "Only customers can generate invoices for their bookings",

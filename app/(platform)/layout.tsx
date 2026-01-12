@@ -11,7 +11,7 @@ export default function PlatformLayout({ children }: { children: ReactNode }) {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
             <Warehouse className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">TSmart Warehouse</span>
+            <span className="text-xl font-bold">Warebnb</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/find-warehouses" className="text-sm font-medium hover:text-primary transition-colors">
@@ -37,7 +37,7 @@ export default function PlatformLayout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-semibold mb-4">TSmart Warehouse</h3>
+              <h3 className="font-semibold mb-4">Warebnb</h3>
               <p className="text-sm text-muted-foreground">
                 The marketplace for warehouse space rental
               </p>
@@ -94,7 +94,7 @@ export default function PlatformLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Warebnb. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -169,8 +169,14 @@ export default function CustomerDashboardPage() {
         router.push('/warehouse')
       } else if (newRole === 'warehouse_finder') {
         router.push('/dashboard/warehouse-finder')
-      } else if (newRole === 'reseller') {
-        router.push('/dashboard')
+      } else if (newRole === 'warehouse_broker') {
+        router.push('/dashboard/reseller')
+      } else if (newRole === 'end_delivery_party') {
+        router.push('/dashboard/end-delivery')
+      } else if (newRole === 'local_transport') {
+        router.push('/dashboard/local-transport')
+      } else if (newRole === 'international_transport') {
+        router.push('/dashboard/international-transport')
       } else {
         router.push('/dashboard')
       }
@@ -180,18 +186,32 @@ export default function CustomerDashboardPage() {
     }
   }
 
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller']
-  const currentTestRole = selectedTestRole || (userRole as UserRole) || 'customer'
+  const availableRoles: UserRole[] = [
+    'root', 
+    'warehouse_admin', 
+    'warehouse_supervisor', 
+    'warehouse_client', 
+    'warehouse_staff', 
+    'warehouse_finder', 
+    'warehouse_broker',
+    'end_delivery_party',
+    'local_transport',
+    'international_transport'
+  ]
+  const currentTestRole = selectedTestRole || (userRole as UserRole) || 'warehouse_client'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      warehouse_owner: '🟢 Warehouse Owner',
-      warehouse_admin: '🔵 Warehouse Admin',
-      customer: '🟣 Customer',
+      warehouse_admin: '🟢 Warehouse Admin',
+      warehouse_supervisor: '🔵 Warehouse Supervisor',
+      warehouse_client: '🟣 Warehouse Client',
       warehouse_staff: '⚪ Warehouse Staff',
       warehouse_finder: '🟡 Warehouse Finder',
-      reseller: '🟦 Reseller',
+      warehouse_broker: '🟠 Warehouse Broker',
+      end_delivery_party: '🟤 End Delivery Party',
+      local_transport: '🚚 Local Transport',
+      international_transport: '✈️ International Transport',
     }
     return labels[role] || role
   }

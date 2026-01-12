@@ -1,7 +1,18 @@
-// Core Types for TSmart Warehouse Management System
+// Core Types for Warebnb Platform
 
-// User Types
-export type UserRole = "root" | "warehouse_owner" | "warehouse_admin" | "customer" | "warehouse_staff" | "warehouse_finder" | "reseller"
+// User Types - Restructured Roles (2026-01-11)
+export type UserRole = 
+  | "root"                    // System Admin - full access
+  | "warehouse_admin"         // Warehouse Owner (formerly warehouse_owner) - full warehouse access
+  | "warehouse_supervisor"    // Warehouse Manager (formerly warehouse_admin) - booking/service management
+  | "warehouse_client"        // Customer (formerly customer) - rents warehouse space
+  | "warehouse_staff"         // Warehouse Personnel - operations and tasks
+  | "warehouse_finder"        // Warehouse Scout - finds new warehouses for commission
+  | "warehouse_broker"        // Reseller (formerly reseller) - commission-based sales
+  | "end_delivery_party"      // End Delivery Company - receives products from warehouse
+  | "local_transport"         // Local Transport Company - domestic shipping
+  | "international_transport" // International Transport - cross-border shipping
+
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
 export interface User {
@@ -11,7 +22,7 @@ export interface User {
   role: UserRole
   companyId?: string
   companyName?: string
-  companyRole?: 'warehouse_owner' | 'warehouse_admin' | 'warehouse_staff' | null // Role in company (from profiles table)
+  companyRole?: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_staff' | null // Role in company (from profiles table)
   phone?: string
   avatar?: string
   membershipTier?: MembershipTier
@@ -819,4 +830,307 @@ export interface WarehouseDiscoveryResult {
   totalSqFt: number
   distanceKm: number
   inCrm: boolean // Whether this warehouse is already in user's CRM
+}
+
+// =====================================================
+// Transport Types (2026-01-11)
+// =====================================================
+
+export type TransportCompanyType = 'local' | 'international' | 'end_delivery'
+export type DriverAvailabilityStatus = 'available' | 'on_job' | 'off_duty' | 'unavailable'
+export type VehicleStatus = 'available' | 'in_use' | 'maintenance' | 'out_of_service'
+export type ShipmentType = 'inbound' | 'outbound' | 'transfer'
+export type ShipmentStatus = 
+  | 'pending' 
+  | 'confirmed' 
+  | 'dispatched' 
+  | 'picked_up' 
+  | 'in_transit' 
+  | 'at_customs' 
+  | 'out_for_delivery' 
+  | 'delivered' 
+  | 'cancelled' 
+  | 'on_hold' 
+  | 'exception'
+
+export interface TransportCompany {
+  id: string
+  companyName: string
+  companyType: TransportCompanyType
+  taxNumber?: string
+  registrationNumber?: string
+  address?: string
+  city?: string
+  state?: string
+  country?: string
+  zipCode?: string
+  phone?: string
+  email?: string
+  website?: string
+  contactPersonName?: string
+  contactPersonPhone?: string
+  contactPersonEmail?: string
+  licenseNumber?: string
+  licenseExpiry?: string
+  insuranceNumber?: string
+  insuranceExpiry?: string
+  dotNumber?: string // Department of Transportation (US)
+  mcNumber?: string  // Motor Carrier (US)
+  serviceAreas?: string[]
+  serviceCountries?: string[]
+  userId?: string // Linked user account
+  isActive: boolean
+  isVerified: boolean
+  verifiedAt?: string
+  verifiedBy?: string
+  notes?: string
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TransportDriver {
+  id: string
+  transportCompanyId: string
+  userId?: string
+  fullName: string
+  phone?: string
+  email?: string
+  photoUrl?: string
+  licenseNumber: string
+  licenseType?: string
+  licenseState?: string
+  licenseExpiry?: string
+  licensePlate?: string
+  vehicleType?: string
+  vehicleMake?: string
+  vehicleModel?: string
+  vehicleYear?: number
+  vehicleCapacity?: string
+  hazmatCertified: boolean
+  hazmatExpiry?: string
+  twicCard: boolean
+  twicExpiry?: string
+  isActive: boolean
+  availabilityStatus: DriverAvailabilityStatus
+  currentLatitude?: number
+  currentLongitude?: number
+  lastLocationUpdate?: string
+  notes?: string
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+  // Joined fields
+  transportCompany?: TransportCompany
+}
+
+export interface TransportVehicle {
+  id: string
+  transportCompanyId: string
+  primaryDriverId?: string
+  licensePlate: string
+  vehicleType: string
+  vehicleMake?: string
+  vehicleModel?: string
+  vehicleYear?: number
+  vinNumber?: string
+  capacityWeight?: number
+  capacityVolume?: number
+  capacityPallets?: number
+  maxDimensions?: { length: number; width: number; height: number }
+  isRefrigerated: boolean
+  temperatureMin?: number
+  temperatureMax?: number
+  hasLiftGate: boolean
+  hasPalletJack: boolean
+  registrationExpiry?: string
+  insuranceExpiry?: string
+  lastInspectionDate?: string
+  nextInspectionDue?: string
+  isActive: boolean
+  status: VehicleStatus
+  currentLatitude?: number
+  currentLongitude?: number
+  lastLocationUpdate?: string
+  notes?: string
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+  // Joined fields
+  transportCompany?: TransportCompany
+  primaryDriver?: TransportDriver
+}
+
+export interface Shipment {
+  id: string
+  shipmentNumber: string
+  bookingId: string
+  shipmentType: ShipmentType
+  localTransportId?: string
+  internationalTransportId?: string
+  endDeliveryPartyId?: string
+  driverId?: string
+  vehicleId?: string
+  // Origin
+  originAddress?: string
+  originCity?: string
+  originState?: string
+  originCountry?: string
+  originZip?: string
+  originLatitude?: number
+  originLongitude?: number
+  originContactName?: string
+  originContactPhone?: string
+  // Destination
+  destinationAddress?: string
+  destinationCity?: string
+  destinationState?: string
+  destinationCountry?: string
+  destinationZip?: string
+  destinationLatitude?: number
+  destinationLongitude?: number
+  destinationContactName?: string
+  destinationContactPhone?: string
+  // Cargo Details
+  cargoDescription?: string
+  totalWeight?: number
+  weightUnit?: string
+  totalVolume?: number
+  volumeUnit?: string
+  palletCount?: number
+  packageCount?: number
+  // Special Requirements
+  isHazmat: boolean
+  hazmatClass?: string
+  requiresRefrigeration: boolean
+  temperatureRequirement?: { min: number; max: number; unit: string }
+  specialHandling?: string
+  // Scheduling
+  scheduledPickupDate?: string
+  scheduledPickupTime?: string
+  actualPickupAt?: string
+  scheduledDeliveryDate?: string
+  scheduledDeliveryTime?: string
+  actualDeliveryAt?: string
+  estimatedTransitDays?: number
+  // Status
+  status: ShipmentStatus
+  statusHistory?: Array<{ status: string; timestamp: string; note?: string }>
+  // Customs
+  customsStatus?: string
+  customsDeclarationNumber?: string
+  customsClearedAt?: string
+  // Proof of Delivery
+  podSignatureUrl?: string
+  podPhotoUrls?: string[]
+  podReceivedBy?: string
+  podNotes?: string
+  // Costs
+  transportCost?: number
+  customsCost?: number
+  insuranceCost?: number
+  otherCosts?: number
+  totalCost?: number
+  currency?: string
+  // Tracking
+  trackingNumber?: string
+  trackingUrl?: string
+  currentLatitude?: number
+  currentLongitude?: number
+  lastTrackingUpdate?: string
+  notes?: string
+  internalNotes?: string
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
+  // Joined fields
+  booking?: Booking
+  localTransport?: TransportCompany
+  internationalTransport?: TransportCompany
+  endDeliveryParty?: TransportCompany
+  driver?: TransportDriver
+  vehicle?: TransportVehicle
+}
+
+// =====================================================
+// Staff Task Types (2026-01-11)
+// =====================================================
+
+export type StaffTaskCode = 
+  | 'unload_goods'      // 0. Unload incoming goods
+  | 'acceptance'        // 1. Accept and verify goods
+  | 'placement'         // 2. Place at warehouse location
+  | 'customer_contact'  // 3. Contact customer for scheduling
+  | 'locate_goods'      // 4. Find goods for shipment
+  | 'prepare_loading'   // 5. Prepare for loading
+  | 'load_goods'        // 6. Load onto transport
+  | 'inventory_count'   // 7. Warehouse inventory
+  | 'warehouse_cleaning'// 8. Warehouse cleaning
+  | 'reorganization'    // 9. Warehouse optimization
+  | 'special_services'  // 10. Labeling, re-palletization, etc.
+
+export type StaffTaskStatus = 'pending' | 'assigned' | 'in_progress' | 'paused' | 'completed' | 'cancelled' | 'blocked'
+export type StaffTaskPriority = 'low' | 'normal' | 'high' | 'urgent'
+
+export interface StaffTaskType {
+  id: string
+  code: StaffTaskCode
+  name: string
+  description?: string
+  workflowOrder: number
+  estimatedDurationMinutes: number
+  requiresPhoto: boolean
+  requiresSignature: boolean
+  isActive: boolean
+  createdAt: string
+}
+
+export interface StaffTask {
+  id: string
+  taskTypeId: string
+  bookingId?: string
+  serviceOrderId?: string
+  shipmentId?: string
+  warehouseId: string
+  assignedTo?: string
+  assignedBy?: string
+  assignedAt?: string
+  // Location
+  warehouseZone?: string
+  warehouseAisle?: string
+  warehouseRack?: string
+  warehouseLevel?: string
+  palletIds?: string[]
+  // Scheduling
+  scheduledDate?: string
+  scheduledTime?: string
+  dueDate?: string
+  priority: StaffTaskPriority
+  // Status
+  status: StaffTaskStatus
+  startedAt?: string
+  completedAt?: string
+  // Completion Details
+  completionNotes?: string
+  completionPhotos?: string[]
+  signatureUrl?: string
+  verifiedBy?: string
+  verifiedAt?: string
+  // Time Tracking
+  estimatedMinutes?: number
+  actualMinutes?: number
+  instructions?: string
+  notes?: string
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
+  // Joined fields
+  taskType?: StaffTaskType
+  booking?: Booking
+  shipment?: Shipment
+  warehouse?: Warehouse
+  assignedToUser?: User
+  assignedByUser?: User
 }

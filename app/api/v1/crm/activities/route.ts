@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     // Apply role-based filtering through contact ownership
     if (profile.role === "root") {
       // Root can see all
-    } else if (["warehouse_admin", "warehouse_owner"].includes(profile.role) && profile.company_id) {
+    } else if (["warehouse_admin", "warehouse_admin"].includes(profile.role) && profile.company_id) {
       query = query.eq("crm_contacts.company_id", profile.company_id)
     } else {
       // Users can only see activities for their own contacts
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
     // Check permissions
     if (profile.role === "root") {
       // Root can create activities for all contacts
-    } else if (["warehouse_admin", "warehouse_owner"].includes(profile.role) && profile.company_id) {
+    } else if (["warehouse_admin", "warehouse_admin"].includes(profile.role) && profile.company_id) {
       if (contact.company_id !== profile.company_id) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },

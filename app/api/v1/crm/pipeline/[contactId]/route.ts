@@ -59,7 +59,7 @@ export async function PATCH(
     // Check permissions
     if (profile.role === "root") {
       // Root can update all
-    } else if (["warehouse_admin", "warehouse_owner"].includes(profile.role) && profile.company_id) {
+    } else if (["warehouse_admin", "warehouse_admin"].includes(profile.role) && profile.company_id) {
       if (contact.company_id !== profile.company_id) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },

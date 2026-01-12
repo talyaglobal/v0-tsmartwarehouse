@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from 'react'
-import { Bell, LogOut, Settings } from "@/components/icons"
+import { LogOut, Settings } from "@/components/icons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/auth-provider"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
+import { NotificationBell } from "@/components/notifications/notification-bell"
+import { RealtimeNotificationToast } from "@/components/notifications/realtime-notification-toast"
 import type { UserRole } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
@@ -17,7 +19,7 @@ interface WarehouseHeaderProps {
   title?: string
 }
 
-export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderProps) {
+export function WarehouseHeader({ title = "Warebnb" }: WarehouseHeaderProps) {
   const router = useRouter()
   const { signOut } = useAuth()
   const [selectedTestRole, setSelectedTestRole] = useState<UserRole | null>(null)
@@ -89,18 +91,32 @@ export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderP
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff']
+  const availableRoles: UserRole[] = [
+    'root', 
+    'warehouse_admin', 
+    'warehouse_supervisor', 
+    'warehouse_client', 
+    'warehouse_staff',
+    'warehouse_finder',
+    'warehouse_broker',
+    'end_delivery_party',
+    'local_transport',
+    'international_transport'
+  ]
   const currentTestRole = selectedTestRole || profile?.role || 'warehouse_staff'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      warehouse_owner: '🟢 Warehouse Owner',
-      warehouse_admin: '🔵 Warehouse Admin',
-      customer: '🟣 Customer',
+      warehouse_admin: '🟢 Warehouse Admin',
+      warehouse_supervisor: '🔵 Warehouse Supervisor',
+      warehouse_client: '🟣 Warehouse Client',
       warehouse_staff: '⚪ Warehouse Staff',
-      warehouse_finder: '🔍 Warehouse Finder',
-      reseller: '💼 Reseller',
+      warehouse_finder: '🟡 Warehouse Finder',
+      warehouse_broker: '🟠 Warehouse Broker',
+      end_delivery_party: '🟤 End Delivery Party',
+      local_transport: '🚚 Local Transport',
+      international_transport: '✈️ International Transport',
     }
     return labels[role] || role
   }
@@ -126,12 +142,12 @@ export function WarehouseHeader({ title = "TSmart Warehouse" }: WarehouseHeaderP
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center text-[10px]">
-            3
-          </Badge>
-        </Button>
+        {/* Real-time notification toast provider */}
+        <RealtimeNotificationToast enableSound={true} toastDuration={6000} />
+        
+        {/* Notification bell with real-time updates */}
+        <NotificationBell />
+        
         {isRootUser && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

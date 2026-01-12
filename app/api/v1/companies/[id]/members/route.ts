@@ -374,7 +374,7 @@ export async function POST(
       await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: {
           name: fullName.trim(),
-          role: 'customer', // Keep as customer in metadata for compatibility
+          role: 'warehouse_client', // Keep as customer in metadata for compatibility
         },
       })
     } else {
@@ -385,7 +385,7 @@ export async function POST(
         email_confirm: true, // Auto-confirm email
         user_metadata: {
           name: fullName.trim(),
-          role: 'customer', // Default role in metadata
+          role: 'warehouse_client', // Default role in metadata
         },
       })
 
@@ -525,7 +525,7 @@ export async function POST(
             fullName: fullName.trim(),
             password: password,
             role: role,
-            companyName: company?.name || 'TSmart Warehouse',
+            companyName: company?.name || 'Warebnb',
             dashboardUrl: `${siteUrl}/login`,
           }
           

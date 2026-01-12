@@ -27,9 +27,10 @@ interface BookingTimeSlotModalProps {
   quantity: number
   startDate: string
   endDate: string
-  selectedServices: string[]
-  onServicesChange: (serviceIds: string[]) => void
   onConfirm: (selectedDate: string, selectedTime: string) => Promise<void>
+  // Legacy props - kept for backwards compatibility but not used
+  selectedServices?: string[]
+  onServicesChange?: (serviceIds: string[]) => void
 }
 
 interface TimeSlot {
@@ -52,8 +53,6 @@ export function BookingTimeSlotModal({
   quantity,
   startDate,
   endDate,
-  selectedServices,
-  onServicesChange,
   onConfirm,
 }: BookingTimeSlotModalProps) {
   const [selectedDate, setSelectedDate] = useState<string>("")
@@ -241,8 +240,6 @@ export function BookingTimeSlotModal({
               quantity={quantity}
               startDate={startDate}
               endDate={endDate}
-              selectedServices={selectedServices}
-              onServicesChange={onServicesChange}
             />
           </div>
 

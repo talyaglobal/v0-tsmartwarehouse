@@ -63,7 +63,7 @@ export async function POST(
     const isWarehouseStaff =
       userProfile.role === "warehouse_staff" ||
       userProfile.role === "warehouse_admin" ||
-      userProfile.role === "warehouse_owner" ||
+      userProfile.role === "warehouse_admin" ||
       userProfile.role === "root"
 
     const isCompanyMember = userProfile.company_id === warehouse.owner_company_id

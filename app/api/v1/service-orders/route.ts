@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     } = {}
 
     // Map legacy roles to new roles
-    const mappedRole = userRole === "customer" ? "member" : 
+    const mappedRole = userRole === "warehouse_client" ? "member" : 
                       userRole === "super_admin" ? "root" : 
                       userRole === "worker" ? "warehouse_staff" : userRole
 

@@ -1,7 +1,7 @@
 /**
  * Database utilities - Centralized exports
  * 
- * This module provides database operations for all entities in the TSmart Warehouse Management System.
+ * This module provides database operations for all entities in the Warebnb platform.
  * All functions use Supabase as the database backend.
  */
 

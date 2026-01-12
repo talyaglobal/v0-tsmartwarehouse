@@ -28,7 +28,7 @@ export const PRICING: PricingConfig = {
 // 3 Floors, 2 Halls per floor, 40,000 sq ft per hall = 240,000 sq ft total
 export const WAREHOUSE_CONFIG: Warehouse = {
   id: "wh-001",
-  name: "TSmart Warehouse - Main Facility",
+  name: "Warebnb - Main Facility",
   address: "735 S Front St",
   city: "Elizabeth",
   zipCode: "07202",

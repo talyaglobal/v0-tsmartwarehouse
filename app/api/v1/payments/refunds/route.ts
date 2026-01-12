@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // Customers can only see their own refunds
     // Admins can see all refunds
     const filters: any = {}
-    if (user?.role === "customer") {
+    if (user?.role === "warehouse_client") {
       filters.customerId = user.id
     } else if (paymentId) {
       filters.paymentId = paymentId

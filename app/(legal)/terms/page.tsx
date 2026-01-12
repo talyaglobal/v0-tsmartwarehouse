@@ -6,12 +6,12 @@ export default function TermsPage() {
 
       <h2>1. Acceptance of Terms</h2>
       <p>
-        By accessing or using TSmart Warehouse services, you agree to be bound by these Terms of Service. If you do not
+        By accessing or using Warebnb services, you agree to be bound by these Terms of Service. If you do not
         agree to these terms, please do not use our services.
       </p>
 
       <h2>2. Services</h2>
-      <p>TSmart Warehouse provides the following services:</p>
+      <p>Warebnb provides the following services:</p>
       <ul>
         <li>
           <strong>Pallet Storage:</strong> Short and long-term storage at $17.50 per pallet per month
@@ -47,7 +47,7 @@ export default function TermsPage() {
 
       <h2>5. Liability and Insurance</h2>
       <p>
-        TSmart Warehouse maintains comprehensive insurance coverage. Customer goods are covered up to $10,000 per
+        Warebnb maintains comprehensive insurance coverage. Customer goods are covered up to $10,000 per
         occurrence unless additional coverage is arranged. Customers are encouraged to maintain their own insurance for
         full replacement value.
       </p>

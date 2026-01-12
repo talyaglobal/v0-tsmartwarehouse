@@ -21,7 +21,7 @@ const defaultCSP = [
   "img-src 'self' data: https: blob: https://maps.googleapis.com https://maps.gstatic.com", // Google Maps images
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com",
-  "frame-src 'self' https://js.stripe.com",
+  "frame-src 'self' https://js.stripe.com https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

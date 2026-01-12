@@ -35,8 +35,8 @@ export const GET = withApiMiddleware(
         query = query.eq("type", type)
       }
 
-      // Role-based filtering: customers can only see their own bookings
-      if (user?.role === "customer" && !customerId) {
+      // Role-based filtering: warehouse_clients can only see their own bookings
+      if (user?.role === "warehouse_client" && !customerId) {
         query = query.eq("customer_id", user.id)
       }
 
@@ -131,7 +131,7 @@ export const POST = withApiMiddleware(
   },
   {
     requireAuth: true, // Require authentication
-    requireRole: ["customer", "root"], // Only customers and root admins can create bookings
+    requireRole: ["warehouse_client", "root"], // Only warehouse_clients and root admins can create bookings
     rateLimit: "api",
     methods: ["POST"],
   }

@@ -43,7 +43,7 @@ export default function BetaLoginPage() {
             <CardTitle className="text-2xl">Beta Access</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">
-            Enter password to access beta.warebnb.co
+            This platform is currently in beta. Enter the access password to continue.
           </p>
         </CardHeader>
         <CardContent>

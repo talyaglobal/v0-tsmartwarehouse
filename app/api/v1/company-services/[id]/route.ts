@@ -117,7 +117,7 @@ export async function PATCH(
     }
 
     // Check if user is company admin, warehouse owner, or root
-    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_owner') {
+    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_admin') {
       return NextResponse.json({
         success: false,
         error: "Only company admins and warehouse owners can update company services",
@@ -226,7 +226,7 @@ export async function DELETE(
     }
 
     // Check if user is company admin, warehouse owner, or root
-    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_owner') {
+    if (profile.role !== 'root' && profile.role !== 'company_admin' && profile.role !== 'warehouse_admin') {
       return NextResponse.json({
         success: false,
         error: "Only company admins and warehouse owners can delete company services",

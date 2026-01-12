@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has permission (warehouse_finder or admin)
-    if (!["warehouse_finder", "root", "warehouse_admin", "warehouse_owner"].includes(profile.role)) {
+    if (!["warehouse_finder", "root", "warehouse_admin", "warehouse_admin"].includes(profile.role)) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Forbidden",

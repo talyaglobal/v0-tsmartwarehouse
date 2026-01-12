@@ -188,25 +188,45 @@ export async function searchWarehouses(
       }
     }
 
-    // Fallback to regular query (city-based or all)
+    // Fallback to regular query (city-based or all) - query warehouses table directly
     let query = supabase
-      .from('warehouse_listings')
-      .select('*', { count: 'exact' })
+      .from('warehouses')
+      .select(`
+        id,
+        name,
+        address,
+        city,
+        zip_code,
+        latitude,
+        longitude,
+        total_sq_ft,
+        available_sq_ft,
+        total_pallet_storage,
+        available_pallet_storage,
+        warehouse_type,
+        storage_type,
+        temperature_types,
+        amenities,
+        photos,
+        operating_hours,
+        owner_company_id,
+        companies(id, name, logo_url, verification_status)
+      `, { count: 'exact' })
+      .eq('status', true)
 
+    // City filter - support both "New York" and "New York, New York" format
     if (params.city) {
-      query = query.ilike('city', `%${params.city}%`)
+      // Extract just the city name if it contains a comma (e.g., "New York, New York" -> "New York")
+      const cityName = params.city.split(',')[0].trim()
+      query = query.ilike('city', `%${cityName}%`)
     }
 
     if (params.warehouse_type?.length) {
-      query = query.in('warehouse_type', params.warehouse_type)
+      query = query.overlaps('warehouse_type', params.warehouse_type)
     }
 
     if (params.storage_type?.length) {
-      query = query.in('storage_type', params.storage_type)
-    }
-
-    if (params.min_rating) {
-      query = query.gte('average_rating', params.min_rating)
+      query = query.overlaps('storage_type', params.storage_type)
     }
 
     if (params.type === 'pallet' && params.quantity) {
@@ -220,12 +240,7 @@ export async function searchWarehouses(
     // Sorting
     const sortBy = params.sort_by || 'name'
     const sortOrder = params.sort_order || 'asc'
-    const sortColumn =
-      sortBy === 'price'
-        ? 'min_price'
-        : sortBy === 'rating'
-        ? 'average_rating'
-        : 'name'
+    const sortColumn = sortBy === 'name' ? 'name' : 'name' // For now, sort by name
     query = query.order(sortColumn, { ascending: sortOrder === 'asc' })
 
     // Pagination
@@ -238,17 +253,60 @@ export async function searchWarehouses(
       throw error
     }
 
+    // Get warehouse IDs for additional data
+    const warehouseIds = (data || []).map((w: any) => w.id)
+
+    // Get pricing data
+    let pricingData: any[] = []
+    if (warehouseIds.length > 0) {
+      const { data: pricing } = await supabase
+        .from('warehouse_pricing')
+        .select('warehouse_id, pricing_type, base_price, unit')
+        .in('warehouse_id', warehouseIds)
+        .eq('status', true)
+      pricingData = pricing || []
+    }
+
+    // Get review summaries
+    let reviewData: any[] = []
+    if (warehouseIds.length > 0) {
+      const { data: reviews } = await supabase
+        .from('warehouse_review_summary')
+        .select('warehouse_id, average_rating, total_reviews')
+        .in('warehouse_id', warehouseIds)
+      reviewData = reviews || []
+    }
+
     // Transform results
-    const warehouses: WarehouseSearchResult[] = (data || []).map((wh: any) => {
+    let warehouses: WarehouseSearchResult[] = (data || []).map((wh: any) => {
       // Convert photo paths to full URLs
       const photos = wh.photos && Array.isArray(wh.photos) ? getStoragePublicUrls(wh.photos, 'docs') : []
       
+      // Get company info
+      const company = Array.isArray(wh.companies) ? wh.companies[0] : wh.companies
+
+      // Get pricing for this warehouse
+      const pricing = pricingData
+        .filter((p: any) => p.warehouse_id === wh.id)
+        .map((p: any) => ({
+          type: p.pricing_type,
+          price: parseFloat(p.base_price) || 0,
+          unit: p.unit,
+        }))
+      
+      const minPrice = pricing.length > 0
+        ? Math.min(...pricing.map((p) => p.price))
+        : 0
+
+      // Get review data
+      const review = reviewData.find((r: any) => r.warehouse_id === wh.id)
+
       return {
         id: wh.id,
         name: wh.name,
         address: wh.address,
         city: wh.city,
-        state: wh.state || undefined,
+        state: undefined, // state column doesn't exist in warehouses table
         zipCode: wh.zip_code || '',
         latitude: wh.latitude ? parseFloat(wh.latitude) : 0,
         longitude: wh.longitude ? parseFloat(wh.longitude) : 0,
@@ -261,15 +319,20 @@ export async function searchWarehouses(
         temperature_types: wh.temperature_types || [],
         amenities: wh.amenities || [],
         photos: photos,
-        min_price: wh.min_price ? parseFloat(wh.min_price) : 0,
-        pricing: wh.pricing || [],
-        average_rating: wh.average_rating ? parseFloat(wh.average_rating) : 0,
-        total_reviews: wh.total_reviews || 0,
-        company_name: wh.company_name || '',
-        company_logo: wh.company_logo || undefined,
-        is_verified: wh.host_verification === 'verified',
+        min_price: minPrice,
+        pricing: pricing,
+        average_rating: review?.average_rating ? parseFloat(review.average_rating) : 0,
+        total_reviews: review?.total_reviews || 0,
+        company_name: company?.name || '',
+        company_logo: company?.logo_url || undefined,
+        is_verified: company?.verification_status === 'verified',
       }
     })
+
+    // Filter by min_rating if provided (done after fetching since rating is from another table)
+    if (params.min_rating) {
+      warehouses = warehouses.filter((w) => w.average_rating >= params.min_rating!)
+    }
 
     return {
       warehouses,
@@ -360,7 +423,8 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       max_sq_ft: warehouse.max_sq_ft || undefined,
       rent_methods: warehouse.rent_methods || [],
       security: warehouse.security || [],
-      video_url: warehouse.video_url || undefined,
+      video_url: warehouse.video_url ? getStoragePublicUrls([warehouse.video_url], 'docs')[0] : undefined,
+      videos: warehouse.videos && Array.isArray(warehouse.videos) ? getStoragePublicUrls(warehouse.videos, 'docs') : [],
       access_info: warehouse.access_info || undefined,
       product_acceptance_start_time: warehouse.product_acceptance_start_time || undefined,
       product_acceptance_end_time: warehouse.product_acceptance_end_time || undefined,

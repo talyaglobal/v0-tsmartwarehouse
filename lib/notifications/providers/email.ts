@@ -39,7 +39,7 @@ export class SendGridProvider implements EmailProvider {
   constructor() {
     this.apiKey = process.env.SENDGRID_API_KEY || ""
     this.fromEmail = process.env.SENDGRID_FROM_EMAIL || "notifications@tsmart.com"
-    this.fromName = process.env.SENDGRID_FROM_NAME || "TSmart Warehouse"
+    this.fromName = process.env.SENDGRID_FROM_NAME || "Warebnb"
 
     if (!this.apiKey) {
       console.warn("SendGrid API key not configured. Email notifications will be disabled.")

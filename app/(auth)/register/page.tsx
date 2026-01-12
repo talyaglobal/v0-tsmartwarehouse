@@ -721,7 +721,7 @@ export default function RegisterPage() {
               Create Your Account
             </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
-              Fill in your details to get started with TSmart Warehouse
+              Fill in your details to get started with Warebnb
             </CardDescription>
           </CardHeader>
           

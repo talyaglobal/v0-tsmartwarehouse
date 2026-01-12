@@ -28,8 +28,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     }
 
     // Get role from profiles table for accurate role checking
-    let userRole: UserRole = 'customer' // Default role
-    let actualRole: UserRole = 'customer' // Store actual role from profile
+    let userRole: UserRole = 'warehouse_client' // Default role
+    let actualRole: UserRole = 'warehouse_client' // Store actual role from profile
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -40,11 +40,11 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       if (profile?.role) {
         // Map legacy roles to new roles
         if (profile.role === 'super_admin') actualRole = 'root'
-        else if (profile.role === 'customer') actualRole = 'customer'
-        else if (profile.role === 'member') actualRole = 'customer' // Map legacy 'member' to 'customer'
+        else if (profile.role === 'warehouse_client') actualRole = 'warehouse_client'
+        else if (profile.role === 'member') actualRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
         else if (profile.role === 'worker') actualRole = 'warehouse_staff'
-        else if (profile.role === 'owner') actualRole = 'warehouse_owner' // Map legacy 'owner' to 'warehouse_owner'
-        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner'].includes(profile.role)) {
+        else if (profile.role === 'owner') actualRole = 'warehouse_admin' // Map legacy 'owner' to 'warehouse_admin'
+        else if (['root', 'warehouse_admin', 'warehouse_client', 'warehouse_staff', 'warehouse_admin'].includes(profile.role)) {
           actualRole = profile.role as UserRole
         }
 
@@ -54,7 +54,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         if (actualRole === 'root') {
           const cookieStore = await cookies()
           const testRoleCookie = cookieStore.get('root-test-role')?.value
-          if (testRoleCookie && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+          if (testRoleCookie && ['warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff'].includes(testRoleCookie)) {
             userRole = testRoleCookie as UserRole
           }
         }
@@ -62,11 +62,11 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         // Fallback to user_metadata if profile doesn't exist
         const metadataRole = user.user_metadata?.role as string
         if (metadataRole === 'super_admin') actualRole = 'root'
-        else if (metadataRole === 'customer') actualRole = 'customer'
-        else if (metadataRole === 'member') actualRole = 'customer' // Map legacy 'member' to 'customer'
+        else if (metadataRole === 'warehouse_client') actualRole = 'warehouse_client'
+        else if (metadataRole === 'member') actualRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
         else if (metadataRole === 'worker') actualRole = 'warehouse_staff'
-        else if (metadataRole === 'owner') actualRole = 'warehouse_owner' // Map legacy 'owner' to 'warehouse_owner'
-        else if (['root', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_owner'].includes(metadataRole)) {
+        else if (metadataRole === 'owner') actualRole = 'warehouse_admin' // Map legacy 'owner' to 'warehouse_admin'
+        else if (['root', 'warehouse_admin', 'warehouse_client', 'warehouse_staff', 'warehouse_admin'].includes(metadataRole)) {
           actualRole = metadataRole as UserRole
         }
 
@@ -76,7 +76,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         if (actualRole === 'root') {
           const cookieStore = await cookies()
           const testRoleCookie = cookieStore.get('root-test-role')?.value
-          if (testRoleCookie && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+          if (testRoleCookie && ['warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff'].includes(testRoleCookie)) {
             userRole = testRoleCookie as UserRole
           }
         }
@@ -96,9 +96,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       // Fallback to user_metadata with mapping
       const metadataRole = user.user_metadata?.role as string
       if (metadataRole === 'super_admin') actualRole = 'root'
-      else if (metadataRole === 'customer') actualRole = 'customer'
+      else if (metadataRole === 'warehouse_client') actualRole = 'warehouse_client'
       else if (metadataRole === 'worker') actualRole = 'warehouse_staff'
-      else if (['root', 'warehouse_owner', 'warehouse_admin', 'warehouse_staff'].includes(metadataRole)) {
+      else if (['root', 'warehouse_admin', 'warehouse_admin', 'warehouse_staff'].includes(metadataRole)) {
         actualRole = metadataRole as UserRole
       }
 
@@ -109,7 +109,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         try {
           const cookieStore = await cookies()
           const testRoleCookie = cookieStore.get('root-test-role')?.value
-          if (testRoleCookie && ['warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff'].includes(testRoleCookie)) {
+          if (testRoleCookie && ['warehouse_admin', 'warehouse_admin', 'warehouse_client', 'warehouse_staff'].includes(testRoleCookie)) {
             userRole = testRoleCookie as UserRole
           }
         } catch {

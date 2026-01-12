@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, Search, Menu, LogOut, User, ChevronDown, Home, Settings } from "@/components/icons"
+import { Search, Menu, LogOut, User, ChevronDown, Home, Settings } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,8 @@ import { useUser } from "@/lib/hooks/use-user"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { NotificationBell } from "@/components/notifications/notification-bell"
+import { RealtimeNotificationToast } from "@/components/notifications/realtime-notification-toast"
 import type { UserRole } from "@/types"
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
@@ -162,8 +164,14 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         router.push('/warehouse')
       } else if (newRole === 'warehouse_finder') {
         router.push('/dashboard/warehouse-finder')
-      } else if (newRole === 'reseller') {
-        router.push('/dashboard')
+      } else if (newRole === 'warehouse_broker') {
+        router.push('/dashboard/reseller')
+      } else if (newRole === 'end_delivery_party') {
+        router.push('/dashboard/end-delivery')
+      } else if (newRole === 'local_transport') {
+        router.push('/dashboard/local-transport')
+      } else if (newRole === 'international_transport') {
+        router.push('/dashboard/international-transport')
       } else {
         router.push('/dashboard')
       }
@@ -174,18 +182,32 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   }
 
   const isRootUser = profile?.role === 'root'
-  const availableRoles: UserRole[] = ['root', 'warehouse_owner', 'warehouse_admin', 'customer', 'warehouse_staff', 'warehouse_finder', 'reseller']
+  const availableRoles: UserRole[] = [
+    'root', 
+    'warehouse_admin', 
+    'warehouse_supervisor', 
+    'warehouse_client', 
+    'warehouse_staff', 
+    'warehouse_finder', 
+    'warehouse_broker',
+    'end_delivery_party',
+    'local_transport',
+    'international_transport'
+  ]
   const currentTestRole = selectedTestRole || profile?.role || 'root'
 
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       root: '🔴 Root Admin',
-      warehouse_owner: '🟢 Warehouse Owner',
-      warehouse_admin: '🔵 Warehouse Admin',
-      customer: '🟣 Customer',
+      warehouse_admin: '🟢 Warehouse Admin',
+      warehouse_supervisor: '🔵 Warehouse Supervisor',
+      warehouse_client: '🟣 Warehouse Client',
       warehouse_staff: '⚪ Warehouse Staff',
       warehouse_finder: '🟡 Warehouse Finder',
-      reseller: '🟦 Reseller',
+      warehouse_broker: '🟠 Warehouse Broker',
+      end_delivery_party: '🟤 End Delivery Party',
+      local_transport: '🚚 Local Transport',
+      international_transport: '✈️ International Transport',
     }
     return labels[role] || role
   }
@@ -198,17 +220,23 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     switch (displayRole) {
       case 'root':
         return 'bg-red-50/95 dark:bg-red-950/95 border-b border-red-200 dark:border-red-900 backdrop-blur-sm shadow-md'
-      case 'warehouse_owner':
-        return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-b border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
       case 'warehouse_admin':
+        return 'bg-emerald-50/95 dark:bg-emerald-950/95 border-b border-emerald-200 dark:border-emerald-900 backdrop-blur-sm shadow-md'
+      case 'warehouse_supervisor':
         return 'bg-blue-50/95 dark:bg-blue-950/95 border-b border-blue-200 dark:border-blue-900 backdrop-blur-sm shadow-md'
-      case 'customer':
+      case 'warehouse_client':
         return 'bg-violet-50/95 dark:bg-violet-950/95 border-b border-violet-200 dark:border-violet-900 backdrop-blur-sm shadow-md'
       case 'warehouse_staff':
         return 'bg-slate-100/95 dark:bg-slate-900/95 border-b border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
       case 'warehouse_finder':
         return 'bg-amber-50/95 dark:bg-amber-950/95 border-b border-amber-200 dark:border-amber-900 backdrop-blur-sm shadow-md'
-      case 'reseller':
+      case 'warehouse_broker':
+        return 'bg-orange-50/95 dark:bg-orange-950/95 border-b border-orange-200 dark:border-orange-900 backdrop-blur-sm shadow-md'
+      case 'end_delivery_party':
+        return 'bg-brown-50/95 dark:bg-stone-950/95 border-b border-stone-200 dark:border-stone-900 backdrop-blur-sm shadow-md'
+      case 'local_transport':
+        return 'bg-cyan-50/95 dark:bg-cyan-950/95 border-b border-cyan-200 dark:border-cyan-900 backdrop-blur-sm shadow-md'
+      case 'international_transport':
         return 'bg-indigo-50/95 dark:bg-indigo-950/95 border-b border-indigo-200 dark:border-indigo-900 backdrop-blur-sm shadow-md'
       default:
         return 'bg-slate-200/90 dark:bg-slate-950/98 border-b border-slate-300 dark:border-slate-800 backdrop-blur-sm shadow-md'
@@ -227,12 +255,12 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center">
-            2
-          </Badge>
-        </Button>
+        {/* Real-time notification toast provider */}
+        <RealtimeNotificationToast enableSound={true} toastDuration={6000} />
+        
+        {/* Notification bell with real-time updates */}
+        <NotificationBell />
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 h-auto px-3 py-2">

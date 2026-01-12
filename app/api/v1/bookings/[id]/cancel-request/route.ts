@@ -39,8 +39,8 @@ export async function POST(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    // Only customer can request cancellation
-    if (currentUser.role !== 'customer' || booking.customerId !== currentUser.id) {
+    // Only warehouse_client can request cancellation
+    if (currentUser.role !== 'warehouse_client' || booking.customerId !== currentUser.id) {
       return NextResponse.json(
         { success: false, error: "Only the booking customer can request cancellation" },
         { status: 403 }
@@ -103,7 +103,7 @@ export async function POST(
         .from('profiles')
         .select('id, email, name')
         .eq('company_id', warehouse.owner_company_id)
-        .in('role', ['warehouse_owner', 'warehouse_admin'])
+        .in('role', ['warehouse_admin', 'warehouse_admin'])
 
       // Send notifications to warehouse owner and admin
       const notificationService = getNotificationService()

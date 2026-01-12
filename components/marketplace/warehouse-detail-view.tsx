@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { 
@@ -31,6 +32,90 @@ import { BookingTimeSlotModal } from "./booking-time-slot-modal"
 import { createBookingRequest } from "@/features/bookings/actions"
 import { useUser } from "@/lib/hooks/use-user"
 import type { WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
+
+// Helper function to get YouTube embed URL
+function getYouTubeEmbedUrl(url: string): string | null {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+  const match = url.match(regExp)
+  if (match && match[2].length === 11) {
+    return `https://www.youtube.com/embed/${match[2]}`
+  }
+  return null
+}
+
+// Helper function to get Vimeo embed URL
+function getVimeoEmbedUrl(url: string): string | null {
+  const regExp = /vimeo\.com\/(\d+)/
+  const match = url.match(regExp)
+  if (match && match[1]) {
+    return `https://player.vimeo.com/video/${match[1]}`
+  }
+  return null
+}
+
+// Helper function to detect video type
+function getVideoType(url: string): 'youtube' | 'vimeo' | 'file' {
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    return 'youtube'
+  }
+  if (url.includes('vimeo.com')) {
+    return 'vimeo'
+  }
+  return 'file'
+}
+
+// Video embed component
+function VideoEmbed({ url }: { url: string }) {
+  const videoType = getVideoType(url)
+  
+  if (videoType === 'youtube') {
+    const embedUrl = getYouTubeEmbedUrl(url)
+    if (embedUrl) {
+      return (
+        <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+          <iframe
+            src={embedUrl}
+            className="w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="YouTube video"
+          />
+        </div>
+      )
+    }
+  }
+  
+  if (videoType === 'vimeo') {
+    const embedUrl = getVimeoEmbedUrl(url)
+    if (embedUrl) {
+      return (
+        <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+          <iframe
+            src={embedUrl}
+            className="w-full h-full"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            title="Vimeo video"
+          />
+        </div>
+      )
+    }
+  }
+  
+  // Direct video file
+  return (
+    <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+      <video
+        src={url}
+        controls
+        className="w-full h-full object-contain"
+        preload="metadata"
+      >
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  )
+}
 
 interface WarehouseDetailViewProps {
   warehouse: WarehouseSearchResult
@@ -122,9 +207,28 @@ export function WarehouseDetailView({
   const router = useRouter()
   const { user, isLoading: userLoading } = useUser()
   const [isFavorite, setIsFavorite] = useState(false)
-  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showBookingModal, setShowBookingModal] = useState(false)
+  const [showVideoModal, setShowVideoModal] = useState(false)
+  const hasVideos = (warehouse.videos && warehouse.videos.length > 0) || warehouse.video_url
+
+  // Fetch favorite status on mount
+  useEffect(() => {
+    const fetchFavoriteStatus = async () => {
+      if (!user) return
+      try {
+        const response = await fetch(`/api/v1/favorites/check?warehouse_id=${warehouse.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setIsFavorite(data.isFavorite)
+        }
+      } catch (error) {
+        console.error("Error fetching favorite status:", error)
+      }
+    }
+    fetchFavoriteStatus()
+  }, [user, warehouse.id])
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -357,21 +461,35 @@ export function WarehouseDetailView({
   }, [warehouse.latitude, warehouse.longitude, warehouse.address, warehouse.city, warehouse.state, warehouse.name])
 
   const handleFavoriteClick = async () => {
+    if (!user) {
+      // Redirect to login if not logged in
+      router.push(`/login?redirect=/warehouses/${warehouse.id}`)
+      return
+    }
+    
+    setIsFavoriteLoading(true)
     try {
       if (isFavorite) {
-        await fetch(`/api/v1/favorites?warehouse_id=${warehouse.id}`, {
+        const response = await fetch(`/api/v1/favorites?warehouse_id=${warehouse.id}`, {
           method: "DELETE",
         })
+        if (response.ok) {
+          setIsFavorite(false)
+        }
       } else {
-        await fetch("/api/v1/favorites", {
+        const response = await fetch("/api/v1/favorites", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ warehouse_id: warehouse.id }),
         })
+        if (response.ok) {
+          setIsFavorite(true)
+        }
       }
-      setIsFavorite(!isFavorite)
     } catch (error) {
       console.error("Error toggling favorite:", error)
+    } finally {
+      setIsFavoriteLoading(false)
     }
   }
 
@@ -421,7 +539,6 @@ export function WarehouseDetailView({
         areaSqFt: type === "area-rental" ? quantity : undefined,
         startDate,
         endDate,
-        serviceIds: selectedServices.length > 0 ? selectedServices : undefined,
         notes: `Requested drop-off date: ${selectedDate} at ${selectedTime}`,
         metadata: {
           requestedDropInTime: `${selectedDate}T${selectedTime}:00`,
@@ -466,6 +583,7 @@ export function WarehouseDetailView({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Photo Gallery and Warehouse Info - Left Side */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Photos - Always shown by default */}
           {warehouse.photos && warehouse.photos.length > 0 ? (
             <PhotoGallery photos={warehouse.photos} alt={warehouse.name} />
           ) : (
@@ -498,13 +616,29 @@ export function WarehouseDetailView({
                 </div>
               </div>
               <div className="flex gap-2">
+                {/* Videos Button - Only show if warehouse has videos */}
+                {hasVideos && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowVideoModal(true)}
+                    className="gap-2"
+                  >
+                    <Video className="h-4 w-4" />
+                    Videos
+                  </Button>
+                )}
+                {/* Favorite Button */}
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={handleFavoriteClick}
+                  disabled={isFavoriteLoading}
+                  title={user ? (isFavorite ? "Remove from favorites" : "Add to favorites") : "Sign in to add favorites"}
                 >
-                  <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+                  <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''} ${isFavoriteLoading ? 'animate-pulse' : ''}`} />
                 </Button>
+                {/* Share Button */}
                 <Button variant="outline" size="icon">
                   <Share2 className="h-4 w-4" />
                 </Button>
@@ -593,8 +727,6 @@ export function WarehouseDetailView({
                 }
                 startDate={(searchParams?.startDate || searchParams?.start_date) as string}
                 endDate={(searchParams?.endDate || searchParams?.end_date) as string}
-                selectedServices={selectedServices}
-                onServicesChange={setSelectedServices}
               />
             )}
 
@@ -702,17 +834,25 @@ export function WarehouseDetailView({
             {warehouse.warehouse_type && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Warehouse Type</p>
-                <Badge variant="secondary" className="text-sm">
-                  {warehouse.warehouse_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </Badge>
+                <div className="flex flex-wrap gap-1">
+                  {(Array.isArray(warehouse.warehouse_type) ? warehouse.warehouse_type : [warehouse.warehouse_type]).map((type, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-sm">
+                      {typeof type === 'string' ? type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : type}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
             {warehouse.storage_type && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Storage Type</p>
-                <Badge variant="secondary" className="text-sm">
-                  {warehouse.storage_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </Badge>
+                <div className="flex flex-wrap gap-1">
+                  {(Array.isArray(warehouse.storage_type) ? warehouse.storage_type : [warehouse.storage_type]).map((type, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-sm">
+                      {typeof type === 'string' ? type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : type}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
             {warehouse.custom_status && (
@@ -967,28 +1107,6 @@ export function WarehouseDetailView({
           </Card>
         )}
 
-        {/* Video */}
-        {warehouse.video_url && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Video className="h-5 w-5" />
-                Warehouse Video
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative aspect-video rounded-lg overflow-hidden">
-                <iframe
-                  src={warehouse.video_url}
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Reviews */}
         {reviewSummary && (
           <Card>
@@ -1093,11 +1211,29 @@ export function WarehouseDetailView({
           }
           startDate={(searchParams?.startDate || searchParams?.start_date) as string}
           endDate={(searchParams?.endDate || searchParams?.end_date) as string}
-          selectedServices={selectedServices}
-          onServicesChange={setSelectedServices}
           onConfirm={handleConfirmBooking}
         />
       )}
+
+      {/* Video Modal */}
+      <Dialog open={showVideoModal} onOpenChange={setShowVideoModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Video className="h-5 w-5" />
+              Warehouse Videos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {warehouse.videos?.map((videoUrl, index) => (
+              <VideoEmbed key={index} url={videoUrl} />
+            ))}
+            {warehouse.video_url && !warehouse.videos?.includes(warehouse.video_url) && (
+              <VideoEmbed url={warehouse.video_url} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

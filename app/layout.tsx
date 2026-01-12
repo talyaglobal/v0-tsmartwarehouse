@@ -15,8 +15,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'TSmart Warehouse',
-  description: 'Professional Warehouse Management System',
+  title: 'Warebnb',
+  description: 'Professional Warehouse Marketplace Platform',
   generator: 'v0.app',
   icons: {
     icon: [

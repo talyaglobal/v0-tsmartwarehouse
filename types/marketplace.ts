@@ -82,6 +82,7 @@ export interface WarehouseSearchResult {
   rent_methods?: string[]
   security?: string[]
   video_url?: string
+  videos?: string[] // Array of video URLs (YouTube, Vimeo, or uploaded files)
   access_info?: {
     accessType?: string
     accessControl?: string

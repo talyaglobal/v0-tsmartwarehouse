@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
         const { data: newWarehouse, error: createError } = await supabase
           .from('warehouses')
           .insert({
-            name: 'TSmart Warehouse - Main Facility',
+            name: 'Warebnb - Main Facility',
             address: '735 S Front St',
             city: 'Elizabeth',
             state: 'NJ',

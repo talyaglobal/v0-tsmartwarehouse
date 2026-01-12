@@ -2,20 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { formatCurrency } from "@/lib/utils/format"
 import { Package, Ruler, Calendar } from "lucide-react"
-import type { WarehouseService } from "@/lib/services/warehouse-services"
 import type { PriceBreakdown } from "@/types/marketplace"
 
 interface BookingSummaryProps {
@@ -24,9 +14,10 @@ interface BookingSummaryProps {
   quantity: number
   startDate: string
   endDate: string
-  selectedServices: string[]
-  onServicesChange: (serviceIds: string[]) => void
   className?: string
+  // Legacy props - kept for backwards compatibility but not used
+  selectedServices?: string[]
+  onServicesChange?: (serviceIds: string[]) => void
 }
 
 export function BookingSummary({
@@ -35,49 +26,10 @@ export function BookingSummary({
   quantity,
   startDate,
   endDate,
-  selectedServices,
-  onServicesChange,
   className,
 }: BookingSummaryProps) {
-  const [services, setServices] = useState<WarehouseService[]>([])
-  const [loading, setLoading] = useState(true)
   const [priceBreakdown, setPriceBreakdown] = useState<PriceBreakdown | null>(null)
   const [priceLoading, setPriceLoading] = useState(false)
-  const [showAllServices, setShowAllServices] = useState(false)
-
-  useEffect(() => {
-    async function fetchServices() {
-      try {
-        const response = await fetch(`/api/v1/warehouses/${warehouseId}/services`)
-        if (response.ok) {
-          const data = await response.json()
-          console.log('[BookingSummary] Services response:', data)
-          // API returns { success: true, data: { services: [...] } }
-          const services = data.data?.services || data.services || data.data || []
-          console.log('[BookingSummary] Parsed services:', services.length)
-          setServices(services)
-        } else {
-          console.error('[BookingSummary] Failed to fetch services:', response.status, response.statusText)
-        }
-      } catch (error) {
-        console.error("[BookingSummary] Error fetching services:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (warehouseId) {
-      fetchServices()
-    }
-  }, [warehouseId])
-
-  const handleServiceToggle = (serviceId: string) => {
-    if (selectedServices.includes(serviceId)) {
-      onServicesChange(selectedServices.filter((id) => id !== serviceId))
-    } else {
-      onServicesChange([...selectedServices, serviceId])
-    }
-  }
 
   // Calculate days
   const start = new Date(startDate)
@@ -119,29 +71,6 @@ export function BookingSummary({
 
     calculatePrice()
   }, [warehouseId, type, quantity, startDate, endDate])
-
-  // Calculate selected services total
-  const selectedServicesTotal = selectedServices.reduce((total, serviceId) => {
-    const service = services.find((s) => s.id === serviceId)
-    if (!service) return total
-
-    let servicePrice = service.base_price
-
-    if (service.pricing_type === 'per_pallet' && type === 'pallet') {
-      servicePrice = service.base_price * quantity
-    } else if (service.pricing_type === 'per_sqft' && type === 'area-rental') {
-      servicePrice = service.base_price * quantity
-    } else if (service.pricing_type === 'per_day') {
-      servicePrice = service.base_price * days
-    } else if (service.pricing_type === 'per_month') {
-      const months = Math.ceil(days / 30) || 1
-      servicePrice = service.base_price * months
-    }
-
-    return total + servicePrice
-  }, 0)
-
-  const grandTotal = (priceBreakdown?.total || 0) + selectedServicesTotal
 
   return (
     <Card className={className}>
@@ -196,117 +125,6 @@ export function BookingSummary({
 
         <Separator />
 
-        {/* Services Selection */}
-        {loading ? (
-          <div className="text-center py-4 text-muted-foreground text-sm">
-            Loading services...
-          </div>
-        ) : services.length > 0 ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Additional Services (Optional)</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAllServices(true)}
-                className="text-xs h-auto py-1"
-              >
-                Show All
-              </Button>
-            </div>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-              {services.map((service) => (
-                <div
-                  key={service.id}
-                  className="flex items-start space-x-3 p-2 rounded-md border hover:bg-muted/50"
-                >
-                  <Checkbox
-                    id={`service-${service.id}`}
-                    checked={selectedServices.includes(service.id)}
-                    onCheckedChange={() => handleServiceToggle(service.id)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 space-y-1">
-                    <Label
-                      htmlFor={`service-${service.id}`}
-                      className="text-sm font-medium cursor-pointer"
-                    >
-                      {service.service_name}
-                    </Label>
-                    {service.service_description && (
-                      <p className="text-xs text-muted-foreground">
-                        {service.service_description}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {formatCurrency(service.base_price)}
-                      {service.pricing_type === "per_pallet" && " per pallet"}
-                      {service.pricing_type === "per_sqft" && " per sq ft"}
-                      {service.pricing_type === "per_day" && " per day"}
-                      {service.pricing_type === "per_month" && " per month"}
-                      {service.pricing_type === "one_time" && " one-time"}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-2 text-muted-foreground text-sm">
-            No additional services available
-          </div>
-        )}
-
-        {/* Show All Services Modal */}
-        <Dialog open={showAllServices} onOpenChange={setShowAllServices}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>All Additional Services</DialogTitle>
-              <DialogDescription>
-                Select additional services for your booking
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {services.map((service) => (
-                <div
-                  key={service.id}
-                  className="flex items-start space-x-3 p-3 rounded-md border hover:bg-muted/50"
-                >
-                  <Checkbox
-                    id={`modal-service-${service.id}`}
-                    checked={selectedServices.includes(service.id)}
-                    onCheckedChange={() => handleServiceToggle(service.id)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 space-y-1">
-                    <Label
-                      htmlFor={`modal-service-${service.id}`}
-                      className="text-sm font-medium cursor-pointer"
-                    >
-                      {service.service_name}
-                    </Label>
-                    {service.service_description && (
-                      <p className="text-xs text-muted-foreground">
-                        {service.service_description}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {formatCurrency(service.base_price)}
-                      {service.pricing_type === "per_pallet" && " per pallet"}
-                      {service.pricing_type === "per_sqft" && " per sq ft"}
-                      {service.pricing_type === "per_day" && " per day"}
-                      {service.pricing_type === "per_month" && " per month"}
-                      {service.pricing_type === "one_time" && " one-time"}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Separator />
-
         {/* Price Breakdown */}
         {priceLoading ? (
           <div className="text-center py-4 text-muted-foreground text-sm">
@@ -332,25 +150,22 @@ export function BookingSummary({
                   <span>-{formatCurrency(priceBreakdown.volume_discount)}</span>
                 </div>
               )}
-              {selectedServicesTotal > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Additional Services:</span>
-                  <span>{formatCurrency(selectedServicesTotal)}</span>
-                </div>
-              )}
               <Separator />
               <div className="flex justify-between font-bold text-lg pt-1">
                 <span>Total:</span>
-                <span>{formatCurrency(grandTotal)}</span>
+                <span>{formatCurrency(priceBreakdown.total)}</span>
               </div>
             </div>
           </div>
         ) : null}
 
-        <div className="pt-2 text-xs text-muted-foreground">
+        <div className="pt-2 text-xs text-muted-foreground space-y-1">
           <p>
             This booking will be created as a pre-order. The warehouse staff will contact you to
             finalize the date and time.
+          </p>
+          <p>
+            Additional services can be purchased after the booking is confirmed.
           </p>
         </div>
       </CardContent>

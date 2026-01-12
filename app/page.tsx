@@ -32,7 +32,7 @@ export default function HomePage() {
         <div className="container mx-auto flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Warehouse className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">TSmart Warehouse</span>
+            <span className="text-xl font-bold">Warebnb</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             <Link href="#services" className="text-sm font-medium hover:text-primary transition-colors">
@@ -237,7 +237,7 @@ export default function HomePage() {
                 <div className="relative aspect-[16/9] md:aspect-[21/9]">
                   <Image
                     src="/warehouse-aerial.png"
-                    alt="TSmart Warehouse aerial view - Myrtle St location"
+                    alt="Warebnb aerial view - Myrtle St location"
                     fill
                     className="object-cover"
                     priority
@@ -405,7 +405,7 @@ export default function HomePage() {
             <div>
               <Link href="/" className="flex items-center gap-2 mb-4">
                 <Warehouse className="h-6 w-6 text-primary" />
-                <span className="font-bold">TSmart Warehouse</span>
+                <span className="font-bold">Warebnb</span>
               </Link>
               <p className="text-sm text-muted-foreground">
                 Professional warehouse storage solutions for businesses of all sizes.
@@ -473,7 +473,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} TSmart Warehouse. All rights reserved.
+            &copy; {new Date().getFullYear()} Warebnb. All rights reserved.
           </div>
         </div>
       </footer>
