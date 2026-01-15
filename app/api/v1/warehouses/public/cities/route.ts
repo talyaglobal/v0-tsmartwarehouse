@@ -15,7 +15,7 @@ export async function GET() {
     // Get all unique cities from active warehouses
     const { data, error } = await supabase
       .from("warehouses")
-      .select("city")
+      .select("city, zip_code")
       .eq("status", true)
       .order("city", { ascending: true })
 
@@ -26,7 +26,16 @@ export async function GET() {
 
     // Extract unique cities
     const uniqueCities = Array.from(
-      new Set((data || []).map((w: any) => w.city).filter(Boolean))
+      new Set(
+        (data || [])
+          .map((w: any) => {
+            const city = (w.city || "").trim()
+            if (!city) return null
+            const zipCode = (w.zip_code || "").trim()
+            return zipCode ? `${city} ${zipCode}` : city
+          })
+          .filter(Boolean)
+      )
     ).sort()
 
     const responseData = {

@@ -189,7 +189,7 @@ export function BookingSearchForm({
                 <BookingSearch
                   value={location}
                   onChange={handleLocationChange}
-                  placeholder="Enter city or location"
+                  placeholder="Enter town, state or ZIP"
                   required
                   className="w-full"
                   inputClassName="h-10"
@@ -207,7 +207,7 @@ export function BookingSearchForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pallet">Pallet Storage</SelectItem>
-                    <SelectItem value="area-rental">Area Rental</SelectItem>
+                    <SelectItem value="area-rental">Space Storage</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -336,7 +336,7 @@ export function BookingSearchForm({
               <BookingSearch
                 value={location}
                 onChange={handleLocationChange}
-                placeholder="Enter city or location"
+                placeholder="Enter town, state or ZIP"
                 required
                 className="w-full"
               />
@@ -353,7 +353,7 @@ export function BookingSearchForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pallet">Pallet Storage</SelectItem>
-                  <SelectItem value="area-rental">Area Rental</SelectItem>
+                  <SelectItem value="area-rental">Space Storage</SelectItem>
                 </SelectContent>
               </Select>
               {/* Conditional Quantity Input - Smaller, below storage type with label */}
@@ -497,4 +497,5 @@ export function BookingSearchForm({
     </Card>
   )
 }
+
 

@@ -191,7 +191,7 @@ export default function SettingsPage() {
                     <p className="text-2xl font-bold">${PRICING.palletOut.toFixed(2)}</p>
                   </div>
                   <div className="rounded-lg border p-4">
-                    <p className="text-sm text-muted-foreground">Area Rental/sq ft/yr</p>
+                    <p className="text-sm text-muted-foreground">Space Storage/sq ft/yr</p>
                     <p className="text-2xl font-bold">${PRICING.areaRentalPerSqFtPerYear.toFixed(2)}</p>
                   </div>
                 </div>

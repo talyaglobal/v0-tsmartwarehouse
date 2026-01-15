@@ -92,7 +92,7 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+            value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()'
           },
           {
             key: 'Content-Security-Policy',
@@ -100,10 +100,10 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com",
               "script-src-elem 'self' 'unsafe-inline' https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com https://maps.gstatic.com",
               "img-src 'self' data: https: blob: https://maps.gstatic.com https://*.googleapis.com https://*.googleusercontent.com",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com",
+              "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com",
               "frame-src 'self' https://js.stripe.com https://www.google.com https://maps.google.com https://*.google.com",
               "object-src 'none'",
               "base-uri 'self'",

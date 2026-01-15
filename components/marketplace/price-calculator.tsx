@@ -83,7 +83,7 @@ export function PriceCalculator({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="pallet">Pallet Storage</SelectItem>
-              <SelectItem value="area-rental">Area Rental</SelectItem>
+              <SelectItem value="area-rental">Space Storage</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -91,7 +91,7 @@ export function PriceCalculator({
         {/* Quantity */}
         <div className="space-y-2">
           <Label>
-            {type === "pallet" ? "Number of Pallets" : "Square Feet"}
+            {type === "pallet" ? "Pallet Storage Units" : "Space Storage (sq ft)"}
           </Label>
           <Input
             type="number"
@@ -131,6 +131,12 @@ export function PriceCalculator({
           <div className="text-center py-4 text-muted-foreground">Calculating...</div>
         ) : priceBreakdown ? (
           <div className="space-y-2 pt-4 border-t">
+            {priceBreakdown.free_days && priceBreakdown.free_days > 0 && (
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Free Storage</span>
+                <span>{priceBreakdown.free_days} days</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span>Base Price</span>
               <span>{formatCurrency(priceBreakdown.base_price)}</span>
@@ -138,7 +144,7 @@ export function PriceCalculator({
             <div className="flex justify-between text-sm">
               <span>Quantity × Days</span>
               <span>
-                {priceBreakdown.quantity} × {priceBreakdown.days}
+                {priceBreakdown.quantity} × {priceBreakdown.billable_days ?? priceBreakdown.days}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -168,4 +174,5 @@ export function PriceCalculator({
     </Card>
   )
 }
+
 

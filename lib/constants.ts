@@ -6,7 +6,7 @@ export const PRICING: PricingConfig = {
   palletIn: 5.0,
   palletOut: 5.0,
   storagePerPalletPerMonth: 17.5,
-  // Area Rental (Level 3 only)
+  // Space Storage (Level 3 only)
   areaRentalPerSqFtPerYear: 20.0,
   areaRentalMinSqFt: 40000,
   // Volume Discounts
@@ -158,7 +158,7 @@ export const WAREHOUSE_CONFIG: Warehouse = {
     {
       id: "floor-3",
       floorNumber: 3,
-      name: "Level 3 - Area Rental",
+      name: "Level 3 - Space Storage",
       totalSqFt: 80000,
       halls: [
         {
@@ -172,7 +172,7 @@ export const WAREHOUSE_CONFIG: Warehouse = {
             {
               id: "z3a1",
               hallId: "floor-3-hall-a",
-              name: "Area Rental A",
+              name: "Space Storage A",
               type: "area-rental",
               totalSqFt: 40000,
               availableSqFt: 40000,
@@ -190,7 +190,7 @@ export const WAREHOUSE_CONFIG: Warehouse = {
             {
               id: "z3b1",
               hallId: "floor-3-hall-b",
-              name: "Area Rental B",
+              name: "Space Storage B",
               type: "area-rental",
               totalSqFt: 40000,
               availableSqFt: 40000,

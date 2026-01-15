@@ -298,7 +298,7 @@ export default function AdminBookingsPage() {
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="pallet">Pallet Storage</SelectItem>
-                <SelectItem value="area-rental">Area Rental</SelectItem>
+                <SelectItem value="area-rental">Space Storage</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -673,3 +673,4 @@ export default function AdminBookingsPage() {
     </div>
   )
 }
+

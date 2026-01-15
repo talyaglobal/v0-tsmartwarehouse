@@ -15,7 +15,6 @@ import {
   ArrowLeft,
   Share2,
   Heart,
-  Building2,
   CheckCircle2,
   Clock,
   Shield,
@@ -31,7 +30,7 @@ import { BookingSummary } from "./booking-summary"
 import { BookingTimeSlotModal } from "./booking-time-slot-modal"
 import { createBookingRequest } from "@/features/bookings/actions"
 import { useUser } from "@/lib/hooks/use-user"
-import type { WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
+import type { PalletBookingDetails, WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
 
 // Helper function to get YouTube embed URL
 function getYouTubeEmbedUrl(url: string): string | null {
@@ -204,6 +203,11 @@ export function WarehouseDetailView({
   reviewSummary,
   searchParams 
 }: WarehouseDetailViewProps) {
+  const formatAccessValue = (value: string) =>
+    value
+      .split(/[-_]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
   const router = useRouter()
   const { user, isLoading: userLoading } = useUser()
   const [isFavorite, setIsFavorite] = useState(false)
@@ -517,7 +521,11 @@ export function WarehouseDetailView({
     setShowBookingModal(true)
   }
 
-  const handleConfirmBooking = async (selectedDate: string, selectedTime: string) => {
+  const handleConfirmBooking = async (
+    selectedDate: string,
+    selectedTime: string,
+    palletDetails?: PalletBookingDetails
+  ) => {
     const startDate = (searchParams?.startDate || searchParams?.start_date) as string
     const endDate = (searchParams?.endDate || searchParams?.end_date) as string
     
@@ -533,11 +541,14 @@ export function WarehouseDetailView({
         : type === "pallet" 
         ? parseInt((searchParams.palletCount || searchParams.quantity) as string) || 0
         : parseInt((searchParams.areaSqFt || searchParams.quantity) as string) || 0
+      const palletQuantity = palletDetails
+        ? palletDetails.pallets.reduce((sum, pallet) => sum + (pallet.quantity || 0), 0)
+        : quantity
 
       const result = await createBookingRequest({
         warehouseId: warehouse.id,
         type,
-        palletCount: type === "pallet" ? quantity : undefined,
+        palletCount: type === "pallet" ? palletQuantity : undefined,
         areaSqFt: type === "area-rental" ? quantity : undefined,
         startDate,
         endDate,
@@ -546,7 +557,9 @@ export function WarehouseDetailView({
           requestedDropInTime: `${selectedDate}T${selectedTime}:00`,
           requestedDropInDate: selectedDate,
           requestedDropInTimeSlot: selectedTime,
+          palletDetails: palletDetails || undefined,
         },
+        palletDetails: palletDetails || undefined,
       })
 
       if (result.success && result.data) {
@@ -632,7 +645,6 @@ export function WarehouseDetailView({
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-3xl font-bold">{warehouse.name}</h1>
                   {warehouse.is_verified && (
                     <CheckCircle2 className="h-6 w-6 text-primary" />
                   )}
@@ -643,9 +655,6 @@ export function WarehouseDetailView({
                     reviewCount={warehouse.total_reviews}
                     size="md"
                   />
-                  {warehouse.warehouse_type && (
-                    <Badge variant="secondary">{warehouse.warehouse_type}</Badge>
-                  )}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -685,8 +694,9 @@ export function WarehouseDetailView({
           <div>
             <h2 className="text-xl font-semibold mb-2">About this warehouse</h2>
             <p className="text-muted-foreground">
-              {/* Description would come from warehouse.description if available */}
-              Professional warehouse space available for rent. Located in {warehouse.city} with easy access to major transportation routes.
+              {warehouse.description?.trim()
+                ? warehouse.description
+                : `Secure, professionally managed warehouse space available in ${warehouse.city}. Benefit from reliable operations, flexible terms, and convenient access to key transportation routes for efficient distribution.`}
             </p>
           </div>
 
@@ -777,7 +787,7 @@ export function WarehouseDetailView({
                   <div className="flex items-center gap-3">
                     <Package className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Pallet Storage</p>
+                    <p className="text-sm text-muted-foreground">Pallet Storage</p>
                       <p className="font-semibold">
                         {warehouse.total_pallet_storage.toLocaleString()} pallets
                       </p>
@@ -938,7 +948,7 @@ export function WarehouseDetailView({
               <div className="grid grid-cols-2 gap-4">
                 {(warehouse.min_pallet || warehouse.max_pallet) && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Pallet Range</p>
+                    <p className="text-sm text-muted-foreground mb-1">Pallet Storage Range</p>
                     <p className="font-medium">
                       {warehouse.min_pallet || 'No minimum'} - {warehouse.max_pallet || 'No maximum'} pallets
                     </p>
@@ -946,7 +956,7 @@ export function WarehouseDetailView({
                 )}
                 {(warehouse.min_sq_ft || warehouse.max_sq_ft) && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Square Feet Range</p>
+                    <p className="text-sm text-muted-foreground mb-1">Space Storage Range</p>
                     <p className="font-medium">
                       {warehouse.min_sq_ft ? `${warehouse.min_sq_ft.toLocaleString()}` : 'No minimum'} - {warehouse.max_sq_ft ? `${warehouse.max_sq_ft.toLocaleString()}` : 'No maximum'} sq ft
                     </p>
@@ -967,7 +977,7 @@ export function WarehouseDetailView({
               <div className="flex flex-wrap gap-2">
                 {warehouse.rent_methods.map((method, index) => (
                   <Badge key={index} variant="secondary">
-                    {method === 'pallet' ? 'Pallet Storage' : method === 'sq_ft' ? 'Square Feet Rental' : method}
+                    {method === 'pallet' ? 'Pallet Storage' : method === 'sq_ft' ? 'Space Storage' : method}
                   </Badge>
                 ))}
               </div>
@@ -1010,7 +1020,7 @@ export function WarehouseDetailView({
               {warehouse.access_info.accessType && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Access Type</p>
-                  <p className="font-medium">{warehouse.access_info.accessType}</p>
+                  <p className="font-medium">{formatAccessValue(warehouse.access_info.accessType)}</p>
                 </div>
               )}
               {warehouse.access_info.accessControl && (
@@ -1147,42 +1157,11 @@ export function WarehouseDetailView({
           </Card>
         )}
 
-        {/* Host Info */}
-        {warehouse.company_name && (
-          <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Host Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4">
-                  {warehouse.company_logo && (
-                    <img
-                      src={warehouse.company_logo}
-                      alt={warehouse.company_name}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
-                  )}
-                  <div>
-                    <p className="font-semibold">{warehouse.company_name}</p>
-                    {warehouse.is_verified && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                        Verified Host
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-          </Card>
-        )}
         </div>
 
-        {/* Booking Summary Sidebar - Right Side (Sticky) */}
+        {/* Booking Summary Sidebar - Right Side */}
         <div className="hidden lg:block lg:col-span-1">
-          <div className="sticky top-24 space-y-4">
+          <div className="space-y-4">
             {(searchParams?.type || searchParams?.startDate || searchParams?.endDate) && (
               <BookingSummary
                 warehouseId={warehouse.id}
@@ -1266,3 +1245,4 @@ export function WarehouseDetailView({
     </div>
   )
 }
+

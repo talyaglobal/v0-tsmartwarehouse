@@ -446,7 +446,7 @@ export default function BookingReviewPage() {
                       <Label className="text-base font-semibold">Storage Type</Label>
                       <div className="mt-2">
                         <Badge variant="secondary">
-                          {bookingDetails.type === "pallet" ? "Pallet Storage" : "Area Rental"}
+                          {bookingDetails.type === "pallet" ? "Pallet Storage" : "Space Storage"}
                         </Badge>
                       </div>
                     </div>
@@ -473,7 +473,7 @@ export default function BookingReviewPage() {
                     ) : (
                       <div>
                         <Label htmlFor="area-sqft" className="text-base font-semibold">
-                          Area (Square Feet)
+                          Space Storage (sq ft)
                         </Label>
                         <Input
                           id="area-sqft"

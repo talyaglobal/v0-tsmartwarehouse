@@ -67,6 +67,7 @@ export async function searchWarehouses(
           storage_type: wh.storage_type || '',
           temperature_types: wh.temperature_types || [],
           amenities: wh.amenities || [],
+          description: wh.description || undefined,
           photos: photos,
           min_price: 0, // Will be populated below
           pricing: [],
@@ -214,11 +215,16 @@ export async function searchWarehouses(
       `, { count: 'exact' })
       .eq('status', true)
 
-    // City filter - support both "New York" and "New York, New York" format
+    // City filter - support "Town, ST" and "Town, ST 12345" formats
     if (params.city) {
-      // Extract just the city name if it contains a comma (e.g., "New York, New York" -> "New York")
       const cityName = params.city.split(',')[0].trim()
-      query = query.ilike('city', `%${cityName}%`)
+      const zipMatch = params.city.match(/\b\d{5}(?:-\d{4})?\b/)
+      if (zipMatch) {
+        const zipCode = zipMatch[0]
+        query = query.or(`city.ilike.%${cityName}%,zip_code.eq.${zipCode}`)
+      } else {
+        query = query.ilike('city', `%${cityName}%`)
+      }
     }
 
     if (params.warehouse_type?.length) {
@@ -318,6 +324,7 @@ export async function searchWarehouses(
         storage_type: wh.storage_type || '',
         temperature_types: wh.temperature_types || [],
         amenities: wh.amenities || [],
+        description: wh.description || undefined,
         photos: photos,
         min_price: minPrice,
         pricing: pricing,
@@ -360,7 +367,23 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       .select(`
         *,
         companies(id, name, logo_url, verification_status),
-        warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts)
+        warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts),
+        warehouse_pallet_pricing(
+          id,
+          pallet_type,
+          pricing_period,
+          goods_type,
+          stackable,
+          stackable_adjustment_type,
+          stackable_adjustment_value,
+          unstackable_adjustment_type,
+          unstackable_adjustment_value,
+          custom_length_cm,
+          custom_width_cm,
+          custom_height_cm,
+          warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
+          warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
+        )
       `)
       .eq('id', id)
       .eq('status', true)
@@ -390,6 +413,50 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
     // Get min price
     const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p: any) => p.price)) : 0
 
+    const palletPricing = (warehouse.warehouse_pallet_pricing || []).map((pp: any) => {
+      const heightRanges = (pp.warehouse_pallet_height_pricing || []).map((hp: any) => ({
+        id: hp.id,
+        heightMinCm: hp.height_min_cm,
+        heightMaxCm: hp.height_max_cm,
+        pricePerUnit: parseFloat(hp.price_per_unit.toString()),
+      }))
+      const weightRanges = (pp.warehouse_pallet_weight_pricing || []).map((wp: any) => ({
+        id: wp.id,
+        weightMinKg: parseFloat(wp.weight_min_kg.toString()),
+        weightMaxKg: parseFloat(wp.weight_max_kg.toString()),
+        pricePerPallet: parseFloat(wp.price_per_pallet.toString()),
+      }))
+
+      return {
+        id: pp.id,
+        palletType: pp.pallet_type,
+        pricingPeriod: pp.pricing_period,
+        goodsType: pp.goods_type || 'general',
+        stackable: pp.stackable !== undefined ? pp.stackable : true,
+        stackableAdjustmentType: pp.stackable_adjustment_type || 'plus_per_unit',
+        stackableAdjustmentValue:
+          pp.stackable_adjustment_value != null
+            ? parseFloat(pp.stackable_adjustment_value.toString())
+            : 0,
+        unstackableAdjustmentType: pp.unstackable_adjustment_type || 'plus_per_unit',
+        unstackableAdjustmentValue:
+          pp.unstackable_adjustment_value != null
+            ? parseFloat(pp.unstackable_adjustment_value.toString())
+            : 0,
+        customDimensions:
+          pp.custom_length_cm && pp.custom_width_cm && pp.custom_height_cm
+            ? {
+                length: pp.custom_length_cm,
+                width: pp.custom_width_cm,
+                height: pp.custom_height_cm,
+                unit: 'cm',
+              }
+            : undefined,
+        heightRanges: heightRanges.length > 0 ? heightRanges : undefined,
+        weightRanges: weightRanges.length > 0 ? weightRanges : undefined,
+      }
+    })
+
     return {
       id: warehouse.id,
       name: warehouse.name,
@@ -407,9 +474,11 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       storage_type: warehouse.storage_type || '',
       temperature_types: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],
+      description: warehouse.description || undefined,
       photos: warehouse.photos && Array.isArray(warehouse.photos) ? getStoragePublicUrls(warehouse.photos, 'docs') : [],
       min_price: minPrice,
       pricing: pricing,
+      palletPricing: palletPricing.length > 0 ? palletPricing : undefined,
       average_rating: reviewSummary?.average_rating ? parseFloat(reviewSummary.average_rating) : 0,
       total_reviews: reviewSummary?.total_reviews || 0,
       company_name: company?.name || '',

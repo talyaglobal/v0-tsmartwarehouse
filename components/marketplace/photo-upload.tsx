@@ -27,6 +27,18 @@ export function PhotoUpload({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
 
   const supabase = createClient()
+  const normalizeImageSrc = (src: string) => {
+    if (
+      src.startsWith("/") ||
+      src.startsWith("http://") ||
+      src.startsWith("https://") ||
+      src.startsWith("blob:") ||
+      src.startsWith("data:")
+    ) {
+      return src
+    }
+    return `/${src}`
+  }
 
   const handleFileSelect = useCallback(
     async (files: FileList | null) => {
@@ -230,7 +242,7 @@ export function PhotoUpload({
                     </div>
                   )}
                   <Image
-                    src={photo}
+                    src={normalizeImageSrc(photo)}
                     alt={`Photo ${index + 1}`}
                     fill
                     className="object-cover rounded-lg"

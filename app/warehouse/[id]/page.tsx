@@ -762,7 +762,7 @@ export default function WarehouseDetailPage() {
                       )}
                       {(warehouse.minSqFt || warehouse.maxSqFt) && (
                         <div>
-                          <div className="text-sm text-muted-foreground mb-2">Square Feet Capacity</div>
+                          <div className="text-sm text-muted-foreground mb-2">Space Storage Capacity (sq ft)</div>
                           <div className="font-semibold">
                             {warehouse.minSqFt && `Min: ${formatNumber(warehouse.minSqFt)} sq ft`}
                             {warehouse.minSqFt && warehouse.maxSqFt && " - "}
@@ -866,7 +866,7 @@ export default function WarehouseDetailPage() {
                           {method === "pallet"
                             ? "Pallet"
                             : method === "sq_ft"
-                              ? "Square Feet"
+                              ? "Space Storage (sq ft)"
                               : method}
                         </Badge>
                       ))}
@@ -900,7 +900,7 @@ export default function WarehouseDetailPage() {
                     <div>
                       <div className="text-sm text-muted-foreground mb-1">Storage Type</div>
                       <div className="font-semibold">
-                        {productinfo === "pallet" ? "Pallet Storage" : "Area Rental"}
+                        {productinfo === "pallet" ? "Pallet Storage" : "Space Storage"}
                       </div>
                     </div>
                   )}
@@ -908,7 +908,7 @@ export default function WarehouseDetailPage() {
                   {uomQty && (
                     <div>
                       <div className="text-sm text-muted-foreground mb-1">
-                        {productinfo === "pallet" ? "Number of Pallets" : "Square Feet"}
+                        {productinfo === "pallet" ? "Pallet Storage Units" : "Space Storage (sq ft)"}
                       </div>
                       <div className="font-semibold">{formatNumber(parseInt(uomQty))}</div>
                     </div>

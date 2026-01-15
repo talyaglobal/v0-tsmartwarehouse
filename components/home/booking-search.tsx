@@ -18,7 +18,7 @@ interface BookingSearchProps {
 export function BookingSearch({
   value,
   onChange,
-  placeholder = "Enter city or location",
+  placeholder = "Enter town, state or ZIP",
   className,
   required = false,
   inputClassName,

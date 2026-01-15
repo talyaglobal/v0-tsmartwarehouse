@@ -165,7 +165,7 @@ export const mockInvoices: Invoice[] = [
     status: "pending",
     items: [
       {
-        description: "Area Rental - Level 3 Hall A (40,000 sq ft x 12 months)",
+        description: "Space Storage - Level 3 Hall A (40,000 sq ft x 12 months)",
         quantity: 1,
         unitPrice: 480000.0,
         total: 480000.0,

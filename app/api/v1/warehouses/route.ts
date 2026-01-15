@@ -8,6 +8,17 @@ import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
+const freeStorageRuleSchema = z.object({
+  minDuration: z.number().positive(),
+  maxDuration: z.number().positive().optional(),
+  durationUnit: z.enum(["day", "week", "month"]),
+  freeAmount: z.number().nonnegative(),
+  freeUnit: z.enum(["day", "week", "month"]),
+}).refine(
+  (rule) => rule.maxDuration === undefined || rule.maxDuration >= rule.minDuration,
+  { message: "Max duration must be greater than or equal to min duration" }
+)
+
 const createWarehouseSchema = z.object({
   address: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
@@ -21,6 +32,7 @@ const createWarehouseSchema = z.object({
   storageType: z.array(z.string()).min(1, "At least one storage type is required"), // Changed to array
   temperatureTypes: z.array(z.enum(["ambient-with-ac", "ambient-without-ac", "ambient-with-heater", "ambient-without-heater", "chilled", "frozen", "open-area-with-tent", "open-area"])).min(1, "At least one temperature option is required"),
   amenities: z.array(z.string()).optional(),
+  description: z.string().optional(),
   photos: z.array(z.string()).min(2, "At least 2 warehouse photos are required"),
   operatingHours: z.object({
     open: z.string(),
@@ -61,9 +73,14 @@ const createWarehouseSchema = z.object({
     }).optional(),
   }).optional(), // New field - object with per-pallet in/out pricing
   palletPricing: z.array(z.object({
+    goodsType: z.string().min(1).optional(),
     palletType: z.enum(["euro", "standard", "custom"]),
     pricingPeriod: z.enum(["day", "week", "month"]),
     stackable: z.boolean().optional(), // Stackable or unstackable option
+    stackableAdjustmentType: z.enum(["rate", "plus_per_unit"]).optional(),
+    stackableAdjustmentValue: z.number().nonnegative().optional(),
+    unstackableAdjustmentType: z.enum(["rate", "plus_per_unit"]).optional(),
+    unstackableAdjustmentValue: z.number().nonnegative().optional(),
     customDimensions: z.object({
       length: z.number().nonnegative(),
       width: z.number().nonnegative(),
@@ -92,6 +109,7 @@ const createWarehouseSchema = z.object({
     container40HC: z.number().nonnegative().optional(),
     container20DC: z.number().nonnegative().optional(),
   })).optional(),
+  freeStorageRules: z.array(freeStorageRuleSchema).optional(),
   // Pricing (will be handled separately in warehouse_pricing table)
   pricing: z.array(z.object({
     pricing_type: z.enum(["pallet", "pallet-monthly", "area", "area-rental"]),
@@ -261,6 +279,7 @@ export async function POST(request: NextRequest) {
       storageType: validated.storageType, // Now an array
       temperatureTypes: validated.temperatureTypes,
       amenities: validated.amenities || [],
+      description: validated.description,
       photos: validated.photos, // Store photo paths
       videos: validated.videos || [], // New field - videos array
       operatingHours: validated.operatingHours || {
@@ -288,6 +307,7 @@ export async function POST(request: NextRequest) {
       warehouseInFee: validated.warehouseInFee,
       warehouseOutFee: validated.warehouseOutFee,
       overtimePrice: validated.overtimePrice, // New field
+      freeStorageRules: validated.freeStorageRules || [],
     })
 
     // Create pricing entries if provided
@@ -315,7 +335,8 @@ export async function POST(request: NextRequest) {
       const customPalletPricing = validated.palletPricing.find(p => p.palletType === 'custom')
       const customDimensions = customPalletPricing?.customDimensions || null
       
-      for (const palletPrice of validated.palletPricing) {
+        for (const palletPrice of validated.palletPricing) {
+          const goodsType = (palletPrice.goodsType || 'general').trim().toLowerCase()
         // Insert base pallet pricing record
         // For custom pallet type, use customDimensions from any period (they should be the same)
         const dimensionsToUse = palletPrice.palletType === 'custom' 
@@ -328,7 +349,12 @@ export async function POST(request: NextRequest) {
             warehouse_id: warehouse.id,
             pallet_type: palletPrice.palletType,
             pricing_period: palletPrice.pricingPeriod,
+            goods_type: goodsType,
             stackable: palletPrice.stackable !== undefined ? palletPrice.stackable : true, // Default to true if not specified
+            stackable_adjustment_type: palletPrice.stackableAdjustmentType || 'plus_per_unit',
+            stackable_adjustment_value: palletPrice.stackableAdjustmentValue ?? 0,
+            unstackable_adjustment_type: palletPrice.unstackableAdjustmentType || 'plus_per_unit',
+            unstackable_adjustment_value: palletPrice.unstackableAdjustmentValue ?? 0,
             custom_length_cm: dimensionsToUse?.length && dimensionsToUse.length > 0 ? dimensionsToUse.length : null,
             custom_width_cm: dimensionsToUse?.width && dimensionsToUse.width > 0 ? dimensionsToUse.width : null,
             custom_height_cm: dimensionsToUse?.height && dimensionsToUse.height > 0 ? dimensionsToUse.height : null,

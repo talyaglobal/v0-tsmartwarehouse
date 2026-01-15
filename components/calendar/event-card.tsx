@@ -33,7 +33,7 @@ export function EventCard({ event }: EventCardProps) {
   const getTypeLabel = () => {
     if (originalType === 'booking') {
       const booking = data as Booking
-      return booking.type === 'pallet' ? 'Pallet Booking' : 'Area Rental'
+      return booking.type === 'pallet' ? 'Pallet Storage Booking' : 'Space Storage'
     }
     if (originalType === 'task') {
       const task = data as Task
@@ -95,4 +95,5 @@ export function EventCard({ event }: EventCardProps) {
     </Card>
   )
 }
+
 

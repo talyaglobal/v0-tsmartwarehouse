@@ -152,7 +152,7 @@ export default function PaymentSuccessPage() {
                       <div className="flex justify-between">
                         <p className="text-muted-foreground">Storage Type</p>
                         <Badge variant="secondary">
-                          {booking.type === "pallet" ? "Pallet Storage" : "Area Rental"}
+                          {booking.type === "pallet" ? "Pallet Storage" : "Space Storage"}
                         </Badge>
                       </div>
                       <div className="flex justify-between">
@@ -233,3 +233,4 @@ export default function PaymentSuccessPage() {
     </div>
   )
 }
+

@@ -77,8 +77,8 @@ export function BookingsListClient({ bookings }: BookingsListClientProps) {
                 )}
                 <CardTitle className="text-lg">
                   {booking.type === 'pallet'
-                    ? `Pallet Storage - ${booking.palletCount} pallets`
-                    : `Area Rental - ${booking.areaSqFt} sq ft`}
+                    ? `Pallet Storage - ${booking.palletCount} units`
+                    : `Space Storage - ${booking.areaSqFt} sq ft`}
                 </CardTitle>
               </div>
               <StatusBadge status={booking.status} />
@@ -141,4 +141,5 @@ export function BookingsListClient({ bookings }: BookingsListClientProps) {
     </div>
   )
 }
+
 

@@ -126,6 +126,50 @@ export function WarehouseCard({
   if (searchParams?.areaSqFt) linkParams.set('areaSqFt', searchParams.areaSqFt)
 
   const href = `/warehouses/${warehouse.id}?${linkParams.toString()}`
+  const normalizeList = (value: unknown): string[] => {
+    if (!value) return []
+    if (Array.isArray(value)) {
+      return value.filter(Boolean).map(String)
+    }
+    if (typeof value === "string") {
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }
+    return []
+  }
+
+  const formatWarehouseType = (value: string) => {
+    const labelMap: Record<string, string> = {
+      "general-dry-ambient": "FMCG",
+      "food-beverage-fda": "Food Stuff",
+      "pharmaceutical-fda-cgmp": "Pharmaceutical (FDA/cGMP)",
+      "medical-devices-fda": "Medical Devices (FDA Registered)",
+      "nutraceuticals-supplements-fda": "Nutraceuticals & Supplements (FDA)",
+      "cosmetics-fda": "Cosmetics (FDA)",
+      "hazardous-materials-hazmat": "Hazardous Materials (Hazmat Certified)",
+      "cold-storage": "Cold Storage (Refrigerated/Frozen)",
+      "alcohol-tobacco-ttb": "Alcohol & Tobacco (TTB Licensed)",
+      "consumer-electronics": "Consumer Electronics",
+      "automotive-parts": "Automotive Parts",
+      "ecommerce-high-velocity": "E-commerce / High-velocity Fulfillment",
+      "spare-parts": "Spare Parts",
+      "aerospace-civil": "Aero Space (Civil)",
+      "aerospace-pentagon-approved": "Aero Space (Pentagon Approved)",
+    }
+
+    return (
+      labelMap[value] ||
+      value
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    )
+  }
+
+  const warehouseTypeBadges = normalizeList((warehouse as any).warehouse_type)
+  const securityBadges = normalizeList((warehouse as any).security)
 
   if (viewMode === "list") {
     return (
@@ -151,7 +195,6 @@ export function WarehouseCard({
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-lg truncate">{warehouse.name}</h3>
                       {warehouse.is_verified && (
                         <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                       )}
@@ -223,9 +266,26 @@ export function WarehouseCard({
                     </div>
                   )}
                 </div>
-                {warehouse.warehouse_type && (
-                  <div className="mt-2">
-                    <Badge variant="secondary">{warehouse.warehouse_type}</Badge>
+                {(warehouseTypeBadges.length > 0 || securityBadges.length > 0) && (
+                  <div className="mt-2 space-y-2">
+                    {warehouseTypeBadges.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {warehouseTypeBadges.map((type) => (
+                          <Badge key={`type-${type}`} variant="secondary">
+                            {formatWarehouseType(type)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {securityBadges.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {securityBadges.map((item) => (
+                          <Badge key={`security-${item}`} variant="outline">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -277,7 +337,9 @@ export function WarehouseCard({
         </div>
         <CardContent className="p-4 flex-1 flex flex-col">
           <div className="flex items-start justify-between gap-2 mb-1">
-            <h3 className="font-semibold text-lg line-clamp-1 flex-1">{warehouse.name}</h3>
+            {warehouse.is_verified && (
+              <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+            )}
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
             <MapPin className="h-3 w-3" />
@@ -301,10 +363,27 @@ export function WarehouseCard({
               <span>• {warehouse.available_pallet_storage.toLocaleString()} pallets</span>
             )}
           </div>
-          {warehouse.warehouse_type && (
-            <Badge variant="secondary" className="mb-3 w-fit">
-              {warehouse.warehouse_type}
-            </Badge>
+          {(warehouseTypeBadges.length > 0 || securityBadges.length > 0) && (
+            <div className="mb-3 space-y-2">
+              {warehouseTypeBadges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {warehouseTypeBadges.map((type) => (
+                    <Badge key={`type-${type}`} variant="secondary">
+                      {formatWarehouseType(type)}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {securityBadges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {securityBadges.map((item) => (
+                    <Badge key={`security-${item}`} variant="outline">
+                      {item}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {price && (
             <div className="mt-auto pt-3 border-t">

@@ -302,7 +302,7 @@ export async function getServiceBreakdown(): Promise<ServiceBreakdown[]> {
       color: '#3b82f6',
     },
     {
-      name: 'Area Rental',
+      name: 'Space Storage',
       value: total > 0 ? Math.round((areaRentalRevenue / total) * 100) : 0,
       color: '#10b981',
     },
@@ -432,4 +432,5 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
   await setCache(cacheKey, result, CACHE_TTL.MEDIUM)
   return result
 }
+
 

@@ -112,14 +112,21 @@ export interface CustomPalletSize {
 export interface PalletPricing {
   id?: string
   warehouseId?: string
+  goodsType?: string
   palletType: PalletType
   pricingPeriod: PricingPeriod
   customDimensions?: CustomPalletDimensions // Only for custom pallet type (deprecated - use customSizes instead)
   customSizes?: CustomPalletSize[] // Multiple sizes for custom pallet type (each with its own height ranges)
   stackable?: boolean // Stackable or unstackable pallet option
+  stackableAdjustmentType?: PricingAdjustmentType
+  stackableAdjustmentValue?: number
+  unstackableAdjustmentType?: PricingAdjustmentType
+  unstackableAdjustmentValue?: number
   heightRanges?: HeightRangePricing[] // Array of height range pricing (for euro/standard pallets, or fallback for custom)
   weightRanges?: WeightRangePricing[] // Array of weight range pricing
 }
+
+export type PricingAdjustmentType = 'rate' | 'plus_per_unit'
 
 export interface Warehouse {
   id: string
@@ -138,6 +145,7 @@ export interface Warehouse {
   temperatureTypes?: string[] // ambient-with-ac, ambient-without-ac, chilled, frozen, open-area-with-tent, open-area
   photos?: string[] // Array of photo paths in storage
   videos?: string[] // Array of video URLs/paths (optional)
+  description?: string // Optional description
   floors: WarehouseFloor[]
   amenities: string[]
   operatingHours: {
@@ -179,6 +187,7 @@ export interface Warehouse {
     container40HC?: number
     container20DC?: number
   }> // Ports and transportation information
+  freeStorageRules?: FreeStorageRule[] // Free storage allowance rules based on booking duration
   pricing?: {
     pallet?: {
       basePrice: number
@@ -194,6 +203,16 @@ export interface Warehouse {
     }
   }
   palletPricing?: PalletPricing[] // New detailed pallet pricing structure
+}
+
+export type DurationUnit = 'day' | 'week' | 'month'
+
+export interface FreeStorageRule {
+  minDuration: number
+  maxDuration?: number
+  durationUnit: DurationUnit
+  freeAmount: number
+  freeUnit: DurationUnit
 }
 
 // Booking Types
@@ -243,7 +262,7 @@ export interface PricingConfig {
   palletIn: number // $5.00
   palletOut: number // $5.00
   storagePerPalletPerMonth: number // $17.50
-  // Area Rental (Level 3 only)
+  // Space Storage (Level 3 only)
   areaRentalPerSqFtPerYear: number // $20.00
   areaRentalMinSqFt: number // 40,000 sq ft
   // Discounts

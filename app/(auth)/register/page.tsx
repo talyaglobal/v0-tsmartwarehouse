@@ -866,7 +866,7 @@ export default function RegisterPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pallet">Pallet Storage</SelectItem>
-                    <SelectItem value="area-rental">Area Rental (Level 3)</SelectItem>
+                    <SelectItem value="area-rental">Space Storage (Level 3)</SelectItem>
                     <SelectItem value="both">Both Options</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1300,3 +1300,4 @@ export default function RegisterPage() {
     </div>
   )
 }
+

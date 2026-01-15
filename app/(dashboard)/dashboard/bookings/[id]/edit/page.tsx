@@ -249,7 +249,7 @@ export default function EditBookingPage({ params }: { params: Promise<{ id: stri
                     <RadioGroupItem value="area-rental" id="area-rental" className="sr-only" />
                     <Building2 className="h-8 w-8 text-primary" />
                     <div className="text-center">
-                      <div className="font-semibold">Area Rental</div>
+                      <div className="font-semibold">Space Storage</div>
                       <Badge variant="secondary" className="mt-1">
                         Level 3
                       </Badge>
@@ -331,11 +331,11 @@ export default function EditBookingPage({ params }: { params: Promise<{ id: stri
               </Card>
             )}
 
-            {/* Area Rental Options */}
+            {/* Space Storage Options */}
             {bookingType === "area-rental" && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Area Rental Details</CardTitle>
+                  <CardTitle>Space Storage Details</CardTitle>
                   <CardDescription>Configure your dedicated space on Level 3</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

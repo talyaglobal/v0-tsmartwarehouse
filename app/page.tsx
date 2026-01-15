@@ -173,7 +173,7 @@ export default function HomePage() {
               <Card className="border-primary">
                 <CardHeader>
                   <Building2 className="h-10 w-10 text-primary mb-2" />
-                  <CardTitle>Area Rental</CardTitle>
+                  <CardTitle>Space Storage</CardTitle>
                   <Badge className="w-fit">Level 3 Exclusive</Badge>
                   <CardDescription>Dedicated warehouse space for large-scale operations.</CardDescription>
                 </CardHeader>
@@ -263,7 +263,7 @@ export default function HomePage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <Layers className="h-8 w-8 text-primary" />
-                      {floor.floorNumber === 3 && <Badge>Area Rental</Badge>}
+                      {floor.floorNumber === 3 && <Badge>Space Storage</Badge>}
                     </div>
                     <CardTitle>{floor.name}</CardTitle>
                     <CardDescription>{formatNumber(floor.totalSqFt)} sq ft total</CardDescription>
@@ -421,7 +421,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <Link href="#services" className="hover:text-foreground">
-                    Area Rental
+                    Space Storage
                   </Link>
                 </li>
                 <li>
@@ -480,3 +480,4 @@ export default function HomePage() {
     </div>
   )
 }
+

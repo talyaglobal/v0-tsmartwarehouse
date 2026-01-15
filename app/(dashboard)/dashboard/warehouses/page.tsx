@@ -462,7 +462,7 @@ export default function WarehousesPage() {
                       <div className="space-y-2 pt-2 border-t">
                         <div className="flex items-center gap-2 text-sm">
                           <Package className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Pallet Storage:</span>
+                          <span className="text-muted-foreground">Pallet Storage Capacity:</span>
                         </div>
                         <div className="ml-6 space-y-1 text-sm">
                           <div className="flex justify-between">
@@ -801,3 +801,4 @@ export default function WarehousesPage() {
     </div>
   )
 }
+

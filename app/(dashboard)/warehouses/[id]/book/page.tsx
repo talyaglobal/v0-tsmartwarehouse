@@ -105,7 +105,7 @@ export default function BookWarehousePage() {
                   variant={bookingType === 'area-rental' ? 'default' : 'outline'}
                   onClick={() => setBookingType('area-rental')}
                 >
-                  Area Rental
+                  Space Storage
                 </Button>
               </div>
             </div>

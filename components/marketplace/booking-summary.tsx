@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { formatCurrency } from "@/lib/utils/format"
 import { Package, Ruler, Calendar } from "lucide-react"
-import type { PriceBreakdown } from "@/types/marketplace"
+import type { PalletBookingDetails, PriceBreakdown } from "@/types/marketplace"
 
 interface BookingSummaryProps {
   warehouseId: string
@@ -15,6 +15,7 @@ interface BookingSummaryProps {
   startDate: string
   endDate: string
   className?: string
+  palletDetails?: PalletBookingDetails
   // Legacy props - kept for backwards compatibility but not used
   selectedServices?: string[]
   onServicesChange?: (serviceIds: string[]) => void
@@ -27,7 +28,13 @@ export function BookingSummary({
   startDate,
   endDate,
   className,
+  palletDetails,
 }: BookingSummaryProps) {
+  const formatGoodsType = (value: string) =>
+    value
+      .split(/[-_ ]+/)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
   const [priceBreakdown, setPriceBreakdown] = useState<PriceBreakdown | null>(null)
   const [priceLoading, setPriceLoading] = useState(false)
 
@@ -36,10 +43,15 @@ export function BookingSummary({
   const end = new Date(endDate)
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1
 
+  const totalPalletQuantity = palletDetails
+    ? palletDetails.pallets.reduce((sum, pallet) => sum + (pallet.quantity || 0), 0)
+    : 0
+  const resolvedQuantity = palletDetails ? totalPalletQuantity : quantity
+
   // Calculate price when booking details change
   useEffect(() => {
     async function calculatePrice() {
-      if (!warehouseId || !startDate || !endDate || quantity <= 0) {
+      if (!warehouseId || !startDate || !endDate || resolvedQuantity <= 0) {
         setPriceBreakdown(null)
         return
       }
@@ -52,9 +64,10 @@ export function BookingSummary({
           body: JSON.stringify({
             warehouse_id: warehouseId,
             type,
-            quantity,
+            quantity: resolvedQuantity,
             start_date: startDate,
             end_date: endDate,
+            pallet_details: palletDetails,
           }),
         })
 
@@ -70,7 +83,7 @@ export function BookingSummary({
     }
 
     calculatePrice()
-  }, [warehouseId, type, quantity, startDate, endDate])
+  }, [warehouseId, type, quantity, resolvedQuantity, startDate, endDate, palletDetails])
 
   return (
     <Card className={className}>
@@ -87,7 +100,7 @@ export function BookingSummary({
               <Ruler className="h-4 w-4 text-muted-foreground" />
             )}
             <span className="text-sm font-medium">
-              {type === "pallet" ? "Pallet Storage" : "Area Rental"}
+              {type === "pallet" ? "Pallet Storage" : "Space Storage"}
             </span>
           </div>
 
@@ -95,9 +108,40 @@ export function BookingSummary({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Quantity:</span>
               <span className="font-medium">
-                {quantity} {type === "pallet" ? "pallets" : "sq ft"}
+                {resolvedQuantity} {type === "pallet" ? "units" : "sq ft"}
               </span>
             </div>
+            {type === "pallet" && palletDetails && (
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Goods Type:</span>
+                  <span className="font-medium">{formatGoodsType(palletDetails.goods_type)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stacking:</span>
+                  <span className="font-medium">
+                    {palletDetails.stackable ? "Stackable" : "Unstackable"}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">Pallets:</span>
+                  <div className="space-y-1">
+                    {palletDetails.pallets.map((pallet, index) => (
+                      <div key={`${pallet.pallet_type}-${index}`} className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {pallet.pallet_type.toUpperCase()} x {pallet.quantity}
+                        </span>
+                        <span className="font-medium">
+                          {pallet.length_cm && pallet.width_cm
+                            ? `${pallet.length_cm} x ${pallet.width_cm} x ${pallet.height_cm || 0} cm`
+                            : "Custom size"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -134,13 +178,21 @@ export function BookingSummary({
           <div className="space-y-2">
             <Label className="text-sm font-medium">Price Breakdown</Label>
             <div className="space-y-1.5 text-sm">
+              {priceBreakdown.free_days && priceBreakdown.free_days > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Free Storage:</span>
+                  <span>{priceBreakdown.free_days} {priceBreakdown.free_days === 1 ? "day" : "days"}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Base Price:</span>
                 <span>{formatCurrency(priceBreakdown.base_price)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  {quantity} {type === "pallet" ? "pallets" : "sq ft"} × {days} {days === 1 ? "day" : "days"}:
+                  {quantity} {type === "pallet" ? "pallets" : "sq ft"} ×{" "}
+                  {priceBreakdown.billable_days ?? days}{" "}
+                  {(priceBreakdown.billable_days ?? days) === 1 ? "day" : "days"}:
                 </span>
                 <span>{formatCurrency(priceBreakdown.subtotal)}</span>
               </div>
@@ -172,4 +224,5 @@ export function BookingSummary({
     </Card>
   )
 }
+
 

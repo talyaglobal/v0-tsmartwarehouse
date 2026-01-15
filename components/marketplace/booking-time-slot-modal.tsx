@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -13,11 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Calendar, Clock, Loader2, Info, ChevronLeft, ChevronRight } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Calendar, Clock, Loader2, Info, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react"
 import { formatDate } from "@/lib/utils/format"
 import { BookingSummary } from "./booking-summary"
 import { api } from "@/lib/api/client"
-import type { WarehouseSearchResult } from "@/types/marketplace"
+import type { PalletBookingDetails, WarehouseSearchResult } from "@/types/marketplace"
 
 interface BookingTimeSlotModalProps {
   open: boolean
@@ -27,7 +31,11 @@ interface BookingTimeSlotModalProps {
   quantity: number
   startDate: string
   endDate: string
-  onConfirm: (selectedDate: string, selectedTime: string) => Promise<void>
+  onConfirm: (
+    selectedDate: string,
+    selectedTime: string,
+    palletDetails?: PalletBookingDetails
+  ) => Promise<void>
   // Legacy props - kept for backwards compatibility but not used
   selectedServices?: string[]
   onServicesChange?: (serviceIds: string[]) => void
@@ -45,6 +53,16 @@ interface DayAvailability {
   timeSlots: TimeSlot[]
 }
 
+interface PalletItemInput {
+  id: string
+  palletType: "standard" | "euro" | "custom"
+  quantity: number
+  length: number
+  width: number
+  height: number
+  weight: number
+}
+
 export function BookingTimeSlotModal({
   open,
   onOpenChange,
@@ -60,6 +78,48 @@ export function BookingTimeSlotModal({
   const [dayAvailabilities, setDayAvailabilities] = useState<DayAvailability[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false)
+  const [goodsType, setGoodsType] = useState<string>("general")
+  const [stackableChoice, setStackableChoice] = useState<"stackable" | "unstackable">("stackable")
+  const [palletItems, setPalletItems] = useState<PalletItemInput[]>([])
+
+  const createPalletItem = (quantityOverride?: number): PalletItemInput => ({
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    palletType: "standard",
+    quantity: quantityOverride ?? 0,
+    length: 0,
+    width: 0,
+    height: 0,
+    weight: 0,
+  })
+
+  const normalizeGoodsType = (value?: string) =>
+    (value || "general").trim().toLowerCase()
+  const formatGoodsType = (value: string) =>
+    value
+      .split(/[-_ ]+/)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+  const normalizeList = (value: string | string[] | undefined) => {
+    if (!value) return []
+    if (Array.isArray(value)) return value.filter(Boolean).map(String)
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  const goodsTypeOptions = useMemo(() => {
+    const warehouseTypes = normalizeList((warehouse as any).warehouse_type)
+    const source = warehouseTypes.length > 0 ? warehouseTypes : ["general"]
+    return Array.from(new Set(source.map((type) => normalizeGoodsType(type))))
+  }, [warehouse])
+
+  useEffect(() => {
+    if (!open || type !== "pallet") return
+    const defaultGoodsType = goodsTypeOptions.length > 0 ? goodsTypeOptions[0] : "general"
+    setGoodsType(defaultGoodsType)
+    setStackableChoice("stackable")
+    setPalletItems((prev) => (prev.length > 0 ? prev : [createPalletItem(quantity)]))
+  }, [open, type, quantity, goodsTypeOptions])
 
   // Generate day availabilities
   useEffect(() => {
@@ -190,9 +250,35 @@ export function BookingTimeSlotModal({
       return
     }
 
+    let palletDetails: PalletBookingDetails | undefined = undefined
+    if (type === "pallet") {
+      if (palletItems.length === 0) {
+        alert("Please add at least one pallet size.")
+        return
+      }
+      const hasInvalid = palletItems.some(
+        (item) =>
+          !item.quantity ||
+          item.quantity <= 0 ||
+          item.length <= 0 ||
+          item.width <= 0 ||
+          item.height <= 0 ||
+          item.weight <= 0
+      )
+      if (hasInvalid) {
+        alert("Please fill in pallet quantity, dimensions, and weight for all items.")
+        return
+      }
+      if (totalPalletQuantity !== quantity) {
+        alert(`Total pallet quantity must be ${quantity}.`)
+        return
+      }
+      palletDetails = buildPalletDetails()
+    }
+
     setSubmitting(true)
     try {
-      await onConfirm(selectedDate, selectedTime)
+      await onConfirm(selectedDate, selectedTime, palletDetails)
       onOpenChange(false)
     } catch (error) {
       console.error("Error confirming booking:", error)
@@ -221,6 +307,50 @@ export function BookingTimeSlotModal({
     }
   }
 
+  const totalPalletQuantity = palletItems.reduce(
+    (sum, item) => sum + (item.quantity || 0),
+    0
+  )
+
+  const buildPalletDetails = (): PalletBookingDetails => {
+    const pallets = palletItems.map((item) => {
+      const isEuro = item.palletType === "euro"
+      const lengthCm = isEuro ? item.length : item.length * 2.54
+      const widthCm = isEuro ? item.width : item.width * 2.54
+      const heightCm = isEuro ? item.height : item.height * 2.54
+      const weightKg = isEuro ? item.weight : item.weight * 0.453592
+
+      return {
+        pallet_type: item.palletType,
+        quantity: item.quantity || 0,
+        length_cm: Number.isFinite(lengthCm) ? Number(lengthCm.toFixed(2)) : undefined,
+        width_cm: Number.isFinite(widthCm) ? Number(widthCm.toFixed(2)) : undefined,
+        height_cm: Number.isFinite(heightCm) ? Number(heightCm.toFixed(2)) : undefined,
+        weight_kg: Number.isFinite(weightKg) ? Number(weightKg.toFixed(2)) : undefined,
+      }
+    })
+
+    return {
+      goods_type: goodsType || "general",
+      stackable: stackableChoice === "stackable",
+      pallets,
+    }
+  }
+
+  const updatePalletItem = (id: string, updates: Partial<PalletItemInput>) => {
+    setPalletItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+    )
+  }
+
+  const addPalletItem = () => {
+    setPalletItems((prev) => [...prev, createPalletItem(0)])
+  }
+
+  const removePalletItem = (id: string) => {
+    setPalletItems((prev) => prev.filter((item) => item.id !== id))
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -240,11 +370,181 @@ export function BookingTimeSlotModal({
               quantity={quantity}
               startDate={startDate}
               endDate={endDate}
+              palletDetails={
+                type === "pallet" && palletItems.length > 0 ? buildPalletDetails() : undefined
+              }
             />
           </div>
 
           {/* Right: Date and Time Selection */}
           <div className="space-y-4">
+            {type === "pallet" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pallet Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Goods Type</Label>
+                      <Select value={goodsType} onValueChange={setGoodsType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select goods type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(goodsTypeOptions.length > 0 ? goodsTypeOptions : ["general"]).map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {formatGoodsType(option)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Stacking</Label>
+                      <RadioGroup
+                        value={stackableChoice}
+                        onValueChange={(value) =>
+                          setStackableChoice(value as "stackable" | "unstackable")
+                        }
+                        className="flex gap-4"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="stackable" id="stackable" />
+                          <Label htmlFor="stackable">Stackable</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="unstackable" id="unstackable" />
+                          <Label htmlFor="unstackable">Unstackable</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </div>
+
+                  {palletItems.map((item, index) => {
+                    const dimensionUnit = item.palletType === "euro" ? "cm" : "in"
+                    const weightUnit = item.palletType === "euro" ? "kg" : "lb"
+                    return (
+                      <div key={item.id} className="border rounded-lg p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>Pallet Size {index + 1}</Label>
+                          {palletItems.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removePalletItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Pallet Type</Label>
+                            <Select
+                              value={item.palletType}
+                              onValueChange={(value) =>
+                                updatePalletItem(item.id, {
+                                  palletType: value as PalletItemInput["palletType"],
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="standard">Standard</SelectItem>
+                                <SelectItem value="euro">Euro</SelectItem>
+                                <SelectItem value="custom">Custom</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Quantity</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.quantity || ""}
+                              onChange={(event) =>
+                                updatePalletItem(item.id, {
+                                  quantity: Number(event.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Length ({dimensionUnit})</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.length || ""}
+                              onChange={(event) =>
+                                updatePalletItem(item.id, {
+                                  length: Number(event.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Width ({dimensionUnit})</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.width || ""}
+                              onChange={(event) =>
+                                updatePalletItem(item.id, {
+                                  width: Number(event.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Height ({dimensionUnit})</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.height || ""}
+                              onChange={(event) =>
+                                updatePalletItem(item.id, {
+                                  height: Number(event.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Weight ({weightUnit})</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.weight || ""}
+                              onChange={(event) =>
+                                updatePalletItem(item.id, {
+                                  weight: Number(event.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  <div className="flex items-center justify-between">
+                    <Button type="button" variant="outline" onClick={addPalletItem}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Pallet Size
+                    </Button>
+                    <Badge variant={totalPalletQuantity === quantity ? "default" : "destructive"}>
+                      Total: {totalPalletQuantity} / {quantity}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

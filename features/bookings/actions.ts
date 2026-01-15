@@ -24,6 +24,7 @@ export async function createBookingRequest(input: {
   notes?: string
   serviceIds?: string[]
   metadata?: Record<string, any>
+  palletDetails?: Record<string, any>
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     // Use authenticated client to read user session from cookies
@@ -86,6 +87,7 @@ export async function createBookingRequest(input: {
         quantity,
         start_date: input.startDate,
         end_date: input.endDate || input.startDate,
+        pallet_details: input.palletDetails as any,
       })
       baseTotal = priceBreakdown.total
     } catch (error) {

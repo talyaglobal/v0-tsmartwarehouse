@@ -131,8 +131,9 @@ export function getBookingTypeLabel(type: BookingType): string {
     case "pallet":
       return "Pallet Storage"
     case "area-rental":
-      return "Area Rental"
+      return "Space Storage"
     default:
       return type
   }
 }
+

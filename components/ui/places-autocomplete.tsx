@@ -40,7 +40,7 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
     }
 
     const script = document.createElement("script")
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`
     script.async = true
     script.defer = true
     script.onload = () => {
@@ -68,8 +68,11 @@ export function PlacesAutocomplete({
 }: PlacesAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<any>(null)
+  const placeElementRef = useRef<any>(null)
+  const placeElementContainerRef = useRef<HTMLDivElement>(null)
   const [isScriptLoaded, setIsScriptLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [usePlaceElement, setUsePlaceElement] = useState(false)
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -93,53 +96,118 @@ export function PlacesAutocomplete({
 
   // Initialize autocomplete
   useEffect(() => {
-    if (!isScriptLoaded || !inputRef.current || !window.google?.maps?.places) {
+    if (!isScriptLoaded || !window.google?.maps?.places) {
       return
     }
 
-    const input = inputRef.current
-
-    // Create autocomplete options
-    const options: any = {
-      componentRestrictions: country ? { country: country.toLowerCase() } : undefined,
-      fields: ['formatted_address', 'geometry', 'address_components', 'place_id'],
-      types: ['address'],
+    const mapsPlaces = window.google.maps.places as any
+    const supportsPlaceElement = typeof mapsPlaces.PlaceAutocompleteElement === 'function'
+    let inputElement: HTMLInputElement | null = null
+    const handleInputEvent = (e: Event) => {
+      onChange((e.target as HTMLInputElement).value, undefined)
     }
 
-    const autocomplete = new window.google.maps.places.Autocomplete(input, options)
-    autocompleteRef.current = autocomplete
+    if (supportsPlaceElement && placeElementContainerRef.current) {
+      const options: any = {
+        componentRestrictions: country ? { country: country.toLowerCase() } : undefined,
+        types: ['address'],
+      }
+      const placeElement = new mapsPlaces.PlaceAutocompleteElement(options)
+      placeElement.classList.add('w-full')
+      placeElement.setAttribute('placeholder', placeholder)
+      placeElement.setAttribute('autocomplete', 'off')
 
-    // Listen for place selection
-    autocomplete.addListener('place_changed', () => {
-      setIsLoading(true)
-      const place = autocomplete.getPlace()
+      placeElement.addEventListener('gmp-placeselect', async (event: any) => {
+        setIsLoading(true)
+        const place = event?.place
 
-      if (place.formatted_address) {
-        onChange(place.formatted_address, place)
-
-        // Extract location if available
-        if (place.geometry?.location && onLocationChange) {
-          const location = {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
+        try {
+          if (place?.fetchFields) {
+            await place.fetchFields({
+              fields: ['formattedAddress', 'location', 'addressComponents', 'displayName'],
+            })
           }
-          onLocationChange(location)
+        } catch (error) {
+          console.warn("[PlacesAutocomplete] Failed to fetch place fields:", error)
         }
+
+        const formatted =
+          place?.formattedAddress ||
+          place?.displayName ||
+          place?.formatted_address ||
+          ""
+
+        if (formatted) {
+          onChange(formatted, place)
+        }
+
+        if (place?.location && onLocationChange) {
+          onLocationChange({
+            lat: place.location.lat(),
+            lng: place.location.lng(),
+          })
+        }
+
+        setIsLoading(false)
+      })
+
+      placeElementContainerRef.current.innerHTML = ''
+      placeElementContainerRef.current.appendChild(placeElement)
+      placeElementRef.current = placeElement
+      inputElement = placeElement.inputElement || null
+      if (inputElement) {
+        inputElement.value = value || ''
+        inputElement.disabled = disabled
+        inputElement.addEventListener('input', handleInputEvent)
+      }
+      setUsePlaceElement(true)
+    } else if (inputRef.current) {
+      const input = inputRef.current
+      inputElement = input
+
+      // Create autocomplete options
+      const options: any = {
+        componentRestrictions: country ? { country: country.toLowerCase() } : undefined,
+        fields: ['formatted_address', 'geometry', 'address_components', 'place_id'],
+        types: ['address'],
       }
 
-      setIsLoading(false)
-    })
+      const autocomplete = new window.google.maps.places.Autocomplete(input, options)
+      autocompleteRef.current = autocomplete
+
+      // Listen for place selection
+      autocomplete.addListener('place_changed', () => {
+        setIsLoading(true)
+        const place = autocomplete.getPlace()
+
+        if (place.formatted_address) {
+          onChange(place.formatted_address, place)
+
+          // Extract location if available
+          if (place.geometry?.location && onLocationChange) {
+            const location = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            }
+            onLocationChange(location)
+          }
+        }
+
+        setIsLoading(false)
+      })
+      setUsePlaceElement(false)
+    }
 
     // Handle manual address input (when user types and leaves the field)
     const handleInputBlur = async () => {
-      if (!input.value.trim()) return
+      if (!inputElement?.value.trim()) return
       
       // If autocomplete didn't trigger place_changed, try to geocode the entered address
       if (window.google?.maps?.Geocoder) {
         const geocoder = new window.google.maps.Geocoder()
         geocoder.geocode(
           { 
-            address: input.value,
+            address: inputElement.value,
             componentRestrictions: country ? { country: country.toLowerCase() } : undefined
           },
           (results: any, status: string) => {
@@ -155,11 +223,11 @@ export function PlacesAutocomplete({
               }
               
               // Update the input with formatted address and pass place object for address component extraction
-              if (results[0].formatted_address && results[0].formatted_address !== input.value) {
+              if (results[0].formatted_address && results[0].formatted_address !== inputElement.value) {
                 onChange(results[0].formatted_address, results[0])
               } else {
                 // Even if address didn't change, pass the place object so address components can be extracted
-                onChange(input.value, results[0])
+                onChange(inputElement.value, results[0])
               }
             }
           }
@@ -167,22 +235,33 @@ export function PlacesAutocomplete({
       }
     }
 
-    input.addEventListener('blur', handleInputBlur)
+    inputElement?.addEventListener('blur', handleInputBlur)
 
     return () => {
-      input.removeEventListener('blur', handleInputBlur)
+      inputElement?.removeEventListener('blur', handleInputBlur)
+      inputElement?.removeEventListener('input', handleInputEvent)
       if (autocompleteRef.current) {
         window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current)
       }
+      if (placeElementRef.current) {
+        placeElementRef.current.remove()
+        placeElementRef.current = null
+      }
     }
-  }, [isScriptLoaded, country, onChange, onLocationChange])
+  }, [isScriptLoaded, country, onChange, onLocationChange, placeholder, value, disabled])
 
   // Update input value when prop changes
   useEffect(() => {
+    if (usePlaceElement && placeElementRef.current?.inputElement) {
+      if (placeElementRef.current.inputElement.value !== value) {
+        placeElementRef.current.inputElement.value = value
+      }
+      return
+    }
     if (inputRef.current && inputRef.current.value !== value) {
       inputRef.current.value = value
     }
-  }, [value])
+  }, [value, usePlaceElement])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value, undefined)
@@ -190,14 +269,18 @@ export function PlacesAutocomplete({
 
   return (
     <div className="relative">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={handleInputChange}
-        placeholder={placeholder}
-        className={className}
-        disabled={disabled}
-      />
+      {usePlaceElement ? (
+        <div ref={placeElementContainerRef} className={className} />
+      ) : (
+        <Input
+          ref={inputRef}
+          value={value}
+          onChange={handleInputChange}
+          placeholder={placeholder}
+          className={className}
+          disabled={disabled}
+        />
+      )}
       {isLoading && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

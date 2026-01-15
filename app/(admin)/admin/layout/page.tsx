@@ -83,7 +83,7 @@ export default function WarehouseLayoutPage() {
               {floor.name}
               {floor.floorNumber === 3 && (
                 <Badge variant="secondary" className="ml-2">
-                  Area Rental
+                  Space Storage
                 </Badge>
               )}
             </TabsTrigger>
@@ -102,7 +102,7 @@ export default function WarehouseLayoutPage() {
                   </div>
                   {floor.floorNumber === 3 && (
                     <div className="text-right">
-                      <Badge className="mb-1">Area Rental Only</Badge>
+                      <Badge className="mb-1">Space Storage Only</Badge>
                       <p className="text-sm text-muted-foreground">
                         {formatCurrency(PRICING.areaRentalPerSqFtPerYear)}/sq ft/year
                       </p>
@@ -184,12 +184,12 @@ export default function WarehouseLayoutPage() {
                             </div>
                           )}
 
-                          {/* Area Rental Info for Level 3 */}
+                          {/* Space Storage Info for Level 3 */}
                           {floor.floorNumber === 3 && (
                             <div className="space-y-2">
                               <div className="p-3 border rounded-lg">
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="font-medium">Area Rental Zone</span>
+                                  <span className="font-medium">Space Storage Zone</span>
                                   <Badge variant="outline">Available</Badge>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -241,7 +241,7 @@ export default function WarehouseLayoutPage() {
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              <span className="text-sm">Area Rental (Level 3 Only)</span>
+              <span className="text-sm">Space Storage (Level 3 Only)</span>
             </div>
           </div>
         </CardContent>
@@ -249,3 +249,4 @@ export default function WarehouseLayoutPage() {
     </div>
   )
 }
+

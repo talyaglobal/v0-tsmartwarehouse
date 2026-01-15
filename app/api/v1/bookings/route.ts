@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getBookings, createBooking } from "@/lib/db/bookings"
 import { PRICING } from "@/lib/constants"
+import { getFreeStorageDays } from "@/lib/utils/free-storage"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -265,13 +266,21 @@ export async function POST(request: NextRequest) {
       console.error('Failed to fetch warehouse pricing:', pricingError)
     }
 
+    const { data: warehouseData } = await supabase
+      .from('warehouses')
+      .select('free_storage_rules')
+      .eq('id', warehouseId)
+      .single()
+
     if (type === "pallet" && palletCount && startDate && endDate) {
       // Calculate days between start and end date
       const start = new Date(startDate)
       const end = new Date(endDate)
       const diffTime = Math.abs(end.getTime() - start.getTime())
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      const diffMonths = diffDays / 30 // Approximate months
+      const freeDays = getFreeStorageDays(warehouseData?.free_storage_rules, diffDays)
+      const billableDays = Math.max(0, diffDays - freeDays)
+      const diffMonths = billableDays / 30 // Approximate months
 
       // Determine if we should use daily or monthly pricing
       // If booking is >= 30 days, use monthly pricing if available
@@ -290,7 +299,7 @@ export async function POST(request: NextRequest) {
             const dailyPricing = pricingData.find(p => p.pricing_type === 'pallet')
             if (dailyPricing) {
               pricePerUnit = dailyPricing.base_price
-              baseStorageAmount = palletCount * pricePerUnit * diffDays
+              baseStorageAmount = palletCount * pricePerUnit * billableDays
             }
           }
         } else {
@@ -298,7 +307,7 @@ export async function POST(request: NextRequest) {
           const dailyPricing = pricingData.find(p => p.pricing_type === 'pallet')
           if (dailyPricing) {
             pricePerUnit = dailyPricing.base_price
-            baseStorageAmount = palletCount * pricePerUnit * diffDays
+            baseStorageAmount = palletCount * pricePerUnit * billableDays
           }
         }
       }
@@ -326,7 +335,10 @@ export async function POST(request: NextRequest) {
           const start = new Date(startDate)
           const end = new Date(endDate)
           const diffTime = Math.abs(end.getTime() - start.getTime())
-          const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30))
+          const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          const freeDays = getFreeStorageDays(warehouseData?.free_storage_rules, totalDays)
+          const billableDays = Math.max(0, totalDays - freeDays)
+          const diffMonths = Math.ceil(billableDays / 30)
           baseStorageAmount = areaSqFt * areaPricing.base_price * diffMonths
         } else {
           // Fallback to old pricing

@@ -54,6 +54,7 @@ export interface WarehouseSearchResult {
   storageTypes?: string[]
   temperatureTypes?: string[]
   amenities?: string[]
+  description?: string
   latitude?: number
   longitude?: number
   photos?: string[]

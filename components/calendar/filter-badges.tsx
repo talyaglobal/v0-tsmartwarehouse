@@ -20,7 +20,7 @@ const filterConfig: Record<CalendarFilter, { label: string; color: string }> = {
   'booking-completed': { label: 'Completed', color: 'bg-gray-500' },
   'booking-cancelled': { label: 'Cancelled', color: 'bg-red-500' },
   'booking-pallet': { label: 'Pallet', color: 'bg-indigo-500' },
-  'booking-area-rental': { label: 'Area Rental', color: 'bg-teal-500' },
+  'booking-area-rental': { label: 'Space Storage', color: 'bg-teal-500' },
 }
 
 export function FilterBadges({ activeFilters, onFilterToggle }: FilterBadgesProps) {

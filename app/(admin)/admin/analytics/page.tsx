@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
                     <span className="font-medium">{stats?.storageEfficiency || 0}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Area Rental Rate</span>
+                    <span className="text-sm text-muted-foreground">Space Storage Rate</span>
                     <span className="font-medium">${stats?.areaRentalRate || 0}/sq ft/year</span>
                   </div>
                 </div>

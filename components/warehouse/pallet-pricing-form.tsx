@@ -9,18 +9,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, X } from "lucide-react"
 import { PalletPricing, PalletType, PricingPeriod, HeightRangePricing, WeightRangePricing, CustomPalletDimensions, CustomPalletSize } from "@/types"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface PalletPricingFormProps {
   onPricingChange: (pricing: PalletPricing[]) => void
   initialPricing?: PalletPricing[]
+  warehouseTypes?: string[]
 }
 
 export function PalletPricingForm({
   onPricingChange,
   initialPricing = [],
+  warehouseTypes = [],
 }: PalletPricingFormProps) {
   const [pricing, setPricing] = useState<PalletPricing[]>(initialPricing)
+  const [selectedGoodsType, setSelectedGoodsType] = useState<string>("general")
+  const adjustmentOptions = [
+    { value: "rate", label: "Rate (%)" },
+    { value: "plus_per_unit", label: "Plus per unit price (USD)" },
+  ] as const
+  const normalizeGoodsType = (value?: string) =>
+    (value || "general").trim().toLowerCase()
+  const formatGoodsType = (value: string) =>
+    value
+      .split(/[-_ ]+/)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
   // Local state for custom dimensions inputs to allow typing
   const [customDimensionInputs, setCustomDimensionInputs] = useState<Record<string, string>>({})
   
@@ -36,12 +50,22 @@ export function PalletPricingForm({
   const prevInitialPricingRef = useRef<string>('')
 
   useEffect(() => {
-    setPricing(initialPricing)
+    setPricing(
+      initialPricing.map((entry) => ({
+        ...entry,
+        goodsType: normalizeGoodsType(entry.goodsType),
+        stackableAdjustmentType: entry.stackableAdjustmentType ?? "plus_per_unit",
+        stackableAdjustmentValue: entry.stackableAdjustmentValue ?? 0,
+        unstackableAdjustmentType: entry.unstackableAdjustmentType ?? "plus_per_unit",
+        unstackableAdjustmentValue: entry.unstackableAdjustmentValue ?? 0,
+      }))
+    )
     
     // Create a stable string representation of initialPricing for comparison
     const currentPricingKey = JSON.stringify(initialPricing.map(p => ({
       palletType: p.palletType,
       pricingPeriod: p.pricingPeriod,
+      goodsType: normalizeGoodsType(p.goodsType),
       customDimensions: p.customDimensions,
     })))
     
@@ -80,6 +104,26 @@ export function PalletPricingForm({
     }
   }, [initialPricing]) // Only depend on initialPricing
 
+  const goodsTypes = Array.from(
+    new Set(
+      (warehouseTypes.length > 0
+        ? warehouseTypes.map((type) => normalizeGoodsType(type))
+        : pricing.map((entry) => normalizeGoodsType(entry.goodsType))
+      ).filter(Boolean)
+    )
+  )
+
+  useEffect(() => {
+    if (goodsTypes.length === 0) {
+      setSelectedGoodsType("general")
+      return
+    }
+    const normalizedSelected = normalizeGoodsType(selectedGoodsType)
+    if (!goodsTypes.includes(normalizedSelected)) {
+      setSelectedGoodsType(goodsTypes[0])
+    }
+  }, [goodsTypes, selectedGoodsType])
+
   // Use useEffect to call onPricingChange when pricing changes, but not during render
   const isInitialMount = useRef(true)
   const onPricingChangeRef = useRef(onPricingChange)
@@ -107,10 +151,34 @@ export function PalletPricingForm({
     // Don't call onPricingChange here - let useEffect handle it
   }
 
+  const isMatchingPricing = (
+    entry: PalletPricing,
+    palletType: PalletType,
+    period: PricingPeriod,
+    goodsType: string = selectedGoodsType
+  ) =>
+    entry.palletType === palletType &&
+    entry.pricingPeriod === period &&
+    normalizeGoodsType(entry.goodsType) === normalizeGoodsType(goodsType)
+
+  const getPrevRangeLimit = <T extends Record<string, any>>(
+    ranges: T[],
+    index: number,
+    minKey: keyof T,
+    maxKey: keyof T
+  ) => {
+    if (index <= 0) return null
+    const prev = ranges[index - 1]
+    const prevMax = Number(prev?.[maxKey])
+    if (Number.isFinite(prevMax)) return prevMax
+    const prevMin = Number(prev?.[minKey])
+    return Number.isFinite(prevMin) ? prevMin : null
+  }
+
   const updatePalletPricing = (palletType: PalletType, period: PricingPeriod, updates: Partial<PalletPricing>) => {
     const updated = [...pricing]
     const existingIndex = updated.findIndex(
-      (p) => p.palletType === palletType && p.pricingPeriod === period
+      (p) => isMatchingPricing(p, palletType, period)
     )
     
     if (existingIndex !== -1) {
@@ -122,16 +190,21 @@ export function PalletPricingForm({
       let customDimensions: CustomPalletDimensions | undefined = undefined
       if (palletType === "custom") {
         const existingCustomPricing = updated.find(
-          (p) => p.palletType === palletType && p.customDimensions
+          (p) => isMatchingPricing(p, palletType, p.pricingPeriod) && p.customDimensions
         )
         customDimensions = existingCustomPricing?.customDimensions || { length: 0, width: 0, height: 0, unit: "in" }
       }
       
       const newPricing: PalletPricing = {
+        goodsType: normalizeGoodsType(selectedGoodsType),
         palletType,
         pricingPeriod: period,
         heightRanges: [],
         weightRanges: [],
+        stackableAdjustmentType: "plus_per_unit",
+        stackableAdjustmentValue: 0,
+        unstackableAdjustmentType: "plus_per_unit",
+        unstackableAdjustmentValue: 0,
         ...(customDimensions ? { customDimensions } : {}),
         ...updates,
       }
@@ -142,12 +215,6 @@ export function PalletPricingForm({
   }
 
   const addHeightRange = (palletType: PalletType, _period: PricingPeriod) => {
-    const newRange: HeightRangePricing = {
-      heightMinCm: 0,
-      heightMaxCm: 200,
-      pricePerUnit: 0,
-    }
-    
     // Add the same range to all periods (day, week, month) with empty price
     // First, ensure all periods have pricing entries
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
@@ -155,12 +222,13 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       let pricingForPeriod = updatedPricing.find(
-        (pr) => pr.palletType === palletType && pr.pricingPeriod === p
+        (pr) => isMatchingPricing(pr, palletType, p)
       )
       
       if (!pricingForPeriod) {
         // Create new pricing entry if it doesn't exist
         const newPricing: PalletPricing = {
+          goodsType: normalizeGoodsType(selectedGoodsType),
           palletType,
           pricingPeriod: p,
           heightRanges: [],
@@ -175,15 +243,18 @@ export function PalletPricingForm({
       
       // Add the range
       const existingRanges = pricingForPeriod.heightRanges || []
+      const prevMax = getPrevRangeLimit(existingRanges, existingRanges.length, "heightMinCm", "heightMaxCm")
+      const heightMin = Number.isFinite(prevMax) && prevMax !== null ? prevMax : 0
+      const heightMax = Number.isFinite(prevMax) && prevMax !== null ? prevMax + 1 : 200
       const rangeForPeriod: HeightRangePricing = {
-        heightMinCm: newRange.heightMinCm,
-        heightMaxCm: newRange.heightMaxCm,
+        heightMinCm: heightMin,
+        heightMaxCm: heightMax,
         pricePerUnit: 0, // Empty price - user will fill it per period
       }
       
       // Update the pricing entry in the array
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           return {
             ...pr,
             heightRanges: [...existingRanges, rangeForPeriod]
@@ -201,7 +272,7 @@ export function PalletPricingForm({
     
     // Remove from current period
     updatedPricing = updatedPricing.map(pr => {
-      if (pr.palletType === palletType && pr.pricingPeriod === period) {
+      if (isMatchingPricing(pr, palletType, period)) {
         const updatedRanges = (pr.heightRanges || []).filter((_, i) => i !== index)
         return { ...pr, heightRanges: updatedRanges }
       }
@@ -215,7 +286,7 @@ export function PalletPricingForm({
       if (p === period) return // Skip current period
       
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const rangesForPeriod = pr.heightRanges || []
           // Remove the range at the same index position
           if (index < rangesForPeriod.length) {
@@ -241,12 +312,13 @@ export function PalletPricingForm({
     
     // Find or create pricing for current period
     let palletPricing = updatedPricing.find(
-      (p) => p.palletType === palletType && p.pricingPeriod === period
+      (p) => isMatchingPricing(p, palletType, period)
     )
     
     if (!palletPricing) {
       // Create new pricing if it doesn't exist
       const newPricing: PalletPricing = {
+        goodsType: normalizeGoodsType(selectedGoodsType),
         palletType,
         pricingPeriod: period,
         heightRanges: [],
@@ -268,7 +340,7 @@ export function PalletPricingForm({
     
     // Update current period
     updatedPricing = updatedPricing.map(p => {
-      if (p.palletType === palletType && p.pricingPeriod === period) {
+      if (isMatchingPricing(p, palletType, period)) {
         return { ...p, heightRanges: updatedRanges }
       }
       return p
@@ -282,7 +354,7 @@ export function PalletPricingForm({
         if (p === period) return // Skip current period
         
         const pricingForPeriod = updatedPricing.find(
-          (pr) => pr.palletType === palletType && pr.pricingPeriod === p
+          (pr) => isMatchingPricing(pr, palletType, p)
         )
         
         if (pricingForPeriod) {
@@ -298,7 +370,7 @@ export function PalletPricingForm({
             })
             
             updatedPricing = updatedPricing.map(pr => {
-              if (pr.palletType === palletType && pr.pricingPeriod === p) {
+              if (isMatchingPricing(pr, palletType, p)) {
                 return { ...pr, heightRanges: updatedRangesForPeriod }
               }
               return pr
@@ -312,12 +384,6 @@ export function PalletPricingForm({
   }
 
   const addWeightRange = (palletType: PalletType, _period: PricingPeriod) => {
-    const newRange: WeightRangePricing = {
-      weightMinKg: 0,
-      weightMaxKg: 1000,
-      pricePerPallet: 0,
-    }
-    
     // Add the same range to all periods (day, week, month) with empty price
     // First, ensure all periods have pricing entries
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
@@ -325,12 +391,13 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       let pricingForPeriod = updatedPricing.find(
-        (pr) => pr.palletType === palletType && pr.pricingPeriod === p
+        (pr) => isMatchingPricing(pr, palletType, p)
       )
       
       if (!pricingForPeriod) {
         // Create new pricing entry if it doesn't exist
         const newPricing: PalletPricing = {
+          goodsType: normalizeGoodsType(selectedGoodsType),
           palletType,
           pricingPeriod: p,
           heightRanges: [],
@@ -345,15 +412,18 @@ export function PalletPricingForm({
       
       // Add the range
       const existingRanges = pricingForPeriod.weightRanges || []
+      const prevMax = getPrevRangeLimit(existingRanges, existingRanges.length, "weightMinKg", "weightMaxKg")
+      const weightMin = Number.isFinite(prevMax) && prevMax !== null ? prevMax : 0
+      const weightMax = Number.isFinite(prevMax) && prevMax !== null ? prevMax + 1 : 1000
       const rangeForPeriod: WeightRangePricing = {
-        weightMinKg: newRange.weightMinKg,
-        weightMaxKg: newRange.weightMaxKg,
+        weightMinKg: weightMin,
+        weightMaxKg: weightMax,
         pricePerPallet: 0, // Empty price - user will fill it per period
       }
       
       // Update the pricing entry in the array
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           return {
             ...pr,
             weightRanges: [...existingRanges, rangeForPeriod]
@@ -371,7 +441,7 @@ export function PalletPricingForm({
     
     // Remove from current period
     updatedPricing = updatedPricing.map(pr => {
-      if (pr.palletType === palletType && pr.pricingPeriod === period) {
+      if (isMatchingPricing(pr, palletType, period)) {
         const updatedRanges = (pr.weightRanges || []).filter((_, i) => i !== index)
         return { ...pr, weightRanges: updatedRanges }
       }
@@ -385,7 +455,7 @@ export function PalletPricingForm({
       if (p === period) return // Skip current period
       
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const rangesForPeriod = pr.weightRanges || []
           // Remove the range at the same index position
           if (index < rangesForPeriod.length) {
@@ -411,12 +481,13 @@ export function PalletPricingForm({
     
     // Find or create pricing for current period
     let palletPricing = updatedPricing.find(
-      (p) => p.palletType === palletType && p.pricingPeriod === period
+      (p) => isMatchingPricing(p, palletType, period)
     )
     
     if (!palletPricing) {
       // Create new pricing if it doesn't exist
       const newPricing: PalletPricing = {
+        goodsType: normalizeGoodsType(selectedGoodsType),
         palletType,
         pricingPeriod: period,
         heightRanges: [],
@@ -438,7 +509,7 @@ export function PalletPricingForm({
     
     // Update current period
     updatedPricing = updatedPricing.map(p => {
-      if (p.palletType === palletType && p.pricingPeriod === period) {
+      if (isMatchingPricing(p, palletType, period)) {
         return { ...p, weightRanges: updatedRanges }
       }
       return p
@@ -452,7 +523,7 @@ export function PalletPricingForm({
         if (p === period) return // Skip current period
         
         const pricingForPeriod = updatedPricing.find(
-          (pr) => pr.palletType === palletType && pr.pricingPeriod === p
+          (pr) => isMatchingPricing(pr, palletType, p)
         )
         
         if (pricingForPeriod) {
@@ -468,7 +539,7 @@ export function PalletPricingForm({
             })
             
             updatedPricing = updatedPricing.map(pr => {
-              if (pr.palletType === palletType && pr.pricingPeriod === p) {
+              if (isMatchingPricing(pr, palletType, p)) {
                 return { ...pr, weightRanges: updatedRangesForPeriod }
               }
               return pr
@@ -490,11 +561,12 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       let pricingForPeriod = updatedPricing.find(
-        (pr) => pr.palletType === palletType && pr.pricingPeriod === p
+        (pr) => isMatchingPricing(pr, palletType, p)
       )
       
       if (!pricingForPeriod) {
         pricingForPeriod = {
+          goodsType: normalizeGoodsType(selectedGoodsType),
           palletType,
           pricingPeriod: p,
           heightRanges: [],
@@ -512,7 +584,7 @@ export function PalletPricingForm({
       }
       
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           return {
             ...pr,
             customSizes: [...existingSizes, newSize]
@@ -533,7 +605,7 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const sizes = pr.customSizes || []
           const updatedSizes = sizes.filter((_, i) => i !== sizeIndex)
           return { ...pr, customSizes: updatedSizes }
@@ -560,7 +632,7 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const sizes = pr.customSizes || []
           const updatedSizes = sizes.map((size, i) => {
             if (i === sizeIndex) {
@@ -589,14 +661,17 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const sizes = pr.customSizes || []
           const updatedSizes = sizes.map((size, i) => {
             if (i === sizeIndex) {
               const existingRanges = size.heightRanges || []
+              const prevMax = getPrevRangeLimit(existingRanges, existingRanges.length, "heightMinCm", "heightMaxCm")
+              const heightMin = Number.isFinite(prevMax) && prevMax !== null ? prevMax : 0
+              const heightMax = Number.isFinite(prevMax) && prevMax !== null ? prevMax + 1 : 1
               const newRange: HeightRangePricing = {
-                heightMinCm: 0,
-                heightMaxCm: 0,
+                heightMinCm: heightMin,
+                heightMaxCm: heightMax,
                 pricePerUnit: 0,
               }
               return { ...size, heightRanges: [...existingRanges, newRange] }
@@ -625,7 +700,7 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const sizes = pr.customSizes || []
           const updatedSizes = sizes.map((size, i) => {
             if (i === sizeIndex) {
@@ -659,7 +734,7 @@ export function PalletPricingForm({
     
     allPeriods.forEach(p => {
       updatedPricing = updatedPricing.map(pr => {
-        if (pr.palletType === palletType && pr.pricingPeriod === p) {
+        if (isMatchingPricing(pr, palletType, p)) {
           const sizes = pr.customSizes || []
           const updatedSizes = sizes.map((size, i) => {
             if (i === sizeIndex) {
@@ -685,10 +760,13 @@ export function PalletPricingForm({
 
   const renderPalletTypeSection = (palletType: PalletType) => {
     const palletTypeLabel = {
-      euro: "Euro Pallet (47.24\" x 31.50\")",
+      euro: "Euro Pallet (120 cm x 80 cm)",
       standard: "Standard Pallet (48\" x 40\")",
       custom: "Custom Pallet",
     }[palletType]
+
+    const sizeUnitLabel = palletType === "euro" ? "cm" : "inches"
+    const weightUnitLabel = palletType === "euro" ? "kg" : "lbs"
 
     return (
       <Card key={palletType}>
@@ -714,7 +792,7 @@ export function PalletPricingForm({
               
               {/* Render sizes from day period (sizes are synced across all periods) */}
               {(() => {
-                const dayPricing = pricing.find(p => p.palletType === palletType && p.pricingPeriod === "day")
+                const dayPricing = pricing.find(p => isMatchingPricing(p, palletType, "day"))
                 const sizes = dayPricing?.customSizes || []
                 
                 if (sizes.length === 0) {
@@ -824,54 +902,112 @@ export function PalletPricingForm({
 
             {(["day", "week", "month"] as PricingPeriod[]).map((period) => {
               let palletPricing = pricing.find(
-                (p) => p.palletType === palletType && p.pricingPeriod === period
+                (p) => isMatchingPricing(p, palletType, period)
               )
               
               if (!palletPricing) {
                 palletPricing = {
+                  goodsType: normalizeGoodsType(selectedGoodsType),
                   palletType,
                   pricingPeriod: period,
                   heightRanges: [],
                   weightRanges: [],
-                  stackable: true, // Default to stackable (required field)
+                  stackable: true, // Default to stackable (backwards compat)
+                  stackableAdjustmentType: "plus_per_unit",
+                  stackableAdjustmentValue: 0,
+                  unstackableAdjustmentType: "plus_per_unit",
+                  unstackableAdjustmentValue: 0,
                   ...(palletType === "custom" ? { customDimensions: { length: 0, width: 0, height: 0, unit: "in" } } : {}),
                 }
-              } else if (palletPricing.stackable === undefined) {
-                // If stackable is undefined, set default to true
-                palletPricing = { ...palletPricing, stackable: true }
+              } else {
+                palletPricing = {
+                  ...palletPricing,
+                  stackable: palletPricing.stackable ?? true,
+                  stackableAdjustmentType: palletPricing.stackableAdjustmentType ?? "plus_per_unit",
+                  stackableAdjustmentValue: palletPricing.stackableAdjustmentValue ?? 0,
+                  unstackableAdjustmentType: palletPricing.unstackableAdjustmentType ?? "plus_per_unit",
+                  unstackableAdjustmentValue: palletPricing.unstackableAdjustmentValue ?? 0,
+                }
               }
 
               return (
                 <TabsContent key={period} value={period} className="space-y-4">
-                  {/* Stackable/Unstackable Option */}
-                  <div className="space-y-2">
+                  {/* Stackable/Unstackable Adjustments */}
+                  <div className="space-y-3">
                     <Label>
-                      Pallet Type <span className="text-destructive">*</span>
+                      Stackable / Unstackable Adjustments <span className="text-destructive">*</span>
                     </Label>
-                    <RadioGroup
-                      value={palletPricing.stackable === true ? 'stackable' : palletPricing.stackable === false ? 'unstackable' : 'stackable'}
-                      onValueChange={(value) => {
-                        if (value === 'stackable' || value === 'unstackable') {
-                          updatePalletPricing(palletType, period, { 
-                            stackable: value === 'stackable' ? true : false
-                          })
-                        }
-                      }}
-                      className="flex items-center space-x-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="stackable" id={`stackable-${palletType}-${period}`} />
-                        <Label htmlFor={`stackable-${palletType}-${period}`} className="text-sm font-normal cursor-pointer">
-                          Stackable
-                        </Label>
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="space-y-2 rounded-lg border p-3">
+                        <Label className="text-xs text-muted-foreground">Stackable</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select
+                            value={palletPricing.stackableAdjustmentType ?? "plus_per_unit"}
+                            onValueChange={(value) =>
+                              updatePalletPricing(palletType, period, {
+                                stackableAdjustmentType: value as "rate" | "plus_per_unit",
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {adjustmentOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={palletPricing.stackableAdjustmentValue ?? 0}
+                            onChange={(e) =>
+                              updatePalletPricing(palletType, period, {
+                                stackableAdjustmentValue: Number(e.target.value) || 0,
+                              })
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="unstackable" id={`unstackable-${palletType}-${period}`} />
-                        <Label htmlFor={`unstackable-${palletType}-${period}`} className="text-sm font-normal cursor-pointer">
-                          Unstackable
-                        </Label>
+
+                      <div className="space-y-2 rounded-lg border p-3">
+                        <Label className="text-xs text-muted-foreground">Unstackable</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select
+                            value={palletPricing.unstackableAdjustmentType ?? "plus_per_unit"}
+                            onValueChange={(value) =>
+                              updatePalletPricing(palletType, period, {
+                                unstackableAdjustmentType: value as "rate" | "plus_per_unit",
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {adjustmentOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={palletPricing.unstackableAdjustmentValue ?? 0}
+                            onChange={(e) =>
+                              updatePalletPricing(palletType, period, {
+                                unstackableAdjustmentValue: Number(e.target.value) || 0,
+                              })
+                            }
+                          />
+                        </div>
                       </div>
-                    </RadioGroup>
+                    </div>
                   </div>
 
                   {/* Height Range Pricing */}
@@ -898,7 +1034,7 @@ export function PalletPricingForm({
                                 <TableRow>
                                   <TableHead>Min Height (inches)</TableHead>
                                   <TableHead>Max Height (inches)</TableHead>
-                                  <TableHead>Price per Unit</TableHead>
+                                  <TableHead>Price per Unit (USD)</TableHead>
                                   <TableHead className="w-[50px]"></TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -906,10 +1042,11 @@ export function PalletPricingForm({
                                 {size.heightRanges.map((range, rangeIndex) => (
                                   <TableRow key={rangeIndex}>
                                     <TableCell>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={range.heightMinCm || ''}
+                                      <div className="space-y-1">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          value={range.heightMinCm || ''}
                                         onFocus={(e) => {
                                           if (e.target.value === '0') {
                                             e.target.select()
@@ -925,13 +1062,40 @@ export function PalletPricingForm({
                                             Number(e.target.value) || 0
                                           )
                                         }
-                                      />
+                                        />
+                                        {(() => {
+                                          const prevMax =
+                                            rangeIndex > 0
+                                              ? Number(
+                                                  size.heightRanges?.[rangeIndex - 1]?.heightMaxCm ||
+                                                    size.heightRanges?.[rangeIndex - 1]?.heightMinCm ||
+                                                    0
+                                                )
+                                              : null
+                                          const currentMin = Number(range.heightMinCm || 0)
+                                          if (
+                                            prevMax !== null &&
+                                            Number.isFinite(prevMax) &&
+                                            Number.isFinite(currentMin) &&
+                                            currentMin > 0 &&
+                                            currentMin < prevMax
+                                          ) {
+                                            return (
+                                              <p className="text-xs text-destructive">
+                                                Min must be ≥ previous max.
+                                              </p>
+                                            )
+                                          }
+                                          return null
+                                        })()}
+                                      </div>
                                     </TableCell>
                                     <TableCell>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={range.heightMaxCm || ''}
+                                      <div className="space-y-1">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          value={range.heightMaxCm || ''}
                                         onFocus={(e) => {
                                           if (e.target.value === '0') {
                                             e.target.select()
@@ -947,7 +1111,26 @@ export function PalletPricingForm({
                                             Number(e.target.value) || 0
                                           )
                                         }
-                                      />
+                                        />
+                                        {(() => {
+                                          const minValue = Number(range.heightMinCm || 0)
+                                          const maxValue = Number(range.heightMaxCm || 0)
+                                          if (
+                                            Number.isFinite(minValue) &&
+                                            Number.isFinite(maxValue) &&
+                                            maxValue > 0 &&
+                                            minValue > 0 &&
+                                            maxValue < minValue
+                                          ) {
+                                            return (
+                                              <p className="text-xs text-destructive">
+                                                Max must be ≥ Min.
+                                              </p>
+                                            )
+                                          }
+                                          return null
+                                        })()}
+                                      </div>
                                     </TableCell>
                                     <TableCell>
                                       <Input
@@ -996,7 +1179,7 @@ export function PalletPricingForm({
                     // For euro/standard pallets: show regular height ranges
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>Height Range Pricing (inches)</Label>
+                      <Label>Height Range Pricing ({sizeUnitLabel})</Label>
                         <Button
                           type="button"
                           variant="outline"
@@ -1011,9 +1194,9 @@ export function PalletPricingForm({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Min Height (inches)</TableHead>
-                              <TableHead>Max Height (inches)</TableHead>
-                              <TableHead>Price per Unit</TableHead>
+                              <TableHead>Min Height ({sizeUnitLabel})</TableHead>
+                              <TableHead>Max Height ({sizeUnitLabel})</TableHead>
+                              <TableHead>Price per Unit (USD)</TableHead>
                               <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                           </TableHeader>
@@ -1021,10 +1204,11 @@ export function PalletPricingForm({
                             {palletPricing.heightRanges.map((range, index) => (
                               <TableRow key={index}>
                                 <TableCell>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    value={range.heightMinCm || ''}
+                                  <div className="space-y-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={range.heightMinCm || ''}
                                     onFocus={(e) => {
                                       if (e.target.value === '0') {
                                         e.target.select()
@@ -1039,13 +1223,40 @@ export function PalletPricingForm({
                                         Number(e.target.value) || 0
                                       )
                                     }
-                                  />
+                                    />
+                                    {(() => {
+                                      const prevMax =
+                                        index > 0
+                                          ? Number(
+                                              palletPricing.heightRanges?.[index - 1]?.heightMaxCm ||
+                                                palletPricing.heightRanges?.[index - 1]?.heightMinCm ||
+                                                0
+                                            )
+                                          : null
+                                      const currentMin = Number(range.heightMinCm || 0)
+                                      if (
+                                        prevMax !== null &&
+                                        Number.isFinite(prevMax) &&
+                                        Number.isFinite(currentMin) &&
+                                        currentMin > 0 &&
+                                        currentMin < prevMax
+                                      ) {
+                                        return (
+                                          <p className="text-xs text-destructive">
+                                            Min must be ≥ previous max.
+                                          </p>
+                                        )
+                                      }
+                                      return null
+                                    })()}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    value={range.heightMaxCm || ''}
+                                  <div className="space-y-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={range.heightMaxCm || ''}
                                     onFocus={(e) => {
                                       if (e.target.value === '0') {
                                         e.target.select()
@@ -1060,7 +1271,26 @@ export function PalletPricingForm({
                                         Number(e.target.value) || 0
                                       )
                                     }
-                                  />
+                                    />
+                                    {(() => {
+                                      const minValue = Number(range.heightMinCm || 0)
+                                      const maxValue = Number(range.heightMaxCm || 0)
+                                      if (
+                                        Number.isFinite(minValue) &&
+                                        Number.isFinite(maxValue) &&
+                                        maxValue > 0 &&
+                                        minValue > 0 &&
+                                        maxValue < minValue
+                                      ) {
+                                        return (
+                                          <p className="text-xs text-destructive">
+                                            Max must be ≥ Min.
+                                          </p>
+                                        )
+                                      }
+                                      return null
+                                    })()}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <Input
@@ -1107,7 +1337,7 @@ export function PalletPricingForm({
                   {/* Weight Range Pricing */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Weight Range Pricing (lbs per pallet)</Label>
+                      <Label>Weight Range Pricing ({weightUnitLabel} per pallet)</Label>
                       <Button
                         type="button"
                         variant="outline"
@@ -1122,9 +1352,9 @@ export function PalletPricingForm({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Min Weight (lbs)</TableHead>
-                            <TableHead>Max Weight (lbs)</TableHead>
-                            <TableHead>Price per Pallet</TableHead>
+                            <TableHead>Min Weight ({weightUnitLabel})</TableHead>
+                            <TableHead>Max Weight ({weightUnitLabel})</TableHead>
+                            <TableHead>Price per Pallet (USD)</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1132,11 +1362,12 @@ export function PalletPricingForm({
                           {palletPricing.weightRanges.map((range, index) => (
                             <TableRow key={index}>
                               <TableCell>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={range.weightMinKg || ''}
+                                <div className="space-y-1">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={range.weightMinKg || ''}
                                   onFocus={(e) => {
                                     if (e.target.value === '0') {
                                       e.target.select()
@@ -1151,14 +1382,41 @@ export function PalletPricingForm({
                                       Number(e.target.value) || 0
                                     )
                                   }
-                                />
+                                  />
+                                  {(() => {
+                                    const prevMax =
+                                      index > 0
+                                        ? Number(
+                                            palletPricing.weightRanges?.[index - 1]?.weightMaxKg ||
+                                              palletPricing.weightRanges?.[index - 1]?.weightMinKg ||
+                                              0
+                                          )
+                                        : null
+                                    const currentMin = Number(range.weightMinKg || 0)
+                                    if (
+                                      prevMax !== null &&
+                                      Number.isFinite(prevMax) &&
+                                      Number.isFinite(currentMin) &&
+                                      currentMin > 0 &&
+                                      currentMin < prevMax
+                                    ) {
+                                      return (
+                                        <p className="text-xs text-destructive">
+                                          Min must be ≥ previous max.
+                                        </p>
+                                      )
+                                    }
+                                    return null
+                                  })()}
+                                </div>
                               </TableCell>
                               <TableCell>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={range.weightMaxKg || ''}
+                                <div className="space-y-1">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={range.weightMaxKg || ''}
                                   onFocus={(e) => {
                                     if (e.target.value === '0') {
                                       e.target.select()
@@ -1173,7 +1431,26 @@ export function PalletPricingForm({
                                       Number(e.target.value) || 0
                                     )
                                   }
-                                />
+                                  />
+                                  {(() => {
+                                    const minValue = Number(range.weightMinKg || 0)
+                                    const maxValue = Number(range.weightMaxKg || 0)
+                                    if (
+                                      Number.isFinite(minValue) &&
+                                      Number.isFinite(maxValue) &&
+                                      maxValue > 0 &&
+                                      minValue > 0 &&
+                                      maxValue < minValue
+                                    ) {
+                                      return (
+                                        <p className="text-xs text-destructive">
+                                          Max must be ≥ Min.
+                                        </p>
+                                      )
+                                    }
+                                    return null
+                                  })()}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Input
@@ -1224,6 +1501,8 @@ export function PalletPricingForm({
     )
   }
 
+  const goodsTypeOptions = goodsTypes.length > 0 ? goodsTypes : ["general"]
+
   return (
     <div className="space-y-6">
       <div>
@@ -1232,6 +1511,22 @@ export function PalletPricingForm({
           Configure pricing for different pallet types (Euro, Standard, Custom) with height and weight ranges.
           Set pricing for Day, Week, and Month periods.
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Goods Type</Label>
+        <Select value={normalizeGoodsType(selectedGoodsType)} onValueChange={setSelectedGoodsType}>
+          <SelectTrigger className="sm:w-64">
+            <SelectValue placeholder="Select goods type" />
+          </SelectTrigger>
+          <SelectContent>
+            {goodsTypeOptions.map((type) => (
+              <SelectItem key={type} value={type}>
+                {formatGoodsType(type)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-4">

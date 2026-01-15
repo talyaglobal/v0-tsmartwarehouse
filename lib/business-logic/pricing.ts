@@ -1,6 +1,8 @@
 import { PRICING } from "@/lib/constants"
 import type { MembershipTier, PricingConfig } from "@/types"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { getFreeStorageDays } from "@/lib/utils/free-storage"
+import type { FreeStorageRule } from "@/types"
 import { getMembershipSettingByTier } from "@/lib/db/membership"
 
 /**
@@ -49,6 +51,20 @@ interface WarehousePricingData {
   volume_discounts?: Record<string, number>
 }
 
+async function getWarehouseFreeStorageRules(
+  warehouseId: string
+): Promise<FreeStorageRule[] | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('warehouses')
+    .select('free_storage_rules')
+    .eq('id', warehouseId)
+    .single()
+
+  if (error || !data) return null
+  return (data.free_storage_rules as FreeStorageRule[]) || null
+}
+
 /**
  * Get warehouse pricing from database
  */
@@ -93,6 +109,13 @@ export async function calculatePalletPricing(
   const palletCount = input.palletCount
   const months = input.months || 1
   const totalPalletCount = (input.existingPalletCount || 0) + palletCount
+  const totalDays = Math.max(1, Math.ceil(months * 30))
+  const freeStorageRules = input.warehouseId
+    ? await getWarehouseFreeStorageRules(input.warehouseId)
+    : null
+  const freeDays = getFreeStorageDays(freeStorageRules, totalDays)
+  const billableDays = Math.max(0, totalDays - freeDays)
+  const billableMonths = Math.ceil(billableDays / 30)
 
   // Try to get warehouse-specific pricing
   let warehousePricing: WarehousePricingData | null = null
@@ -138,7 +161,7 @@ export async function calculatePalletPricing(
   }
 
   // Calculate base amounts
-  const storageCost = palletCount * storagePerPalletPerMonth * months
+  const storageCost = palletCount * storagePerPalletPerMonth * billableMonths
   const baseAmount = palletInCost + storageCost
 
   // Calculate volume discount using warehouse pricing or static config
@@ -188,9 +211,9 @@ export async function calculatePalletPricing(
     })
   }
   breakdown.push({
-    item: `Storage (${months} month${months > 1 ? "s" : ""})`,
+    item: `Storage (${billableMonths} month${billableMonths > 1 ? "s" : ""})`,
     quantity: palletCount,
-    unitPrice: storagePerPalletPerMonth * months,
+    unitPrice: storagePerPalletPerMonth * billableMonths,
     total: storageCost,
   })
 
@@ -220,6 +243,13 @@ export async function calculateAreaRentalPricing(
   }
 
   const areaSqFt = input.areaSqFt
+  const totalDays = Math.max(1, Math.ceil((input.months || 1) * 30))
+  const freeStorageRules = input.warehouseId
+    ? await getWarehouseFreeStorageRules(input.warehouseId)
+    : null
+  const freeDays = getFreeStorageDays(freeStorageRules, totalDays)
+  const billableDays = Math.max(0, totalDays - freeDays)
+  const billableMonths = Math.ceil(billableDays / 30)
 
   // Try to get warehouse-specific pricing
   let warehousePricing: WarehousePricingData | null = null
@@ -270,8 +300,7 @@ export async function calculateAreaRentalPricing(
   }
 
   // Calculate base amount (for display, use yearly equivalent if original was yearly)
-  const months = input.months || 1
-  const baseAmount = areaSqFt * areaRentalPerSqFt * months
+  const baseAmount = areaSqFt * areaRentalPerSqFt * billableMonths
 
   // Area rentals typically don't get volume discounts, only membership
   const volumeDiscount = 0
@@ -308,7 +337,7 @@ export async function calculateAreaRentalPricing(
   // Build breakdown
   const breakdown = [
     {
-      item: `Area Rental (${months} month${months > 1 ? "s" : ""})`,
+      item: `Space Storage (${billableMonths} month${billableMonths > 1 ? "s" : ""})`,
       quantity: 1,
       unitPrice: baseAmount,
       total: baseAmount,

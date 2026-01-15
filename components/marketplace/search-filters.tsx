@@ -121,7 +121,7 @@ export function SearchFilters({
         >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="pallet">Pallet</TabsTrigger>
-            <TabsTrigger value="area-rental">Area Rental</TabsTrigger>
+            <TabsTrigger value="area-rental">Space Storage</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

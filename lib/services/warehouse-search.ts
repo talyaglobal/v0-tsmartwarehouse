@@ -52,8 +52,9 @@ function buildWhereClause(params: WarehouseSearchParams): any {
 
   // City filter
   if (params.city) {
+    const cityName = params.city.split(',')[0].trim()
     where.city = {
-      contains: params.city,
+      contains: cityName,
       mode: 'insensitive',
     }
   }
@@ -229,6 +230,7 @@ export async function searchWarehouses(
         storageTypes: wh.storage_type ? [wh.storage_type] : [],
         temperatureTypes: wh.temperature_types || [],
         amenities: wh.amenities || [],
+        description: wh.description || undefined,
         latitude: wh.latitude ? parseFloat(wh.latitude) : undefined,
         longitude: wh.longitude ? parseFloat(wh.longitude) : undefined,
         photos: wh.photos || [],
@@ -350,6 +352,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       storageTypes: warehouse.storage_type ? [warehouse.storage_type] : [],
       temperatureTypes: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],
+      description: warehouse.description || undefined,
       latitude: warehouse.latitude ? parseFloat(warehouse.latitude) : undefined,
       longitude: warehouse.longitude ? parseFloat(warehouse.longitude) : undefined,
       photos: warehouse.photos || [],

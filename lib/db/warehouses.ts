@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_type, temperature_types, photos, videos, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, access_info, product_acceptance_time_slots, product_departure_time_slots, overtime_price, working_days, warehouse_in_fee, warehouse_out_fee, ports, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_type, temperature_types, photos, videos, description, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, access_info, product_acceptance_time_slots, product_departure_time_slots, overtime_price, working_days, warehouse_in_fee, warehouse_out_fee, ports, free_storage_rules, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -76,6 +76,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       photos,
       videos,
       amenities,
+      description,
       operating_hours,
       status,
       custom_status,
@@ -92,12 +93,13 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       warehouse_in_fee,
       warehouse_out_fee,
       overtime_price,
+      free_storage_rules,
       ports,
       created_at,
       updated_at,
       warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts),
       warehouse_pallet_pricing(
-        id, pallet_type, pricing_period, stackable, custom_length_cm, custom_width_cm, custom_height_cm,
+        id, pallet_type, pricing_period, goods_type, stackable, stackable_adjustment_type, stackable_adjustment_value, unstackable_adjustment_type, unstackable_adjustment_value, custom_length_cm, custom_width_cm, custom_height_cm,
         warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
         warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
       )
@@ -159,6 +161,7 @@ export async function createWarehouse(
       temperature_types: warehouse.temperatureTypes,
       photos: warehouse.photos,
       videos: (warehouse as any).videos || [], // New field - videos array
+      description: (warehouse as any).description,
       amenities: warehouse.amenities,
       operating_hours: warehouse.operatingHours,
       owner_company_id: warehouse.ownerCompanyId,
@@ -177,6 +180,7 @@ export async function createWarehouse(
       warehouse_out_fee: (warehouse as any).warehouseOutFee,
       overtime_price: overtimePriceValue, // New field - JSONB format (Supabase automatically converts objects to JSONB)
       ports: (warehouse as any).ports || [],
+      free_storage_rules: (warehouse as any).freeStorageRules || [],
     })
     .select()
     .single()
@@ -214,6 +218,7 @@ export async function updateWarehouse(
   if (updates.temperatureTypes !== undefined) updateData.temperature_types = updates.temperatureTypes
   if (updates.photos !== undefined) updateData.photos = updates.photos
   if ((updates as any).videos !== undefined) updateData.videos = (updates as any).videos // New field - videos array
+  if ((updates as any).description !== undefined) updateData.description = (updates as any).description
   if (updates.amenities !== undefined) updateData.amenities = updates.amenities
   if (updates.operatingHours !== undefined)
     updateData.operating_hours = updates.operatingHours
@@ -250,6 +255,7 @@ export async function updateWarehouse(
     console.log('[UPDATE DB] OvertimePrice is undefined in updates')
   }
   if ((updates as any).ports !== undefined) updateData.ports = (updates as any).ports
+  if ((updates as any).freeStorageRules !== undefined) updateData.free_storage_rules = (updates as any).freeStorageRules
 
   const { data, error } = await supabase
     .from('warehouses')
@@ -313,7 +319,12 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
         id: pp.id,
         palletType: pp.pallet_type,
         pricingPeriod: pp.pricing_period,
+        goodsType: pp.goods_type || 'general',
         stackable: pp.stackable !== undefined ? pp.stackable : true, // Default to true if not specified
+        stackableAdjustmentType: pp.stackable_adjustment_type || 'plus_per_unit',
+        stackableAdjustmentValue: pp.stackable_adjustment_value != null ? parseFloat(pp.stackable_adjustment_value.toString()) : 0,
+        unstackableAdjustmentType: pp.unstackable_adjustment_type || 'plus_per_unit',
+        unstackableAdjustmentValue: pp.unstackable_adjustment_value != null ? parseFloat(pp.unstackable_adjustment_value.toString()) : 0,
         customDimensions: pp.custom_length_cm && pp.custom_width_cm && pp.custom_height_cm ? {
           length: pp.custom_length_cm,
           width: pp.custom_width_cm,
@@ -375,6 +386,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     temperatureTypes: Array.isArray(row.temperature_types) ? row.temperature_types : (row.temperature_types ? [row.temperature_types] : []),
     photos: Array.isArray(row.photos) ? row.photos : [],
     videos: Array.isArray(row.videos) ? row.videos : [], // New field - videos array
+    description: row.description || undefined,
     amenities: Array.isArray(row.amenities) ? row.amenities : [],
     operatingHours: row.operating_hours || {
       open: row.product_acceptance_time_slots && Array.isArray(row.product_acceptance_time_slots) && row.product_acceptance_time_slots.length > 0
@@ -401,6 +413,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     overtimePrice: row.overtime_price != null && typeof row.overtime_price === 'object' 
       ? row.overtime_price as any
       : undefined, // New field - JSONB object with per-pallet in/out pricing
+    freeStorageRules: Array.isArray(row.free_storage_rules) ? row.free_storage_rules : [],
     pricing: Object.keys(pricing).length > 0 ? pricing : undefined, // Add pricing to warehouse object
     // Additional fields
     warehouseInFee: row.warehouse_in_fee != null && row.warehouse_in_fee !== '' ? parseFloat(row.warehouse_in_fee.toString()) : undefined,

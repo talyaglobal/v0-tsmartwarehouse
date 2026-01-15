@@ -146,7 +146,7 @@ export function WarehouseSearchFilters({
                 <span className="text-sm flex-1">{location}</span>
               </div>
             ) : (
-              <BookingSearch value={location} onChange={onLocationChange} placeholder="Search location" />
+              <BookingSearch value={location} onChange={onLocationChange} placeholder="Search town, state or ZIP" />
             )}
           </div>
 

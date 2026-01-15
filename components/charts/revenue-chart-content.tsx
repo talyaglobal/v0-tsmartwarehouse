@@ -32,7 +32,7 @@ export function RevenueChartContent({ data }: RevenueChartContentProps) {
             }}
           />
           <Bar dataKey="pallet" name="Pallet Services" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="areaRental" name="Area Rental" fill="#10b981" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="areaRental" name="Space Storage" fill="#10b981" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

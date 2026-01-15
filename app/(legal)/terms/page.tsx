@@ -14,13 +14,13 @@ export default function TermsPage() {
       <p>Warebnb provides the following services:</p>
       <ul>
         <li>
-          <strong>Pallet Storage:</strong> Short and long-term storage at $17.50 per pallet per month
+          <strong>Pallet Storage:</strong> Short and long-term storage at $17.50 per unit per month
         </li>
         <li>
           <strong>Pallet Handling:</strong> $5.00 per pallet for both inbound and outbound
         </li>
         <li>
-          <strong>Area Rental:</strong> $20.00 per square foot per year (minimum 40,000 sq ft, Level 3 only)
+          <strong>Space Storage:</strong> $20.00 per square foot per year (minimum 40,000 sq ft, Level 3 only)
         </li>
         <li>
           <strong>Value-Added Services:</strong> Including pick-and-pack, labeling, and inventory management
@@ -33,7 +33,7 @@ export default function TermsPage() {
         Customers agree to store only legal goods that comply with all applicable laws and regulations. Prohibited items
         include hazardous materials, perishables without proper cold storage arrangement, and illegal substances.
       </p>
-      <h3>3.2 Area Rental</h3>
+      <h3>3.2 Space Storage</h3>
       <p>
         Area rentals are available exclusively on Level 3 of our facility with a minimum commitment of 40,000 square
         feet. Lease terms are typically annual with renewal options.
@@ -75,3 +75,4 @@ export default function TermsPage() {
     </div>
   )
 }
+

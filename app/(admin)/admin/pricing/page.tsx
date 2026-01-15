@@ -104,12 +104,12 @@ export default function PricingConfigPage() {
             </CardContent>
           </Card>
 
-          {/* Area Rental Rates */}
+          {/* Space Storage Rates */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
-                Area Rental Rates
+                Space Storage Rates
                 <Badge>Level 3 Only</Badge>
               </CardTitle>
               <CardDescription>Configure dedicated area rental pricing</CardDescription>
@@ -252,7 +252,7 @@ export default function PricingConfigPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5" />
-                  Area Rental Calculator
+                  Space Storage Calculator
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -297,3 +297,4 @@ export default function PricingConfigPage() {
     </div>
   )
 }
+

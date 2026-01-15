@@ -322,15 +322,24 @@ function FileItem({
   const Icon = isImageFile(file.file.type) ? ImageIcon : FileText
   // Use preview first, then url, for image display
   const imageSrc = file.preview || file.url
+  const normalizedImageSrc = imageSrc
+    ? imageSrc.startsWith("/") ||
+      imageSrc.startsWith("http://") ||
+      imageSrc.startsWith("https://") ||
+      imageSrc.startsWith("blob:") ||
+      imageSrc.startsWith("data:")
+      ? imageSrc
+      : `/${imageSrc}`
+    : undefined
 
   return (
     <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
       {/* Preview/Icon */}
       <div className="flex-shrink-0">
-        {imageSrc ? (
+        {normalizedImageSrc ? (
           <div className="relative w-12 h-12 rounded overflow-hidden bg-muted">
             <Image
-              src={imageSrc}
+              src={normalizedImageSrc}
               alt={file.file.name}
               fill
               className="object-cover"

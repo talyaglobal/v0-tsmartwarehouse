@@ -430,7 +430,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-emerald-500" />
-                    <span className="font-medium">Area Rental</span>
+                    <span className="font-medium">Space Storage</span>
                   </div>
                   <span className={`font-bold ${areaUtilization > 80 ? 'text-red-500' : areaUtilization > 50 ? 'text-yellow-500' : 'text-green-500'}`}>
                     {areaUtilization}%
@@ -754,3 +754,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+

@@ -13,6 +13,7 @@ export interface CreateWarehouseInput {
   zipCode: string
   totalSqFt: number
   amenities?: string[]
+  description?: string
   operatingHours?: {
     open: string
     close: string
@@ -29,6 +30,7 @@ export interface UpdateWarehouseInput {
   zipCode?: string
   totalSqFt?: number
   amenities?: string[]
+  description?: string
   operatingHours?: {
     open: string
     close: string
@@ -83,6 +85,7 @@ export async function createWarehouseAction(
     const warehouse = await createWarehouse({
       ...input,
       amenities: input.amenities || [],
+      description: input.description,
       operatingHours: input.operatingHours || {
         open: '08:00',
         close: '18:00',

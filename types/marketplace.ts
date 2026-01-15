@@ -57,6 +57,7 @@ export interface WarehouseSearchResult {
   storage_type: string
   temperature_types: string[]
   amenities: string[]
+  description?: string
   photos: string[]
   
   min_price: number
@@ -65,6 +66,7 @@ export interface WarehouseSearchResult {
     price: number
     unit: string
   }[]
+  palletPricing?: MarketplacePalletPricing[]
   
   average_rating: number
   total_reviews: number
@@ -308,17 +310,65 @@ export interface PriceCalculation {
   quantity: number
   start_date: string
   end_date: string
+  pallet_details?: PalletBookingDetails
 }
 
 export interface PriceBreakdown {
   base_price: number
   quantity: number
   days: number
+  billable_days?: number
+  free_days?: number
   subtotal: number
   volume_discount: number
   discount_percent: number
   total: number
   currency: string
+}
+
+export interface PalletBookingDetails {
+  goods_type: string
+  stackable: boolean
+  pallets: PalletBookingItem[]
+}
+
+export interface PalletBookingItem {
+  pallet_type: 'standard' | 'euro' | 'custom'
+  quantity: number
+  length_cm?: number
+  width_cm?: number
+  height_cm?: number
+  weight_kg?: number
+}
+
+export interface MarketplacePalletPricing {
+  id?: string
+  palletType: 'standard' | 'euro' | 'custom'
+  pricingPeriod: 'day' | 'week' | 'month'
+  goodsType?: string
+  stackable?: boolean
+  stackableAdjustmentType?: 'rate' | 'plus_per_unit'
+  stackableAdjustmentValue?: number
+  unstackableAdjustmentType?: 'rate' | 'plus_per_unit'
+  unstackableAdjustmentValue?: number
+  customDimensions?: {
+    length: number
+    width: number
+    height: number
+    unit?: 'cm' | 'in'
+  }
+  heightRanges?: Array<{
+    id?: string
+    heightMinCm: number
+    heightMaxCm: number
+    pricePerUnit: number
+  }>
+  weightRanges?: Array<{
+    id?: string
+    weightMinKg: number
+    weightMaxKg: number
+    pricePerPallet: number
+  }>
 }
 
 // =====================================================

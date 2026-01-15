@@ -335,7 +335,7 @@ export async function generateInvoiceForBookingAction(
       const quantity = booking.pallet_count || 0
       const total = unitPrice * quantity
       items.push({
-        description: `Pallet Storage (${quantity} pallets)`,
+        description: `Pallet Storage (${quantity} units)`,
         quantity,
         unitPrice,
         total,
@@ -346,7 +346,7 @@ export async function generateInvoiceForBookingAction(
       const quantity = booking.area_sq_ft || 0
       const total = unitPrice * quantity
       items.push({
-        description: `Area Rental (${quantity} sq ft)`,
+        description: `Space Storage (${quantity} sq ft)`,
         quantity,
         unitPrice,
         total,
@@ -424,4 +424,5 @@ function transformInvoiceRow(row: any): Invoice {
     createdAt: row.created_at,
   }
 }
+
 

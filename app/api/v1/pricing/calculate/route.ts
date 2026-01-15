@@ -12,10 +12,11 @@ export async function POST(request: NextRequest) {
       quantity: body.quantity,
       start_date: body.start_date,
       end_date: body.end_date,
+      pallet_details: body.pallet_details,
     }
 
     // Validate required fields
-    if (!params.warehouse_id || !params.type || !params.quantity || !params.start_date || !params.end_date) {
+    if (!params.warehouse_id || !params.type || params.quantity == null || !params.start_date || !params.end_date) {
       return NextResponse.json(
         {
           success: false,

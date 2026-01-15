@@ -74,7 +74,7 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
 
     // Create new script
     const script = document.createElement("script")
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`
     script.async = true
     script.defer = true
     
@@ -121,6 +121,8 @@ export function MapLocationPicker({
   const [isLoading, setIsLoading] = useState(false)
   const [isMapReady, setIsMapReady] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -128,6 +130,8 @@ export function MapLocationPicker({
       setIsLoading(false)
       setIsMapReady(false)
       setSelectedLocation(null)
+      setIsLocating(false)
+      setLocationError(null)
       return
     }
 
@@ -190,17 +194,11 @@ export function MapLocationPicker({
           setSelectedLocation({ lat: initialLat, lng: initialLng })
         }
 
-        // Handle map click
-        const handleMapClick = (e: any) => {
-          const lat = e.latLng.lat()
-          const lng = e.latLng.lng()
-
-          // Remove existing marker
+        const placeMarker = (lat: number, lng: number) => {
           if (markerRef.current) {
             markerRef.current.setMap(null)
           }
 
-          // Add new marker
           const marker = new window.google.maps.Marker({
             position: { lat, lng },
             map,
@@ -208,7 +206,6 @@ export function MapLocationPicker({
             title: "Warehouse Location",
           })
 
-          // Handle marker drag
           marker.addListener("dragend", (dragEvent: any) => {
             const dragLat = dragEvent.latLng.lat()
             const dragLng = dragEvent.latLng.lng()
@@ -217,6 +214,12 @@ export function MapLocationPicker({
 
           markerRef.current = marker
           setSelectedLocation({ lat, lng })
+        }
+
+        const handleMapClick = (e: any) => {
+          const lat = e.latLng.lat()
+          const lng = e.latLng.lng()
+          placeMarker(lat, lng)
         }
 
         map.addListener("click", handleMapClick)
@@ -252,6 +255,98 @@ export function MapLocationPicker({
       }
     }
   }, [open, initialLat, initialLng])
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported in this browser.")
+      return
+    }
+
+    const map = mapInstanceRef.current
+    if (!map || !window.google?.maps) {
+      setLocationError("Map is not ready yet. Please try again in a moment.")
+      return
+    }
+
+    setIsLocating(true)
+    setLocationError(null)
+
+    const placeCurrentMarker = (lat: number, lng: number) => {
+      if (markerRef.current) {
+        markerRef.current.setMap(null)
+      }
+
+      const marker = new window.google.maps.Marker({
+        position: { lat, lng },
+        map,
+        draggable: true,
+        title: "Warehouse Location",
+      })
+
+      marker.addListener("dragend", (dragEvent: any) => {
+        const dragLat = dragEvent.latLng.lat()
+        const dragLng = dragEvent.latLng.lng()
+        setSelectedLocation({ lat: dragLat, lng: dragLng })
+      })
+
+      markerRef.current = marker
+      map.setCenter({ lat, lng })
+      map.setZoom(15)
+      setSelectedLocation({ lat, lng })
+    }
+
+    const handlePositionSuccess = (position: GeolocationPosition) => {
+      const lat = position?.coords?.latitude
+      const lng = position?.coords?.longitude
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setLocationError("Unable to access your location. Please try again.")
+        setIsLocating(false)
+        return
+      }
+
+      placeCurrentMarker(lat as number, lng as number)
+      setIsLocating(false)
+    }
+
+    const handlePositionError = (error: GeolocationPositionError | any) => {
+      console.error("[MapLocationPicker] Failed to get current location:", error)
+      if (error?.code === 1) {
+        setLocationError("Location permission denied. Please allow location access and try again.")
+      } else if (error?.code === 2) {
+        setLocationError("Location unavailable. Please try again.")
+      } else if (error?.code === 3) {
+        setLocationError("Location request timed out. Please try again.")
+      } else {
+        setLocationError("Unable to access your location. Please try again.")
+      }
+      setIsLocating(false)
+    }
+
+    const requestLocation = (highAccuracy: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        handlePositionSuccess,
+        handlePositionError,
+        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 15000 : 10000 }
+      )
+    }
+
+    // Try high accuracy first, then fallback if it errors with empty/unknown failure
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        handlePositionSuccess(position)
+      },
+      (error) => {
+        // Some browsers return an empty error object; retry with lower accuracy.
+        if (!error || Object.keys(error).length === 0) {
+          requestLocation(false)
+          return
+        }
+        handlePositionError(error)
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
+  }
 
 
   const handleConfirm = async () => {
@@ -306,6 +401,17 @@ export function MapLocationPicker({
         </DialogHeader>
 
         <div className="flex-1 relative px-6 pb-6 flex flex-col min-h-0 overflow-hidden">
+          <div className="mb-3 flex items-center justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUseCurrentLocation}
+              disabled={!isMapReady || isLoading || isLocating}
+            >
+              {isLocating ? "Locating..." : "Use Current Location"}
+            </Button>
+          </div>
           {isLoading && !isMapReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10 rounded-lg">
               <div className="flex flex-col items-center gap-2">
@@ -328,6 +434,9 @@ export function MapLocationPicker({
                 Latitude: {selectedLocation.lat.toFixed(6)}, Longitude: {selectedLocation.lng.toFixed(6)}
               </p>
             </div>
+          )}
+          {locationError && (
+            <p className="mt-3 text-xs text-destructive">{locationError}</p>
           )}
 
           <div className="mt-4 flex justify-end gap-2">
