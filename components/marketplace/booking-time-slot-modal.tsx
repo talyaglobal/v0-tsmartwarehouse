@@ -677,9 +677,9 @@ export function BookingTimeSlotModal({
                   <div className="mt-4">
                     <label className="text-xs text-muted-foreground mb-2 block">Or select from all available dates:</label>
                     <div className="grid grid-cols-4 gap-2 max-h-[120px] overflow-y-auto">
-                      {dayAvailabilities.map((day) => (
+                      {dayAvailabilities.map((day, index) => (
                         <button
-                          key={day.date}
+                          key={`${day.date}-${index}`}
                           onClick={() => {
                             if (day.isAvailable) {
                               setSelectedDate(day.date)

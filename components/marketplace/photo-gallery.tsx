@@ -89,6 +89,7 @@ export function PhotoGallery({
               onClick={() => openLightbox(safeIndex)}
               onError={() => handleImageError(safeIndex)}
               unoptimized={mainPhoto.startsWith('http') && !mainPhoto.includes('supabase')}
+              sizes="(max-width: 1024px) 100vw, 66vw"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
@@ -162,6 +163,7 @@ export function PhotoGallery({
                     className="object-cover"
                     onError={() => handleImageError(index)}
                     unoptimized={photo.startsWith('http') && !photo.includes('supabase')}
+                    sizes="(max-width: 768px) 25vw, 12vw"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">

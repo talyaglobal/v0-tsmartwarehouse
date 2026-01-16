@@ -199,9 +199,17 @@ export default function EditWarehousePage() {
       freeUnit: 'day' | 'week' | 'month'
     }>,
     palletPricing: [] as Array<{
+      goodsType?: string
       palletType: 'euro' | 'standard' | 'custom'
       pricingPeriod: 'day' | 'week' | 'month'
       customDimensions?: { length: number; width: number; height: number; unit?: 'cm' | 'in' }
+      customSizes?: Array<{
+        lengthMin: number
+        lengthMax: number
+        widthMin: number
+        widthMax: number
+        heightRanges: Array<{ heightMinCm: number; heightMaxCm: number; pricePerUnit: number }>
+      }>
       heightRanges?: Array<{ heightMinCm: number; heightMaxCm: number; pricePerUnit: number }>
       weightRanges?: Array<{ weightMinKg: number; weightMaxKg: number; pricePerPallet: number }>
     }>, // New field
@@ -212,6 +220,8 @@ export default function EditWarehousePage() {
       volumeDiscounts: Record<string, string>
     }>,
   })
+  const [palletPricingErrors, setPalletPricingErrors] = useState<Record<string, string>>({})
+  const [palletPricingSectionErrors, setPalletPricingSectionErrors] = useState<Record<string, string>>({})
 
   // Memoize the pricing change handler to avoid re-renders
   const handlePricingChange = useCallback((pricing: any[]) => {
@@ -436,6 +446,96 @@ export default function EditWarehousePage() {
     
     setIsLoading(true)
     try {
+      const normalizeGoodsType = (value?: string) => (value || "general").trim().toLowerCase()
+      const goodsTypeOptions =
+        formData.warehouseType.length > 0
+          ? formData.warehouseType.map((type) => normalizeGoodsType(type))
+          : ["general"]
+      const requiredPalletTypes = ["standard", "euro", "custom"] as const
+      const periods: Array<"day" | "week" | "month"> = ["day", "week", "month"]
+      const fieldErrors: Record<string, string> = {}
+      const sectionErrors: Record<string, string> = {}
+      let hasPricingErrors = false
+
+      goodsTypeOptions.forEach((goodsType) => {
+        requiredPalletTypes.forEach((palletType) => {
+          periods.forEach((period) => {
+            const pricingIndex = formData.palletPricing.findIndex(
+              (entry) =>
+                normalizeGoodsType(entry.goodsType) === goodsType &&
+                entry.palletType === palletType &&
+                entry.pricingPeriod === period
+            )
+            const entry = pricingIndex >= 0 ? formData.palletPricing[pricingIndex] : undefined
+            const baseSectionKey = `${goodsType}|${palletType}|${period}`
+
+            if (!entry) {
+              sectionErrors[`${baseSectionKey}|heightRanges`] = "At least one height range is required."
+              sectionErrors[`${baseSectionKey}|weightRanges`] = "At least one weight range is required."
+              if (palletType === "custom") {
+                sectionErrors[`${baseSectionKey}|customSizes`] = "Add at least one custom size."
+              }
+              hasPricingErrors = true
+              return
+            }
+
+            if (palletType === "custom") {
+              if (!entry.customSizes || entry.customSizes.length === 0) {
+                sectionErrors[`${baseSectionKey}|customSizes`] = "Add at least one custom size."
+                hasPricingErrors = true
+              }
+              entry.customSizes?.forEach((size, sizeIndex) => {
+                if (!size.heightRanges || size.heightRanges.length === 0) {
+                  sectionErrors[`${baseSectionKey}|heightRanges`] =
+                    "Add at least one height range for each custom size."
+                  hasPricingErrors = true
+                }
+                size.heightRanges?.forEach((range, rangeIndex) => {
+                  if (!Number.isFinite(range.pricePerUnit) || range.pricePerUnit <= 0) {
+                    fieldErrors[
+                      `${pricingIndex}.customSizes.${sizeIndex}.heightRanges.${rangeIndex}.pricePerUnit`
+                    ] = "Price per unit is required."
+                    hasPricingErrors = true
+                  }
+                })
+              })
+            } else {
+              if (!entry.heightRanges || entry.heightRanges.length === 0) {
+                sectionErrors[`${baseSectionKey}|heightRanges`] = "At least one height range is required."
+                hasPricingErrors = true
+              }
+              entry.heightRanges?.forEach((range, rangeIndex) => {
+                if (!Number.isFinite(range.pricePerUnit) || range.pricePerUnit <= 0) {
+                  fieldErrors[`${pricingIndex}.heightRanges.${rangeIndex}.pricePerUnit`] =
+                    "Price per unit is required."
+                  hasPricingErrors = true
+                }
+              })
+            }
+
+            if (!entry.weightRanges || entry.weightRanges.length === 0) {
+              sectionErrors[`${baseSectionKey}|weightRanges`] = "At least one weight range is required."
+              hasPricingErrors = true
+            }
+            entry.weightRanges?.forEach((range, rangeIndex) => {
+              if (!Number.isFinite(range.pricePerPallet) || range.pricePerPallet <= 0) {
+                fieldErrors[`${pricingIndex}.weightRanges.${rangeIndex}.pricePerPallet`] =
+                  "Price per pallet is required."
+                hasPricingErrors = true
+              }
+            })
+          })
+        })
+      })
+
+      if (hasPricingErrors) {
+        setPalletPricingErrors(fieldErrors)
+        setPalletPricingSectionErrors(sectionErrors)
+        setIsLoading(false)
+        setCurrentStep(4)
+        return
+      }
+
       const totalPalletStorageValue = parseNumberInput(formData.totalPalletStorage)
       const totalSqFtValue = parseNumberInput(formData.totalSqFt)
       const freeStorageRules = formData.freeStorageRules
@@ -570,9 +670,27 @@ export default function EditWarehousePage() {
       })
 
       if (result.success) {
+        setPalletPricingErrors({})
+        setPalletPricingSectionErrors({})
         queryClient.invalidateQueries({ queryKey: ['company-warehouses'] })
         router.push("/dashboard/warehouses")
       } else {
+        if (result.details) {
+          const errors: Record<string, string> = {}
+          const parts = String(result.details)
+            .split(',')
+            .map((part) => part.trim())
+          const regex =
+            /^palletPricing\.(\d+)\.(heightRanges|weightRanges)\.(\d+)\.(heightMinCm|heightMaxCm|weightMinKg|weightMaxKg):\s*(.+)$/i
+          parts.forEach((part) => {
+            const match = part.match(regex)
+            if (match) {
+              const [, pricingIndex, rangeType, rangeIndex, field, message] = match
+              errors[`${pricingIndex}.${rangeType}.${rangeIndex}.${field}`] = message
+            }
+          })
+          setPalletPricingErrors(errors)
+        }
         setIsLoading(false)
       }
     } catch (error) {
@@ -1244,6 +1362,8 @@ export default function EditWarehousePage() {
                     onPricingChange={handlePricingChange}
                     initialPricing={formData.palletPricing}
                     warehouseTypes={formData.warehouseType}
+                    fieldErrors={palletPricingErrors}
+                    sectionErrors={palletPricingSectionErrors}
                   />
                 </>
               )}

@@ -67,6 +67,9 @@ export interface WarehouseSearchResult {
     unit: string
   }[]
   palletPricing?: MarketplacePalletPricing[]
+  external_rating?: number
+  external_reviews_count?: number
+  external_rating_source?: string
   
   average_rating: number
   total_reviews: number

@@ -246,6 +246,7 @@ export function PhotoUpload({
                     alt={`Photo ${index + 1}`}
                     fill
                     className="object-cover rounded-lg"
+                    sizes="(max-width: 768px) 50vw, 25vw"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
                     <GripVertical className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />

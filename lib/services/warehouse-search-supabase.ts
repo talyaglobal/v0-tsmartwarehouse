@@ -73,6 +73,9 @@ export async function searchWarehouses(
           pricing: [],
           average_rating: 0,
           total_reviews: 0,
+          external_rating: wh.external_rating ? parseFloat(wh.external_rating) : undefined,
+          external_reviews_count: wh.external_reviews_count || undefined,
+          external_rating_source: "google_maps",
           company_name: '',
           is_verified: false,
         }
@@ -210,6 +213,9 @@ export async function searchWarehouses(
         amenities,
         photos,
         operating_hours,
+        external_rating,
+        external_reviews_count,
+        external_rating_source,
         owner_company_id,
         companies(id, name, logo_url, verification_status)
       `, { count: 'exact' })
@@ -330,6 +336,9 @@ export async function searchWarehouses(
         pricing: pricing,
         average_rating: review?.average_rating ? parseFloat(review.average_rating) : 0,
         total_reviews: review?.total_reviews || 0,
+        external_rating: wh.external_rating != null ? parseFloat(wh.external_rating) : undefined,
+        external_reviews_count: wh.external_reviews_count || undefined,
+        external_rating_source: wh.external_rating_source || undefined,
         company_name: company?.name || '',
         company_logo: company?.logo_url || undefined,
         is_verified: company?.verification_status === 'verified',
@@ -382,7 +391,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
           custom_width_cm,
           custom_height_cm,
           warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
-          warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
+        warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
         )
       `)
       .eq('id', id)
@@ -479,6 +488,9 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       min_price: minPrice,
       pricing: pricing,
       palletPricing: palletPricing.length > 0 ? palletPricing : undefined,
+      external_rating: warehouse.external_rating != null ? parseFloat(warehouse.external_rating) : undefined,
+      external_reviews_count: warehouse.external_reviews_count || undefined,
+      external_rating_source: warehouse.external_rating_source || undefined,
       average_rating: reviewSummary?.average_rating ? parseFloat(reviewSummary.average_rating) : 0,
       total_reviews: reviewSummary?.total_reviews || 0,
       company_name: company?.name || '',

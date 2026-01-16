@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
+import { useRealtimeNotifications } from "@/lib/realtime/hooks"
 import { createClient } from "@/lib/supabase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
 
@@ -39,7 +40,7 @@ const baseNavigation = [
   { name: "Calendar", href: "/dashboard/calendar", icon: Calendar, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
   { name: "Invoices", href: "/dashboard/invoices", icon: Receipt, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
   { name: "Claims", href: "/dashboard/claims", icon: AlertCircle, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
-  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: 2, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
   { name: "Membership", href: "/dashboard/membership", icon: CreditCard, roles: ['warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ['warehouse_client', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff'] },
 ]
@@ -91,6 +92,7 @@ const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 export function DashboardSidebar() {
   const pathname = usePathname()
   const { user } = useUser()
+  const { unreadCount } = useRealtimeNotifications(user?.id || "")
   const [logoError, setLogoError] = useState(false)
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
   const [selectedTestRole, setSelectedTestRole] = useState<string | null>(null)
@@ -367,12 +369,13 @@ export function DashboardSidebar() {
                     {underReviewCount}
                   </Badge>
                 )}
-                {/* Show badge for other items if badge is defined */}
-                {item.name !== "Bookings" && item.name !== "Claims" && item.badge && (
+                {/* Show badge for Notifications */}
+                {item.name === "Notifications" && unreadCount > 0 && (
                   <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                    {item.badge}
+                    {unreadCount}
                   </Badge>
                 )}
+                {/* Other badges are handled per item type */}
               </Link>
             )
           })

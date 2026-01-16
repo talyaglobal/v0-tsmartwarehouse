@@ -184,6 +184,7 @@ export function WarehouseCard({
                     alt={warehouse.name}
                     fill
                     className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 128px"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
@@ -249,8 +250,16 @@ export function WarehouseCard({
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                   <RatingStars
-                    rating={warehouse.average_rating}
-                    reviewCount={warehouse.total_reviews}
+                    rating={
+                      warehouse.total_reviews > 0
+                        ? warehouse.average_rating
+                        : warehouse.external_rating || 0
+                    }
+                    reviewCount={
+                      warehouse.total_reviews > 0
+                        ? warehouse.total_reviews
+                        : warehouse.external_reviews_count || 0
+                    }
                     size="sm"
                   />
                   {warehouse.available_sq_ft > 0 && (
@@ -350,8 +359,16 @@ export function WarehouseCard({
           </div>
           <div className="mb-2">
             <RatingStars
-              rating={warehouse.average_rating}
-              reviewCount={warehouse.total_reviews}
+              rating={
+                warehouse.total_reviews > 0
+                  ? warehouse.average_rating
+                  : warehouse.external_rating || 0
+              }
+              reviewCount={
+                warehouse.total_reviews > 0
+                  ? warehouse.total_reviews
+                  : warehouse.external_reviews_count || 0
+              }
               size="sm"
             />
           </div>

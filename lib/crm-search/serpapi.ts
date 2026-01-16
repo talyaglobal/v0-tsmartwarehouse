@@ -60,6 +60,7 @@ export type SerpAPILocalResult = z.infer<typeof SerpAPILocalResultSchema>
 export type SerpAPIResponse = z.infer<typeof SerpAPIResponseSchema>
 
 export interface SerpAPISearchParams {
+  engine?: string
   q: string
   location?: string
   gl?: string
@@ -69,6 +70,7 @@ export interface SerpAPISearchParams {
   device?: "desktop" | "mobile" | "tablet"
   no_cache?: boolean
   safe?: "active" | "off"
+  place_id?: string
 }
 
 const RATE_LIMIT = {
@@ -142,7 +144,7 @@ export async function searchSerpAPI(
 
   const url = new URL("https://serpapi.com/search.json")
   url.searchParams.set("api_key", apiKey)
-  url.searchParams.set("engine", "google")
+  url.searchParams.set("engine", params.engine || "google")
   url.searchParams.set("q", params.q)
   if (params.location) url.searchParams.set("location", params.location)
   if (params.gl) url.searchParams.set("gl", params.gl)
@@ -152,6 +154,7 @@ export async function searchSerpAPI(
   if (params.device) url.searchParams.set("device", params.device)
   if (params.no_cache) url.searchParams.set("no_cache", "true")
   if (params.safe) url.searchParams.set("safe", params.safe)
+  if (params.place_id) url.searchParams.set("place_id", params.place_id)
 
   try {
     const response = await fetch(url.toString(), {
@@ -279,5 +282,61 @@ export async function getSerpAPIAccountInfo(): Promise<{
     searches_per_month: (data.plan_searches_left || 0) + (data.this_month_usage || 0),
     this_month_usage: data.this_month_usage || 0,
     remaining: data.plan_searches_left || 0,
+  }
+}
+
+export async function searchGoogleMapsPlace(input: {
+  query: string
+  location?: string
+}) {
+  const { data } = await searchSerpAPI({
+    engine: "google_maps",
+    q: input.query,
+    location: input.location,
+    gl: "us",
+    hl: "en",
+    num: 5,
+    device: "desktop",
+    no_cache: false,
+  })
+
+  const placeResults = (data as any).place_results
+  const localPlaces = (data as any).local_results?.places || []
+  const candidate = placeResults || localPlaces[0]
+
+  return {
+    placeId: candidate?.place_id as string | undefined,
+    rating: candidate?.rating as number | undefined,
+    reviews: candidate?.reviews as number | undefined,
+  }
+}
+
+export async function searchGoogleMapsReviews(placeId: string) {
+  const { data } = await searchSerpAPI({
+    engine: "google_maps_reviews",
+    q: "",
+    gl: "us",
+    hl: "en",
+    num: 10,
+    device: "desktop",
+    no_cache: false,
+    start: 0,
+    place_id: placeId,
+  })
+
+  const placeInfo = (data as any).place_info
+  const rating =
+    placeInfo?.rating ??
+    (data as any).rating ??
+    (data as any).place_results?.rating
+  const reviewsCount =
+    placeInfo?.reviews ??
+    placeInfo?.reviews_count ??
+    (data as any).reviews_count ??
+    (data as any).place_results?.reviews
+
+  return {
+    rating: typeof rating === "number" ? rating : undefined,
+    reviewsCount: typeof reviewsCount === "number" ? reviewsCount : undefined,
   }
 }

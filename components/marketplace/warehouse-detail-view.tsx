@@ -215,6 +215,12 @@ export function WarehouseDetailView({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showVideoModal, setShowVideoModal] = useState(false)
+  const [externalRating, setExternalRating] = useState<number | null>(
+    warehouse.external_rating ?? null
+  )
+  const [externalReviewsCount, setExternalReviewsCount] = useState<number>(
+    warehouse.external_reviews_count || 0
+  )
   const hasVideos = (warehouse.videos && warehouse.videos.length > 0) || warehouse.video_url
 
   // Fetch favorite status on mount
@@ -233,6 +239,27 @@ export function WarehouseDetailView({
     }
     fetchFavoriteStatus()
   }, [user, warehouse.id])
+
+  useEffect(() => {
+    if (warehouse.total_reviews > 0) return
+    if (externalRating != null) return
+
+    const fetchExternalRating = async () => {
+      try {
+        const response = await fetch(`/api/v1/warehouses/${warehouse.id}/external-rating`)
+        if (!response.ok) return
+        const data = await response.json()
+        if (data?.success) {
+          setExternalRating(typeof data.rating === "number" ? data.rating : null)
+          setExternalReviewsCount(data.reviewsCount || 0)
+        }
+      } catch (error) {
+        console.error("[WarehouseDetailView] Failed to fetch external rating:", error)
+      }
+    }
+
+    fetchExternalRating()
+  }, [warehouse.id, warehouse.total_reviews, externalRating])
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -651,8 +678,16 @@ export function WarehouseDetailView({
                 </div>
                 <div className="flex items-center gap-4 mb-4">
                   <RatingStars
-                    rating={warehouse.average_rating}
-                    reviewCount={warehouse.total_reviews}
+                    rating={
+                      warehouse.total_reviews > 0
+                        ? warehouse.average_rating
+                        : externalRating || 0
+                    }
+                    reviewCount={
+                      warehouse.total_reviews > 0
+                        ? warehouse.total_reviews
+                        : externalReviewsCount
+                    }
                     size="md"
                   />
                 </div>

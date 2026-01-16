@@ -104,8 +104,10 @@ export interface WeightRangePricing {
 }
 
 export interface CustomPalletSize {
-  length: number // in inches
-  width: number // in inches
+  lengthMin: number // in inches
+  lengthMax: number // in inches
+  widthMin: number // in inches
+  widthMax: number // in inches
   heightRanges: HeightRangePricing[] // Height ranges specific to this custom size
 }
 
