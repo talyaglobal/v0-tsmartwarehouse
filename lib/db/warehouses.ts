@@ -101,7 +101,17 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       warehouse_pallet_pricing(
         id, pallet_type, pricing_period, goods_type, stackable, stackable_adjustment_type, stackable_adjustment_value, unstackable_adjustment_type, unstackable_adjustment_value, custom_length_cm, custom_width_cm, custom_height_cm,
         warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
-        warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
+        warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet),
+        warehouse_custom_pallet_sizes(
+          id,
+          length_cm,
+          width_cm,
+          length_min_cm,
+          length_max_cm,
+          width_min_cm,
+          width_max_cm,
+          warehouse_custom_pallet_size_height_pricing(id, height_min_cm, height_max_cm, price_per_unit)
+        )
       )
     `)
     .eq('id', id)
@@ -314,6 +324,23 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
         weightMaxKg: parseFloat(wp.weight_max_kg.toString()),
         pricePerPallet: parseFloat(wp.price_per_pallet.toString()),
       }))
+      const customSizes = (pp.warehouse_custom_pallet_sizes || []).map((size: any) => ({
+        id: size.id,
+        lengthMin: size.length_min_cm ?? size.length_cm,
+        lengthMax: size.length_max_cm ?? size.length_cm,
+        widthMin: size.width_min_cm ?? size.width_cm,
+        widthMax: size.width_max_cm ?? size.width_cm,
+        stackableAdjustmentType: size.stackable_adjustment_type || 'plus_per_unit',
+        stackableAdjustmentValue: size.stackable_adjustment_value != null ? parseFloat(size.stackable_adjustment_value.toString()) : 0,
+        unstackableAdjustmentType: size.unstackable_adjustment_type || 'plus_per_unit',
+        unstackableAdjustmentValue: size.unstackable_adjustment_value != null ? parseFloat(size.unstackable_adjustment_value.toString()) : 0,
+        heightRanges: (size.warehouse_custom_pallet_size_height_pricing || []).map((hr: any) => ({
+          id: hr.id,
+          heightMinCm: hr.height_min_cm,
+          heightMaxCm: hr.height_max_cm,
+          pricePerUnit: parseFloat(hr.price_per_unit.toString()),
+        })),
+      }))
 
       palletPricing.push({
         id: pp.id,
@@ -331,6 +358,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
           height: pp.custom_height_cm,
           unit: 'cm',
         } : undefined,
+        customSizes: customSizes.length > 0 ? customSizes : undefined,
         heightRanges: heightPricing.length > 0 ? heightPricing : undefined,
         weightRanges: weightPricing.length > 0 ? weightPricing : undefined,
       })

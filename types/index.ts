@@ -108,6 +108,10 @@ export interface CustomPalletSize {
   lengthMax: number // in inches
   widthMin: number // in inches
   widthMax: number // in inches
+  stackableAdjustmentType?: PricingAdjustmentType
+  stackableAdjustmentValue?: number
+  unstackableAdjustmentType?: PricingAdjustmentType
+  unstackableAdjustmentValue?: number
   heightRanges: HeightRangePricing[] // Height ranges specific to this custom size
 }
 

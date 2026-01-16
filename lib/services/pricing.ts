@@ -66,7 +66,21 @@ async function calculatePalletDetailsPrice(
       unstackable_adjustment_type,
       unstackable_adjustment_value,
       warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
-      warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
+      warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet),
+      warehouse_custom_pallet_sizes(
+        id,
+        length_cm,
+        width_cm,
+        length_min_cm,
+        length_max_cm,
+        width_min_cm,
+        width_max_cm,
+        stackable_adjustment_type,
+        stackable_adjustment_value,
+        unstackable_adjustment_type,
+        unstackable_adjustment_value,
+        warehouse_custom_pallet_size_height_pricing(id, height_min_cm, height_max_cm, price_per_unit)
+      )
     `)
     .eq('warehouse_id', warehouseId)
     .eq('status', true)
@@ -104,13 +118,48 @@ async function calculatePalletDetailsPrice(
     const availablePeriods = new Set(rowsForType.map((row) => row.pricing_period))
     const period = pickPricingPeriod(availablePeriods, billableDays)
     const pricingRow = rowsForType.find((row) => row.pricing_period === period) || rowsForType[0]
-    const heightPrice = findRangePrice(
-      pricingRow.warehouse_pallet_height_pricing,
-      pallet.height_cm,
-      'height_min_cm',
-      'height_max_cm',
-      'price_per_unit'
-    )
+    let heightPrice = 0
+    let matchingSize: any | undefined
+    if (palletType === 'custom' && pallet.length_cm != null && pallet.width_cm != null) {
+      const lengthCm = pallet.length_cm
+      const widthCm = pallet.width_cm
+      matchingSize = (pricingRow.warehouse_custom_pallet_sizes || []).find((size: any) => {
+        const lengthMin = Number(size.length_min_cm ?? size.length_cm ?? 0)
+        const lengthMax = Number(size.length_max_cm ?? size.length_cm ?? 0)
+        const widthMin = Number(size.width_min_cm ?? size.width_cm ?? 0)
+        const widthMax = Number(size.width_max_cm ?? size.width_cm ?? 0)
+        return (
+          lengthCm >= lengthMin &&
+          lengthCm <= lengthMax &&
+          widthCm >= widthMin &&
+          widthCm <= widthMax
+        )
+      })
+      heightPrice = findRangePrice(
+        matchingSize?.warehouse_custom_pallet_size_height_pricing,
+        pallet.height_cm,
+        'height_min_cm',
+        'height_max_cm',
+        'price_per_unit'
+      )
+      if (!heightPrice) {
+        heightPrice = findRangePrice(
+          pricingRow.warehouse_pallet_height_pricing,
+          pallet.height_cm,
+          'height_min_cm',
+          'height_max_cm',
+          'price_per_unit'
+        )
+      }
+    } else {
+      heightPrice = findRangePrice(
+        pricingRow.warehouse_pallet_height_pricing,
+        pallet.height_cm,
+        'height_min_cm',
+        'height_max_cm',
+        'price_per_unit'
+      )
+    }
     const weightPrice = findRangePrice(
       pricingRow.warehouse_pallet_weight_pricing,
       pallet.weight_kg,
@@ -118,14 +167,29 @@ async function calculatePalletDetailsPrice(
       'weight_max_kg',
       'price_per_pallet'
     )
-    const baseUnitPrice = heightPrice + weightPrice
+    const baseUnitPrice =
+      palletType === 'custom' ? Math.max(heightPrice, weightPrice) : heightPrice + weightPrice
 
-    const adjustmentType = palletDetails.stackable
+    let adjustmentType = palletDetails.stackable
       ? pricingRow.stackable_adjustment_type
       : pricingRow.unstackable_adjustment_type
-    const adjustmentValue = palletDetails.stackable
+    let adjustmentValue = palletDetails.stackable
       ? pricingRow.stackable_adjustment_value
       : pricingRow.unstackable_adjustment_value
+    if (palletType === 'custom' && matchingSize) {
+      const sizeAdjustmentType = palletDetails.stackable
+        ? matchingSize.stackable_adjustment_type
+        : matchingSize.unstackable_adjustment_type
+      const sizeAdjustmentValue = palletDetails.stackable
+        ? matchingSize.stackable_adjustment_value
+        : matchingSize.unstackable_adjustment_value
+      if (sizeAdjustmentType) {
+        adjustmentType = sizeAdjustmentType
+      }
+      if (sizeAdjustmentValue != null) {
+        adjustmentValue = sizeAdjustmentValue
+      }
+    }
     let adjustedUnitPrice = baseUnitPrice
 
     if (adjustmentType === 'rate' && adjustmentValue) {

@@ -447,6 +447,29 @@ export default function EditWarehousePage() {
     setIsLoading(true)
     try {
       const normalizeGoodsType = (value?: string) => (value || "general").trim().toLowerCase()
+      const sanitizePalletPricing = (entries: typeof formData.palletPricing) =>
+        entries.map((entry) => ({
+          ...entry,
+          heightRanges: entry.heightRanges?.map((range) => ({
+            ...range,
+            pricePerUnit:
+              range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
+          })),
+          weightRanges: entry.weightRanges?.map((range) => ({
+            ...range,
+            pricePerPallet:
+              range.pricePerPallet != null && range.pricePerPallet > 0 ? range.pricePerPallet : 1,
+          })),
+          customSizes: entry.customSizes?.map((size) => ({
+            ...size,
+            heightRanges: size.heightRanges?.map((range) => ({
+              ...range,
+              pricePerUnit:
+                range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
+            })),
+          })),
+        }))
+      const palletPricingToValidate = sanitizePalletPricing(formData.palletPricing)
       const goodsTypeOptions =
         formData.warehouseType.length > 0
           ? formData.warehouseType.map((type) => normalizeGoodsType(type))
@@ -460,13 +483,13 @@ export default function EditWarehousePage() {
       goodsTypeOptions.forEach((goodsType) => {
         requiredPalletTypes.forEach((palletType) => {
           periods.forEach((period) => {
-            const pricingIndex = formData.palletPricing.findIndex(
+            const pricingIndex = palletPricingToValidate.findIndex(
               (entry) =>
                 normalizeGoodsType(entry.goodsType) === goodsType &&
                 entry.palletType === palletType &&
                 entry.pricingPeriod === period
             )
-            const entry = pricingIndex >= 0 ? formData.palletPricing[pricingIndex] : undefined
+            const entry = pricingIndex >= 0 ? palletPricingToValidate[pricingIndex] : undefined
             const baseSectionKey = `${goodsType}|${palletType}|${period}`
 
             if (!entry) {
@@ -617,7 +640,7 @@ export default function EditWarehousePage() {
           
           return Object.keys(result).length > 0 ? result : undefined
         })(), // New field - object with per-pallet in/out pricing
-        palletPricing: formData.palletPricing.length > 0 ? formData.palletPricing : undefined, // New field
+        palletPricing: palletPricingToValidate.length > 0 ? palletPricingToValidate : undefined, // New field
         temperatureTypes: formData.temperatureTypes,
         description: formData.description?.trim() || undefined,
         photos: warehousePhotos,
@@ -681,7 +704,7 @@ export default function EditWarehousePage() {
             .split(',')
             .map((part) => part.trim())
           const regex =
-            /^palletPricing\.(\d+)\.(heightRanges|weightRanges)\.(\d+)\.(heightMinCm|heightMaxCm|weightMinKg|weightMaxKg):\s*(.+)$/i
+            /^palletPricing\.(\d+)\.(heightRanges|weightRanges)\.(\d+)\.(heightMinCm|heightMaxCm|weightMinKg|weightMaxKg|pricePerUnit|pricePerPallet):\s*(.+)$/i
           parts.forEach((part) => {
             const match = part.match(regex)
             if (match) {

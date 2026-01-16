@@ -87,15 +87,30 @@ const createWarehouseSchema = z.object({
       height: z.number().nonnegative(),
       unit: z.enum(["cm", "in"]).optional(),
     }).optional(),
+    customSizes: z.array(z.object({
+      lengthMin: z.number().positive(),
+      lengthMax: z.number().positive(),
+      widthMin: z.number().positive(),
+      widthMax: z.number().positive(),
+      stackableAdjustmentType: z.enum(["rate", "plus_per_unit"]).optional(),
+      stackableAdjustmentValue: z.number().nonnegative().optional(),
+      unstackableAdjustmentType: z.enum(["rate", "plus_per_unit"]).optional(),
+      unstackableAdjustmentValue: z.number().nonnegative().optional(),
+      heightRanges: z.array(z.object({
+        heightMinCm: z.number().nonnegative(),
+        heightMaxCm: z.number().positive(),
+        pricePerUnit: z.number().positive(),
+      })),
+    })).optional(),
     heightRanges: z.array(z.object({
       heightMinCm: z.number().nonnegative(),
       heightMaxCm: z.number().positive(),
-      pricePerUnit: z.number().nonnegative(),
+      pricePerUnit: z.number().positive(),
     })).optional(),
     weightRanges: z.array(z.object({
       weightMinKg: z.number().nonnegative(),
       weightMaxKg: z.number().positive(),
-      pricePerPallet: z.number().nonnegative(),
+      pricePerPallet: z.number().positive(),
     })).optional(),
   })).optional(), // New field
   workingDays: z.array(z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])).optional(),
@@ -366,6 +381,47 @@ export async function POST(request: NextRequest) {
         if (palletError || !palletPricingRecord) {
           console.error('Error creating pallet pricing:', palletError)
           continue
+        }
+
+        if (palletPrice.palletType === 'custom' && palletPrice.customSizes && palletPrice.customSizes.length > 0) {
+          const { data: sizeRows, error: sizeError } = await supabase
+            .from('warehouse_custom_pallet_sizes')
+            .insert(
+              palletPrice.customSizes.map((size) => ({
+                pallet_pricing_id: palletPricingRecord.id,
+                length_cm: size.lengthMin,
+                width_cm: size.widthMin,
+                length_min_cm: size.lengthMin,
+                length_max_cm: size.lengthMax,
+                width_min_cm: size.widthMin,
+                width_max_cm: size.widthMax,
+                stackable_adjustment_type: size.stackableAdjustmentType || 'plus_per_unit',
+                stackable_adjustment_value: size.stackableAdjustmentValue ?? 0,
+                unstackable_adjustment_type: size.unstackableAdjustmentType || 'plus_per_unit',
+                unstackable_adjustment_value: size.unstackableAdjustmentValue ?? 0,
+                status: true,
+              }))
+            )
+            .select('id')
+
+          if (sizeError || !sizeRows) {
+            console.error('Error creating custom pallet sizes:', sizeError)
+          } else {
+            const heightRows = sizeRows.flatMap((sizeRow, index) => {
+              const size = palletPrice.customSizes?.[index]
+              if (!size || !size.heightRanges || size.heightRanges.length === 0) return []
+              return size.heightRanges.map((range) => ({
+                custom_pallet_size_id: sizeRow.id,
+                height_min_cm: range.heightMinCm,
+                height_max_cm: range.heightMaxCm,
+                price_per_unit: range.pricePerUnit,
+                status: true,
+              }))
+            })
+            if (heightRows.length > 0) {
+              await supabase.from('warehouse_custom_pallet_size_height_pricing').insert(heightRows)
+            }
+          }
         }
 
         // Insert height range pricing

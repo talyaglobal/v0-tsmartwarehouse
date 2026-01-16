@@ -307,6 +307,191 @@ export function PalletPricingForm({
     )
   }
 
+  const clonePricingEntry = (entry: PalletPricing, goodsType: string): PalletPricing => {
+    const cloned = JSON.parse(JSON.stringify(entry)) as PalletPricing
+    return {
+      ...cloned,
+      goodsType: normalizeGoodsType(goodsType),
+    }
+  }
+
+  const ensurePositivePrice = (value?: number) => (value != null && value > 0 ? value : 1)
+
+  const buildDefaultHeightRange = (
+    palletType: PalletType,
+    existingRanges: HeightRangePricing[]
+  ): HeightRangePricing => {
+    const prevMax = getPrevRangeLimit(existingRanges, existingRanges.length, "heightMinCm", "heightMaxCm")
+    let heightMin = 0
+    let heightMax = 0
+    if (existingRanges.length === 0) {
+      if (palletType === "euro") {
+        heightMin = 120
+        heightMax = 150
+      } else {
+        heightMin = 100
+        heightMax = 150
+      }
+    } else if (Number.isFinite(prevMax) && prevMax !== null) {
+      heightMin = prevMax + 1
+      heightMax = prevMax + 2
+    }
+    return {
+      heightMinCm: heightMin,
+      heightMaxCm: heightMax,
+      pricePerUnit: 1,
+    }
+  }
+
+  const buildDefaultWeightRange = (
+    palletType: PalletType,
+    existingRanges: WeightRangePricing[]
+  ): WeightRangePricing => {
+    const prevMax = getPrevRangeLimit(existingRanges, existingRanges.length, "weightMinKg", "weightMaxKg")
+    let weightMin = 0
+    let weightMax = 0
+    if (existingRanges.length === 0) {
+      if (palletType === "euro") {
+        weightMin = 400
+        weightMax = 800
+      } else {
+        weightMin = 880
+        weightMax = 1760
+      }
+    } else if (Number.isFinite(prevMax) && prevMax !== null) {
+      weightMin = prevMax + 1
+      weightMax = prevMax + 2
+    }
+    return {
+      weightMinKg: weightMin,
+      weightMaxKg: weightMax,
+      pricePerPallet: 1,
+    }
+  }
+
+  const normalizeHeightRanges = (ranges: HeightRangePricing[], palletType: PalletType) => {
+    if (!ranges || ranges.length === 0) {
+      return [buildDefaultHeightRange(palletType, [])]
+    }
+    return ranges.map((range) => ({
+      ...range,
+      pricePerUnit: ensurePositivePrice(range.pricePerUnit),
+    }))
+  }
+
+  const normalizeWeightRanges = (ranges: WeightRangePricing[], palletType: PalletType) => {
+    if (!ranges || ranges.length === 0) {
+      return [buildDefaultWeightRange(palletType, [])]
+    }
+    return ranges.map((range) => ({
+      ...range,
+      pricePerPallet: ensurePositivePrice(range.pricePerPallet),
+    }))
+  }
+
+  const normalizeCustomSizes = (sizes: CustomPalletSize[]): CustomPalletSize[] => {
+    if (!sizes || sizes.length === 0) {
+      return [
+        {
+          lengthMin: 48,
+          lengthMax: 48,
+          widthMin: 40,
+          widthMax: 40,
+          stackableAdjustmentType: "plus_per_unit",
+          stackableAdjustmentValue: 0,
+          unstackableAdjustmentType: "plus_per_unit",
+          unstackableAdjustmentValue: 0,
+          heightRanges: [buildDefaultHeightRange("custom", [])],
+        },
+      ]
+    }
+    return sizes.map((size) => ({
+      ...size,
+      stackableAdjustmentType: size.stackableAdjustmentType ?? "plus_per_unit",
+      stackableAdjustmentValue: size.stackableAdjustmentValue ?? 0,
+      unstackableAdjustmentType: size.unstackableAdjustmentType ?? "plus_per_unit",
+      unstackableAdjustmentValue: size.unstackableAdjustmentValue ?? 0,
+      heightRanges: normalizeHeightRanges(size.heightRanges || [], "custom"),
+    }))
+  }
+
+  const ensurePricingForGoodsType = (source: PalletPricing[], goodsType: string) => {
+    const normalizedType = normalizeGoodsType(goodsType)
+    const existing = source.filter(
+      (entry) => normalizeGoodsType(entry.goodsType) === normalizedType
+    )
+    const keys = new Set(existing.map((entry) => `${entry.palletType}-${entry.pricingPeriod}`))
+    const palletTypes: PalletType[] = ["standard", "euro", "custom"]
+    const periods: PricingPeriod[] = ["day", "week", "month"]
+    const normalizedEntries = existing.map((entry) => {
+      if (entry.palletType === "custom") {
+        return {
+          ...entry,
+          goodsType: normalizedType,
+          customSizes: normalizeCustomSizes(entry.customSizes || []),
+          weightRanges: normalizeWeightRanges(entry.weightRanges || [], "custom"),
+        }
+      }
+      return {
+        ...entry,
+        goodsType: normalizedType,
+        heightRanges: normalizeHeightRanges(entry.heightRanges || [], entry.palletType),
+        weightRanges: normalizeWeightRanges(entry.weightRanges || [], entry.palletType),
+      }
+    })
+
+    const filledEntries: PalletPricing[] = [...normalizedEntries]
+    palletTypes.forEach((palletType) => {
+      periods.forEach((period) => {
+        const key = `${palletType}-${period}`
+        if (keys.has(key)) return
+        const baseEntry: PalletPricing = {
+          goodsType: normalizedType,
+          palletType,
+          pricingPeriod: period,
+          heightRanges: palletType === "custom" ? [] : normalizeHeightRanges([], palletType),
+          weightRanges: normalizeWeightRanges([], palletType),
+          stackableAdjustmentType: "plus_per_unit",
+          stackableAdjustmentValue: 0,
+          unstackableAdjustmentType: "plus_per_unit",
+          unstackableAdjustmentValue: 0,
+        }
+        if (palletType === "custom") {
+          baseEntry.customSizes = normalizeCustomSizes([])
+        }
+        filledEntries.push(baseEntry)
+      })
+    })
+
+    return filledEntries
+  }
+
+  const applyPricingToAllGoodsTypes = () => {
+    const confirmed = window.confirm(
+      "Apply this pricing configuration to all goods types? This will overwrite existing pricing for other goods types."
+    )
+    if (!confirmed) return
+
+    const sourceKey = normalizeGoodsType(selectedGoodsType)
+    const sourceEntries = ensurePricingForGoodsType(pricing, sourceKey)
+    if (sourceEntries.length === 0) return
+
+    const targetGoodsTypes = goodsTypeOptions
+      .map((type) => normalizeGoodsType(type))
+      .filter((type) => type !== sourceKey)
+
+    const optionKeys = goodsTypeOptions.map((type) => normalizeGoodsType(type))
+    const filteredPricing = pricing.filter(
+      (entry) => !optionKeys.includes(normalizeGoodsType(entry.goodsType))
+    )
+
+    const clonedEntries = targetGoodsTypes.flatMap((type) =>
+      sourceEntries.map((entry) => clonePricingEntry(entry, type))
+    )
+
+    setPricing([...filteredPricing, ...sourceEntries, ...clonedEntries])
+  }
+
   const updatePalletPricing = (palletType: PalletType, period: PricingPeriod, updates: Partial<PalletPricing>) => {
     const updated = [...pricing]
     const existingIndex = updated.findIndex(
@@ -450,7 +635,7 @@ export function PalletPricingForm({
     period: PricingPeriod,
     index: number,
     field: keyof HeightRangePricing,
-    value: number
+    value: number | undefined
   ) => {
     let updatedPricing = [...pricing]
     
@@ -475,7 +660,7 @@ export function PalletPricingForm({
       palletPricing = newPricing
     }
 
-    if (field === "heightMinCm") {
+    if (field === "heightMinCm" && value != null) {
       const prevMax = getPrevRangeLimit(
         palletPricing.heightRanges || [],
         index,
@@ -496,7 +681,7 @@ export function PalletPricingForm({
 
     const updatedRanges = (palletPricing.heightRanges || []).map((range, i) => {
       if (i === index) {
-        return { ...range, [field]: value }
+        return { ...range, [field]: value } as HeightRangePricing
       }
       return range
     })
@@ -650,7 +835,7 @@ export function PalletPricingForm({
     period: PricingPeriod,
     index: number,
     field: keyof WeightRangePricing,
-    value: number
+    value: number | undefined
   ) => {
     let updatedPricing = [...pricing]
     
@@ -675,7 +860,7 @@ export function PalletPricingForm({
       palletPricing = newPricing
     }
 
-    if (field === "weightMinKg") {
+    if (field === "weightMinKg" && value != null) {
       const prevMax = getPrevRangeLimit(
         palletPricing.weightRanges || [],
         index,
@@ -696,7 +881,7 @@ export function PalletPricingForm({
 
     const updatedRanges = (palletPricing.weightRanges || []).map((range, i) => {
       if (i === index) {
-        return { ...range, [field]: value }
+        return { ...range, [field]: value } as WeightRangePricing
       }
       return range
     })
@@ -777,6 +962,10 @@ export function PalletPricingForm({
         lengthMax: isFirstSize ? 48 : 0,
         widthMin: isFirstSize ? 40 : 0,
         widthMax: isFirstSize ? 40 : 0,
+        stackableAdjustmentType: "plus_per_unit",
+        stackableAdjustmentValue: 0,
+        unstackableAdjustmentType: "plus_per_unit",
+        unstackableAdjustmentValue: 0,
         heightRanges: [],
       }
       
@@ -818,12 +1007,34 @@ export function PalletPricingForm({
     palletType: PalletType,
     _period: PricingPeriod,
     sizeIndex: number,
-    field: 'lengthMin' | 'lengthMax' | 'widthMin' | 'widthMax',
+    field:
+      | 'lengthMin'
+      | 'lengthMax'
+      | 'widthMin'
+      | 'widthMax'
+      | 'stackableAdjustmentType'
+      | 'stackableAdjustmentValue'
+      | 'unstackableAdjustmentType'
+      | 'unstackableAdjustmentValue',
     value: number | string
   ) => {
     if (palletType !== 'custom') return
-    
-    const numValue = typeof value === 'string' ? (value === '' ? 0 : Number(value)) : value
+
+    const adjustmentTypeFields = ['stackableAdjustmentType', 'unstackableAdjustmentType'] as const
+    const adjustmentValueFields = ['stackableAdjustmentValue', 'unstackableAdjustmentValue'] as const
+    const isAdjustmentTypeField = adjustmentTypeFields.includes(
+      field as (typeof adjustmentTypeFields)[number]
+    )
+    const isAdjustmentValueField = adjustmentValueFields.includes(
+      field as (typeof adjustmentValueFields)[number]
+    )
+    const nextValue = isAdjustmentTypeField
+      ? value
+      : isAdjustmentValueField
+        ? (typeof value === 'string' ? (value === '' ? undefined : Number(value)) : value)
+        : typeof value === 'string'
+          ? (value === '' ? 0 : Number(value))
+          : value
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
     let updatedPricing = [...pricing]
     
@@ -833,7 +1044,7 @@ export function PalletPricingForm({
           const sizes = pr.customSizes || []
           const updatedSizes = sizes.map((size, i) => {
             if (i === sizeIndex) {
-              return { ...size, [field]: numValue }
+              return { ...size, [field]: nextValue }
             }
             return size
           })
@@ -929,14 +1140,14 @@ export function PalletPricingForm({
     sizeIndex: number,
     rangeIndex: number,
     field: keyof HeightRangePricing,
-    value: number
+    value: number | undefined
   ) => {
     if (palletType !== 'custom') return
     
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
     let updatedPricing = [...pricing]
 
-    if (field === "heightMinCm") {
+    if (field === "heightMinCm" && value != null) {
       const pricingForPeriod = updatedPricing.find((pr) => isMatchingPricing(pr, palletType, period))
       const sizeRanges = pricingForPeriod?.customSizes?.[sizeIndex]?.heightRanges || []
       const prevMax = getPrevRangeLimit(sizeRanges, rangeIndex, "heightMinCm", "heightMaxCm")
@@ -961,7 +1172,7 @@ export function PalletPricingForm({
               const ranges = size.heightRanges || []
               const updatedRanges = ranges.map((range, ri) => {
                 if (ri === rangeIndex) {
-                  return { ...range, [field]: value }
+                  return { ...range, [field]: value } as HeightRangePricing
                 }
                 return range
               })
@@ -991,8 +1202,29 @@ export function PalletPricingForm({
     const customWeightUnitKey = `custom-weight-unit-${normalizeGoodsType(selectedGoodsType)}`
     const customLengthUnit = getUnitSelection(customLengthUnitKey, "in")
     const customWeightUnit = getUnitSelection(customWeightUnitKey, "lbs")
-    const getCustomSectionError = (section: string) =>
-      sectionErrors[`${normalizeGoodsType(selectedGoodsType)}|${palletType}|day|${section}`]
+    const getCustomSectionError = (section: string) => {
+      const key = `${normalizeGoodsType(selectedGoodsType)}|${palletType}|day|${section}`
+      const error = sectionErrors[key]
+      if (!error) return undefined
+      const dayPricing = pricing.find((p) => isMatchingPricing(p, palletType, "day"))
+      if (!dayPricing) return error
+      if (section === "customSizes" && dayPricing.customSizes && dayPricing.customSizes.length > 0) {
+        return undefined
+      }
+      if (section === "heightRanges") {
+        if (
+          dayPricing.customSizes &&
+          dayPricing.customSizes.length > 0 &&
+          dayPricing.customSizes.every((size) => (size.heightRanges || []).length > 0)
+        ) {
+          return undefined
+        }
+      }
+      if (section === "weightRanges" && (dayPricing.weightRanges || []).length > 0) {
+        return undefined
+      }
+      return error
+    }
 
     return (
       <Card key={palletType}>
@@ -1019,230 +1251,6 @@ export function PalletPricingForm({
               {getCustomSectionError("customSizes") && (
                 <p className="text-xs text-destructive">{getCustomSectionError("customSizes")}</p>
               )}
-              
-              {/* Render sizes from day period (sizes are synced across all periods) */}
-              {(() => {
-                const dayPricing = pricing.find(p => isMatchingPricing(p, palletType, "day"))
-              const sizes = dayPricing?.customSizes || []
-                
-                if (sizes.length === 0) {
-                  return (
-                    <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-lg text-center">
-                      No custom pallet sizes added yet. Click "Add Size" to add a new size.
-                    </div>
-                  )
-                }
-                
-                return (
-                  <div className="space-y-6">
-                    {sizes.map((size, sizeIndex) => (
-                      <Card key={sizeIndex} className="border-2">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Size {sizeIndex + 1}</CardTitle>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeCustomPalletSize(palletType, "day", sizeIndex)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          {/* Length and Width Inputs */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                              <Label>Length</Label>
-                              <div className="space-y-2">
-                                <div className="flex gap-2">
-                                  <Select
-                                    value={customLengthUnit}
-                                    onValueChange={(value) => {
-                                      const nextUnit = value as "in" | "cm"
-                                      applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
-                                      setUnitSelection(customLengthUnitKey, nextUnit)
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9 w-[68px] text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {lengthUnitOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                          {option.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Input
-                                    id={`custom-size-${sizeIndex}-length-min`}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="48"
-                                    value={size.lengthMin?.toString() || "0"}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={(e) => {
-                                      const value = e.target.value
-                                      if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "lengthMin", 0)
-                                      } else {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "lengthMin", Number(value))
-                                      }
-                                    }}
-                                  />
-                                </div>
-                                <div className="flex gap-2">
-                                  <Select
-                                    value={customLengthUnit}
-                                    onValueChange={(value) => {
-                                      const nextUnit = value as "in" | "cm"
-                                      applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
-                                      setUnitSelection(customLengthUnitKey, nextUnit)
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9 w-[68px] text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {lengthUnitOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                          {option.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Input
-                                    id={`custom-size-${sizeIndex}-length-max`}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="48"
-                                    value={size.lengthMax?.toString() || "0"}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={(e) => {
-                                      const value = e.target.value
-                                      if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "lengthMax", 0)
-                                      } else {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "lengthMax", Number(value))
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            <div className="space-y-3">
-                              <Label>Width</Label>
-                              <div className="space-y-2">
-                                <div className="flex gap-2">
-                                  <Select
-                                    value={customLengthUnit}
-                                    onValueChange={(value) => {
-                                      const nextUnit = value as "in" | "cm"
-                                      applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
-                                      setUnitSelection(customLengthUnitKey, nextUnit)
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9 w-[68px] text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {lengthUnitOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                          {option.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Input
-                                    id={`custom-size-${sizeIndex}-width-min`}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="40"
-                                    value={size.widthMin?.toString() || "0"}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={(e) => {
-                                      const value = e.target.value
-                                      if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "widthMin", 0)
-                                      } else {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "widthMin", Number(value))
-                                      }
-                                    }}
-                                  />
-                                </div>
-                                <div className="flex gap-2">
-                                  <Select
-                                    value={customLengthUnit}
-                                    onValueChange={(value) => {
-                                      const nextUnit = value as "in" | "cm"
-                                      applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
-                                      setUnitSelection(customLengthUnitKey, nextUnit)
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-9 w-[68px] text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {lengthUnitOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                          {option.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Input
-                                    id={`custom-size-${sizeIndex}-width-max`}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="40"
-                                    value={size.widthMax?.toString() || "0"}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={(e) => {
-                                      const value = e.target.value
-                                      if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "widthMax", 0)
-                                      } else {
-                                        updateCustomPalletSize(palletType, "day", sizeIndex, "widthMax", Number(value))
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Height Ranges for this size - shown in tabs below */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label>
-                                Height Range Pricing for {size.lengthMin}-{size.lengthMax} {customLengthUnit} x {size.widthMin}-{size.widthMax} {customLengthUnit}
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addHeightRangeToCustomSize(palletType, "day", sizeIndex)}
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Height Range
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Height ranges for this size will be configured in the pricing period tabs below.
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )
-              })()}
             </div>
           )}
 
@@ -1285,10 +1293,32 @@ export function PalletPricingForm({
                   `${palletPricingIndex}.customSizes.${sizeIndex}.heightRanges.${rangeIndex}.${field}`
                 ]
               }
-              const getSectionError = (section: string) =>
-                sectionErrors[
-                  `${normalizeGoodsType(selectedGoodsType)}|${palletType}|${period}|${section}`
-                ]
+              const getSectionError = (section: string) => {
+                const key = `${normalizeGoodsType(selectedGoodsType)}|${palletType}|${period}|${section}`
+                const error = sectionErrors[key]
+                if (!error) return undefined
+                if (!palletPricing) return error
+                if (section === "customSizes" && palletPricing.customSizes && palletPricing.customSizes.length > 0) {
+                  return undefined
+                }
+                if (section === "heightRanges") {
+                  if (palletType === "custom") {
+                    if (
+                      palletPricing.customSizes &&
+                      palletPricing.customSizes.length > 0 &&
+                      palletPricing.customSizes.every((size) => (size.heightRanges || []).length > 0)
+                    ) {
+                      return undefined
+                    }
+                  } else if ((palletPricing.heightRanges || []).length > 0) {
+                    return undefined
+                  }
+                }
+                if (section === "weightRanges" && (palletPricing.weightRanges || []).length > 0) {
+                  return undefined
+                }
+                return error
+              }
               
               if (!palletPricing) {
                 palletPricing = {
@@ -1318,220 +1348,402 @@ export function PalletPricingForm({
               return (
                 <TabsContent key={period} value={period} className="space-y-4">
                   {/* Stackable/Unstackable Adjustments */}
-                  <div className="space-y-3">
-                    <Label>
-                      Stackable / Unstackable Adjustments <span className="text-destructive">*</span>
-                    </Label>
-                    <div className="grid gap-3 lg:grid-cols-2">
-                      <div className="space-y-2 rounded-lg border p-3">
-                        <Label className="text-xs text-muted-foreground">Stackable</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select
-                            value={palletPricing.stackableAdjustmentType ?? "plus_per_unit"}
-                            onValueChange={(value) =>
-                              updatePalletPricing(palletType, period, {
-                                stackableAdjustmentType: value as "rate" | "plus_per_unit",
-                              })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {adjustmentOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={palletPricing.stackableAdjustmentValue ?? ""}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              updatePalletPricing(palletType, period, {
-                                stackableAdjustmentValue:
-                                  value === "" ? undefined : Number(value),
-                              })
-                            }}
-                          />
+                  {palletType !== "custom" && (
+                    <div className="space-y-3">
+                      <Label>
+                        Stackable / Unstackable Adjustments <span className="text-destructive">*</span>
+                      </Label>
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        <div className="space-y-2 rounded-lg border p-3">
+                          <Label className="text-xs text-muted-foreground">Stackable</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select
+                              value={palletPricing.stackableAdjustmentType ?? "plus_per_unit"}
+                              onValueChange={(value) =>
+                                updatePalletPricing(palletType, period, {
+                                  stackableAdjustmentType: value as "rate" | "plus_per_unit",
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {adjustmentOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={palletPricing.stackableAdjustmentValue ?? ""}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                updatePalletPricing(palletType, period, {
+                                  stackableAdjustmentValue:
+                                    value === "" ? undefined : Number(value),
+                                })
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="space-y-2 rounded-lg border p-3">
-                        <Label className="text-xs text-muted-foreground">Unstackable</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select
-                            value={palletPricing.unstackableAdjustmentType ?? "plus_per_unit"}
-                            onValueChange={(value) =>
-                              updatePalletPricing(palletType, period, {
-                                unstackableAdjustmentType: value as "rate" | "plus_per_unit",
-                              })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {adjustmentOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={palletPricing.unstackableAdjustmentValue ?? ""}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              updatePalletPricing(palletType, period, {
-                                unstackableAdjustmentValue:
-                                  value === "" ? undefined : Number(value),
-                              })
-                            }}
-                          />
+                        <div className="space-y-2 rounded-lg border p-3">
+                          <Label className="text-xs text-muted-foreground">Unstackable</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select
+                              value={palletPricing.unstackableAdjustmentType ?? "plus_per_unit"}
+                              onValueChange={(value) =>
+                                updatePalletPricing(palletType, period, {
+                                  unstackableAdjustmentType: value as "rate" | "plus_per_unit",
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {adjustmentOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={palletPricing.unstackableAdjustmentValue ?? ""}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                updatePalletPricing(palletType, period, {
+                                  unstackableAdjustmentValue:
+                                    value === "" ? undefined : Number(value),
+                                })
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Height Range Pricing */}
-                  {palletType === "custom" && palletPricing.customSizes && palletPricing.customSizes.length > 0 ? (
-                    // For custom pallets: show height ranges per size
+                  {palletType === "custom" ? (
                     <div className="space-y-6">
-                      {palletPricing.customSizes.map((size, sizeIndex) => (
-                        <div key={sizeIndex} className="space-y-2 border rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <Label>
-                              Height Range Pricing for {size.lengthMin}-{size.lengthMax} {customLengthUnit} x{" "}
-                              {size.widthMin}-{size.widthMax} {customLengthUnit}
-                            </Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addHeightRangeToCustomSize(palletType, period, sizeIndex)}
-                              className={getSectionError("heightRanges") ? "border-destructive text-destructive" : ""}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Range
-                            </Button>
-                          </div>
-                          {getSectionError("heightRanges") && (
-                            <p className="text-xs text-destructive">{getSectionError("heightRanges")}</p>
-                          )}
-                          {size.heightRanges && size.heightRanges.length > 0 ? (
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Min Height</TableHead>
-                                  <TableHead>Max Height</TableHead>
-                                  <TableHead>Price per Unit (USD)</TableHead>
-                                  <TableHead className="w-[50px]"></TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {size.heightRanges.map((range, rangeIndex) => (
-                                  <TableRow key={rangeIndex}>
-                                    <TableCell>
-                                      <div className="space-y-1">
-                                        <div className="flex gap-2">
-                                          <Select
-                                            value={customLengthUnit}
-                                            onValueChange={(value) => {
-                                              const nextUnit = value as "in" | "cm"
-                                              applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
-                                              setUnitSelection(customLengthUnitKey, nextUnit)
-                                            }}
-                                          >
-                                            <SelectTrigger className="h-9 w-[68px] text-xs">
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {lengthUnitOptions.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                  {option.label}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            value={range.heightMinCm || ''}
-                                            onFocus={(e) => {
-                                              if (e.target.value === '0') {
-                                                e.target.select()
-                                              }
-                                            }}
-                                            onChange={(e) =>
-                                              updateHeightRangeInCustomSize(
-                                                palletType,
-                                                period,
-                                                sizeIndex,
-                                                rangeIndex,
-                                                "heightMinCm",
-                                                Number(e.target.value) || 0
-                                              )
-                                            }
-                                          />
-                                        </div>
-                                        {(() => {
-                                          const errorKey = getRangeErrorKey(
-                                            "height",
+                      {palletPricing.customSizes && palletPricing.customSizes.length > 0 ? (
+                        palletPricing.customSizes.map((size, sizeIndex) => (
+                          <Card key={sizeIndex} className="border-2">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">Size {sizeIndex + 1}</CardTitle>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeCustomPalletSize(palletType, period, sizeIndex)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                  <Label>Min Length</Label>
+                                  <div className="flex gap-2">
+                                    <Select
+                                      value={customLengthUnit}
+                                      onValueChange={(value) => {
+                                        const nextUnit = value as "in" | "cm"
+                                        applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
+                                        setUnitSelection(customLengthUnitKey, nextUnit)
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 w-[68px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {lengthUnitOptions.map((option) => (
+                                          <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      id={`custom-size-${sizeIndex}-length-min-${period}`}
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="48"
+                                      value={size.lengthMin?.toString() || "0"}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) => {
+                                        const value = e.target.value
+                                        if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "lengthMin", 0)
+                                        } else {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "lengthMin", Number(value))
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <Label>Max Length</Label>
+                                  <div className="flex gap-2">
+                                    <Select
+                                      value={customLengthUnit}
+                                      onValueChange={(value) => {
+                                        const nextUnit = value as "in" | "cm"
+                                        applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
+                                        setUnitSelection(customLengthUnitKey, nextUnit)
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 w-[68px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {lengthUnitOptions.map((option) => (
+                                          <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      id={`custom-size-${sizeIndex}-length-max-${period}`}
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="48"
+                                      value={size.lengthMax?.toString() || "0"}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) => {
+                                        const value = e.target.value
+                                        if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "lengthMax", 0)
+                                        } else {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "lengthMax", Number(value))
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-3">
+                                  <Label>Min Width</Label>
+                                  <div className="flex gap-2">
+                                    <Select
+                                      value={customLengthUnit}
+                                      onValueChange={(value) => {
+                                        const nextUnit = value as "in" | "cm"
+                                        applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
+                                        setUnitSelection(customLengthUnitKey, nextUnit)
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 w-[68px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {lengthUnitOptions.map((option) => (
+                                          <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      id={`custom-size-${sizeIndex}-width-min-${period}`}
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="40"
+                                      value={size.widthMin?.toString() || "0"}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) => {
+                                        const value = e.target.value
+                                        if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "widthMin", 0)
+                                        } else {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "widthMin", Number(value))
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <Label>Max Width</Label>
+                                  <div className="flex gap-2">
+                                    <Select
+                                      value={customLengthUnit}
+                                      onValueChange={(value) => {
+                                        const nextUnit = value as "in" | "cm"
+                                        applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
+                                        setUnitSelection(customLengthUnitKey, nextUnit)
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 w-[68px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {lengthUnitOptions.map((option) => (
+                                          <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      id={`custom-size-${sizeIndex}-width-max-${period}`}
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="40"
+                                      value={size.widthMax?.toString() || "0"}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) => {
+                                        const value = e.target.value
+                                        if (value === "" || value === "-" || isNaN(Number(value)) || Number(value) < 0) {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "widthMax", 0)
+                                        } else {
+                                          updateCustomPalletSize(palletType, period, sizeIndex, "widthMax", Number(value))
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2 rounded-lg border p-3">
+                                <Label className="text-xs text-muted-foreground">
+                                  Stackable / Unstackable Adjustments
+                                </Label>
+                                <div className="grid gap-3 lg:grid-cols-2">
+                                  <div className="space-y-2 rounded-lg border p-3">
+                                    <Label className="text-xs text-muted-foreground">Stackable</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Select
+                                        value={size.stackableAdjustmentType ?? "plus_per_unit"}
+                                        onValueChange={(value) =>
+                                          updateCustomPalletSize(
                                             palletType,
                                             period,
-                                            rangeIndex,
-                                            sizeIndex
+                                            sizeIndex,
+                                            "stackableAdjustmentType",
+                                            value as "rate" | "plus_per_unit"
                                           )
-                                          const errorMessage = rangeErrors[errorKey]
-                                          if (errorMessage) {
-                                            return (
-                                              <p className="text-xs text-destructive">
-                                                {errorMessage}
-                                              </p>
-                                            )
-                                          }
-                                          const prevMax =
-                                            rangeIndex > 0
-                                              ? Number(
-                                                  size.heightRanges?.[rangeIndex - 1]?.heightMaxCm ||
-                                                    size.heightRanges?.[rangeIndex - 1]?.heightMinCm ||
-                                                    0
-                                                )
-                                              : null
-                                          const currentMin = Number(range.heightMinCm || 0)
-                                          if (
-                                            prevMax !== null &&
-                                            Number.isFinite(prevMax) &&
-                                            Number.isFinite(currentMin) &&
-                                            currentMin > 0 &&
-                                            currentMin <= prevMax
-                                          ) {
-                                            return (
-                                              <p className="text-xs text-destructive">
-                                                Min must be &gt; previous max.
-                                              </p>
-                                            )
-                                          }
-                                          return null
-                                        })()}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-1">
-                                        {(() => {
-                                          const serverError = getServerFieldError(
-                                            "heightRanges",
-                                            rangeIndex,
-                                            "heightMaxCm"
+                                        }
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {adjustmentOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                              {option.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={size.stackableAdjustmentValue ?? ""}
+                                        onChange={(e) => {
+                                          const value = e.target.value
+                                          updateCustomPalletSize(
+                                            palletType,
+                                            period,
+                                            sizeIndex,
+                                            "stackableAdjustmentValue",
+                                            value === "" ? "" : Number(value)
                                           )
-                                          return (
-                                            <>
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2 rounded-lg border p-3">
+                                    <Label className="text-xs text-muted-foreground">Unstackable</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Select
+                                        value={size.unstackableAdjustmentType ?? "plus_per_unit"}
+                                        onValueChange={(value) =>
+                                          updateCustomPalletSize(
+                                            palletType,
+                                            period,
+                                            sizeIndex,
+                                            "unstackableAdjustmentType",
+                                            value as "rate" | "plus_per_unit"
+                                          )
+                                        }
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {adjustmentOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                              {option.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={size.unstackableAdjustmentValue ?? ""}
+                                        onChange={(e) => {
+                                          const value = e.target.value
+                                          updateCustomPalletSize(
+                                            palletType,
+                                            period,
+                                            sizeIndex,
+                                            "unstackableAdjustmentValue",
+                                            value === "" ? "" : Number(value)
+                                          )
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label>
+                                    Height Range Pricing for {size.lengthMin}-{size.lengthMax} {customLengthUnit} x{" "}
+                                    {size.widthMin}-{size.widthMax} {customLengthUnit}
+                                  </Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addHeightRangeToCustomSize(palletType, period, sizeIndex)}
+                                    className={getSectionError("heightRanges") ? "border-destructive text-destructive" : ""}
+                                  >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Range
+                                  </Button>
+                                </div>
+                                {getSectionError("heightRanges") && (
+                                  <p className="text-xs text-destructive">{getSectionError("heightRanges")}</p>
+                                )}
+                                {size.heightRanges && size.heightRanges.length > 0 ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Min Height</TableHead>
+                                        <TableHead>Max Height</TableHead>
+                                        <TableHead>Price per Unit (USD)</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {size.heightRanges.map((range, rangeIndex) => (
+                                        <TableRow key={rangeIndex}>
+                                          <TableCell>
+                                            <div className="space-y-1">
                                               <div className="flex gap-2">
                                                 <Select
                                                   value={customLengthUnit}
@@ -1555,104 +1767,451 @@ export function PalletPricingForm({
                                                 <Input
                                                   type="number"
                                                   min="0"
-                                                  value={range.heightMaxCm || ''}
+                                                  value={range.heightMinCm || ""}
                                                   onFocus={(e) => {
-                                                    if (e.target.value === '0') {
+                                                    if (e.target.value === "0") {
                                                       e.target.select()
                                                     }
                                                   }}
                                                   onChange={(e) =>
-                                                    updateHeightRangeInCustomSize(
+                                            updateHeightRangeInCustomSize(
                                                       palletType,
                                                       period,
                                                       sizeIndex,
                                                       rangeIndex,
-                                                      "heightMaxCm",
-                                                      Number(e.target.value) || 0
+                                                      "heightMinCm",
+                                              e.target.value === "" ? undefined : Number(e.target.value)
                                                     )
                                                   }
-                                                  className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
                                                 />
                                               </div>
-                                              {serverError && (
-                                                <p className="text-xs text-destructive">{serverError}</p>
-                                              )}
-                                            </>
-                                          )
-                                        })()}
-                                        {(() => {
-                                          const minValue = Number(range.heightMinCm || 0)
-                                          const maxValue = Number(range.heightMaxCm || 0)
-                                          if (
-                                            Number.isFinite(minValue) &&
-                                            Number.isFinite(maxValue) &&
-                                            maxValue > 0 &&
-                                            minValue > 0 &&
-                                            maxValue < minValue
-                                          ) {
-                                            return (
-                                              <p className="text-xs text-destructive">
-                                                Max must be ≥ Min.
-                                              </p>
-                                            )
-                                          }
-                                          return null
-                                        })()}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                  {(() => {
-                                    const priceError = getCustomRangeError(sizeIndex, rangeIndex, "pricePerUnit")
-                                    return (
-                                      <>
-                                        <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={range.pricePerUnit || ''}
-                                        onFocus={(e) => {
-                                          if (e.target.value === '0') {
-                                            e.target.select()
-                                          }
-                                        }}
-                                        onChange={(e) =>
-                                          updateHeightRangeInCustomSize(
-                                            palletType,
-                                            period,
-                                            sizeIndex,
-                                            rangeIndex,
-                                            "pricePerUnit",
-                                            Number(e.target.value) || 0
-                                          )
-                                        }
-                                        className={priceError ? "border-destructive focus-visible:ring-destructive" : ""}
-                                      />
-                                        {priceError && (
-                                          <p className="text-xs text-destructive">{priceError}</p>
-                                        )}
-                                      </>
-                                    )
-                                  })()}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeHeightRangeFromCustomSize(palletType, period, sizeIndex, rangeIndex)}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">No height ranges added for this size</p>
-                          )}
+                                              {(() => {
+                                                const errorKey = getRangeErrorKey(
+                                                  "height",
+                                                  palletType,
+                                                  period,
+                                                  rangeIndex,
+                                                  sizeIndex
+                                                )
+                                                const errorMessage = rangeErrors[errorKey]
+                                                if (errorMessage) {
+                                                  return (
+                                                    <p className="text-xs text-destructive">
+                                                      {errorMessage}
+                                                    </p>
+                                                  )
+                                                }
+                                                const prevMax =
+                                                  rangeIndex > 0
+                                                    ? Number(
+                                                        size.heightRanges?.[rangeIndex - 1]?.heightMaxCm ||
+                                                          size.heightRanges?.[rangeIndex - 1]?.heightMinCm ||
+                                                          0
+                                                      )
+                                                    : null
+                                                const currentMin = Number(range.heightMinCm || 0)
+                                                if (
+                                                  prevMax !== null &&
+                                                  Number.isFinite(prevMax) &&
+                                                  Number.isFinite(currentMin) &&
+                                                  currentMin > 0 &&
+                                                  currentMin <= prevMax
+                                                ) {
+                                                  return (
+                                                    <p className="text-xs text-destructive">
+                                                      Min must be &gt; previous max.
+                                                    </p>
+                                                  )
+                                                }
+                                                return null
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            <div className="space-y-1">
+                                              {(() => {
+                                                const serverError = getServerFieldError(
+                                                  "heightRanges",
+                                                  rangeIndex,
+                                                  "heightMaxCm"
+                                                )
+                                                return (
+                                                  <>
+                                                    <div className="flex gap-2">
+                                                      <Select
+                                                        value={customLengthUnit}
+                                                        onValueChange={(value) => {
+                                                          const nextUnit = value as "in" | "cm"
+                                                          applyCustomLengthUnit(customLengthUnit as "in" | "cm", nextUnit)
+                                                          setUnitSelection(customLengthUnitKey, nextUnit)
+                                                        }}
+                                                      >
+                                                        <SelectTrigger className="h-9 w-[68px] text-xs">
+                                                          <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                          {lengthUnitOptions.map((option) => (
+                                                            <SelectItem key={option.value} value={option.value}>
+                                                              {option.label}
+                                                            </SelectItem>
+                                                          ))}
+                                                        </SelectContent>
+                                                      </Select>
+                                                      <Input
+                                                        type="number"
+                                                        min="0"
+                                                        value={range.heightMaxCm || ""}
+                                                        onFocus={(e) => {
+                                                          if (e.target.value === "0") {
+                                                            e.target.select()
+                                                          }
+                                                        }}
+                                                        onChange={(e) =>
+                                                          updateHeightRangeInCustomSize(
+                                                            palletType,
+                                                            period,
+                                                            sizeIndex,
+                                                            rangeIndex,
+                                                            "heightMaxCm",
+                                                            e.target.value === "" ? undefined : Number(e.target.value)
+                                                          )
+                                                        }
+                                                        className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                                      />
+                                                    </div>
+                                                    {serverError && (
+                                                      <p className="text-xs text-destructive">{serverError}</p>
+                                                    )}
+                                                  </>
+                                                )
+                                              })()}
+                                              {(() => {
+                                                const minValue = Number(range.heightMinCm || 0)
+                                                const maxValue = Number(range.heightMaxCm || 0)
+                                                if (
+                                                  Number.isFinite(minValue) &&
+                                                  Number.isFinite(maxValue) &&
+                                                  maxValue > 0 &&
+                                                  minValue > 0 &&
+                                                  maxValue < minValue
+                                                ) {
+                                                  return (
+                                                    <p className="text-xs text-destructive">
+                                                      Max must be ≥ Min.
+                                                    </p>
+                                                  )
+                                                }
+                                                return null
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {(() => {
+                                              const priceError = getCustomRangeError(sizeIndex, rangeIndex, "pricePerUnit")
+                                              return (
+                                                <>
+                                                  <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={range.pricePerUnit || ""}
+                                                    onFocus={(e) => {
+                                                      if (e.target.value === "0") {
+                                                        e.target.select()
+                                                      }
+                                                    }}
+                                                    onChange={(e) =>
+                                                    updateHeightRangeInCustomSize(
+                                                        palletType,
+                                                        period,
+                                                        sizeIndex,
+                                                        rangeIndex,
+                                                        "pricePerUnit",
+                                                      e.target.value === "" ? undefined : Number(e.target.value)
+                                                      )
+                                                    }
+                                                    className={priceError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                                  />
+                                                  {priceError && (
+                                                    <p className="text-xs text-destructive">{priceError}</p>
+                                                  )}
+                                                </>
+                                              )
+                                            })()}
+                                          </TableCell>
+                                          <TableCell>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={() =>
+                                                removeHeightRangeFromCustomSize(palletType, period, sizeIndex, rangeIndex)
+                                              }
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No height ranges added for this size</p>
+                                )}
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label>Weight Range Pricing ({weightUnitLabel} per pallet)</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addWeightRange(palletType, period)}
+                                    className={getSectionError("weightRanges") ? "border-destructive text-destructive" : ""}
+                                  >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Range
+                                  </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  Weight ranges apply to all custom sizes for this goods type.
+                                </p>
+                                {getSectionError("weightRanges") && (
+                                  <p className="text-xs text-destructive">{getSectionError("weightRanges")}</p>
+                                )}
+                                {palletPricing.weightRanges && palletPricing.weightRanges.length > 0 ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Min Weight</TableHead>
+                                        <TableHead>Max Weight</TableHead>
+                                        <TableHead>Price per Pallet (USD)</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {palletPricing.weightRanges.map((range, rangeIndex) => (
+                                        <TableRow key={rangeIndex}>
+                                          <TableCell>
+                                            <div className="space-y-1">
+                                              <div className="flex gap-2">
+                                                <Select
+                                                  value={customWeightUnit}
+                                                  onValueChange={(value) => {
+                                                    const nextUnit = value as "lbs" | "kg"
+                                                    applyCustomWeightUnit(customWeightUnit as "lbs" | "kg", nextUnit)
+                                                    setUnitSelection(customWeightUnitKey, nextUnit)
+                                                  }}
+                                                >
+                                                  <SelectTrigger className="h-9 w-[68px] text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {weightUnitOptions.map((option) => (
+                                                      <SelectItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                                <Input
+                                                  type="number"
+                                                  min="0"
+                                                  value={range.weightMinKg || ""}
+                                                  onFocus={(e) => {
+                                                    if (e.target.value === "0") {
+                                                      e.target.select()
+                                                    }
+                                                  }}
+                                                  onChange={(e) =>
+                                          updateWeightRange(
+                                                      palletType,
+                                                      period,
+                                                      rangeIndex,
+                                                      "weightMinKg",
+                                            e.target.value === "" ? undefined : Number(e.target.value)
+                                                    )
+                                                  }
+                                                />
+                                              </div>
+                                              {(() => {
+                                                const errorKey = getRangeErrorKey(
+                                                  "weight",
+                                                  palletType,
+                                                  period,
+                                                  rangeIndex
+                                                )
+                                                const errorMessage = rangeErrors[errorKey]
+                                                if (errorMessage) {
+                                                  return <p className="text-xs text-destructive">{errorMessage}</p>
+                                                }
+                                                const prevMax =
+                                                  rangeIndex > 0
+                                                    ? Number(
+                                                        palletPricing.weightRanges?.[rangeIndex - 1]?.weightMaxKg ||
+                                                          palletPricing.weightRanges?.[rangeIndex - 1]?.weightMinKg ||
+                                                          0
+                                                      )
+                                                    : null
+                                                const currentMin = Number(range.weightMinKg || 0)
+                                                if (
+                                                  prevMax !== null &&
+                                                  Number.isFinite(prevMax) &&
+                                                  Number.isFinite(currentMin) &&
+                                                  currentMin > 0 &&
+                                                  currentMin <= prevMax
+                                                ) {
+                                                  return (
+                                                    <p className="text-xs text-destructive">
+                                                      Min must be &gt; previous max.
+                                                    </p>
+                                                  )
+                                                }
+                                                return null
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            <div className="space-y-1">
+                                              {(() => {
+                                                const serverError = getServerFieldError(
+                                                  "weightRanges",
+                                                  rangeIndex,
+                                                  "weightMaxKg"
+                                                )
+                                                return (
+                                                  <>
+                                                    <div className="flex gap-2">
+                                                      <Select
+                                                        value={customWeightUnit}
+                                                        onValueChange={(value) => {
+                                                          const nextUnit = value as "lbs" | "kg"
+                                                          applyCustomWeightUnit(customWeightUnit as "lbs" | "kg", nextUnit)
+                                                          setUnitSelection(customWeightUnitKey, nextUnit)
+                                                        }}
+                                                      >
+                                                        <SelectTrigger className="h-9 w-[68px] text-xs">
+                                                          <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                          {weightUnitOptions.map((option) => (
+                                                            <SelectItem key={option.value} value={option.value}>
+                                                              {option.label}
+                                                            </SelectItem>
+                                                          ))}
+                                                        </SelectContent>
+                                                      </Select>
+                                                      <Input
+                                                        type="number"
+                                                        min="0"
+                                                        value={range.weightMaxKg || ""}
+                                                        onFocus={(e) => {
+                                                          if (e.target.value === "0") {
+                                                            e.target.select()
+                                                          }
+                                                        }}
+                                                        onChange={(e) =>
+                                                          updateWeightRange(
+                                                            palletType,
+                                                            period,
+                                                            rangeIndex,
+                                                            "weightMaxKg",
+                                                            e.target.value === "" ? undefined : Number(e.target.value)
+                                                          )
+                                                        }
+                                                        className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                                      />
+                                                    </div>
+                                                    {serverError && (
+                                                      <p className="text-xs text-destructive">{serverError}</p>
+                                                    )}
+                                                  </>
+                                                )
+                                              })()}
+                                              {(() => {
+                                                const minValue = Number(range.weightMinKg || 0)
+                                                const maxValue = Number(range.weightMaxKg || 0)
+                                                if (
+                                                  Number.isFinite(minValue) &&
+                                                  Number.isFinite(maxValue) &&
+                                                  maxValue > 0 &&
+                                                  minValue > 0 &&
+                                                  maxValue < minValue
+                                                ) {
+                                                  return (
+                                                    <p className="text-xs text-destructive">
+                                                      Max must be ≥ Min.
+                                                    </p>
+                                                  )
+                                                }
+                                                return null
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {(() => {
+                                              const priceError = getServerFieldError(
+                                                "weightRanges",
+                                                rangeIndex,
+                                                "pricePerPallet"
+                                              )
+                                              return (
+                                                <>
+                                                  <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={range.pricePerPallet || ""}
+                                                    onFocus={(e) => {
+                                                      if (e.target.value === "0") {
+                                                        e.target.select()
+                                                      }
+                                                    }}
+                                                    onChange={(e) =>
+                                                    updateWeightRange(
+                                                        palletType,
+                                                        period,
+                                                        rangeIndex,
+                                                        "pricePerPallet",
+                                                      e.target.value === "" ? undefined : Number(e.target.value)
+                                                      )
+                                                    }
+                                                    className={priceError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                                  />
+                                                  {priceError && (
+                                                    <p className="text-xs text-destructive">{priceError}</p>
+                                                  )}
+                                                </>
+                                              )
+                                            })()}
+                                          </TableCell>
+                                          <TableCell>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={() => removeWeightRange(palletType, period, rangeIndex)}
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No weight ranges added yet</p>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-lg text-center">
+                          No custom pallet sizes added yet. Click "Add Size" to add a new size.
                         </div>
-                      ))}
+                      )}
                     </div>
                   ) : (
                     // For euro/standard pallets: show regular height ranges
@@ -1703,7 +2262,7 @@ export function PalletPricingForm({
                                         period,
                                         index,
                                         "heightMinCm",
-                                        Number(e.target.value) || 0
+                                        e.target.value === "" ? undefined : Number(e.target.value)
                                       )
                                     }
                                     />
@@ -1773,7 +2332,7 @@ export function PalletPricingForm({
                                                 period,
                                                 index,
                                                 "heightMaxCm",
-                                                Number(e.target.value) || 0
+                                                e.target.value === "" ? undefined : Number(e.target.value)
                                               )
                                             }
                                             className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
@@ -1829,7 +2388,7 @@ export function PalletPricingForm({
                                               period,
                                               index,
                                               "pricePerUnit",
-                                              Number(e.target.value) || 0
+                                              e.target.value === "" ? undefined : Number(e.target.value)
                                             )
                                           }
                                           className={priceError ? "border-destructive focus-visible:ring-destructive" : ""}
@@ -1862,10 +2421,11 @@ export function PalletPricingForm({
                   )}
 
                   {/* Weight Range Pricing */}
-                  <div className="space-y-2">
+                  {palletType !== "custom" && (
+                    <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>
-                        Weight Range Pricing ({palletType === "custom" ? customWeightUnit : weightUnitLabel} per pallet)
+                        Weight Range Pricing ({weightUnitLabel} per pallet)
                       </Label>
                       <Button
                         type="button"
@@ -1885,12 +2445,8 @@ export function PalletPricingForm({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>
-                              {palletType === "custom" ? "Min Weight" : `Min Weight (${weightUnitLabel})`}
-                            </TableHead>
-                            <TableHead>
-                              {palletType === "custom" ? "Max Weight" : `Max Weight (${weightUnitLabel})`}
-                            </TableHead>
+                            <TableHead>Min Weight ({weightUnitLabel})</TableHead>
+                            <TableHead>Max Weight ({weightUnitLabel})</TableHead>
                             <TableHead>Price per Pallet (USD)</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
@@ -1900,70 +2456,26 @@ export function PalletPricingForm({
                             <TableRow key={index}>
                               <TableCell>
                                 <div className="space-y-1">
-                                  {palletType === "custom" ? (
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={customWeightUnit}
-                                        onValueChange={(value) => {
-                                          const nextUnit = value as "lbs" | "kg"
-                                          applyCustomWeightUnit(customWeightUnit as "lbs" | "kg", nextUnit)
-                                          setUnitSelection(customWeightUnitKey, nextUnit)
-                                        }}
-                                      >
-                                        <SelectTrigger className="h-9 w-[68px] text-xs">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {weightUnitOptions.map((option) => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                              {option.label}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={range.weightMinKg || ''}
-                                        onFocus={(e) => {
-                                          if (e.target.value === '0') {
-                                            e.target.select()
-                                          }
-                                        }}
-                                        onChange={(e) =>
-                                          updateWeightRange(
-                                            palletType,
-                                            period,
-                                            index,
-                                            "weightMinKg",
-                                            Number(e.target.value) || 0
-                                          )
-                                        }
-                                      />
-                                    </div>
-                                  ) : (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={range.weightMinKg || ''}
-                                      onFocus={(e) => {
-                                        if (e.target.value === '0') {
-                                          e.target.select()
-                                        }
-                                      }}
-                                      onChange={(e) =>
-                                        updateWeightRange(
-                                          palletType,
-                                          period,
-                                          index,
-                                          "weightMinKg",
-                                          Number(e.target.value) || 0
-                                        )
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={range.weightMinKg || ""}
+                                    onFocus={(e) => {
+                                      if (e.target.value === "0") {
+                                        e.target.select()
                                       }
-                                    />
-                                  )}
+                                    }}
+                                    onChange={(e) =>
+                                      updateWeightRange(
+                                        palletType,
+                                        period,
+                                        index,
+                                        "weightMinKg",
+                                        e.target.value === "" ? undefined : Number(e.target.value)
+                                      )
+                                    }
+                                  />
                                   {(() => {
                                     const errorKey = getRangeErrorKey(
                                       "weight",
@@ -2015,72 +2527,27 @@ export function PalletPricingForm({
                                     )
                                     return (
                                       <>
-                                        {palletType === "custom" ? (
-                                          <div className="flex gap-2">
-                                            <Select
-                                              value={customWeightUnit}
-                                              onValueChange={(value) => {
-                                                const nextUnit = value as "lbs" | "kg"
-                                                applyCustomWeightUnit(customWeightUnit as "lbs" | "kg", nextUnit)
-                                                setUnitSelection(customWeightUnitKey, nextUnit)
-                                              }}
-                                            >
-                                              <SelectTrigger className="h-9 w-[68px] text-xs">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {weightUnitOptions.map((option) => (
-                                                  <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                  </SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                            <Input
-                                              type="number"
-                                              min="0"
-                                              step="0.01"
-                                              value={range.weightMaxKg || ''}
-                                              onFocus={(e) => {
-                                                if (e.target.value === '0') {
-                                                  e.target.select()
-                                                }
-                                              }}
-                                              onChange={(e) =>
-                                                updateWeightRange(
-                                                  palletType,
-                                                  period,
-                                                  index,
-                                                  "weightMaxKg",
-                                                  Number(e.target.value) || 0
-                                                )
-                                              }
-                                              className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
-                                            />
-                                          </div>
-                                        ) : (
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={range.weightMaxKg || ''}
-                                            onFocus={(e) => {
-                                              if (e.target.value === '0') {
-                                                e.target.select()
-                                              }
-                                            }}
-                                            onChange={(e) =>
-                                              updateWeightRange(
-                                                palletType,
-                                                period,
-                                                index,
-                                                "weightMaxKg",
-                                                Number(e.target.value) || 0
-                                              )
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={range.weightMaxKg || ""}
+                                          onFocus={(e) => {
+                                            if (e.target.value === "0") {
+                                              e.target.select()
                                             }
-                                            className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
-                                          />
-                                        )}
+                                          }}
+                                          onChange={(e) =>
+                                            updateWeightRange(
+                                              palletType,
+                                              period,
+                                              index,
+                                              "weightMaxKg",
+                                              e.target.value === "" ? undefined : Number(e.target.value)
+                                            )
+                                          }
+                                          className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                        />
                                         {serverError && (
                                           <p className="text-xs text-destructive">{serverError}</p>
                                         )}
@@ -2132,7 +2599,7 @@ export function PalletPricingForm({
                                             period,
                                             index,
                                             "pricePerPallet",
-                                            Number(e.target.value) || 0
+                                            e.target.value === "" ? undefined : Number(e.target.value)
                                           )
                                         }
                                         className={priceError ? "border-destructive focus-visible:ring-destructive" : ""}
@@ -2161,7 +2628,8 @@ export function PalletPricingForm({
                     ) : (
                       <p className="text-sm text-muted-foreground">No weight ranges added</p>
                     )}
-                  </div>
+                    </div>
+                  )}
                 </TabsContent>
               )
             })}
@@ -2185,18 +2653,25 @@ export function PalletPricingForm({
 
       <div className="space-y-2">
         <Label>Goods Type</Label>
-        <Select value={normalizeGoodsType(selectedGoodsType)} onValueChange={setSelectedGoodsType}>
-          <SelectTrigger className="sm:w-64">
-            <SelectValue placeholder="Select goods type" />
-          </SelectTrigger>
-          <SelectContent>
-            {goodsTypeOptions.map((type) => (
-              <SelectItem key={type} value={type}>
-                {formatGoodsType(type)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={normalizeGoodsType(selectedGoodsType)} onValueChange={setSelectedGoodsType}>
+            <SelectTrigger className="sm:w-64">
+              <SelectValue placeholder="Select goods type" />
+            </SelectTrigger>
+            <SelectContent>
+              {goodsTypeOptions.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {formatGoodsType(type)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {goodsTypeOptions.length > 1 && (
+            <Button type="button" variant="outline" size="sm" onClick={applyPricingToAllGoodsTypes}>
+              Apply for all goods types
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">
