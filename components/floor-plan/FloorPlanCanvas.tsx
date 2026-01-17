@@ -95,6 +95,22 @@ interface PlacedItem extends CatalogItem {
   y: number
   rotation: number
   instanceId: number
+  
+  // Item type classification
+  type?: 'rack' | 'zone' | 'equipment' | 'door' | 'pallet'
+  
+  // 3D height (feet)
+  height?: number
+  
+  // Rack-specific properties
+  beamLevels?: number
+  bayWidth?: number
+  palletPositions?: number
+  aisleWidth?: number
+  
+  // Custom properties
+  customLabel?: string
+  notes?: string
 }
 
 interface Vertex {
@@ -186,6 +202,19 @@ export default function FloorPlanCanvas({
   const [selectedVertexIdx, setSelectedVertexIdx] = useState<number | null>(null)
   const [isDraggingVertex, setIsDraggingVertex] = useState(false)
   const [wallToolbarPos, setWallToolbarPos] = useState({ x: 0, y: 0 })
+  
+  // Right-click context menu
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean
+    x: number
+    y: number
+    itemIndex: number | null
+  }>({ visible: false, x: 0, y: 0, itemIndex: null })
+  
+  // Edit dimensions modal
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<PlacedItem | null>(null)
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null)
   
   // 3D wall height (ft)
   const [wallHeight, setWallHeight] = useState(initialWallHeight || 20)
@@ -307,6 +336,51 @@ export default function FloorPlanCanvas({
   const totalArea = calcArea()
   const utilization = totalArea > 0 ? ((equipArea / totalArea) * 100).toFixed(1) : '0'
   const totalPallets = items.reduce((sum, item) => sum + (item.pallets || 0), 0)
+  
+  // Determine item type from name/id
+  const getItemType = useCallback((item: PlacedItem): PlacedItem['type'] => {
+    if (item.type) return item.type
+    const name = item.name.toLowerCase()
+    const id = item.id?.toLowerCase() || ''
+    
+    if (name.includes('rack') || id.includes('rack') || name.includes('cantilever')) return 'rack'
+    if (name.includes('door') || name.includes('exit') || name.includes('window') || item.wallItem) return 'door'
+    if (name.includes('pallet') || id.includes('pallet')) return 'pallet'
+    if (name.includes('office') || name.includes('room') || name.includes('area') || 
+        name.includes('zone') || name.includes('station') || name.includes('restroom')) return 'zone'
+    return 'equipment'
+  }, [])
+  
+  // Calculate pallets for rack items
+  const calculatePallets = useCallback((item: PlacedItem): number => {
+    const type = getItemType(item)
+    if (type !== 'rack') return item.pallets || 0
+    
+    const levels = item.beamLevels || 4
+    const bayWidth = item.bayWidth || 8
+    const palletsPerLevel = item.palletPositions || Math.max(1, Math.floor(item.w / bayWidth) * 3)
+    
+    return levels * palletsPerLevel
+  }, [getItemType])
+  
+  // Validate item dimensions
+  const validateDimensions = useCallback((item: PlacedItem): string[] => {
+    const errors: string[] = []
+    const type = getItemType(item)
+    
+    if (item.w < 1) errors.push('Width must be at least 1 ft')
+    if (item.h < 1) errors.push('Depth must be at least 1 ft')
+    if (item.w > 100) errors.push('Width cannot exceed 100 ft')
+    if (item.h > 100) errors.push('Depth cannot exceed 100 ft')
+    
+    if (type === 'rack') {
+      if ((item.height || 16) > 40) errors.push('Rack height cannot exceed 40 ft')
+      if ((item.beamLevels || 4) > 10) errors.push('Maximum 10 beam levels')
+      if ((item.aisleWidth || 12) < 8) errors.push('Aisle width should be at least 8 ft for forklifts')
+    }
+    
+    return errors
+  }, [getItemType])
   
   // Check if point is inside polygon
   const isPointInPolygon = useCallback((point: { x: number; y: number }, polygon: Vertex[]): boolean => {
@@ -600,16 +674,17 @@ export default function FloorPlanCanvas({
       ctx.lineWidth = (selectedItem === idx ? 3 : 1) / zoom
       ctx.strokeRect(x, y, w, h)
       
-      // Item label
+      // Item label (use customLabel if available)
+      const displayName = item.customLabel || item.name
       ctx.font = `bold ${11 / zoom}px Inter, Arial, sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       
       // Text shadow
       ctx.fillStyle = 'rgba(0,0,0,0.5)'
-      ctx.fillText(item.name, x + w/2 + 1/zoom, y + h/2 + 1/zoom)
+      ctx.fillText(displayName, x + w/2 + 1/zoom, y + h/2 + 1/zoom)
       ctx.fillStyle = '#fff'
-      ctx.fillText(item.name, x + w/2, y + h/2)
+      ctx.fillText(displayName, x + w/2, y + h/2)
       
       if (item.pallets > 0) {
         ctx.font = `${10 / zoom}px Inter, Arial, sans-serif`
@@ -792,6 +867,142 @@ export default function FloorPlanCanvas({
     setSelectedVertexIdx(null)
     setIsDraggingVertex(false)
   }, [])
+  
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (contextMenu.visible) {
+        setContextMenu(prev => ({ ...prev, visible: false }))
+      }
+    }
+    window.addEventListener('click', handleGlobalClick)
+    return () => window.removeEventListener('click', handleGlobalClick)
+  }, [contextMenu.visible])
+  
+  // Handle right-click on canvas
+  const handleCanvasContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    
+    const pos = getGridPos(e)
+    
+    // Check if right-clicked on an item
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i]
+      if (pos.x >= item.x && pos.x < item.x + item.w &&
+          pos.y >= item.y && pos.y < item.y + item.h) {
+        setContextMenu({
+          visible: true,
+          x: e.clientX,
+          y: e.clientY,
+          itemIndex: i
+        })
+        setSelectedItem(i)
+        return
+      }
+    }
+    
+    // Right-clicked on empty space - hide menu
+    setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+  }, [items, getGridPos])
+  
+  // Open edit modal for item
+  const openEditModal = useCallback((itemIndex: number) => {
+    const item = items[itemIndex]
+    if (!item) return
+    
+    // Ensure item has a type
+    const itemWithType = {
+      ...item,
+      type: getItemType(item),
+      height: item.height || (getItemType(item) === 'rack' ? 16 : 4),
+      beamLevels: item.beamLevels || 4,
+      bayWidth: item.bayWidth || 8,
+      palletPositions: item.palletPositions || 3,
+      aisleWidth: item.aisleWidth || 12
+    }
+    
+    setEditingItem(itemWithType as PlacedItem)
+    setEditingItemIndex(itemIndex)
+    setEditModalOpen(true)
+    setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+  }, [items, getItemType])
+  
+  // Save edited item
+  const saveEditedItem = useCallback(() => {
+    if (editingItem === null || editingItemIndex === null) return
+    
+    // Validate
+    const errors = validateDimensions(editingItem)
+    if (errors.length > 0) {
+      toast({ title: errors[0], variant: 'destructive' })
+      return
+    }
+    
+    // Recalculate pallets for racks
+    const updatedItem = {
+      ...editingItem,
+      pallets: calculatePallets(editingItem)
+    }
+    
+    const newItems = [...items]
+    newItems[editingItemIndex] = updatedItem
+    setItems(newItems)
+    saveToHistory(vertices, newItems)
+    
+    setEditModalOpen(false)
+    setEditingItem(null)
+    setEditingItemIndex(null)
+    
+    toast({ title: 'Item updated!', variant: 'success' })
+  }, [editingItem, editingItemIndex, items, vertices, saveToHistory, validateDimensions, calculatePallets, toast])
+  
+  // Context menu actions
+  const contextMenuDuplicate = useCallback(() => {
+    if (contextMenu.itemIndex === null) return
+    const item = items[contextMenu.itemIndex]
+    if (!item) return
+    
+    const newItem: PlacedItem = {
+      ...item,
+      instanceId: Date.now(),
+      x: item.x + 2,
+      y: item.y + 2,
+      customLabel: item.customLabel ? `${item.customLabel} (Copy)` : undefined
+    }
+    
+    const newItems = [...items, newItem]
+    setItems(newItems)
+    setSelectedItem(newItems.length - 1)
+    saveToHistory(vertices, newItems)
+    setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+  }, [contextMenu.itemIndex, items, vertices, saveToHistory])
+  
+  const contextMenuRotate = useCallback(() => {
+    if (contextMenu.itemIndex === null) return
+    const item = items[contextMenu.itemIndex]
+    if (!item) return
+    
+    const newItems = [...items]
+    newItems[contextMenu.itemIndex] = {
+      ...item,
+      w: item.h,
+      h: item.w,
+      rotation: ((item.rotation || 0) + 90) % 360
+    }
+    setItems(newItems)
+    saveToHistory(vertices, newItems)
+    setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+  }, [contextMenu.itemIndex, items, vertices, saveToHistory])
+  
+  const contextMenuDelete = useCallback(() => {
+    if (contextMenu.itemIndex === null) return
+    
+    const newItems = items.filter((_, i) => i !== contextMenu.itemIndex)
+    setItems(newItems)
+    setSelectedItem(null)
+    saveToHistory(vertices, newItems)
+    setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+  }, [contextMenu.itemIndex, items, vertices, saveToHistory])
   
   // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1320,8 +1531,18 @@ export default function FloorPlanCanvas({
       // Ignore if typing in input
       if (e.target instanceof HTMLInputElement) return
       
-      // Escape key - exit wall edit mode
+      // Escape key - close modal or exit wall edit mode
       if (e.key === 'Escape') {
+        if (editModalOpen) {
+          setEditModalOpen(false)
+          setEditingItem(null)
+          setEditingItemIndex(null)
+          return
+        }
+        if (contextMenu.visible) {
+          setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+          return
+        }
         if (wallEditMode) {
           exitWallEditMode()
         }
@@ -1364,7 +1585,7 @@ export default function FloorPlanCanvas({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem, selectedOpening, deleteSelected, rotateSelected, duplicateSelected, undo, redo, wallEditMode, selectedVertexIdx, deleteVertex, exitWallEditMode])
+  }, [selectedItem, selectedOpening, deleteSelected, rotateSelected, duplicateSelected, undo, redo, wallEditMode, selectedVertexIdx, deleteVertex, exitWallEditMode, editModalOpen, contextMenu.visible])
 
   // Loading state
   return (
@@ -1564,7 +1785,7 @@ export default function FloorPlanCanvas({
                 onMouseLeave={handleMouseUp}
                 onDoubleClick={handleDoubleClick}
                 onWheel={handleWheel}
-                onContextMenu={(e) => e.preventDefault()}
+                onContextMenu={handleCanvasContextMenu}
               />
               
               {/* Wall Edit Popup */}
@@ -1681,6 +1902,252 @@ export default function FloorPlanCanvas({
                   <span className="animate-pulse">🏗️</span>
                   <span className="font-medium">Wall Edit Mode</span>
                   <span className="text-purple-200 text-sm">• Click vertices or walls to select</span>
+                </div>
+              )}
+              
+              {/* Right-Click Context Menu */}
+              {contextMenu.visible && contextMenu.itemIndex !== null && (
+                <div 
+                  className="fixed bg-slate-800 rounded-lg shadow-2xl border border-slate-600 py-1 z-50 min-w-[180px]"
+                  style={{ left: contextMenu.x, top: contextMenu.y }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => openEditModal(contextMenu.itemIndex!)}
+                    className="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-3 text-sm"
+                  >
+                    <span>📐</span> Edit Dimensions
+                  </button>
+                  <button
+                    onClick={contextMenuDuplicate}
+                    className="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-3 text-sm"
+                  >
+                    <span>📋</span> Duplicate
+                  </button>
+                  <button
+                    onClick={contextMenuRotate}
+                    className="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-3 text-sm"
+                  >
+                    <span>🔄</span> Rotate 90°
+                  </button>
+                  <div className="border-t border-slate-600 my-1" />
+                  <button
+                    onClick={contextMenuDelete}
+                    className="w-full px-4 py-2 text-left hover:bg-red-600 text-red-400 hover:text-white flex items-center gap-3 text-sm"
+                  >
+                    <span>🗑️</span> Delete
+                  </button>
+                </div>
+              )}
+              
+              {/* Edit Dimensions Modal */}
+              {editModalOpen && editingItem && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditModalOpen(false)}>
+                  <div 
+                    className="bg-slate-800 rounded-xl shadow-2xl border border-slate-600 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-slate-600">
+                      <h2 className="text-lg font-bold flex items-center gap-2">
+                        <span>📐</span>
+                        Edit: {editingItem.customLabel || editingItem.name}
+                      </h2>
+                      <button 
+                        onClick={() => setEditModalOpen(false)}
+                        className="text-slate-400 hover:text-white p-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    {/* Modal Body */}
+                    <div className="p-4 space-y-6">
+                      {/* Dimensions */}
+                      <div>
+                        <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                          <span>📏</span> Dimensions
+                        </h3>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-xs text-slate-500 block mb-1">Width (ft)</label>
+                            <input
+                              type="number"
+                              value={editingItem.w}
+                              onChange={(e) => setEditingItem(prev => prev ? { ...prev, w: Number(e.target.value) || 1 } : null)}
+                              min="1"
+                              max="100"
+                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 block mb-1">Depth (ft)</label>
+                            <input
+                              type="number"
+                              value={editingItem.h}
+                              onChange={(e) => setEditingItem(prev => prev ? { ...prev, h: Number(e.target.value) || 1 } : null)}
+                              min="1"
+                              max="100"
+                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 block mb-1">Height (ft)</label>
+                            <input
+                              type="number"
+                              value={editingItem.height || (getItemType(editingItem) === 'rack' ? 16 : 4)}
+                              onChange={(e) => setEditingItem(prev => prev ? { ...prev, height: Number(e.target.value) || 4 } : null)}
+                              min="1"
+                              max="40"
+                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Rack Configuration (only for racks) */}
+                      {getItemType(editingItem) === 'rack' && (
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                            <span>🏗️</span> Rack Configuration
+                          </h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Beam Levels</label>
+                              <input
+                                type="number"
+                                value={editingItem.beamLevels || 4}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, beamLevels: Number(e.target.value) || 1 } : null)}
+                                min="1"
+                                max="10"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Bay Width (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.bayWidth || 8}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, bayWidth: Number(e.target.value) || 4 } : null)}
+                                min="4"
+                                max="16"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Pallets/Level</label>
+                              <input
+                                type="number"
+                                value={editingItem.palletPositions || 3}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, palletPositions: Number(e.target.value) || 1 } : null)}
+                                min="1"
+                                max="20"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Aisle Width (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.aisleWidth || 12}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, aisleWidth: Number(e.target.value) || 8 } : null)}
+                                min="8"
+                                max="20"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Calculated Values */}
+                          <div className="mt-4 p-3 bg-slate-900 rounded-lg grid grid-cols-2 gap-3 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">📦 Pallet Capacity:</span>
+                              <span className="font-bold text-green-400">{calculatePallets(editingItem)} pallets</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">📐 Footprint:</span>
+                              <span className="font-bold">{editingItem.w * editingItem.h} sq ft</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Appearance */}
+                      <div>
+                        <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                          <span>🎨</span> Appearance
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-slate-500 block mb-1">Color</label>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="color"
+                                value={editingItem.color}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, color: e.target.value } : null)}
+                                className="w-10 h-10 rounded border border-slate-600 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={editingItem.color}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, color: e.target.value } : null)}
+                                className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm font-mono focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 block mb-1">Custom Label</label>
+                            <input
+                              type="text"
+                              value={editingItem.customLabel || ''}
+                              onChange={(e) => setEditingItem(prev => prev ? { ...prev, customLabel: e.target.value || undefined } : null)}
+                              placeholder={editingItem.name}
+                              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Notes */}
+                      <div>
+                        <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                          <span>📝</span> Notes
+                        </h3>
+                        <textarea
+                          value={editingItem.notes || ''}
+                          onChange={(e) => setEditingItem(prev => prev ? { ...prev, notes: e.target.value || undefined } : null)}
+                          placeholder="Add notes about this item..."
+                          rows={3}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white resize-none focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      
+                      {/* Quick Info */}
+                      <div className="p-3 bg-slate-900/50 rounded-lg text-xs text-slate-400 flex items-center gap-4">
+                        <span>Type: <span className="text-white capitalize">{getItemType(editingItem)}</span></span>
+                        <span>•</span>
+                        <span>Position: ({editingItem.x}, {editingItem.y})</span>
+                        <span>•</span>
+                        <span>Rotation: {editingItem.rotation || 0}°</span>
+                      </div>
+                    </div>
+                    
+                    {/* Modal Footer */}
+                    <div className="flex justify-end gap-3 p-4 border-t border-slate-600">
+                      <button
+                        onClick={() => setEditModalOpen(false)}
+                        className="px-4 py-2 bg-slate-600 rounded hover:bg-slate-500 font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveEditedItem}
+                        className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 font-medium"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </>
