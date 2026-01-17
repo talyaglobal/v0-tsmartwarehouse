@@ -17,12 +17,19 @@ import { formatDate } from "@/lib/utils/format"
 import type { Notification, NotificationType } from "@/types"
 import { Button } from "@/components/ui/button"
 
-const notificationIcons: Record<NotificationType, React.ElementType> = {
+type IconComponent = React.ComponentType<{ className?: string }>
+
+const notificationIcons: Record<string, IconComponent> = {
   booking: Package,
   invoice: FileText,
   task: CheckCircle,
   incident: AlertCircle,
   system: Bell,
+}
+
+// Get icon with fallback
+function getNotificationIcon(type: NotificationType | string): IconComponent {
+  return notificationIcons[type] || Bell
 }
 
 // Get navigation URL based on notification type
@@ -92,7 +99,7 @@ export default function NotificationsPage() {
             <CardContent className="space-y-4">
               {notifications.length > 0 ? (
                 notifications.map((notification) => {
-                  const Icon = notificationIcons[notification.type]
+                  const Icon = getNotificationIcon(notification.type)
                   return (
                     <div
                       key={notification.id}
@@ -142,7 +149,7 @@ export default function NotificationsPage() {
               {unreadNotifications.length > 0 ? (
                 <div className="space-y-4">
                   {unreadNotifications.map((notification) => {
-                      const Icon = notificationIcons[notification.type]
+                      const Icon = getNotificationIcon(notification.type)
                       return (
                         <div
                           key={notification.id}

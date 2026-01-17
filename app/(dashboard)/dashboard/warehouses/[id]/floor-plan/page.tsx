@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -31,37 +31,6 @@ export default function WarehouseFloorPlanPage() {
     load()
   }, [warehouseId])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleSave = useCallback(async (data: any) => {
-    // Convert floor plan data to API format
-    const minX = Math.min(...data.vertices.map((v: { x: number }) => v.x))
-    const maxX = Math.max(...data.vertices.map((v: { x: number }) => v.x))
-    const minY = Math.min(...data.vertices.map((v: { y: number }) => v.y))
-    const maxY = Math.max(...data.vertices.map((v: { y: number }) => v.y))
-    
-    // Convert feet to meters (1 ft = 0.3048 m)
-    const ftToMeters = (ft: number) => ft * 0.3048
-    
-    const floorPlanPayload = {
-      name: "Main Floor",
-      floor_level: 0,
-      floor_number: 1,
-      length_m: ftToMeters(maxX - minX),
-      width_m: ftToMeters(maxY - minY),
-      height_m: 8.5, // Default ceiling height in meters
-      outline_points: data.vertices.map((v: { x: number; y: number }) => ({ x: v.x, y: v.y })),
-      items: data.items,
-      total_area_sqft: data.totalArea,
-      equipment_area_sqft: data.equipmentArea,
-      pallet_capacity: data.palletCapacity,
-    }
-    
-    await api.post(`/api/v1/warehouses/${warehouseId}/floors`, [floorPlanPayload], {
-      successMessage: "Floor plan saved successfully.",
-      errorMessage: "Failed to save floor plan.",
-    })
-  }, [warehouseId])
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -84,7 +53,10 @@ export default function WarehouseFloorPlanPage() {
           <div className="text-muted-foreground">Loading floor plan editor...</div>
         </div>
       ) : (
-        <FloorPlanCanvas onSave={handleSave} />
+        <FloorPlanCanvas 
+          warehouseId={warehouseId}
+          warehouseName={warehouse?.name || 'Warehouse'}
+        />
       )}
     </div>
   )
