@@ -4,10 +4,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
-interface Vertex { 
-  x: number
-  y: number 
-}
+interface Vertex { x: number; y: number }
 
 interface PlacedItem {
   instanceId: number
@@ -36,252 +33,482 @@ interface Props {
   items: PlacedItem[]
   wallOpenings?: WallOpening[]
   wallHeight?: number
+  selectedItemId?: number | null
+  dragItem?: { name: string; w: number; h: number; color: string } | null
+  onItemSelect?: (instanceId: number | null) => void
+  onItemMove?: (instanceId: number, newX: number, newY: number) => void
+  onDropItem?: (x: number, y: number) => void
 }
 
-type CameraPreset = 'iso' | 'top' | 'front' | 'side'
-
-// Create text label sprite
-function createTextLabel(text: string, fontSize: number = 20): THREE.Sprite {
-  const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')!
-  
-  canvas.width = 256
-  canvas.height = 64
-  
-  // Background
-  context.fillStyle = 'rgba(0, 0, 0, 0.75)'
-  context.beginPath()
-  context.roundRect(4, 4, canvas.width - 8, canvas.height - 8, 8)
-  context.fill()
-  
-  // Text
-  context.font = `bold ${fontSize}px Arial, sans-serif`
-  context.fillStyle = 'white'
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-  
-  // Truncate text if too long
-  let displayText = text
-  const maxWidth = canvas.width - 20
-  while (context.measureText(displayText).width > maxWidth && displayText.length > 3) {
-    displayText = displayText.slice(0, -4) + '...'
-  }
-  
-  context.fillText(displayText, canvas.width / 2, canvas.height / 2)
-  
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  
-  const material = new THREE.SpriteMaterial({ 
-    map: texture,
-    transparent: true
-  })
-  const sprite = new THREE.Sprite(material)
-  sprite.scale.set(6, 1.5, 1)
-  
-  return sprite
-}
-
-export default function FloorPlan3DSimple({ vertices, items, wallOpenings = [], wallHeight = 20 }: Props) {
+export default function FloorPlan3DSimple({
+  vertices,
+  items,
+  wallOpenings = [],
+  wallHeight = 20,
+  selectedItemId,
+  dragItem,
+  onItemSelect,
+  onItemMove,
+  onDropItem
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const sceneRef = useRef<THREE.Scene | null>(null)
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-  const controlsRef = useRef<OrbitControls | null>(null)
-  const animationRef = useRef<number>(0)
-  const boundsRef = useRef<{ center: { x: number; y: number }; size: number }>({ center: { x: 20, y: 15 }, size: 50 })
+  
+  // Three.js objects - persist across renders (don't reset camera!)
+  const threeRef = useRef<{
+    scene: THREE.Scene | null
+    camera: THREE.PerspectiveCamera | null
+    renderer: THREE.WebGLRenderer | null
+    controls: OrbitControls | null
+    itemGroups: Map<number, THREE.Group>
+    floorGroup: THREE.Group | null
+    wallGroup: THREE.Group | null
+    openingsGroup: THREE.Group | null
+    dragPreview: THREE.Mesh | null
+    initialized: boolean
+  }>({
+    scene: null,
+    camera: null,
+    renderer: null,
+    controls: null,
+    itemGroups: new Map(),
+    floorGroup: null,
+    wallGroup: null,
+    openingsGroup: null,
+    dragPreview: null,
+    initialized: false
+  })
 
-  const [cameraPreset, setCameraPreset] = useState<CameraPreset>('iso')
+  // Drag state
+  const dragState = useRef({
+    isDragging: false,
+    draggedId: null as number | null,
+    startFloor: { x: 0, z: 0 },
+    startItemCenter: { x: 0, z: 0 },
+    itemDims: { w: 0, h: 0 }
+  })
 
-  // Safe vertices
+  const [status, setStatus] = useState('Ready - Click items to drag')
+
+  // Safe data
   const safeVertices = useMemo(() => {
     if (!vertices || vertices.length < 3) {
       return [
-        { x: 2, y: 2 },
-        { x: 42, y: 2 },
-        { x: 42, y: 27 },
-        { x: 2, y: 27 }
+        { x: 2, y: 2 }, { x: 42, y: 2 }, { x: 42, y: 27 }, { x: 2, y: 27 }
       ]
     }
     return vertices
   }, [vertices])
 
-  // Safe items
   const safeItems = useMemo(() => {
     if (!items || !Array.isArray(items)) return []
     return items.filter(item => 
-      item && 
-      typeof item.x === 'number' && 
-      typeof item.y === 'number' &&
-      typeof item.w === 'number' &&
-      typeof item.h === 'number'
+      item && typeof item.x === 'number' && typeof item.y === 'number' &&
+      typeof item.w === 'number' && typeof item.h === 'number'
     )
   }, [items])
 
-  // Calculate bounds
   const bounds = useMemo(() => {
     const xs = safeVertices.map(v => v.x)
     const ys = safeVertices.map(v => v.y)
-    const minX = Math.min(...xs)
-    const maxX = Math.max(...xs)
-    const minY = Math.min(...ys)
-    const maxY = Math.max(...ys)
-    const result = {
-      center: {
-        x: (minX + maxX) / 2,
-        y: (minY + maxY) / 2
-      },
-      size: Math.max(maxX - minX, maxY - minY)
+    return {
+      cx: (Math.min(...xs) + Math.max(...xs)) / 2,
+      cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+      size: Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
     }
-    boundsRef.current = result
-    return result
   }, [safeVertices])
 
-  // Camera preset function
-  const applyCameraPreset = useCallback((preset: CameraPreset) => {
-    if (!cameraRef.current || !controlsRef.current) return
-    
-    const camera = cameraRef.current
-    const controls = controlsRef.current
-    const { center, size } = boundsRef.current
-    const dist = size * 1.2
+  // Raycast to find item mesh (works from ANY angle!)
+  const raycastToItem = useCallback((clientX: number, clientY: number): number | null => {
+    const t = threeRef.current
+    if (!containerRef.current || !t.camera || !t.scene) return null
 
-    const presets: Record<CameraPreset, { position: [number, number, number]; target: [number, number, number] }> = {
-      iso: {
-        position: [center.x + dist * 0.8, dist * 0.6, center.y + dist * 0.8],
-        target: [center.x, wallHeight / 4, center.y]
-      },
-      top: {
-        position: [center.x, dist * 1.5, center.y + 0.01],
-        target: [center.x, 0, center.y]
-      },
-      front: {
-        position: [center.x, wallHeight / 2 + 5, center.y + dist * 1.5],
-        target: [center.x, wallHeight / 4, center.y]
-      },
-      side: {
-        position: [center.x + dist * 1.5, wallHeight / 2 + 5, center.y],
-        target: [center.x, wallHeight / 4, center.y]
+    const rect = containerRef.current.getBoundingClientRect()
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    )
+
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(mouse, t.camera)
+
+    // Collect all item meshes
+    const meshes: THREE.Object3D[] = []
+    t.itemGroups.forEach(group => {
+      group.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          meshes.push(child)
+        }
+      })
+    })
+
+    const hits = raycaster.intersectObjects(meshes, false)
+    
+    if (hits.length > 0) {
+      // Find parent group with itemId
+      let obj: THREE.Object3D | null = hits[0].object
+      while (obj) {
+        if (obj.userData?.itemId !== undefined) {
+          return obj.userData.itemId
+        }
+        obj = obj.parent
+      }
+    }
+    return null
+  }, [])
+
+  // Raycast to floor plane
+  const raycastToFloor = useCallback((clientX: number, clientY: number): { x: number; z: number } | null => {
+    const t = threeRef.current
+    if (!containerRef.current || !t.camera) return null
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    )
+
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(mouse, t.camera)
+    
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+    const point = new THREE.Vector3()
+    
+    if (raycaster.ray.intersectPlane(plane, point)) {
+      return { x: point.x, z: point.z }
+    }
+    return null
+  }, [])
+
+  // Stable callback refs for event handlers
+  const handlersRef = useRef({
+    onItemSelect,
+    onItemMove,
+    onDropItem,
+    items: safeItems,
+    dragItem
+  })
+  
+  // Update refs when props change
+  useEffect(() => {
+    handlersRef.current = {
+      onItemSelect,
+      onItemMove,
+      onDropItem,
+      items: safeItems,
+      dragItem
+    }
+  }, [onItemSelect, onItemMove, onDropItem, safeItems, dragItem])
+
+  // Mouse handlers - use refs to avoid recreating
+  const handlePointerDown = useCallback((e: PointerEvent) => {
+    if (e.button !== 0) return
+    
+    const t = threeRef.current
+    const ds = dragState.current
+    const handlers = handlersRef.current
+
+    // Check for catalog item drop first
+    if (handlers.dragItem) {
+      const floorPos = raycastToFloor(e.clientX, e.clientY)
+      if (floorPos) {
+        const x = Math.round(floorPos.x - handlers.dragItem.w / 2)
+        const z = Math.round(floorPos.z - handlers.dragItem.h / 2)
+        handlers.onDropItem?.(x, z)
+        setStatus(`Dropped "${handlers.dragItem.name}" at (${x}, ${z})`)
+      }
+      return
+    }
+
+    // Try to hit an item mesh (works from any angle!)
+    const hitItemId = raycastToItem(e.clientX, e.clientY)
+    
+    if (hitItemId !== null) {
+      const item = handlers.items.find(i => i.instanceId === hitItemId)
+      if (!item) return
+
+      const floorPos = raycastToFloor(e.clientX, e.clientY)
+      if (!floorPos) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      ds.isDragging = true
+      ds.draggedId = hitItemId
+      ds.startFloor = { x: floorPos.x, z: floorPos.z }
+      ds.startItemCenter = { x: item.x + item.w / 2, z: item.y + item.h / 2 }
+      ds.itemDims = { w: item.w, h: item.h }
+
+      // Disable orbit controls
+      if (t.controls) {
+        t.controls.enabled = false
+      }
+
+      handlers.onItemSelect?.(hitItemId)
+      setStatus(`Dragging: ${item.name}`)
+      
+      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    }
+    // If no item hit, OrbitControls handles it
+  }, [raycastToItem, raycastToFloor])
+
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    const t = threeRef.current
+    const ds = dragState.current
+    const handlers = handlersRef.current
+
+    // Update drag preview for catalog items
+    if (handlers.dragItem && t.dragPreview) {
+      const floorPos = raycastToFloor(e.clientX, e.clientY)
+      if (floorPos) {
+        t.dragPreview.position.x = floorPos.x
+        t.dragPreview.position.z = floorPos.z
+        t.dragPreview.visible = true
       }
     }
 
-    const p = presets[preset]
-    camera.position.set(...p.position)
-    controls.target.set(...p.target)
-    controls.update()
-  }, [wallHeight])
+    if (!ds.isDragging || ds.draggedId === null) return
 
-  // Apply camera preset when changed
-  useEffect(() => {
-    applyCameraPreset(cameraPreset)
-  }, [cameraPreset, applyCameraPreset])
+    const floorPos = raycastToFloor(e.clientX, e.clientY)
+    if (!floorPos) return
 
+    const group = t.itemGroups.get(ds.draggedId)
+    if (!group) return
+
+    // Calculate new position
+    const dx = floorPos.x - ds.startFloor.x
+    const dz = floorPos.z - ds.startFloor.z
+    
+    const newX = Math.round(ds.startItemCenter.x + dx)
+    const newZ = Math.round(ds.startItemCenter.z + dz)
+
+    // Update mesh position directly (smooth)
+    group.position.x = newX
+    group.position.z = newZ
+
+    const cornerX = newX - Math.floor(ds.itemDims.w / 2)
+    const cornerZ = newZ - Math.floor(ds.itemDims.h / 2)
+    setStatus(`Moving: (${cornerX}, ${cornerZ})`)
+  }, [raycastToFloor])
+
+  const handlePointerUp = useCallback((e: PointerEvent) => {
+    const t = threeRef.current
+    const ds = dragState.current
+    const handlers = handlersRef.current
+
+    // Hide drag preview
+    if (t.dragPreview) {
+      t.dragPreview.visible = false
+    }
+
+    if (ds.isDragging && ds.draggedId !== null) {
+      const group = t.itemGroups.get(ds.draggedId)
+
+      if (group) {
+        const finalX = Math.round(group.position.x - ds.itemDims.w / 2)
+        const finalZ = Math.round(group.position.z - ds.itemDims.h / 2)
+        
+        handlers.onItemMove?.(ds.draggedId, finalX, finalZ)
+        setStatus(`Dropped at (${finalX}, ${finalZ})`)
+      }
+
+      try {
+        ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+      } catch {
+        // Ignore
+      }
+    }
+
+    // Re-enable orbit controls
+    if (t.controls) {
+      t.controls.enabled = true
+    }
+
+    ds.isDragging = false
+    ds.draggedId = null
+  }, [])
+
+  // Initialize Three.js scene ONCE
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current || threeRef.current.initialized) return
 
     const container = containerRef.current
-    const width = container.clientWidth
-    const height = container.clientHeight
+    const t = threeRef.current
+    const w = container.clientWidth
+    const h = container.clientHeight
 
     // Scene
-    const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x0f172a)
-    sceneRef.current = scene
+    t.scene = new THREE.Scene()
+    t.scene.background = new THREE.Color(0x0f172a)
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000)
-    const dist = bounds.size * 1.5
-    camera.position.set(bounds.center.x + dist * 0.8, dist * 0.6, bounds.center.y + dist * 0.8)
-    camera.lookAt(bounds.center.x, wallHeight / 4, bounds.center.y)
-    cameraRef.current = camera
+    // Camera - initial position
+    const dist = bounds.size * 1.2
+    t.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 500)
+    t.camera.position.set(bounds.cx + dist, dist * 0.7, bounds.cy + dist)
+    t.camera.lookAt(bounds.cx, 0, bounds.cy)
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(width, height)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    container.appendChild(renderer.domElement)
-    rendererRef.current = renderer
+    t.renderer = new THREE.WebGLRenderer({ antialias: true })
+    t.renderer.setSize(w, h)
+    t.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    t.renderer.shadowMap.enabled = true
+    t.renderer.domElement.style.touchAction = 'none'
+    container.appendChild(t.renderer.domElement)
 
     // Controls
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.target.set(bounds.center.x, wallHeight / 4, bounds.center.y)
-    controls.maxPolarAngle = Math.PI / 2.1
-    controls.minDistance = 10
-    controls.maxDistance = 200
-    controls.enableDamping = true
-    controls.dampingFactor = 0.05
-    controls.update()
-    controlsRef.current = controls
+    t.controls = new OrbitControls(t.camera, t.renderer.domElement)
+    t.controls.target.set(bounds.cx, 0, bounds.cy)
+    t.controls.enableDamping = true
+    t.controls.dampingFactor = 0.1
+    t.controls.maxPolarAngle = Math.PI / 2 - 0.05
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
-    scene.add(ambientLight)
-
-    const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x1e3a5f, 0.3)
-    scene.add(hemisphereLight)
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(bounds.center.x + 30, 50, bounds.center.y + 30)
-    directionalLight.castShadow = true
-    directionalLight.shadow.mapSize.width = 1024
-    directionalLight.shadow.mapSize.height = 1024
-    directionalLight.shadow.camera.near = 0.5
-    directionalLight.shadow.camera.far = 200
-    scene.add(directionalLight)
-
-    const pointLight = new THREE.PointLight(0xfef3c7, 0.3, 100)
-    pointLight.position.set(bounds.center.x, wallHeight - 2, bounds.center.y)
-    scene.add(pointLight)
+    t.scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+    t.scene.add(new THREE.HemisphereLight(0x87ceeb, 0x1e3a5f, 0.3))
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8)
+    sun.position.set(bounds.cx + 30, 50, bounds.cy + 30)
+    sun.castShadow = true
+    t.scene.add(sun)
 
     // Grid
-    const gridHelper = new THREE.GridHelper(100, 100, 0x1e293b, 0x1e293b)
-    gridHelper.position.set(50, -0.01, 50)
-    scene.add(gridHelper)
+    const grid = new THREE.GridHelper(100, 100, 0x334155, 0x1e293b)
+    grid.position.set(50, -0.05, 50)
+    t.scene.add(grid)
 
-    // Floor
-    const floorShape = new THREE.Shape()
-    floorShape.moveTo(safeVertices[0].x, safeVertices[0].y)
-    for (let i = 1; i < safeVertices.length; i++) {
-      floorShape.lineTo(safeVertices[i].x, safeVertices[i].y)
+    // Groups for organized updates
+    t.floorGroup = new THREE.Group()
+    t.wallGroup = new THREE.Group()
+    t.openingsGroup = new THREE.Group()
+    t.scene.add(t.floorGroup)
+    t.scene.add(t.wallGroup)
+    t.scene.add(t.openingsGroup)
+
+    // Drag preview
+    t.dragPreview = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, transparent: true, opacity: 0.5 })
+    )
+    t.dragPreview.visible = false
+    t.dragPreview.position.y = 2
+    t.scene.add(t.dragPreview)
+
+    // Events
+    t.renderer.domElement.addEventListener('pointerdown', handlePointerDown)
+    t.renderer.domElement.addEventListener('pointermove', handlePointerMove)
+    t.renderer.domElement.addEventListener('pointerup', handlePointerUp)
+    t.renderer.domElement.addEventListener('pointercancel', handlePointerUp)
+    t.renderer.domElement.addEventListener('pointerleave', handlePointerUp)
+
+    // Animation loop
+    let frameId: number
+    const animate = () => {
+      frameId = requestAnimationFrame(animate)
+      t.controls?.update()
+      if (t.renderer && t.scene && t.camera) {
+        t.renderer.render(t.scene, t.camera)
+      }
     }
-    floorShape.closePath()
+    animate()
 
-    const floorGeometry = new THREE.ShapeGeometry(floorShape)
-    const floorMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x1e3a5f, 
-      side: THREE.DoubleSide 
-    })
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial)
-    floor.rotation.x = -Math.PI / 2
-    floor.receiveShadow = true
-    scene.add(floor)
+    // Resize handler
+    const onResize = () => {
+      if (!t.camera || !t.renderer) return
+      const nw = container.clientWidth
+      const nh = container.clientHeight
+      t.camera.aspect = nw / nh
+      t.camera.updateProjectionMatrix()
+      t.renderer.setSize(nw, nh)
+    }
+    window.addEventListener('resize', onResize)
 
-    // Walls
-    for (let i = 0; i < safeVertices.length; i++) {
-      const v1 = safeVertices[i]
-      const v2 = safeVertices[(i + 1) % safeVertices.length]
-      
-      const length = Math.sqrt((v2.x - v1.x) ** 2 + (v2.y - v1.y) ** 2)
-      const midX = (v1.x + v2.x) / 2
-      const midZ = (v1.y + v2.y) / 2
-      const angle = Math.atan2(v2.y - v1.y, v2.x - v1.x)
+    t.initialized = true
 
-      const wallGeometry = new THREE.BoxGeometry(length, wallHeight, 0.5)
-      const wallMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x475569, 
-        transparent: true, 
-        opacity: 0.7 
+    return () => {
+      cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', onResize)
+      if (t.renderer) {
+        t.renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
+        t.renderer.domElement.removeEventListener('pointermove', handlePointerMove)
+        t.renderer.domElement.removeEventListener('pointerup', handlePointerUp)
+        t.renderer.domElement.removeEventListener('pointercancel', handlePointerUp)
+        t.renderer.domElement.removeEventListener('pointerleave', handlePointerUp)
+        t.renderer.dispose()
+        if (container.contains(t.renderer.domElement)) {
+          container.removeChild(t.renderer.domElement)
+        }
+      }
+      t.controls?.dispose()
+      t.initialized = false
+    }
+  }, [bounds.cx, bounds.cy, bounds.size, handlePointerDown, handlePointerMove, handlePointerUp])
+
+  // Build floor when vertices change
+  useEffect(() => {
+    const t = threeRef.current
+    if (!t.scene || !t.initialized || !t.floorGroup) return
+
+    const floorGroup = t.floorGroup
+
+    // Clear floor group
+    while (floorGroup.children.length > 0) {
+      floorGroup.remove(floorGroup.children[0])
+    }
+
+    if (safeVertices.length >= 3) {
+      const shape = new THREE.Shape()
+      shape.moveTo(safeVertices[0].x, safeVertices[0].y)
+      safeVertices.slice(1).forEach(v => shape.lineTo(v.x, v.y))
+      shape.closePath()
+
+      const floor = new THREE.Mesh(
+        new THREE.ShapeGeometry(shape),
+        new THREE.MeshStandardMaterial({ color: 0x1e3a5f, side: THREE.DoubleSide })
+      )
+      floor.rotation.x = -Math.PI / 2
+      floor.receiveShadow = true
+      floorGroup.add(floor)
+    }
+  }, [safeVertices])
+
+  // Build walls when vertices/wallHeight change
+  useEffect(() => {
+    const t = threeRef.current
+    if (!t.scene || !t.initialized || !t.wallGroup) return
+
+    const wallGroup = t.wallGroup
+
+    // Clear wall group
+    while (wallGroup.children.length > 0) {
+      wallGroup.remove(wallGroup.children[0])
+    }
+
+    if (safeVertices.length >= 3) {
+      safeVertices.forEach((v1, i) => {
+        const v2 = safeVertices[(i + 1) % safeVertices.length]
+        const len = Math.hypot(v2.x - v1.x, v2.y - v1.y)
+        const wall = new THREE.Mesh(
+          new THREE.BoxGeometry(len, wallHeight, 0.5),
+          new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.6 })
+        )
+        wall.position.set((v1.x + v2.x) / 2, wallHeight / 2, (v1.y + v2.y) / 2)
+        wall.rotation.y = -Math.atan2(v2.y - v1.y, v2.x - v1.x)
+        wall.castShadow = true
+        wallGroup.add(wall)
       })
-      const wall = new THREE.Mesh(wallGeometry, wallMaterial)
-      wall.position.set(midX, wallHeight / 2, midZ)
-      wall.rotation.y = -angle
-      wall.castShadow = true
-      scene.add(wall)
+    }
+  }, [safeVertices, wallHeight])
+
+  // Build wall openings
+  useEffect(() => {
+    const t = threeRef.current
+    if (!t.scene || !t.initialized || !t.openingsGroup) return
+
+    const openingsGroup = t.openingsGroup
+
+    // Clear openings group
+    while (openingsGroup.children.length > 0) {
+      openingsGroup.remove(openingsGroup.children[0])
     }
 
-    // Wall Openings (doors/windows)
     wallOpenings.forEach(opening => {
       if (opening.wallIndex >= safeVertices.length) return
       
@@ -297,42 +524,47 @@ export default function FloorPlan3DSimple({ vertices, items, wallOpenings = [], 
       const yPos = isWindow ? wallHeight * 0.5 : doorHeight / 2
 
       const colors: Record<string, number> = {
-        dock: 0x3b82f6,
-        personnel: 0x6b7280,
-        emergency: 0x22c55e,
-        rollup: 0xf59e0b,
-        window: 0x06b6d4,
+        dock: 0x3b82f6, personnel: 0x6b7280, emergency: 0x22c55e,
+        rollup: 0xf59e0b, window: 0x06b6d4,
       }
 
-      const doorGeometry = new THREE.BoxGeometry(opening.width, doorHeight, 0.8)
-      const doorMaterial = new THREE.MeshStandardMaterial({ 
-        color: colors[opening.type] || 0xffffff,
-        transparent: isWindow,
-        opacity: isWindow ? 0.4 : 1
-      })
-      const door = new THREE.Mesh(doorGeometry, doorMaterial)
+      const door = new THREE.Mesh(
+        new THREE.BoxGeometry(opening.width, doorHeight, 0.8),
+        new THREE.MeshStandardMaterial({ 
+          color: colors[opening.type] || 0xffffff,
+          transparent: isWindow, opacity: isWindow ? 0.4 : 1
+        })
+      )
       door.position.set(x, yPos, z)
       door.rotation.y = -angle
-      scene.add(door)
+      openingsGroup.add(door)
     })
+  }, [wallOpenings, safeVertices, wallHeight])
 
-    // Equipment Items
+  // Build items - DON'T touch camera!
+  useEffect(() => {
+    const t = threeRef.current
+    if (!t.scene || !t.initialized) return
+
+    // Remove old items
+    t.itemGroups.forEach(g => t.scene!.remove(g))
+    t.itemGroups.clear()
+
+    // Add items
     safeItems.forEach(item => {
+      const group = new THREE.Group()
+      group.userData.itemId = item.instanceId
+      group.position.set(item.x + item.w / 2, 0, item.y + item.h / 2)
+
       const isRack = item.name?.toLowerCase().includes('rack')
+      const itemHeight = isRack ? 16 : 4
       const color = new THREE.Color(item.color || '#f97316')
+      const isSelected = selectedItemId === item.instanceId
 
       if (isRack) {
-        // Detailed rack with posts and shelves
-        const group = new THREE.Group()
-        group.position.set(item.x + item.w / 2, 0, item.y + item.h / 2)
-
-        const levels = 4
-        const levelHeight = 4
-        const totalHeight = levels * levelHeight
-
-        // Posts
-        const postGeometry = new THREE.BoxGeometry(0.25, totalHeight, 0.25)
-        const postMaterial = new THREE.MeshStandardMaterial({ color })
+        // Rack structure with posts and shelves
+        const postGeom = new THREE.BoxGeometry(0.25, itemHeight, 0.25)
+        const postMat = new THREE.MeshStandardMaterial({ color })
         
         const postPositions = [
           [-item.w/2 + 0.15, -item.h/2 + 0.15],
@@ -342,132 +574,168 @@ export default function FloorPlan3DSimple({ vertices, items, wallOpenings = [], 
         ]
         
         postPositions.forEach(([px, pz]) => {
-          const post = new THREE.Mesh(postGeometry, postMaterial)
-          post.position.set(px, totalHeight / 2, pz)
+          const post = new THREE.Mesh(postGeom, postMat)
+          post.position.set(px, itemHeight / 2, pz)
           post.castShadow = true
+          post.userData.itemId = item.instanceId
           group.add(post)
         })
 
-        // Shelves and pallets
-        const beamMaterial = new THREE.MeshStandardMaterial({ color })
-        const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x64748b })
-        const palletMaterial = new THREE.MeshStandardMaterial({ color: 0x92400e })
+        // Shelves
+        const shelfMat = new THREE.MeshStandardMaterial({ color: 0x64748b })
+        const palletMat = new THREE.MeshStandardMaterial({ color: 0x92400e })
         
-        for (let level = 0; level < levels; level++) {
-          const yPos = (level + 1) * levelHeight
-
-          // Beams
-          const beamGeometry = new THREE.BoxGeometry(item.w - 0.3, 0.15, 0.1)
-          const beamFront = new THREE.Mesh(beamGeometry, beamMaterial)
-          beamFront.position.set(0, yPos, -item.h/2 + 0.15)
-          beamFront.castShadow = true
-          group.add(beamFront)
-
-          const beamBack = new THREE.Mesh(beamGeometry, beamMaterial)
-          beamBack.position.set(0, yPos, item.h/2 - 0.15)
-          beamBack.castShadow = true
-          group.add(beamBack)
-
-          // Shelf deck
-          const shelfGeometry = new THREE.BoxGeometry(item.w - 0.4, 0.08, item.h - 0.4)
-          const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial)
-          shelf.position.set(0, yPos + 0.1, 0)
-          shelf.receiveShadow = true
+        for (let level = 0; level < 4; level++) {
+          const yPos = (level + 1) * 4
+          const shelf = new THREE.Mesh(
+            new THREE.BoxGeometry(item.w - 0.4, 0.1, item.h - 0.4),
+            shelfMat
+          )
+          shelf.position.set(0, yPos, 0)
+          shelf.userData.itemId = item.instanceId
           group.add(shelf)
 
-          // Pallet on shelf (except top level)
-          if (level < levels - 1) {
-            const palletGeometry = new THREE.BoxGeometry(item.w - 0.6, 0.5, item.h - 0.5)
-            const pallet = new THREE.Mesh(palletGeometry, palletMaterial)
-            pallet.position.set(0, yPos + 0.4, 0)
+          if (level < 3) {
+            const pallet = new THREE.Mesh(
+              new THREE.BoxGeometry(item.w - 0.6, 0.5, item.h - 0.5),
+              palletMat
+            )
+            pallet.position.set(0, yPos + 0.35, 0)
+            pallet.userData.itemId = item.instanceId
             group.add(pallet)
           }
         }
-
-        scene.add(group)
-
-        // Add label above rack
-        const label = createTextLabel(item.name)
-        label.position.set(item.x + item.w / 2, totalHeight + 2, item.y + item.h / 2)
-        scene.add(label)
       } else {
-        // Simple box for non-rack items
-        const itemHeight = item.name?.toLowerCase().includes('zone') || 
-                          item.name?.toLowerCase().includes('area') ||
-                          item.name?.toLowerCase().includes('station') ? 0.3 : 4
+        // Simple box
+        const isZone = item.name?.toLowerCase().includes('zone') || 
+                       item.name?.toLowerCase().includes('area') ||
+                       item.name?.toLowerCase().includes('station')
+        const boxHeight = isZone ? 0.3 : itemHeight
         
-        const boxGeometry = new THREE.BoxGeometry(item.w, itemHeight, item.h)
-        const boxMaterial = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.9 })
-        const box = new THREE.Mesh(boxGeometry, boxMaterial)
-        box.position.set(
-          item.x + item.w / 2,
-          itemHeight / 2,
-          item.y + item.h / 2
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(item.w - 0.1, boxHeight, item.h - 0.1),
+          new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.9 })
         )
-        box.castShadow = true
-        box.receiveShadow = true
-        scene.add(box)
-
-        // Add label above item
-        const label = createTextLabel(item.name)
-        label.position.set(item.x + item.w / 2, itemHeight + 1.5, item.y + item.h / 2)
-        scene.add(label)
+        body.position.y = boxHeight / 2
+        body.castShadow = true
+        body.userData.itemId = item.instanceId
+        group.add(body)
       }
+
+      // Selection highlight (green platform)
+      if (isSelected) {
+        const highlight = new THREE.Mesh(
+          new THREE.BoxGeometry(item.w + 0.4, 0.2, item.h + 0.4),
+          new THREE.MeshBasicMaterial({ color: 0x22c55e })
+        )
+        highlight.position.y = 0.1
+        group.add(highlight)
+      }
+
+      // Label sprite
+      const canvas = document.createElement('canvas')
+      canvas.width = 256
+      canvas.height = 48
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'
+      ctx.roundRect(4, 4, 248, 40, 6)
+      ctx.fill()
+      ctx.font = 'bold 18px Arial'
+      ctx.fillStyle = '#ffffff'
+      ctx.textAlign = 'center'
+      ctx.fillText(item.name, 128, 30)
+
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true })
+      )
+      sprite.scale.set(5, 1.2, 1)
+      sprite.position.y = (isRack ? 16 : 4) + 1.5
+      group.add(sprite)
+
+      t.scene!.add(group)
+      t.itemGroups.set(item.instanceId, group)
     })
+  }, [safeItems, selectedItemId])
 
-    // Animation loop
-    const animate = () => {
-      animationRef.current = requestAnimationFrame(animate)
-      controls.update()
-      renderer.render(scene, camera)
-    }
-    animate()
-
-    // Resize handler
-    const handleResize = () => {
-      const w = container.clientWidth
-      const h = container.clientHeight
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
-      renderer.setSize(w, h)
-    }
-    window.addEventListener('resize', handleResize)
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      cancelAnimationFrame(animationRef.current)
-      controls.dispose()
-      renderer.dispose()
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement)
+  // Update drag preview
+  useEffect(() => {
+    const t = threeRef.current
+    if (t.dragPreview && dragItem) {
+      t.dragPreview.scale.set(dragItem.w || 4, 1, dragItem.h || 4)
+      const color = parseInt(dragItem.color?.replace('#', '0x') || '0x22c55e', 16)
+      if (t.dragPreview.material instanceof THREE.MeshStandardMaterial) {
+        t.dragPreview.material.color.setHex(color)
       }
     }
-  }, [safeVertices, safeItems, wallOpenings, wallHeight, bounds])
+  }, [dragItem])
+
+  // Camera presets
+  const setCameraPreset = useCallback((preset: 'iso' | 'top' | 'front' | 'side') => {
+    const t = threeRef.current
+    if (!t.camera || !t.controls) return
+    
+    const d = bounds.size * 1.2
+    
+    const positions: Record<string, [number, number, number]> = {
+      iso: [bounds.cx + d, d * 0.7, bounds.cy + d],
+      top: [bounds.cx, d * 1.5, bounds.cy + 0.01],
+      front: [bounds.cx, wallHeight / 2 + 5, bounds.cy + d * 1.3],
+      side: [bounds.cx + d * 1.3, wallHeight / 2 + 5, bounds.cy]
+    }
+    
+    const pos = positions[preset]
+    t.camera.position.set(pos[0], pos[1], pos[2])
+    t.controls.target.set(bounds.cx, 0, bounds.cy)
+  }, [bounds, wallHeight])
 
   return (
     <div ref={containerRef} className="w-full h-full relative bg-slate-900 rounded-lg overflow-hidden">
-      {/* Camera Preset Buttons */}
+      {/* Camera Presets */}
       <div className="absolute top-4 left-4 flex gap-2 z-10">
-        {(['iso', 'top', 'front', 'side'] as CameraPreset[]).map((preset) => (
-          <button
-            key={preset}
-            onClick={() => setCameraPreset(preset)}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              cameraPreset === preset 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            {preset === 'iso' ? 'Iso' : preset.charAt(0).toUpperCase() + preset.slice(1)}
-          </button>
-        ))}
+        <button 
+          onClick={() => setCameraPreset('iso')} 
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm font-medium transition-colors"
+        >
+          Iso
+        </button>
+        <button 
+          onClick={() => setCameraPreset('top')} 
+          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm transition-colors"
+        >
+          Top
+        </button>
+        <button 
+          onClick={() => setCameraPreset('front')} 
+          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm transition-colors"
+        >
+          Front
+        </button>
+        <button 
+          onClick={() => setCameraPreset('side')} 
+          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm transition-colors"
+        >
+          Side
+        </button>
       </div>
 
-      {/* Info overlay */}
-      <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs px-3 py-2 rounded">
-        🖱️ Left: Rotate • Right: Pan • Scroll: Zoom | Items: {safeItems.length} • Walls: {safeVertices.length}
+      {/* Status */}
+      <div className="absolute top-4 right-4 bg-black/70 text-white text-xs px-3 py-2 rounded z-10 font-mono">
+        {status} | Items: {safeItems.length}
       </div>
+
+      {/* Help */}
+      <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs px-3 py-2 rounded z-10">
+        🖱️ <span className="text-green-400">Click item:</span> Select & Drag • 
+        <span className="text-yellow-300"> Drag empty:</span> Rotate • 
+        Right: Pan • Scroll: Zoom
+      </div>
+      
+      {/* Catalog drop hint */}
+      {dragItem && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-green-600/90 text-white text-sm px-4 py-2 rounded-lg shadow-lg animate-pulse z-10">
+          ✋ Click anywhere to drop &quot;{dragItem.name}&quot;
+        </div>
+      )}
     </div>
   )
 }

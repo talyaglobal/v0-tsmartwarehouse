@@ -1280,6 +1280,12 @@ export default function FloorPlanCanvas({
               ref={canvasContainerRef}
               className="relative" 
               style={{ width: CANVAS_W, height: CANVAS_H }}
+              onMouseUp={() => {
+                // Handle catalog item drop in 3D mode
+                if (dragItem && !dragItem.wallItem) {
+                  // Position will be handled by the 3D component
+                }
+              }}
             >
               <FloorPlan3D 
                 key={`3d-${items.length}-${vertices.length}-${wallOpenings.length}`}
@@ -1287,6 +1293,42 @@ export default function FloorPlanCanvas({
                 items={items}
                 wallOpenings={wallOpenings}
                 wallHeight={wallHeight}
+                selectedItemId={selectedItem !== null ? items[selectedItem]?.instanceId : null}
+                dragItem={dragItem}
+                onItemSelect={(instanceId) => {
+                  if (instanceId === null) {
+                    setSelectedItem(null)
+                  } else {
+                    const idx = items.findIndex(i => i.instanceId === instanceId)
+                    setSelectedItem(idx >= 0 ? idx : null)
+                  }
+                }}
+                onItemMove={(instanceId, newX, newY) => {
+                  const idx = items.findIndex(i => i.instanceId === instanceId)
+                  if (idx >= 0) {
+                    const newItems = [...items]
+                    newItems[idx] = { ...newItems[idx], x: newX, y: newY }
+                    setItems(newItems)
+                  }
+                }}
+                onDropItem={(x, y) => {
+                  if (dragItem && !dragItem.wallItem) {
+                    const itemBox = { x, y, w: dragItem.w, h: dragItem.h }
+                    if (isInsideWarehouse(itemBox) && !hasCollision(itemBox)) {
+                      const newItem: PlacedItem = { 
+                        ...dragItem, 
+                        x, 
+                        y, 
+                        rotation: 0, 
+                        instanceId: Date.now() 
+                      }
+                      const newItems = [...items, newItem]
+                      setItems(newItems)
+                      saveToHistory(vertices, newItems)
+                    }
+                    setDragItem(null)
+                  }
+                }}
               />
             </div>
           )}
