@@ -180,6 +180,13 @@ export default function FloorPlanCanvas({
   const [wallLength, setWallLength] = useState<string>('')
   const [wallEditPos, setWallEditPos] = useState({ x: 0, y: 0 })
   
+  // IKEA-style wall edit mode
+  const [wallEditMode, setWallEditMode] = useState(false)
+  const [selectedWallIdx, setSelectedWallIdx] = useState<number | null>(null)
+  const [selectedVertexIdx, setSelectedVertexIdx] = useState<number | null>(null)
+  const [isDraggingVertex, setIsDraggingVertex] = useState(false)
+  const [wallToolbarPos, setWallToolbarPos] = useState({ x: 0, y: 0 })
+  
   // 3D wall height (ft)
   const [wallHeight, setWallHeight] = useState(initialWallHeight || 20)
   
@@ -507,15 +514,50 @@ export default function FloorPlanCanvas({
       ctx.fillText(`${len.toFixed(0)} ft`, offsetX, offsetY)
     }
     
+    // Draw wall selection highlight (in wall edit mode)
+    if (wallEditMode && selectedWallIdx !== null) {
+      const v1 = vertices[selectedWallIdx]
+      const v2 = vertices[(selectedWallIdx + 1) % vertices.length]
+      
+      ctx.beginPath()
+      ctx.moveTo(v1.x * GRID_SIZE, v1.y * GRID_SIZE)
+      ctx.lineTo(v2.x * GRID_SIZE, v2.y * GRID_SIZE)
+      ctx.strokeStyle = '#22c55e'
+      ctx.lineWidth = 8 / zoom
+      ctx.lineCap = 'round'
+      ctx.stroke()
+      ctx.lineCap = 'butt'
+    }
+    
     // Draw vertices
     vertices.forEach((v, i) => {
-      const radius = (editingVertex === i ? 10 : 8) / zoom
+      // Different styling in wall edit mode
+      const isEditingThisVertex = editingVertex === i
+      const isSelectedVertex = wallEditMode && selectedVertexIdx === i
+      const isInEditMode = wallEditMode
+      
+      // Larger handles in wall edit mode
+      let radius = 8 / zoom
+      if (isInEditMode) radius = 10 / zoom
+      if (isEditingThisVertex || isSelectedVertex) radius = 12 / zoom
+      
+      // Outer circle
       ctx.beginPath()
       ctx.arc(v.x * GRID_SIZE, v.y * GRID_SIZE, radius, 0, Math.PI * 2)
-      ctx.fillStyle = editingVertex === i ? '#22c55e' : '#3b82f6'
+      
+      // Color based on state
+      if (isEditingThisVertex || isSelectedVertex) {
+        ctx.fillStyle = '#22c55e' // Green for selected/editing
+      } else if (isInEditMode) {
+        ctx.fillStyle = '#3b82f6' // Blue in edit mode
+      } else {
+        ctx.fillStyle = '#3b82f6' // Blue normally
+      }
       ctx.fill()
+      
+      // Border
       ctx.strokeStyle = '#fff'
-      ctx.lineWidth = 2 / zoom
+      ctx.lineWidth = (isInEditMode ? 3 : 2) / zoom
       ctx.stroke()
       
       // Inner dot
@@ -523,6 +565,15 @@ export default function FloorPlanCanvas({
       ctx.arc(v.x * GRID_SIZE, v.y * GRID_SIZE, 3 / zoom, 0, Math.PI * 2)
       ctx.fillStyle = '#fff'
       ctx.fill()
+      
+      // Vertex number in edit mode
+      if (isInEditMode) {
+        ctx.font = `bold ${10 / zoom}px Inter, Arial, sans-serif`
+        ctx.fillStyle = '#fff'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(`${i + 1}`, v.x * GRID_SIZE, v.y * GRID_SIZE - radius - 8 / zoom)
+      }
     })
     
     // Draw placed items
@@ -686,7 +737,61 @@ export default function FloorPlanCanvas({
     }
     
     ctx.restore()
-  }, [vertices, items, wallOpenings, selectedItem, selectedOpening, dragItem, editingVertex, editingWall, zoom, pan, isInsideWarehouse, hasCollision, findClosestWall])
+  }, [vertices, items, wallOpenings, selectedItem, selectedOpening, dragItem, editingVertex, editingWall, zoom, pan, isInsideWarehouse, hasCollision, findClosestWall, wallEditMode, selectedWallIdx, selectedVertexIdx])
+  
+  // Get closest point on wall segment (for wall click detection)
+  const getClosestPointOnWall = useCallback((mousePos: { x: number; y: number }, wallIdx: number): { t: number; dist: number } => {
+    const v1 = vertices[wallIdx]
+    const v2 = vertices[(wallIdx + 1) % vertices.length]
+    
+    const dx = v2.x - v1.x
+    const dy = v2.y - v1.y
+    const lenSq = dx * dx + dy * dy
+    
+    if (lenSq === 0) return { t: 0, dist: Infinity }
+    
+    // Project mouse onto line, clamp to segment
+    let t = ((mousePos.x - v1.x) * dx + (mousePos.y - v1.y) * dy) / lenSq
+    t = Math.max(0, Math.min(1, t))
+    
+    const closestX = v1.x + t * dx
+    const closestY = v1.y + t * dy
+    const dist = Math.sqrt(Math.pow(mousePos.x - closestX, 2) + Math.pow(mousePos.y - closestY, 2))
+    
+    return { t, dist }
+  }, [vertices])
+  
+  // Find wall at click position (for wall edit mode)
+  const findWallAtPos = useCallback((pos: { x: number; y: number }): number | null => {
+    for (let i = 0; i < vertices.length; i++) {
+      const { t, dist } = getClosestPointOnWall(pos, i)
+      // Within 2 feet of wall, not too close to vertices (middle 80%)
+      if (dist < 2 && t > 0.1 && t < 0.9) {
+        return i
+      }
+    }
+    return null
+  }, [vertices, getClosestPointOnWall])
+  
+  // Find vertex at click position
+  const findVertexAtPos = useCallback((pos: { x: number; y: number }): number | null => {
+    for (let i = 0; i < vertices.length; i++) {
+      const v = vertices[i]
+      const dist = Math.sqrt(Math.pow(pos.x - v.x, 2) + Math.pow(pos.y - v.y, 2))
+      if (dist < 1.5) { // Within 1.5 feet of vertex
+        return i
+      }
+    }
+    return null
+  }, [vertices])
+  
+  // Exit wall edit mode
+  const exitWallEditMode = useCallback(() => {
+    setWallEditMode(false)
+    setSelectedWallIdx(null)
+    setSelectedVertexIdx(null)
+    setIsDraggingVertex(false)
+  }, [])
   
   // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -701,6 +806,36 @@ export default function FloorPlanCanvas({
     if (e.button !== 0) return
     
     const pos = getGridPos(e)
+    const canvasPos = getCanvasPos(e)
+    
+    // Wall edit mode - different interaction logic
+    if (wallEditMode) {
+      // First, check for vertex click
+      const vertexIdx = findVertexAtPos(pos)
+      if (vertexIdx !== null) {
+        setSelectedVertexIdx(vertexIdx)
+        setSelectedWallIdx(null)
+        setIsDraggingVertex(true)
+        setWallToolbarPos({ x: canvasPos.x + 20, y: canvasPos.y + 20 })
+        return
+      }
+      
+      // Then, check for wall click
+      const wallIdx = findWallAtPos(pos)
+      if (wallIdx !== null) {
+        setSelectedWallIdx(wallIdx)
+        setSelectedVertexIdx(null)
+        setWallToolbarPos({ x: canvasPos.x + 20, y: canvasPos.y + 20 })
+        return
+      }
+      
+      // Click on empty space - deselect
+      setSelectedWallIdx(null)
+      setSelectedVertexIdx(null)
+      return
+    }
+    
+    // Normal mode - existing logic
     
     // Check vertex click
     for (let i = 0; i < vertices.length; i++) {
@@ -722,7 +857,6 @@ export default function FloorPlanCanvas({
         const len = Math.sqrt(Math.pow(v2.x - v1.x, 2) + Math.pow(v2.y - v1.y, 2))
         setEditingWall(i)
         setWallLength(len.toFixed(0))
-        const canvasPos = getCanvasPos(e)
         setWallEditPos({ x: canvasPos.x + 20, y: canvasPos.y - 50 })
         setSelectedItem(null)
         setEditingVertex(null)
@@ -768,7 +902,7 @@ export default function FloorPlanCanvas({
     setSelectedOpening(null)
     setEditingVertex(null)
     setEditingWall(null)
-  }, [vertices, items, wallOpenings, getGridPos, getCanvasPos, isPointOnLine])
+  }, [vertices, items, wallOpenings, getGridPos, getCanvasPos, isPointOnLine, wallEditMode, findVertexAtPos, findWallAtPos])
   
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Panning
@@ -783,13 +917,23 @@ export default function FloorPlanCanvas({
     
     const pos = getGridPos(e)
     
+    // Wall edit mode vertex dragging
+    if (wallEditMode && isDraggingVertex && selectedVertexIdx !== null) {
+      const newVerts = [...vertices]
+      newVerts[selectedVertexIdx] = { x: Math.round(Math.max(0, pos.x)), y: Math.round(Math.max(0, pos.y)) }
+      setVertices(newVerts)
+      return
+    }
+    
+    // Normal vertex editing
     if (editingVertex !== null) {
       const newVerts = [...vertices]
       newVerts[editingVertex] = { x: Math.max(0, pos.x), y: Math.max(0, pos.y) }
       setVertices(newVerts)
     }
     
-    if (selectedItem !== null && e.buttons === 1) {
+    // Item dragging (disabled in wall edit mode)
+    if (!wallEditMode && selectedItem !== null && e.buttons === 1) {
       const newItems = [...items]
       const newX = Math.max(0, pos.x - dragOffset.x)
       const newY = Math.max(0, pos.y - dragOffset.y)
@@ -804,11 +948,18 @@ export default function FloorPlanCanvas({
     if (dragItem) {
       setDragItem({ ...dragItem, x: pos.x, y: pos.y })
     }
-  }, [editingVertex, selectedItem, dragItem, vertices, items, dragOffset, getGridPos, isPanning, lastPan])
+  }, [editingVertex, selectedItem, dragItem, vertices, items, dragOffset, getGridPos, isPanning, lastPan, wallEditMode, isDraggingVertex, selectedVertexIdx])
   
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
       setIsPanning(false)
+      return
+    }
+    
+    // Wall edit mode - end vertex dragging
+    if (wallEditMode && isDraggingVertex) {
+      setIsDraggingVertex(false)
+      saveToHistory(vertices, items)
       return
     }
     
@@ -849,7 +1000,7 @@ export default function FloorPlanCanvas({
     }
     
     setEditingVertex(null)
-  }, [dragItem, items, vertices, wallOpenings, editingVertex, isPanning, isInsideWarehouse, hasCollision, saveToHistory, findClosestWall])
+  }, [dragItem, items, vertices, wallOpenings, editingVertex, isPanning, isInsideWarehouse, hasCollision, saveToHistory, findClosestWall, wallEditMode, isDraggingVertex])
   
   // Double click to add vertex
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -954,6 +1105,141 @@ export default function FloorPlanCanvas({
     saveToHistory(newVertices, items)
   }, [editingWall, wallLength, vertices, items, saveToHistory])
   
+  // IKEA-style wall editing functions
+  
+  // Split wall at midpoint
+  const splitWall = useCallback(() => {
+    if (selectedWallIdx === null) return
+    
+    const v1 = vertices[selectedWallIdx]
+    const v2 = vertices[(selectedWallIdx + 1) % vertices.length]
+    
+    const midpoint = {
+      x: Math.round((v1.x + v2.x) / 2),
+      y: Math.round((v1.y + v2.y) / 2)
+    }
+    
+    const newVertices = [...vertices]
+    newVertices.splice(selectedWallIdx + 1, 0, midpoint)
+    
+    setVertices(newVertices)
+    setSelectedWallIdx(null)
+    saveToHistory(newVertices, items)
+  }, [selectedWallIdx, vertices, items, saveToHistory])
+  
+  // Delete selected vertex
+  const deleteVertex = useCallback(() => {
+    if (selectedVertexIdx === null || vertices.length <= 3) return
+    
+    const newVertices = vertices.filter((_, i) => i !== selectedVertexIdx)
+    setVertices(newVertices)
+    setSelectedVertexIdx(null)
+    saveToHistory(newVertices, items)
+  }, [selectedVertexIdx, vertices, items, saveToHistory])
+  
+  // Calculate wall normal (perpendicular direction)
+  const getWallNormal = useCallback((wallIdx: number): { nx: number; ny: number } => {
+    const v1 = vertices[wallIdx]
+    const v2 = vertices[(wallIdx + 1) % vertices.length]
+    
+    const dx = v2.x - v1.x
+    const dy = v2.y - v1.y
+    const len = Math.sqrt(dx * dx + dy * dy)
+    
+    if (len === 0) return { nx: 0, ny: -1 }
+    
+    // Perpendicular normal (points "inward" for clockwise vertices)
+    return { nx: -dy / len, ny: dx / len }
+  }, [vertices])
+  
+  // Add indent (inward notch) to selected wall
+  const addIndent = useCallback(() => {
+    if (selectedWallIdx === null) return
+    
+    const v1 = vertices[selectedWallIdx]
+    const v2 = vertices[(selectedWallIdx + 1) % vertices.length]
+    
+    const dx = v2.x - v1.x
+    const dy = v2.y - v1.y
+    const len = Math.sqrt(dx * dx + dy * dy)
+    
+    if (len < 8) {
+      toast({ title: 'Wall too short for indent', variant: 'destructive' })
+      return
+    }
+    
+    const { nx, ny } = getWallNormal(selectedWallIdx)
+    
+    // Indent parameters
+    const depth = 4 // 4 feet inward
+    const halfWidth = Math.min(len / 4, 4) // Max 8ft wide, or 1/4 of wall
+    
+    // Direction along wall
+    const ux = dx / len
+    const uy = dy / len
+    
+    // Midpoint of wall
+    const midX = (v1.x + v2.x) / 2
+    const midY = (v1.y + v2.y) / 2
+    
+    // 4 new points for indent
+    const p1 = { x: Math.round(midX - ux * halfWidth), y: Math.round(midY - uy * halfWidth) }
+    const p2 = { x: Math.round(p1.x + nx * depth), y: Math.round(p1.y + ny * depth) }
+    const p3 = { x: Math.round(midX + ux * halfWidth + nx * depth), y: Math.round(midY + uy * halfWidth + ny * depth) }
+    const p4 = { x: Math.round(midX + ux * halfWidth), y: Math.round(midY + uy * halfWidth) }
+    
+    const newVertices = [...vertices]
+    newVertices.splice(selectedWallIdx + 1, 0, p1, p2, p3, p4)
+    
+    setVertices(newVertices)
+    setSelectedWallIdx(null)
+    saveToHistory(newVertices, items)
+  }, [selectedWallIdx, vertices, items, getWallNormal, saveToHistory, toast])
+  
+  // Add bump (outward protrusion) to selected wall
+  const addBump = useCallback(() => {
+    if (selectedWallIdx === null) return
+    
+    const v1 = vertices[selectedWallIdx]
+    const v2 = vertices[(selectedWallIdx + 1) % vertices.length]
+    
+    const dx = v2.x - v1.x
+    const dy = v2.y - v1.y
+    const len = Math.sqrt(dx * dx + dy * dy)
+    
+    if (len < 8) {
+      toast({ title: 'Wall too short for bump', variant: 'destructive' })
+      return
+    }
+    
+    const { nx, ny } = getWallNormal(selectedWallIdx)
+    
+    // Bump parameters (outward = negative normal direction)
+    const depth = -4 // 4 feet outward
+    const halfWidth = Math.min(len / 4, 4)
+    
+    // Direction along wall
+    const ux = dx / len
+    const uy = dy / len
+    
+    // Midpoint of wall
+    const midX = (v1.x + v2.x) / 2
+    const midY = (v1.y + v2.y) / 2
+    
+    // 4 new points for bump
+    const p1 = { x: Math.round(midX - ux * halfWidth), y: Math.round(midY - uy * halfWidth) }
+    const p2 = { x: Math.round(p1.x + nx * depth), y: Math.round(p1.y + ny * depth) }
+    const p3 = { x: Math.round(midX + ux * halfWidth + nx * depth), y: Math.round(midY + uy * halfWidth + ny * depth) }
+    const p4 = { x: Math.round(midX + ux * halfWidth), y: Math.round(midY + uy * halfWidth) }
+    
+    const newVertices = [...vertices]
+    newVertices.splice(selectedWallIdx + 1, 0, p1, p2, p3, p4)
+    
+    setVertices(newVertices)
+    setSelectedWallIdx(null)
+    saveToHistory(newVertices, items)
+  }, [selectedWallIdx, vertices, items, getWallNormal, saveToHistory, toast])
+  
   const handleSave = useCallback(async () => {
     // Call parent onSave if provided
     if (onSave) {
@@ -1034,18 +1320,39 @@ export default function FloorPlanCanvas({
       // Ignore if typing in input
       if (e.target instanceof HTMLInputElement) return
       
+      // Escape key - exit wall edit mode
+      if (e.key === 'Escape') {
+        if (wallEditMode) {
+          exitWallEditMode()
+        }
+        return
+      }
+      
+      // Delete/Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // In wall edit mode, delete selected vertex
+        if (wallEditMode && selectedVertexIdx !== null) {
+          deleteVertex()
+          return
+        }
+        // Normal mode, delete selected item/opening
         if (selectedItem !== null || selectedOpening !== null) {
           deleteSelected()
         }
       }
-      if (e.key === 'r' || e.key === 'R') {
-        rotateSelected()
+      
+      // These shortcuts are disabled in wall edit mode
+      if (!wallEditMode) {
+        if (e.key === 'r' || e.key === 'R') {
+          rotateSelected()
+        }
+        if (e.key === 'd' && e.ctrlKey) {
+          e.preventDefault()
+          duplicateSelected()
+        }
       }
-      if (e.key === 'd' && e.ctrlKey) {
-        e.preventDefault()
-        duplicateSelected()
-      }
+      
+      // Undo/Redo work in any mode
       if (e.key === 'z' && e.ctrlKey) {
         e.preventDefault()
         undo()
@@ -1057,7 +1364,7 @@ export default function FloorPlanCanvas({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem, selectedOpening, deleteSelected, rotateSelected, duplicateSelected, undo, redo])
+  }, [selectedItem, selectedOpening, deleteSelected, rotateSelected, duplicateSelected, undo, redo, wallEditMode, selectedVertexIdx, deleteVertex, exitWallEditMode])
 
   // Loading state
   return (
@@ -1123,6 +1430,27 @@ export default function FloorPlanCanvas({
               title="Redo (Ctrl+Y)"
             >↪️</button>
           </div>
+          
+          {/* Wall Edit Mode Toggle */}
+          <button 
+            onClick={() => {
+              if (wallEditMode) {
+                exitWallEditMode()
+              } else {
+                setWallEditMode(true)
+                setSelectedItem(null)
+                setSelectedOpening(null)
+              }
+            }}
+            className={`px-4 py-2 rounded font-medium flex items-center gap-2 transition-colors ${
+              wallEditMode 
+                ? 'bg-purple-600 hover:bg-purple-700 ring-2 ring-purple-400' 
+                : 'bg-slate-700 hover:bg-slate-600'
+            }`}
+            title="Toggle Wall Edit Mode"
+          >
+            🏗️ {wallEditMode ? 'Exit Edit' : 'Edit Walls'}
+          </button>
           
           {/* Shape Templates */}
           <div className="flex gap-1 border-l border-slate-600 pl-4">
@@ -1274,6 +1602,87 @@ export default function FloorPlanCanvas({
                   </div>
                 </div>
               )}
+              
+              {/* Wall Edit Mode - Floating Toolbar for Wall Selection */}
+              {wallEditMode && selectedWallIdx !== null && (
+                <div 
+                  className="absolute bg-slate-800 p-3 rounded-lg shadow-xl border border-purple-500 z-20"
+                  style={{ left: wallToolbarPos.x, top: wallToolbarPos.y }}
+                >
+                  <div className="text-xs text-purple-400 mb-2 font-medium">Wall {selectedWallIdx + 1} Selected</div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={splitWall}
+                      className="px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm font-medium flex items-center gap-1"
+                      title="Add vertex at wall midpoint"
+                    >
+                      ✂️ Split
+                    </button>
+                    <button 
+                      onClick={addIndent}
+                      className="px-3 py-2 bg-orange-600 rounded hover:bg-orange-700 text-sm font-medium flex items-center gap-1"
+                      title="Add inward indent"
+                    >
+                      ⬇️ Indent
+                    </button>
+                    <button 
+                      onClick={addBump}
+                      className="px-3 py-2 bg-cyan-600 rounded hover:bg-cyan-700 text-sm font-medium flex items-center gap-1"
+                      title="Add outward bump"
+                    >
+                      ⬆️ Bump
+                    </button>
+                    <button 
+                      onClick={() => setSelectedWallIdx(null)}
+                      className="px-2 py-2 bg-slate-600 rounded hover:bg-slate-500 text-sm"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Wall Edit Mode - Floating Toolbar for Vertex Selection */}
+              {wallEditMode && selectedVertexIdx !== null && !isDraggingVertex && (
+                <div 
+                  className="absolute bg-slate-800 p-3 rounded-lg shadow-xl border border-green-500 z-20"
+                  style={{ left: wallToolbarPos.x, top: wallToolbarPos.y }}
+                >
+                  <div className="text-xs text-green-400 mb-2 font-medium">Vertex {selectedVertexIdx + 1} Selected</div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={deleteVertex}
+                      disabled={vertices.length <= 3}
+                      className={`px-3 py-2 rounded text-sm font-medium flex items-center gap-1 ${
+                        vertices.length <= 3 
+                          ? 'bg-slate-600 opacity-50 cursor-not-allowed' 
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
+                      title={vertices.length <= 3 ? 'Minimum 3 vertices required' : 'Delete this vertex'}
+                    >
+                      🗑️ Delete Point
+                    </button>
+                    <button 
+                      onClick={() => setSelectedVertexIdx(null)}
+                      className="px-2 py-2 bg-slate-600 rounded hover:bg-slate-500 text-sm"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {vertices.length <= 3 && (
+                    <div className="text-xs text-slate-500 mt-2">Min 3 vertices needed</div>
+                  )}
+                </div>
+              )}
+              
+              {/* Wall Edit Mode Indicator */}
+              {wallEditMode && (
+                <div className="absolute top-4 left-4 bg-purple-600/90 text-white px-4 py-2 rounded-lg shadow-lg z-10 flex items-center gap-2">
+                  <span className="animate-pulse">🏗️</span>
+                  <span className="font-medium">Wall Edit Mode</span>
+                  <span className="text-purple-200 text-sm">• Click vertices or walls to select</span>
+                </div>
+              )}
             </>
           ) : (
             <div 
@@ -1336,30 +1745,52 @@ export default function FloorPlanCanvas({
         
         {/* Help text */}
         <div className="mt-3 text-sm text-slate-400 flex items-center flex-wrap gap-x-2 gap-y-1">
-          <span><span className="text-blue-400 font-medium">Click</span> corners to drag</span>
-          <span>•</span>
-          <span><span className="text-blue-400 font-medium">Double-click</span> wall to add corner</span>
-          <span>•</span>
-          <span><span className="text-blue-400 font-medium">Click</span> wall to edit length</span>
-          <span>•</span>
-          <span><span className="text-blue-400 font-medium">Drag</span> items/doors from catalog</span>
-          <span>•</span>
-          <span><span className="text-yellow-400 font-medium">[R]</span> Rotate</span>
-          <span>•</span>
-          <span><span className="text-yellow-400 font-medium">[Del]</span> Delete</span>
-          <span>•</span>
-          <span><span className="text-yellow-400 font-medium">[Ctrl+D]</span> Duplicate</span>
-          <span>•</span>
-          <span><span className="text-yellow-400 font-medium">[Scroll]</span> Zoom</span>
-          <span>•</span>
-          <span><span className="text-yellow-400 font-medium">[Middle Mouse]</span> Pan</span>
-          {selectedItem !== null && (
-            <button 
-              onClick={deleteSelected} 
-              className="ml-4 px-3 py-1 bg-red-600 rounded text-white text-xs font-medium hover:bg-red-700"
-            >
-              🗑️ Delete Selected
-            </button>
+          {wallEditMode ? (
+            // Wall edit mode help
+            <>
+              <span><span className="text-purple-400 font-medium">Click vertex</span> to select & drag</span>
+              <span>•</span>
+              <span><span className="text-purple-400 font-medium">Click wall</span> to select</span>
+              <span>•</span>
+              <span><span className="text-green-400 font-medium">Split</span> adds midpoint vertex</span>
+              <span>•</span>
+              <span><span className="text-orange-400 font-medium">Indent</span> creates inward notch</span>
+              <span>•</span>
+              <span><span className="text-cyan-400 font-medium">Bump</span> creates outward protrusion</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[Del]</span> Delete vertex</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[Esc]</span> Exit edit mode</span>
+            </>
+          ) : (
+            // Normal mode help
+            <>
+              <span><span className="text-blue-400 font-medium">Click</span> corners to drag</span>
+              <span>•</span>
+              <span><span className="text-blue-400 font-medium">Double-click</span> wall to add corner</span>
+              <span>•</span>
+              <span><span className="text-blue-400 font-medium">Click</span> wall to edit length</span>
+              <span>•</span>
+              <span><span className="text-blue-400 font-medium">Drag</span> items/doors from catalog</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[R]</span> Rotate</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[Del]</span> Delete</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[Ctrl+D]</span> Duplicate</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[Scroll]</span> Zoom</span>
+              <span>•</span>
+              <span><span className="text-yellow-400 font-medium">[Middle Mouse]</span> Pan</span>
+              {selectedItem !== null && (
+                <button 
+                  onClick={deleteSelected} 
+                  className="ml-4 px-3 py-1 bg-red-600 rounded text-white text-xs font-medium hover:bg-red-700"
+                >
+                  🗑️ Delete Selected
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
