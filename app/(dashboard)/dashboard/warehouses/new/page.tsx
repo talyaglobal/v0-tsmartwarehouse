@@ -212,6 +212,7 @@ export default function NewWarehousePage() {
       volumeDiscounts: Record<string, string>
     }>,
   })
+
   const [palletPricingErrors, setPalletPricingErrors] = useState<Record<string, string>>({})
   const [palletPricingSectionErrors, setPalletPricingSectionErrors] = useState<Record<string, string>>({})
 
@@ -439,7 +440,7 @@ export default function NewWarehousePage() {
         setPalletPricingErrors(fieldErrors)
         setPalletPricingSectionErrors(sectionErrors)
         setIsLoading(false)
-        setCurrentStep(5)
+        setCurrentStep(4)
         return
       }
 
@@ -620,7 +621,7 @@ export default function NewWarehousePage() {
     }
   }
 
-  const progress = (currentStep / 6) * 100
+  const progress = (currentStep / STEPS.length) * 100
 
   return (
     <div className="space-y-6">

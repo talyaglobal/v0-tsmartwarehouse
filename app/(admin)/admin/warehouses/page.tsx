@@ -445,6 +445,12 @@ export default function WarehousesPage() {
                                   Edit
                                 </Link>
                               </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/warehouses/${warehouse.id}/floor-plan`}>
+                                  <MapPin className="h-4 w-4 mr-2" />
+                                  Floor Plan
+                                </Link>
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 className="text-red-600"

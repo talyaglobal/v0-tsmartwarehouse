@@ -220,6 +220,7 @@ export default function EditWarehousePage() {
       volumeDiscounts: Record<string, string>
     }>,
   })
+
   const [palletPricingErrors, setPalletPricingErrors] = useState<Record<string, string>>({})
   const [palletPricingSectionErrors, setPalletPricingSectionErrors] = useState<Record<string, string>>({})
 
@@ -1555,6 +1556,7 @@ export default function EditWarehousePage() {
 
             </div>
           )}
+
 
         </CardContent>
         <CardFooter className="flex justify-between">

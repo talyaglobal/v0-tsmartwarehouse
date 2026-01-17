@@ -110,8 +110,36 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
           length_max_cm,
           width_min_cm,
           width_max_cm,
+          stackable_adjustment_type,
+          stackable_adjustment_value,
+          unstackable_adjustment_type,
+          unstackable_adjustment_value,
           warehouse_custom_pallet_size_height_pricing(id, height_min_cm, height_max_cm, price_per_unit)
         )
+      ),
+      warehouse_floors(
+        id,
+        name,
+        floor_level,
+        length_m,
+        width_m,
+        height_m,
+        wall_clearance_m,
+        sprinkler_clearance_m,
+        safety_clearance_m,
+        main_aisle_m,
+        side_aisle_m,
+        pedestrian_aisle_m,
+        loading_zone_depth_m,
+        dock_zone_depth_m,
+        standard_pallet_height_m,
+        euro_pallet_height_m,
+        custom_pallet_length_cm,
+        custom_pallet_width_cm,
+        custom_pallet_height_cm,
+        stacking_override,
+        status,
+        warehouse_floor_zones(id, zone_type, x_m, y_m, width_m, height_m, rotation_deg, status)
       )
     `)
     .eq('id', id)
@@ -397,6 +425,38 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     })
   }
 
+  const floorPlans = (row.warehouse_floors || []).map((floor: any) => ({
+    id: floor.id,
+    name: floor.name,
+    floorLevel: floor.floor_level,
+    lengthM: Number(floor.length_m),
+    widthM: Number(floor.width_m),
+    heightM: Number(floor.height_m),
+    wallClearanceM: Number(floor.wall_clearance_m),
+    sprinklerClearanceM: Number(floor.sprinkler_clearance_m),
+    safetyClearanceM: Number(floor.safety_clearance_m),
+    mainAisleM: Number(floor.main_aisle_m),
+    sideAisleM: Number(floor.side_aisle_m),
+    pedestrianAisleM: Number(floor.pedestrian_aisle_m),
+    loadingZoneDepthM: Number(floor.loading_zone_depth_m),
+    dockZoneDepthM: Number(floor.dock_zone_depth_m),
+    standardPalletHeightM: Number(floor.standard_pallet_height_m),
+    euroPalletHeightM: Number(floor.euro_pallet_height_m),
+    customPalletLengthCm: Number(floor.custom_pallet_length_cm),
+    customPalletWidthCm: Number(floor.custom_pallet_width_cm),
+    customPalletHeightCm: Number(floor.custom_pallet_height_cm),
+    stackingOverride: floor.stacking_override,
+    zones: (floor.warehouse_floor_zones || []).map((zone: any) => ({
+      id: zone.id,
+      zoneType: zone.zone_type,
+      xM: Number(zone.x_m),
+      yM: Number(zone.y_m),
+      widthM: Number(zone.width_m),
+      heightM: Number(zone.height_m),
+      rotationDeg: Number(zone.rotation_deg || 0),
+    })),
+  }))
+
   const warehouse: Warehouse = {
     id: row.id,
     name: row.name,
@@ -442,6 +502,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
       ? row.overtime_price as any
       : undefined, // New field - JSONB object with per-pallet in/out pricing
     freeStorageRules: Array.isArray(row.free_storage_rules) ? row.free_storage_rules : [],
+    floorPlans: floorPlans.length > 0 ? floorPlans : undefined,
     pricing: Object.keys(pricing).length > 0 ? pricing : undefined, // Add pricing to warehouse object
     // Additional fields
     warehouseInFee: row.warehouse_in_fee != null && row.warehouse_in_fee !== '' ? parseFloat(row.warehouse_in_fee.toString()) : undefined,

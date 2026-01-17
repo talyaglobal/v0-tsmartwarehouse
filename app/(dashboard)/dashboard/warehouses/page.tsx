@@ -526,6 +526,12 @@ export default function WarehousesPage() {
                           </Button>
                         </Link>
                       </div>
+                      <Link href={`/dashboard/warehouses/${warehouse.id}/floor-plan`}>
+                        <Button variant="outline" className="w-full">
+                          <MapPin className="h-4 w-4 mr-2" />
+                          Floor Plan
+                        </Button>
+                      </Link>
                       <div className="flex gap-2 mb-2">
                         <Button
                           variant="outline"
@@ -660,6 +666,12 @@ export default function WarehousesPage() {
                             <Link href={`/dashboard/warehouses/${warehouse.id}/edit?step=4`}>
                               <DollarSign className="h-4 w-4 mr-2" />
                               Set Price
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/warehouses/${warehouse.id}/floor-plan`}>
+                              <MapPin className="h-4 w-4 mr-2" />
+                              Floor Plan
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem

@@ -134,6 +134,40 @@ export interface PalletPricing {
 
 export type PricingAdjustmentType = 'rate' | 'plus_per_unit'
 
+export interface WarehouseFloorZone {
+  id?: string
+  zoneType: string
+  xM: number
+  yM: number
+  widthM: number
+  heightM: number
+  rotationDeg?: number
+}
+
+export interface WarehouseFloorPlan {
+  id?: string
+  name: string
+  floorLevel: number
+  lengthM: number
+  widthM: number
+  heightM: number
+  wallClearanceM: number
+  sprinklerClearanceM: number
+  safetyClearanceM: number
+  mainAisleM: number
+  sideAisleM: number
+  pedestrianAisleM: number
+  loadingZoneDepthM: number
+  dockZoneDepthM: number
+  standardPalletHeightM: number
+  euroPalletHeightM: number
+  customPalletLengthCm: number
+  customPalletWidthCm: number
+  customPalletHeightCm: number
+  stackingOverride?: number | null
+  zones: WarehouseFloorZone[]
+}
+
 export interface Warehouse {
   id: string
   name: string
@@ -194,6 +228,7 @@ export interface Warehouse {
     container20DC?: number
   }> // Ports and transportation information
   freeStorageRules?: FreeStorageRule[] // Free storage allowance rules based on booking duration
+  floorPlans?: WarehouseFloorPlan[] // Floor plan layouts
   pricing?: {
     pallet?: {
       basePrice: number

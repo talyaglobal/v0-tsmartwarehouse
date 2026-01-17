@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { z } from "zod"
 
 const freeStorageRuleSchema = z.object({
@@ -17,6 +18,38 @@ const freeStorageRuleSchema = z.object({
   (rule) => rule.maxDuration === undefined || rule.maxDuration >= rule.minDuration,
   { message: "Max duration must be greater than or equal to min duration" }
 )
+
+const floorZoneSchema = z.object({
+  zoneType: z.string().min(1),
+  xM: z.number().nonnegative(),
+  yM: z.number().nonnegative(),
+  widthM: z.number().positive(),
+  heightM: z.number().positive(),
+  rotationDeg: z.number().optional(),
+})
+
+const floorPlanSchema = z.object({
+  name: z.string().min(1),
+  floorLevel: z.number().int(),
+  lengthM: z.number().positive(),
+  widthM: z.number().positive(),
+  heightM: z.number().positive(),
+  wallClearanceM: z.number().nonnegative(),
+  sprinklerClearanceM: z.number().nonnegative(),
+  safetyClearanceM: z.number().nonnegative(),
+  mainAisleM: z.number().nonnegative(),
+  sideAisleM: z.number().nonnegative(),
+  pedestrianAisleM: z.number().nonnegative(),
+  loadingZoneDepthM: z.number().nonnegative(),
+  dockZoneDepthM: z.number().nonnegative(),
+  standardPalletHeightM: z.number().positive(),
+  euroPalletHeightM: z.number().positive(),
+  customPalletLengthCm: z.number().positive(),
+  customPalletWidthCm: z.number().positive(),
+  customPalletHeightCm: z.number().positive(),
+  stackingOverride: z.number().int().positive().nullable().optional(),
+  zones: z.array(floorZoneSchema),
+})
 import type { ErrorResponse, ApiResponse } from "@/types/api"
 
 const updateWarehouseSchema = z.object({
@@ -121,6 +154,7 @@ const updateWarehouseSchema = z.object({
     container20DC: z.number().nonnegative().optional(),
   })).optional(),
   freeStorageRules: z.array(freeStorageRuleSchema).optional(),
+  floorPlans: z.array(floorPlanSchema).optional(),
   pricing: z.array(z.object({
     pricing_type: z.enum(["pallet", "pallet-monthly", "area", "area-rental"]),
     base_price: z.number().positive(),
@@ -220,7 +254,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const supabase = createServerSupabaseClient()
+    const supabase = createAdminClient()
 
     // Build update object with only provided fields
     const updateFields: Record<string, any> = {}
@@ -585,6 +619,87 @@ export async function PUT(
           }
         }
       }
+
+    if (validated.floorPlans) {
+      const { data: existingFloors } = await supabase
+        .from('warehouse_floors')
+        .select('id')
+        .eq('warehouse_id', warehouseId)
+
+      const floorIds = (existingFloors || []).map((floor) => floor.id)
+      if (floorIds.length > 0) {
+        await supabase.from('warehouse_floor_zones').delete().in('floor_id', floorIds)
+        await supabase.from('warehouse_floor_aisle_defs').delete().in('floor_id', floorIds)
+        await supabase.from('warehouse_floor_pallet_layouts').delete().in('floor_id', floorIds)
+        await supabase.from('warehouse_floors').delete().in('id', floorIds)
+      }
+
+      if (validated.floorPlans.length > 0) {
+        const { data: floorRows, error: floorError } = await supabase
+          .from('warehouse_floors')
+          .insert(
+            validated.floorPlans.map((floor) => ({
+              warehouse_id: warehouseId,
+              name: floor.name,
+              floor_level: floor.floorLevel,
+              length_m: floor.lengthM,
+              width_m: floor.widthM,
+              height_m: floor.heightM,
+              wall_clearance_m: floor.wallClearanceM,
+              sprinkler_clearance_m: floor.sprinklerClearanceM,
+              safety_clearance_m: floor.safetyClearanceM,
+              main_aisle_m: floor.mainAisleM,
+              side_aisle_m: floor.sideAisleM,
+              pedestrian_aisle_m: floor.pedestrianAisleM,
+              loading_zone_depth_m: floor.loadingZoneDepthM,
+              dock_zone_depth_m: floor.dockZoneDepthM,
+              standard_pallet_height_m: floor.standardPalletHeightM,
+              euro_pallet_height_m: floor.euroPalletHeightM,
+              custom_pallet_length_cm: floor.customPalletLengthCm,
+              custom_pallet_width_cm: floor.customPalletWidthCm,
+              custom_pallet_height_cm: floor.customPalletHeightCm,
+              stacking_override: floor.stackingOverride ?? null,
+              status: true,
+            }))
+          )
+          .select('id')
+
+        if (floorError || !floorRows) {
+          console.error('Error creating floor plans:', floorError)
+        } else {
+          const zoneRows = floorRows.flatMap((floorRow, index) => {
+            const floor = validated.floorPlans?.[index]
+            if (!floor || !floor.zones || floor.zones.length === 0) return []
+            return floor.zones.map((zone) => ({
+              floor_id: floorRow.id,
+              zone_type: zone.zoneType,
+              x_m: zone.xM,
+              y_m: zone.yM,
+              width_m: zone.widthM,
+              height_m: zone.heightM,
+              rotation_deg: zone.rotationDeg ?? 0,
+              status: true,
+            }))
+          })
+          if (zoneRows.length > 0) {
+            await supabase.from('warehouse_floor_zones').insert(zoneRows)
+          }
+
+          const aisleRows = floorRows.flatMap((floorRow, index) => {
+            const floor = validated.floorPlans?.[index]
+            if (!floor) return []
+            return [
+              { floor_id: floorRow.id, aisle_type: 'main', width_m: floor.mainAisleM, status: true },
+              { floor_id: floorRow.id, aisle_type: 'side', width_m: floor.sideAisleM, status: true },
+              { floor_id: floorRow.id, aisle_type: 'pedestrian', width_m: floor.pedestrianAisleM, status: true },
+            ]
+          })
+          if (aisleRows.length > 0) {
+            await supabase.from('warehouse_floor_aisle_defs').insert(aisleRows)
+          }
+        }
+      }
+    }
     }
 
     const responseData: ApiResponse = {
@@ -663,13 +778,27 @@ export async function DELETE(
       }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createAdminClient()
+
+    // Clean up floor plan data first to avoid FK/RLS issues
+    const { data: floorIds } = await supabase
+      .from("warehouse_floors")
+      .select("id")
+      .eq("warehouse_id", warehouseId)
+
+    if (floorIds && floorIds.length > 0) {
+      const ids = floorIds.map((floor) => floor.id)
+      await supabase.from("warehouse_floor_zones").delete().in("floor_id", ids)
+      await supabase.from("warehouse_floor_aisle_defs").delete().in("floor_id", ids)
+      await supabase.from("warehouse_floor_pallet_layouts").delete().in("floor_id", ids)
+      await supabase.from("warehouse_floors").delete().in("id", ids)
+    }
 
     // Soft delete the warehouse by setting status to false
     const { error } = await supabase
-      .from('warehouses')
+      .from("warehouses")
       .update({ status: false, updated_at: new Date().toISOString() })
-      .eq('id', warehouseId)
+      .eq("id", warehouseId)
 
     if (error) {
       console.error('Error deleting warehouse:', error)

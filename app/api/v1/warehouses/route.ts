@@ -19,6 +19,38 @@ const freeStorageRuleSchema = z.object({
   { message: "Max duration must be greater than or equal to min duration" }
 )
 
+const floorZoneSchema = z.object({
+  zoneType: z.string().min(1),
+  xM: z.number().nonnegative(),
+  yM: z.number().nonnegative(),
+  widthM: z.number().positive(),
+  heightM: z.number().positive(),
+  rotationDeg: z.number().optional(),
+})
+
+const floorPlanSchema = z.object({
+  name: z.string().min(1),
+  floorLevel: z.number().int(),
+  lengthM: z.number().positive(),
+  widthM: z.number().positive(),
+  heightM: z.number().positive(),
+  wallClearanceM: z.number().nonnegative(),
+  sprinklerClearanceM: z.number().nonnegative(),
+  safetyClearanceM: z.number().nonnegative(),
+  mainAisleM: z.number().nonnegative(),
+  sideAisleM: z.number().nonnegative(),
+  pedestrianAisleM: z.number().nonnegative(),
+  loadingZoneDepthM: z.number().nonnegative(),
+  dockZoneDepthM: z.number().nonnegative(),
+  standardPalletHeightM: z.number().positive(),
+  euroPalletHeightM: z.number().positive(),
+  customPalletLengthCm: z.number().positive(),
+  customPalletWidthCm: z.number().positive(),
+  customPalletHeightCm: z.number().positive(),
+  stackingOverride: z.number().int().positive().nullable().optional(),
+  zones: z.array(floorZoneSchema),
+})
+
 const createWarehouseSchema = z.object({
   address: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
@@ -125,6 +157,7 @@ const createWarehouseSchema = z.object({
     container20DC: z.number().nonnegative().optional(),
   })).optional(),
   freeStorageRules: z.array(freeStorageRuleSchema).optional(),
+  floorPlans: z.array(floorPlanSchema).optional(),
   // Pricing (will be handled separately in warehouse_pricing table)
   pricing: z.array(z.object({
     pricing_type: z.enum(["pallet", "pallet-monthly", "area", "area-rental"]),
@@ -448,6 +481,75 @@ export async function POST(request: NextRequest) {
               status: true,
             }))
           )
+        }
+      }
+    }
+
+    // Create floor plans if provided
+    if (validated.floorPlans && validated.floorPlans.length > 0) {
+      const supabase = await createServerSupabaseClient()
+      const { data: floorRows, error: floorError } = await supabase
+        .from('warehouse_floors')
+        .insert(
+          validated.floorPlans.map((floor) => ({
+            warehouse_id: warehouse.id,
+            name: floor.name,
+            floor_level: floor.floorLevel,
+            length_m: floor.lengthM,
+            width_m: floor.widthM,
+            height_m: floor.heightM,
+            wall_clearance_m: floor.wallClearanceM,
+            sprinkler_clearance_m: floor.sprinklerClearanceM,
+            safety_clearance_m: floor.safetyClearanceM,
+            main_aisle_m: floor.mainAisleM,
+            side_aisle_m: floor.sideAisleM,
+            pedestrian_aisle_m: floor.pedestrianAisleM,
+            loading_zone_depth_m: floor.loadingZoneDepthM,
+            dock_zone_depth_m: floor.dockZoneDepthM,
+            standard_pallet_height_m: floor.standardPalletHeightM,
+            euro_pallet_height_m: floor.euroPalletHeightM,
+            custom_pallet_length_cm: floor.customPalletLengthCm,
+            custom_pallet_width_cm: floor.customPalletWidthCm,
+            custom_pallet_height_cm: floor.customPalletHeightCm,
+            stacking_override: floor.stackingOverride ?? null,
+            status: true,
+          }))
+        )
+        .select('id')
+
+      if (floorError || !floorRows) {
+        console.error('Error creating floor plans:', floorError)
+      } else {
+        const zoneRows = floorRows.flatMap((floorRow, index) => {
+          const floor = validated.floorPlans?.[index]
+          if (!floor || !floor.zones || floor.zones.length === 0) return []
+          return floor.zones.map((zone) => ({
+            floor_id: floorRow.id,
+            zone_type: zone.zoneType,
+            x_m: zone.xM,
+            y_m: zone.yM,
+            width_m: zone.widthM,
+            height_m: zone.heightM,
+            rotation_deg: zone.rotationDeg ?? 0,
+            status: true,
+          }))
+        })
+
+        if (zoneRows.length > 0) {
+          await supabase.from('warehouse_floor_zones').insert(zoneRows)
+        }
+
+        const aisleRows = floorRows.flatMap((floorRow, index) => {
+          const floor = validated.floorPlans?.[index]
+          if (!floor) return []
+          return [
+            { floor_id: floorRow.id, aisle_type: 'main', width_m: floor.mainAisleM, status: true },
+            { floor_id: floorRow.id, aisle_type: 'side', width_m: floor.sideAisleM, status: true },
+            { floor_id: floorRow.id, aisle_type: 'pedestrian', width_m: floor.pedestrianAisleM, status: true },
+          ]
+        })
+        if (aisleRows.length > 0) {
+          await supabase.from('warehouse_floor_aisle_defs').insert(aisleRows)
         }
       }
     }
