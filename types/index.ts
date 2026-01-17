@@ -165,6 +165,10 @@ export interface WarehouseFloorPlan {
   customPalletWidthCm: number
   customPalletHeightCm: number
   stackingOverride?: number | null
+  outlinePoints?: Array<{
+    xM: number
+    yM: number
+  }>
   zones: WarehouseFloorZone[]
 }
 

@@ -137,6 +137,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
         custom_pallet_length_cm,
         custom_pallet_width_cm,
         custom_pallet_height_cm,
+        outline_points,
         stacking_override,
         status,
         warehouse_floor_zones(id, zone_type, x_m, y_m, width_m, height_m, rotation_deg, status)
@@ -446,6 +447,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     customPalletWidthCm: Number(floor.custom_pallet_width_cm),
     customPalletHeightCm: Number(floor.custom_pallet_height_cm),
     stackingOverride: floor.stacking_override,
+    outlinePoints: Array.isArray(floor.outline_points) ? floor.outline_points : [],
     zones: (floor.warehouse_floor_zones || []).map((zone: any) => ({
       id: zone.id,
       zoneType: zone.zone_type,

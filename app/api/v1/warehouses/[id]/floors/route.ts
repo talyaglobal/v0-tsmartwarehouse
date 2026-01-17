@@ -36,6 +36,14 @@ const floorPlanSchema = z.object({
   customPalletWidthCm: z.number().positive(),
   customPalletHeightCm: z.number().positive(),
   stackingOverride: z.number().int().positive().nullable().optional(),
+  outlinePoints: z
+    .array(
+      z.object({
+        xM: z.number().nonnegative(),
+        yM: z.number().nonnegative(),
+      })
+    )
+    .optional(),
   zones: z.array(floorZoneSchema),
 })
 
@@ -78,7 +86,7 @@ export async function GET(
     const { data, error } = await supabase
       .from("warehouse_floors")
       .select(
-        `id,name,floor_level,length_m,width_m,height_m,wall_clearance_m,sprinkler_clearance_m,safety_clearance_m,main_aisle_m,side_aisle_m,pedestrian_aisle_m,loading_zone_depth_m,dock_zone_depth_m,standard_pallet_height_m,euro_pallet_height_m,custom_pallet_length_cm,custom_pallet_width_cm,custom_pallet_height_cm,stacking_override,status,warehouse_floor_zones(id,zone_type,x_m,y_m,width_m,height_m,rotation_deg,status)`
+        `id,name,floor_level,length_m,width_m,height_m,wall_clearance_m,sprinkler_clearance_m,safety_clearance_m,main_aisle_m,side_aisle_m,pedestrian_aisle_m,loading_zone_depth_m,dock_zone_depth_m,standard_pallet_height_m,euro_pallet_height_m,custom_pallet_length_cm,custom_pallet_width_cm,custom_pallet_height_cm,stacking_override,outline_points,status,warehouse_floor_zones(id,zone_type,x_m,y_m,width_m,height_m,rotation_deg,status)`
       )
       .eq("warehouse_id", resolvedParams.id)
       .eq("status", true)
@@ -169,6 +177,7 @@ export async function POST(
           custom_pallet_width_cm: floor.customPalletWidthCm,
           custom_pallet_height_cm: floor.customPalletHeightCm,
           stacking_override: floor.stackingOverride ?? null,
+          outline_points: floor.outlinePoints ?? null,
           status: true,
         }))
       )
