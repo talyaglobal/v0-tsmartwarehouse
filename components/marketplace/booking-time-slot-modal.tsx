@@ -63,6 +63,12 @@ interface PalletItemInput {
   weight: number
 }
 
+// Standard pallet dimensions
+const STANDARD_PALLET_DIMENSIONS = {
+  standard: { length: 48, width: 40, unit: "in" }, // 48" x 40" GMA Pallet
+  euro: { length: 120, width: 80, unit: "cm" }, // 120cm x 80cm Euro Pallet
+}
+
 export function BookingTimeSlotModal({
   open,
   onOpenChange,
@@ -82,15 +88,18 @@ export function BookingTimeSlotModal({
   const [stackableChoice, setStackableChoice] = useState<"stackable" | "unstackable">("stackable")
   const [palletItems, setPalletItems] = useState<PalletItemInput[]>([])
 
-  const createPalletItem = (quantityOverride?: number): PalletItemInput => ({
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-    palletType: "standard",
-    quantity: quantityOverride ?? 0,
-    length: 0,
-    width: 0,
-    height: 0,
-    weight: 0,
-  })
+  const createPalletItem = (quantityOverride?: number, palletType: "standard" | "euro" | "custom" = "standard"): PalletItemInput => {
+    const standardDims = STANDARD_PALLET_DIMENSIONS[palletType as keyof typeof STANDARD_PALLET_DIMENSIONS]
+    return {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      palletType,
+      quantity: quantityOverride ?? 0,
+      length: standardDims?.length ?? 0,
+      width: standardDims?.width ?? 0,
+      height: 0,
+      weight: 0,
+    }
+  }
 
   const normalizeGoodsType = (value?: string) =>
     (value || "general").trim().toLowerCase()
@@ -256,17 +265,19 @@ export function BookingTimeSlotModal({
         alert("Please add at least one pallet size.")
         return
       }
-      const hasInvalid = palletItems.some(
-        (item) =>
-          !item.quantity ||
-          item.quantity <= 0 ||
-          item.length <= 0 ||
-          item.width <= 0 ||
-          item.height <= 0 ||
-          item.weight <= 0
-      )
+      const hasInvalid = palletItems.some((item) => {
+        // All pallets need quantity, height, and weight
+        if (!item.quantity || item.quantity <= 0 || item.height <= 0 || item.weight <= 0) {
+          return true
+        }
+        // Custom pallets also need length and width
+        if (item.palletType === "custom" && (item.length <= 0 || item.width <= 0)) {
+          return true
+        }
+        return false
+      })
       if (hasInvalid) {
-        alert("Please fill in pallet quantity, dimensions, and weight for all items.")
+        alert("Please fill in all required pallet details (quantity, height, and weight). Custom pallets also require length and width.")
         return
       }
       if (totalPalletQuantity !== quantity) {
@@ -315,10 +326,33 @@ export function BookingTimeSlotModal({
   const buildPalletDetails = (): PalletBookingDetails => {
     const pallets = palletItems.map((item) => {
       const isEuro = item.palletType === "euro"
-      const lengthCm = isEuro ? item.length : item.length * 2.54
-      const widthCm = isEuro ? item.width : item.width * 2.54
-      const heightCm = isEuro ? item.height : item.height * 2.54
-      const weightKg = isEuro ? item.weight : item.weight * 0.453592
+      const isStandard = item.palletType === "standard"
+      
+      // Use standard dimensions for standard/euro, user-provided for custom
+      let lengthCm: number
+      let widthCm: number
+      let heightCm: number
+      let weightKg: number
+      
+      if (isEuro) {
+        // Euro pallet: user enters in cm
+        lengthCm = STANDARD_PALLET_DIMENSIONS.euro.length
+        widthCm = STANDARD_PALLET_DIMENSIONS.euro.width
+        heightCm = item.height // cm
+        weightKg = item.weight // kg
+      } else if (isStandard) {
+        // Standard pallet: user enters in inches/lbs, convert to cm/kg
+        lengthCm = STANDARD_PALLET_DIMENSIONS.standard.length * 2.54 // 48" -> cm
+        widthCm = STANDARD_PALLET_DIMENSIONS.standard.width * 2.54 // 40" -> cm
+        heightCm = item.height * 2.54 // inches to cm
+        weightKg = item.weight * 0.453592 // lbs to kg
+      } else {
+        // Custom pallet: user enters in inches/lbs, convert to cm/kg
+        lengthCm = item.length * 2.54
+        widthCm = item.width * 2.54
+        heightCm = item.height * 2.54
+        weightKg = item.weight * 0.453592
+      }
 
       return {
         pallet_type: item.palletType,
@@ -339,7 +373,22 @@ export function BookingTimeSlotModal({
 
   const updatePalletItem = (id: string, updates: Partial<PalletItemInput>) => {
     setPalletItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      prev.map((item) => {
+        if (item.id !== id) return item
+        
+        // If pallet type is changing, update dimensions to standard values
+        if (updates.palletType && updates.palletType !== item.palletType) {
+          const standardDims = STANDARD_PALLET_DIMENSIONS[updates.palletType as keyof typeof STANDARD_PALLET_DIMENSIONS]
+          return {
+            ...item,
+            ...updates,
+            length: standardDims?.length ?? 0,
+            width: standardDims?.width ?? 0,
+          }
+        }
+        
+        return { ...item, ...updates }
+      })
     )
   }
 
@@ -422,8 +471,12 @@ export function BookingTimeSlotModal({
                   </div>
 
                   {palletItems.map((item, index) => {
-                    const dimensionUnit = item.palletType === "euro" ? "cm" : "in"
-                    const weightUnit = item.palletType === "euro" ? "kg" : "lb"
+                    const isCustom = item.palletType === "custom"
+                    const isEuro = item.palletType === "euro"
+                    const dimensionUnit = isEuro ? "cm" : "in"
+                    const weightUnit = isEuro ? "kg" : "lb"
+                    const standardDims = STANDARD_PALLET_DIMENSIONS[item.palletType as keyof typeof STANDARD_PALLET_DIMENSIONS]
+                    
                     return (
                       <div key={item.id} className="border rounded-lg p-3 space-y-3">
                         <div className="flex items-center justify-between">
@@ -454,8 +507,8 @@ export function BookingTimeSlotModal({
                                 <SelectValue placeholder="Select type" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="standard">Standard</SelectItem>
-                                <SelectItem value="euro">Euro</SelectItem>
+                                <SelectItem value="standard">Standard (48&quot; x 40&quot;)</SelectItem>
+                                <SelectItem value="euro">Euro (120cm x 80cm)</SelectItem>
                                 <SelectItem value="custom">Custom</SelectItem>
                               </SelectContent>
                             </Select>
@@ -474,33 +527,49 @@ export function BookingTimeSlotModal({
                             />
                           </div>
                         </div>
+                        
+                        {/* Show standard dimensions info for standard/euro pallets */}
+                        {!isCustom && standardDims && (
+                          <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-2">
+                            <span className="font-medium">Standard Dimensions:</span>{" "}
+                            {standardDims.length} x {standardDims.width} {standardDims.unit}
+                          </div>
+                        )}
+                        
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Length ({dimensionUnit})</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={item.length || ""}
-                              onChange={(event) =>
-                                updatePalletItem(item.id, {
-                                  length: Number(event.target.value) || 0,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Width ({dimensionUnit})</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={item.width || ""}
-                              onChange={(event) =>
-                                updatePalletItem(item.id, {
-                                  width: Number(event.target.value) || 0,
-                                })
-                              }
-                            />
-                          </div>
+                          {/* Length and Width only for custom pallets */}
+                          {isCustom && (
+                            <>
+                              <div className="space-y-2">
+                                <Label>Length ({dimensionUnit})</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={item.length || ""}
+                                  onChange={(event) =>
+                                    updatePalletItem(item.id, {
+                                      length: Number(event.target.value) || 0,
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Width ({dimensionUnit})</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={item.width || ""}
+                                  onChange={(event) =>
+                                    updatePalletItem(item.id, {
+                                      width: Number(event.target.value) || 0,
+                                    })
+                                  }
+                                />
+                              </div>
+                            </>
+                          )}
+                          
+                          {/* Height and Weight for all pallet types */}
                           <div className="space-y-2">
                             <Label>Height ({dimensionUnit})</Label>
                             <Input

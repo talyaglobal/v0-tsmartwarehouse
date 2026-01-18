@@ -427,10 +427,8 @@ export async function PUT(
       } else {
         // If empty object or all undefined, set to null
         updateData.overtimePrice = null
-        console.log('[EDIT API] OvertimePrice set to null (empty object)')
       }
     } else {
-      console.log('[EDIT API] OvertimePrice is undefined in validated data')
     }
     if (validated.ports !== undefined) updateData.ports = validated.ports
     if (validated.state !== undefined) updateData.state = validated.state

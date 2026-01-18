@@ -194,11 +194,9 @@ export async function setBookingAwaitingTimeSlot(
   bookingId: string,
   staffId: string
 ): Promise<Booking> {
-  console.log(`[setBookingAwaitingTimeSlot] Starting for bookingId: ${bookingId}, staffId: ${staffId}`)
   
   // Verify staff has access to the booking's warehouse
-  const booking = await getBookingById(bookingId, false) // Disable cache to get fresh data
-  console.log(`[setBookingAwaitingTimeSlot] Booking fetched:`, booking ? `Found (status: ${booking.status})` : 'Not found')
+  const booking = await getBookingById(bookingId, false) // Disable cache to get fresh data` : 'Not found')
   
   if (!booking) {
     console.error(`[setBookingAwaitingTimeSlot] Booking not found for ID: ${bookingId}`)
@@ -206,7 +204,6 @@ export async function setBookingAwaitingTimeSlot(
   }
 
   const hasAccess = await hasWarehouseAccess(staffId, booking.warehouseId)
-  console.log(`[setBookingAwaitingTimeSlot] Staff access check:`, hasAccess ? 'Has access' : 'No access')
   
   if (!hasAccess) {
     throw new Error("Staff member does not have access to this warehouse")
@@ -219,12 +216,9 @@ export async function setBookingAwaitingTimeSlot(
   }
 
   // Update booking status
-  console.log(`[setBookingAwaitingTimeSlot] Updating booking status to awaiting_time_slot`)
   const updatedBooking = await updateBooking(bookingId, {
     status: "awaiting_time_slot",
   })
-
-  console.log(`[setBookingAwaitingTimeSlot] Booking updated successfully`)
   return updatedBooking
 }
 
@@ -238,11 +232,9 @@ export async function proposeDateChange(
   newTime: string,
   staffId: string
 ): Promise<Booking> {
-  console.log(`[proposeDateChange] Starting for bookingId: ${bookingId}, staffId: ${staffId}, newDate: ${newDate}, newTime: ${newTime}`)
   
   // Verify staff has access to the booking's warehouse
-  const booking = await getBookingById(bookingId, false) // Disable cache to get fresh data
-  console.log(`[proposeDateChange] Booking fetched:`, booking ? `Found (status: ${booking.status})` : 'Not found')
+  const booking = await getBookingById(bookingId, false) // Disable cache to get fresh data` : 'Not found')
   
   if (!booking) {
     console.error(`[proposeDateChange] Booking not found for ID: ${bookingId}`)
@@ -250,7 +242,6 @@ export async function proposeDateChange(
   }
 
   const hasAccess = await hasWarehouseAccess(staffId, booking.warehouseId)
-  console.log(`[proposeDateChange] Staff access check:`, hasAccess ? 'Has access' : 'No access')
   
   if (!hasAccess) {
     throw new Error("Staff member does not have access to this warehouse")
@@ -266,10 +257,8 @@ export async function proposeDateChange(
 
   // Combine date and time into a single datetime
   const proposedDateTime = `${newDate}T${newTime}:00`
-  console.log(`[proposeDateChange] Proposed datetime: ${proposedDateTime}`)
 
   // Update booking with proposed date/time
-  console.log(`[proposeDateChange] Updating booking with proposed date/time`)
   const updatedBooking = await updateBooking(bookingId, {
     proposedStartDate: proposedDateTime,
     proposedStartTime: newTime,
@@ -277,8 +266,6 @@ export async function proposeDateChange(
     dateChangeRequestedBy: staffId,
     status: "awaiting_time_slot", // Set status to awaiting customer confirmation
   })
-
-  console.log(`[proposeDateChange] Booking updated successfully`)
   return updatedBooking
 }
 

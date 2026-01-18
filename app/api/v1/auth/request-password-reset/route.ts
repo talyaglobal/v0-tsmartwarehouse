@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Check if status is true
     if (profile.status !== true) {
-      console.log('Profile status is not active for user:', profile.id)
+
       // Don't reveal if email exists or not for security
       // Return success anyway
       const responseData: ApiResponse = {

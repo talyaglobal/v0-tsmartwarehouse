@@ -127,9 +127,7 @@ export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) =>
         console.warn('TeamMembersTab: No companyId available')
         return []
       }
-      console.log('TeamMembersTab: Fetching members for companyId:', companyId)
       const result = await api.get<CompanyMember[]>(`/api/v1/companies/${companyId}/members`, { showToast: false })
-      console.log('TeamMembersTab: API result:', result)
       if (!result.success) {
         console.error('TeamMembersTab: API error:', result.error)
         addNotification({
@@ -140,7 +138,6 @@ export const TeamMembersTab = forwardRef<TeamMembersTabRef, {}>((_props, ref) =>
         return []
       }
       const membersList = result.data || []
-      console.log('TeamMembersTab: Members fetched:', membersList.length)
       return membersList
     },
     enabled: !!companyId,

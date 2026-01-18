@@ -49,8 +49,6 @@ export async function POST(
     // Resolve params (Next.js 15+ compatibility)
     const resolvedParams = await Promise.resolve(params)
     const bookingId = resolvedParams.id
-
-    console.log(`[propose-date-change API] Received request for bookingId: ${bookingId}, userId: ${user.id}`)
     const body = await request.json()
 
     // Validate request body

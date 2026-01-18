@@ -179,8 +179,6 @@ export default function SettingsPage() {
         canChangeEmail: companyRole === 'warehouse_admin', // Only warehouse admins can change email
       }
       
-      console.log('Final profile result:', result)
-      
       return result
     },
     enabled: !!user,

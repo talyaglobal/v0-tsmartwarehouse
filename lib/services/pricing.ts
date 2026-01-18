@@ -94,6 +94,15 @@ async function calculatePalletDetailsPrice(
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
   const freeDays = getFreeStorageDays(warehouseData?.free_storage_rules, days)
   const billableDays = Math.max(0, days - freeDays)
+  
+  console.log('[pricing] Date calculation:', {
+    startDate,
+    endDate,
+    days,
+    freeDays,
+    billableDays,
+    freeStorageRules: warehouseData?.free_storage_rules
+  })
 
   const goodsTypeKey = normalizeGoodsType(palletDetails.goods_type)
   const pricingForGoodsType = palletPricingRows.filter(
@@ -103,6 +112,20 @@ async function calculatePalletDetailsPrice(
     (row) => normalizeGoodsType(row.goods_type) === 'general'
   )
   const pricingRows = pricingForGoodsType.length > 0 ? pricingForGoodsType : fallbackPricing
+  
+  console.log('[pricing] Goods type lookup:', {
+    requestedGoodsType: palletDetails.goods_type,
+    normalizedGoodsType: goodsTypeKey,
+    matchedRows: pricingForGoodsType.length,
+    fallbackRows: fallbackPricing.length,
+    usingRows: pricingRows.length,
+    availableGoodsTypes: [...new Set(palletPricingRows.map(r => r.goods_type))],
+    availablePalletTypes: [...new Set(palletPricingRows.map(r => r.pallet_type))],
+    requestedPalletTypes: palletDetails.pallets.map(p => p.pallet_type),
+    days,
+    billableDays,
+    freeDays
+  })
 
   let subtotal = 0
   let totalQuantity = 0
@@ -111,13 +134,31 @@ async function calculatePalletDetailsPrice(
     const quantity = Math.max(0, pallet.quantity || 0)
     if (!quantity) return
 
-    const palletType = pallet.pallet_type
-    const rowsForType = pricingRows.filter((row) => row.pallet_type === palletType)
-    if (rowsForType.length === 0) return
+    const palletType = (pallet.pallet_type || '').toLowerCase()
+    const rowsForType = pricingRows.filter((row) => (row.pallet_type || '').toLowerCase() === palletType)
+    
+    console.log('[pricing] Pallet type matching:', {
+      requestedType: palletType,
+      availableTypes: pricingRows.map(r => r.pallet_type),
+      matchedRows: rowsForType.length
+    })
+    
+    if (rowsForType.length === 0) {
+      console.log('[pricing] WARNING: No pricing rows found for pallet type:', palletType)
+      return
+    }
 
     const availablePeriods = new Set(rowsForType.map((row) => row.pricing_period))
     const period = pickPricingPeriod(availablePeriods, billableDays)
     const pricingRow = rowsForType.find((row) => row.pricing_period === period) || rowsForType[0]
+    
+    console.log('[pricing] Period selection:', {
+      palletType,
+      availablePeriods: [...availablePeriods],
+      selectedPeriod: period,
+      pricingRowPeriod: pricingRow?.pricing_period,
+      rowsForType: rowsForType.length
+    })
     let heightPrice = 0
     let matchingSize: any | undefined
     if (palletType === 'custom' && pallet.length_cm != null && pallet.width_cm != null) {
@@ -167,8 +208,10 @@ async function calculatePalletDetailsPrice(
       'weight_max_kg',
       'price_per_pallet'
     )
-    const baseUnitPrice =
-      palletType === 'custom' ? Math.max(heightPrice, weightPrice) : heightPrice + weightPrice
+    
+    // Use whichever is higher: height price or weight price
+    // This applies to all pallet types (standard, euro, custom)
+    const baseUnitPrice = Math.max(heightPrice, weightPrice)
 
     let adjustmentType = palletDetails.stackable
       ? pricingRow.stackable_adjustment_type
@@ -199,11 +242,101 @@ async function calculatePalletDetailsPrice(
     }
 
     const units = getUnitsForPeriod(pricingRow.pricing_period, billableDays)
+    
+    console.log('[pricing] DEBUG:', {
+      palletType,
+      period: pricingRow.pricing_period,
+      billableDays,
+      units,
+      heightPrice,
+      weightPrice,
+      baseUnitPrice,
+      adjustmentType,
+      adjustmentValue,
+      adjustedUnitPrice,
+      quantity,
+      lineTotal: adjustedUnitPrice * quantity * units,
+      stackable: palletDetails.stackable
+    })
+    
     subtotal += adjustedUnitPrice * quantity * units
     totalQuantity += quantity
   })
 
   const basePrice = totalQuantity > 0 ? subtotal / totalQuantity : 0
+
+  // Collect debug info from last pallet calculation
+  let debugInfo: Record<string, unknown> = {
+    pricingRowsCount: pricingRows.length,
+    palletsCount: palletDetails.pallets.length,
+    goodsTypeRequested: palletDetails.goods_type,
+  }
+
+  // Re-calculate for debug (same logic as above)
+  if (palletDetails.pallets.length > 0) {
+    const pallet = palletDetails.pallets[0]
+    const palletType = (pallet.pallet_type || '').toLowerCase()
+    const rowsForType = pricingRows.filter((row) => (row.pallet_type || '').toLowerCase() === palletType)
+    
+    if (rowsForType.length > 0) {
+      const availablePeriods = new Set(rowsForType.map((row) => row.pricing_period))
+      const period = pickPricingPeriod(availablePeriods, billableDays)
+      const pricingRow = rowsForType.find((row) => row.pricing_period === period) || rowsForType[0]
+      const units = getUnitsForPeriod(pricingRow?.pricing_period || 'day', billableDays)
+      
+      // Calculate height and weight prices for debug
+      const debugHeightPrice = findRangePrice(
+        pricingRow?.warehouse_pallet_height_pricing,
+        pallet.height_cm,
+        'height_min_cm',
+        'height_max_cm',
+        'price_per_unit'
+      )
+      const debugWeightPrice = findRangePrice(
+        pricingRow?.warehouse_pallet_weight_pricing,
+        pallet.weight_kg,
+        'weight_min_kg',
+        'weight_max_kg',
+        'price_per_pallet'
+      )
+      
+      debugInfo = {
+        ...debugInfo,
+        palletType,
+        rowsForTypeCount: rowsForType.length,
+        availablePeriods: [...availablePeriods],
+        selectedPeriod: period,
+        actualPricingPeriod: pricingRow?.pricing_period,
+        calculatedUnits: units,
+        billableDays,
+        // Price debug
+        inputHeightCm: pallet.height_cm,
+        inputWeightKg: pallet.weight_kg,
+        heightPrice: debugHeightPrice,
+        weightPrice: debugWeightPrice,
+        baseUnitPrice: Math.max(debugHeightPrice, debugWeightPrice),
+        heightRangesCount: pricingRow?.warehouse_pallet_height_pricing?.length || 0,
+        weightRangesCount: pricingRow?.warehouse_pallet_weight_pricing?.length || 0,
+      }
+    } else {
+      debugInfo = {
+        ...debugInfo,
+        palletType,
+        rowsForTypeCount: 0,
+        error: 'No pricing rows found for pallet type',
+      }
+    }
+  }
+
+  console.log('[pricing] Final calculation:', {
+    basePrice,
+    totalQuantity,
+    subtotal,
+    days,
+    billableDays,
+    freeDays,
+    debugInfo,
+  })
 
   return {
     base_price: basePrice,
@@ -216,6 +349,8 @@ async function calculatePalletDetailsPrice(
     discount_percent: 0,
     total: subtotal,
     currency: 'USD',
+    // @ts-expect-error - debug info
+    _calculationDebug: debugInfo,
   }
 }
 
@@ -229,7 +364,17 @@ export async function calculatePrice(
   const { warehouse_id, type, quantity, start_date, end_date, pallet_details } = params
 
   try {
+    console.log('[pricing] calculatePrice called:', {
+      type,
+      hasPalletDetails: !!pallet_details,
+      palletDetailsLength: pallet_details?.pallets?.length,
+      warehouse_id,
+      start_date,
+      end_date
+    })
+    
     if (type === 'pallet' && pallet_details) {
+      console.log('[pricing] Using calculatePalletDetailsPrice')
       return await calculatePalletDetailsPrice(
         supabase,
         warehouse_id,
@@ -238,6 +383,8 @@ export async function calculatePrice(
         pallet_details
       )
     }
+    
+    console.log('[pricing] Using LEGACY pricing path')
 
     const { data: warehouseData } = await supabase
       .from('warehouses')

@@ -367,12 +367,6 @@ export default function FloorPlan3D({
 
   // Debug log
   useEffect(() => {
-    console.log('FloorPlan3D rendering:', {
-      vertices: safeVertices.length,
-      items: safeItems.length,
-      openings: safeOpenings.length,
-      wallHeight
-    })
   }, [safeVertices, safeItems, safeOpenings, wallHeight])
 
   return (

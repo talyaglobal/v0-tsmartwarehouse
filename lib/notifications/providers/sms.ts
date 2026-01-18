@@ -325,7 +325,6 @@ export function createSMSProvider(): SMSProvider | null {
   const netgsmPassword = process.env.NETGSM_PASSWORD
 
   if (netgsmUsername && netgsmPassword) {
-    console.log("Using NetGSM SMS provider")
     return new NetGSMProvider()
   }
 
@@ -335,7 +334,6 @@ export function createSMSProvider(): SMSProvider | null {
   const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER
 
   if (twilioAccountSid && twilioAuthToken && twilioPhoneNumber) {
-    console.log("Using Twilio SMS provider")
     return new TwilioSMSProvider()
   }
 

@@ -121,7 +121,6 @@ export async function POST(
     const supabase = createServerSupabaseClient()
 
     // Verify warehouse exists and belongs to user's company
-    console.log('Looking for warehouse with ID:', warehouseId)
     const { data: warehouse, error: warehouseError } = await supabase
       .from('warehouses')
       .select('id, owner_company_id')
@@ -147,9 +146,6 @@ export async function POST(
       }
       return NextResponse.json(errorData, { status: 404 })
     }
-
-    console.log('Found warehouse:', warehouse)
-
     // Get user's company_id
     const { data: profile, error: profileError } = await supabase
       .from('profiles')

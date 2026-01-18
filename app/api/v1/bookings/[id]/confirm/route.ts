@@ -67,8 +67,6 @@ export async function POST(
     }
 
     // Note: Warehouse capacity will be automatically updated by the database trigger
-    console.log("Booking confirmed:", bookingId)
-
     const responseData: ApiResponse = {
       success: true,
       data: updatedBooking,

@@ -332,14 +332,6 @@ export async function acceptInvitation(
         }
       }
     }
-    
-    console.log('✅ Invitation accepted successfully, profile updated:', {
-      profileId: updatedProfile.id,
-      email: updatedProfile.email,
-      companyId: updatedProfile.company_id,
-      role: updatedProfile.role,
-      invitationTokenCleared: updatedProfile.invitation_token === null
-    })
 
     // Emit team member joined event
     const emitter = getEventEmitter()

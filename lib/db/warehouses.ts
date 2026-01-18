@@ -288,10 +288,8 @@ export async function updateWarehouse(
       console.log('[UPDATE DB] OvertimePrice set in updateData:', JSON.stringify(updateData.overtime_price, null, 2))
     } else {
       updateData.overtime_price = null
-      console.log('[UPDATE DB] OvertimePrice set to null (empty or no values)')
     }
   } else {
-    console.log('[UPDATE DB] OvertimePrice is undefined in updates')
   }
   if ((updates as any).ports !== undefined) updateData.ports = (updates as any).ports
   if ((updates as any).freeStorageRules !== undefined) updateData.free_storage_rules = (updates as any).freeStorageRules

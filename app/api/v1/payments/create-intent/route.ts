@@ -31,7 +31,6 @@ interface CreateIntentRequest {
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log('[create-intent] Starting payment intent creation')
     console.log('[create-intent] STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY)
     console.log('[create-intent] STRIPE_SECRET_KEY length:', process.env.STRIPE_SECRET_KEY?.length || 0)
 
@@ -99,7 +98,6 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // If user is not authenticated, treat as guest booking
-        console.log('[create-intent] No user found, treating as guest booking')
         body.isGuest = true
       }
     }

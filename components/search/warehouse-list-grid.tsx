@@ -226,6 +226,7 @@ export function WarehouseListGrid({ warehouses, viewMode, searchParams }: Wareho
                     alt={warehouse.name}
                     fill
                     className="object-cover"
+                    sizes="(max-width: 768px) 50vw, 25vw"
                   />
                   {photos.length > 1 && (
                     <>

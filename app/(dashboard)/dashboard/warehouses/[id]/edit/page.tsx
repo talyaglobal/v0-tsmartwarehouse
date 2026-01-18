@@ -448,28 +448,83 @@ export default function EditWarehousePage() {
     setIsLoading(true)
     try {
       const normalizeGoodsType = (value?: string) => (value || "general").trim().toLowerCase()
+      // Unit conversion helpers
+      const inchesToCm = (inches: number) => inches * 2.54
+      const lbsToKg = (lbs: number) => lbs * 0.453592
+      
       const sanitizePalletPricing = (entries: typeof formData.palletPricing) =>
-        entries.map((entry) => ({
-          ...entry,
-          heightRanges: entry.heightRanges?.map((range) => ({
-            ...range,
-            pricePerUnit:
-              range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
-          })),
-          weightRanges: entry.weightRanges?.map((range) => ({
-            ...range,
-            pricePerPallet:
-              range.pricePerPallet != null && range.pricePerPallet > 0 ? range.pricePerPallet : 1,
-          })),
-          customSizes: entry.customSizes?.map((size) => ({
-            ...size,
-            heightRanges: size.heightRanges?.map((range) => ({
-              ...range,
-              pricePerUnit:
-                range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
+        entries.map((entry) => {
+          // For standard and custom pallets, convert inches to cm and lbs to kg
+          // For euro pallets, values are already in cm and kg
+          const isEuro = entry.palletType === 'euro'
+          
+          return {
+            ...entry,
+            heightRanges: entry.heightRanges
+              ?.filter((range) => 
+                range.heightMinCm != null && 
+                range.heightMaxCm != null && 
+                Number(range.heightMaxCm) > 0
+              )
+              .map((range) => {
+                const heightMin = Number(range.heightMinCm) || 0
+                const heightMax = Number(range.heightMaxCm) || 1
+                return {
+                  ...range,
+                  // Convert inches to cm for standard/custom, keep as-is for euro
+                  heightMinCm: isEuro ? heightMin : inchesToCm(heightMin),
+                  heightMaxCm: isEuro ? heightMax : inchesToCm(heightMax),
+                  pricePerUnit:
+                    range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
+                }
+              }),
+            weightRanges: entry.weightRanges
+              ?.filter((range) => 
+                range.weightMinKg != null && 
+                range.weightMaxKg != null && 
+                Number(range.weightMaxKg) > 0
+              )
+              .map((range) => {
+                const weightMin = Number(range.weightMinKg) || 0
+                const weightMax = Number(range.weightMaxKg) || 1
+                return {
+                  ...range,
+                  // Convert lbs to kg for standard/custom, keep as-is for euro
+                  weightMinKg: isEuro ? weightMin : lbsToKg(weightMin),
+                  weightMaxKg: isEuro ? weightMax : lbsToKg(weightMax),
+                  pricePerPallet:
+                    range.pricePerPallet != null && range.pricePerPallet > 0 ? range.pricePerPallet : 1,
+                }
+              }),
+            // Custom sizes are always in inches/lbs (custom pallet type)
+            customSizes: entry.customSizes?.map((size) => ({
+              ...size,
+              // Convert custom size dimensions from inches to cm
+              lengthMin: size.lengthMin != null ? inchesToCm(Number(size.lengthMin)) : undefined,
+              lengthMax: size.lengthMax != null ? inchesToCm(Number(size.lengthMax)) : undefined,
+              widthMin: size.widthMin != null ? inchesToCm(Number(size.widthMin)) : undefined,
+              widthMax: size.widthMax != null ? inchesToCm(Number(size.widthMax)) : undefined,
+              heightRanges: size.heightRanges
+                ?.filter((range) => 
+                  range.heightMinCm != null && 
+                  range.heightMaxCm != null && 
+                  Number(range.heightMaxCm) > 0
+                )
+                .map((range) => {
+                  const heightMin = Number(range.heightMinCm) || 0
+                  const heightMax = Number(range.heightMaxCm) || 1
+                  return {
+                    ...range,
+                    // Convert inches to cm for custom pallet height ranges
+                    heightMinCm: inchesToCm(heightMin),
+                    heightMaxCm: inchesToCm(heightMax),
+                    pricePerUnit:
+                      range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
+                  }
+                }),
             })),
-          })),
-        }))
+          }
+        })
       const palletPricingToValidate = sanitizePalletPricing(formData.palletPricing)
       const goodsTypeOptions =
         formData.warehouseType.length > 0

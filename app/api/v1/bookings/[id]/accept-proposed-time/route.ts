@@ -23,9 +23,6 @@ export async function POST(
     // Resolve params (Next.js 15+ compatibility)
     const resolvedParams = await Promise.resolve(params)
     const bookingId = resolvedParams.id
-
-    console.log(`[accept-proposed-time API] Received request for bookingId: ${bookingId}, userId: ${user.id}`)
-
     // Get booking
     const booking = await getBookingById(bookingId, false) // Disable cache
     if (!booking) {

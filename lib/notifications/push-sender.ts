@@ -73,7 +73,6 @@ export async function sendPushNotificationToUser(
       .single()
 
     if (!profile?.fcm_token) {
-      console.log('User does not have FCM token:', userId)
       return false
     }
 
@@ -102,7 +101,6 @@ export async function sendPushNotificationToAdmins(
       .not('fcm_token', 'is', null)
 
     if (!admins || admins.length === 0) {
-      console.log('No admins with FCM tokens found')
       return 0
     }
 
@@ -143,7 +141,6 @@ export async function sendPushNotificationToUsers(
       .not('fcm_token', 'is', null)
 
     if (!profiles || profiles.length === 0) {
-      console.log('No users with FCM tokens found')
       return 0
     }
 

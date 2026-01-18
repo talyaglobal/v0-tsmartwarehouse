@@ -139,7 +139,6 @@ export default function LoginPage() {
         // If profile has a pending invitation (invitation_token exists and company_id is NULL),
         // automatically accept it since user has logged in with the correct credentials
         if (profile && profile.invitation_token && !profile.company_id) {
-          console.log('📧 User has pending invitation, accepting automatically...')
           try {
             const acceptResponse = await fetch(`/api/v1/invitations/${profile.invitation_token}/accept`, {
               method: 'POST',
@@ -149,7 +148,6 @@ export default function LoginPage() {
             })
             
             if (acceptResponse.ok) {
-              console.log('✅ Invitation accepted automatically')
               addNotification({
                 type: 'success',
                 message: 'Your invitation has been accepted automatically',
@@ -166,7 +164,6 @@ export default function LoginPage() {
 
         // If profile doesn't exist, create it from auth data
         if (!profile) {
-          console.log('📝 Profile not found, creating profile from auth data...')
           
           const userMetadata = data.user.user_metadata || {}
           const userEmail = data.user.email || email
@@ -193,7 +190,6 @@ export default function LoginPage() {
             console.error('Failed to create profile, but continuing with login...')
             // Don't fail login, continue
           } else {
-            console.log('✅ Profile created successfully from auth data')
           }
         }
 

@@ -404,7 +404,6 @@ export async function confirmBookingTimeSlot(
   try {
     // Note: You might want to get warehouse staff IDs here
     // For now, we'll just log it
-    console.log(`Time slot confirmed for booking ${bookingId} by customer ${customerId}`)
   } catch (error) {
     // Log error but don't fail the confirmation
     console.error("Failed to send confirmation notification:", error)

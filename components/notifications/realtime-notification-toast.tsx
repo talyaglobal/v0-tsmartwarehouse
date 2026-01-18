@@ -146,7 +146,6 @@ export function RealtimeNotificationToast({
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       if (isConnected) {
-        console.log('🔔 Real-time notifications connected')
       } else if (error) {
         console.warn('🔔 Real-time notifications error:', error.message)
       }

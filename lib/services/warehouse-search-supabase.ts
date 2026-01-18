@@ -13,7 +13,125 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { WarehouseSearchParams, WarehouseSearchResult, SearchResponse } from '@/types/marketplace'
 import { getStoragePublicUrls } from '@/lib/utils/storage'
 
+// US State abbreviations mapping
+const US_STATES: Record<string, string> = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+  'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+  'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+  'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
+  'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
+  'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+  'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+  'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
+  'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
+  'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+  'wisconsin': 'WI', 'wyoming': 'WY', 'district of columbia': 'DC',
+}
+
+// Reverse mapping: abbreviation to full name
+const US_STATES_REVERSE: Record<string, string> = Object.fromEntries(
+  Object.entries(US_STATES).map(([name, abbr]) => [abbr.toLowerCase(), name])
+)
+
+/**
+ * Get state abbreviation from full name or vice versa
+ */
+function normalizeStateSearch(searchTerm: string): { abbr: string | null; fullName: string | null } {
+  const lower = searchTerm.toLowerCase().trim()
+  
+  // Check if it's a full state name
+  if (US_STATES[lower]) {
+    return { abbr: US_STATES[lower], fullName: lower }
+  }
+  
+  // Check if it's a state abbreviation (2 letters)
+  if (lower.length === 2 && US_STATES_REVERSE[lower]) {
+    return { abbr: lower.toUpperCase(), fullName: US_STATES_REVERSE[lower] }
+  }
+  
+  return { abbr: null, fullName: null }
+}
+
 // Distance calculation is handled by PostGIS function
+
+/**
+ * Calculate average pallet price per day from pallet pricing data
+ * Algorithm:
+ * 1. Filter to only day-based pricing (for consistent comparison)
+ * 2. Get the first (lowest) height range price from each pricing entry
+ * 3. Average across all pallet types (standard, euro, custom) and goods types
+ * 4. Round to 2 decimal places
+ */
+function calculateAveragePalletPrice(palletPricing: any[]): number | undefined {
+  if (!palletPricing || palletPricing.length === 0) return undefined
+
+  // Get all day-based pricing entries
+  const dayPricing = palletPricing.filter(pp => pp.pricingPeriod === 'day')
+  
+  if (dayPricing.length === 0) {
+    // Fallback to week pricing and convert to daily
+    const weekPricing = palletPricing.filter(pp => pp.pricingPeriod === 'week')
+    if (weekPricing.length > 0) {
+      const prices: number[] = []
+      weekPricing.forEach(pp => {
+        if (pp.heightRanges && pp.heightRanges.length > 0) {
+          // Get the first (typically the lowest/base) height range price
+          const basePrice = pp.heightRanges[0].pricePerUnit
+          if (basePrice > 0) {
+            prices.push(basePrice / 7) // Convert weekly to daily
+          }
+        }
+      })
+      if (prices.length > 0) {
+        const avg = prices.reduce((sum, p) => sum + p, 0) / prices.length
+        return Math.round(avg * 100) / 100
+      }
+    }
+    
+    // Fallback to month pricing and convert to daily
+    const monthPricing = palletPricing.filter(pp => pp.pricingPeriod === 'month')
+    if (monthPricing.length > 0) {
+      const prices: number[] = []
+      monthPricing.forEach(pp => {
+        if (pp.heightRanges && pp.heightRanges.length > 0) {
+          const basePrice = pp.heightRanges[0].pricePerUnit
+          if (basePrice > 0) {
+            prices.push(basePrice / 30) // Convert monthly to daily
+          }
+        }
+      })
+      if (prices.length > 0) {
+        const avg = prices.reduce((sum, p) => sum + p, 0) / prices.length
+        return Math.round(avg * 100) / 100
+      }
+    }
+    
+    return undefined
+  }
+
+  // Collect all base prices from day pricing
+  const prices: number[] = []
+  
+  dayPricing.forEach(pp => {
+    if (pp.heightRanges && pp.heightRanges.length > 0) {
+      // Get the first (typically the lowest/base) height range price
+      const basePrice = pp.heightRanges[0].pricePerUnit
+      if (basePrice > 0) {
+        prices.push(basePrice)
+      }
+    }
+  })
+
+  if (prices.length === 0) return undefined
+
+  // Calculate average
+  const average = prices.reduce((sum, p) => sum + p, 0) / prices.length
+  
+  // Round to 2 decimal places
+  return Math.round(average * 100) / 100
+}
 
 /**
  * Search warehouses with filters, sorting, and pagination
@@ -97,10 +215,10 @@ export async function searchWarehouses(
           .select('warehouse_id, average_rating, total_reviews')
           .in('warehouse_id', warehouseIds)
 
-        // Get company info
+        // Get company info and rent_methods
         const { data: warehouseData } = await supabase
           .from('warehouses')
-          .select('id, owner_company_id, companies(id, name, logo_url, verification_status)')
+          .select('id, owner_company_id, rent_methods, companies(id, name, logo_url, verification_status)')
           .in('id', warehouseIds)
 
         // Merge data
@@ -125,6 +243,7 @@ export async function searchWarehouses(
             ...wh,
             min_price: minPrice,
             pricing,
+            rent_methods: warehouse?.rent_methods || [],
             average_rating: review?.average_rating ? parseFloat(review.average_rating) : 0,
             total_reviews: review?.total_reviews || 0,
             company_name: company?.name || '',
@@ -135,6 +254,22 @@ export async function searchWarehouses(
       }
 
       // Apply additional filters
+      
+      // Filter by rent method (storage type)
+      if (params.type) {
+        const rentMethodMap: Record<string, string> = {
+          'pallet': 'pallet',
+          'area-rental': 'sq_ft',
+        }
+        const requiredRentMethod = rentMethodMap[params.type]
+        if (requiredRentMethod) {
+          results = results.filter((w) => {
+            const rentMethods = (w as any).rent_methods || []
+            return rentMethods.includes(requiredRentMethod)
+          })
+        }
+      }
+      
       if (params.min_rating) {
         results = results.filter((w) => w.average_rating >= params.min_rating!)
       }
@@ -148,6 +283,13 @@ export async function searchWarehouses(
       if (params.amenities?.length) {
         results = results.filter((w) =>
           params.amenities!.some((a) => w.amenities.includes(a))
+        )
+      }
+
+      // Security filter
+      if (params.security?.length) {
+        results = results.filter((w) =>
+          params.security!.some((s) => w.security?.includes(s))
         )
       }
 
@@ -221,15 +363,26 @@ export async function searchWarehouses(
       `, { count: 'exact' })
       .eq('status', true)
 
-    // City filter - support "Town, ST" and "Town, ST 12345" formats
+    // City filter - support "Town, ST", "Town, ST 12345", state names, and zip codes
     if (params.city) {
-      const cityName = params.city.split(',')[0].trim()
-      const zipMatch = params.city.match(/\b\d{5}(?:-\d{4})?\b/)
+      const searchTerm = params.city.trim()
+      const cityName = searchTerm.split(',')[0].trim()
+      const zipMatch = searchTerm.match(/\b\d{5}(?:-\d{4})?\b/)
+      
+      // Check if user is searching for a state name (e.g., "New Jersey" or "NJ")
+      const stateSearch = normalizeStateSearch(searchTerm)
+      
       if (zipMatch) {
+        // ZIP code search
         const zipCode = zipMatch[0]
-        query = query.or(`city.ilike.%${cityName}%,zip_code.eq.${zipCode}`)
+        query = query.or(`city.ilike.%${cityName}%,zip_code.eq.${zipCode},address.ilike.%${zipCode}%`)
+      } else if (stateSearch.abbr) {
+        // State search - search for state abbreviation in city field (e.g., "Fair Lawn, NJ")
+        // Also search in address field for full state names
+        query = query.or(`city.ilike.%, ${stateSearch.abbr}%,city.ilike.%, ${stateSearch.abbr} %,address.ilike.%${stateSearch.abbr}%,address.ilike.%${stateSearch.fullName}%`)
       } else {
-        query = query.ilike('city', `%${cityName}%`)
+        // Regular city/town search - also search in address for broader matches
+        query = query.or(`city.ilike.%${cityName}%,address.ilike.%${cityName}%`)
       }
     }
 
@@ -247,6 +400,18 @@ export async function searchWarehouses(
 
     if (params.type === 'area-rental' && params.quantity) {
       query = query.gte('available_sq_ft', params.quantity)
+    }
+
+    // Filter by rent method (storage type)
+    if (params.type) {
+      const rentMethodMap: Record<string, string> = {
+        'pallet': 'pallet',
+        'area-rental': 'sq_ft',
+      }
+      const requiredRentMethod = rentMethodMap[params.type]
+      if (requiredRentMethod) {
+        query = query.contains('rent_methods', [requiredRentMethod])
+      }
     }
 
     // Sorting
@@ -466,6 +631,10 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       }
     })
 
+    // Calculate average pallet price per day
+    // Algorithm: Get all day-based pricing, average the first height range prices across all pallet types
+    const averagePalletPrice = calculateAveragePalletPrice(palletPricing)
+
     return {
       id: warehouse.id,
       name: warehouse.name,
@@ -486,6 +655,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       description: warehouse.description || undefined,
       photos: warehouse.photos && Array.isArray(warehouse.photos) ? getStoragePublicUrls(warehouse.photos, 'docs') : [],
       min_price: minPrice,
+      average_pallet_price: averagePalletPrice,
       pricing: pricing,
       palletPricing: palletPricing.length > 0 ? palletPricing : undefined,
       external_rating: warehouse.external_rating != null ? parseFloat(warehouse.external_rating) : undefined,

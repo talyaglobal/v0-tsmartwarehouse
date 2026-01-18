@@ -26,8 +26,6 @@ const messaging = firebase.messaging()
 
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
-  console.log('Background message received:', payload)
-
   const notificationTitle = payload.notification?.title || 'New Notification'
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new notification',
@@ -41,7 +39,6 @@ messaging.onBackgroundMessage((payload) => {
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-  console.log('Notification clicked:', event)
   event.notification.close()
 
   // Navigate to the app

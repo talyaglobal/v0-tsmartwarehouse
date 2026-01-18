@@ -418,7 +418,6 @@ export async function POST(
 
       if (!existingProfile) {
         // Profile doesn't exist, create it manually
-        console.log('Profile not found after trigger, creating manually...')
         const { error: profileInsertError } = await supabaseAdmin
           .from('profiles')
           .insert({

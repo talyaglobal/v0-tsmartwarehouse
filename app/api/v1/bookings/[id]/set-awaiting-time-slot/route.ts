@@ -42,9 +42,6 @@ export async function POST(
     // Resolve params (Next.js 15+ compatibility)
     const resolvedParams = await Promise.resolve(params)
     const bookingId = resolvedParams.id
-
-    console.log(`[set-awaiting-time-slot API] Received request for bookingId: ${bookingId}, userId: ${user.id}`)
-
     // Set booking to awaiting_time_slot
     const updatedBooking = await setBookingAwaitingTimeSlot(bookingId, user.id)
 

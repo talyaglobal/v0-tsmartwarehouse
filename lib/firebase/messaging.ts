@@ -20,7 +20,6 @@ export async function requestNotificationPermission(): Promise<string | null> {
     const permission = await Notification.requestPermission()
     
     if (permission !== 'granted') {
-      console.log('Notification permission denied')
       return null
     }
 
@@ -37,10 +36,8 @@ export async function requestNotificationPermission(): Promise<string | null> {
     })
 
     if (token) {
-      console.log('FCM Token:', token)
       return token
     } else {
-      console.log('No registration token available')
       return null
     }
   } catch (error) {
@@ -60,7 +57,6 @@ export function onForegroundMessage(callback: (payload: MessagePayload) => void)
     }
 
     onMessage(messaging, (payload) => {
-      console.log('Foreground message received:', payload)
       callback(payload)
     })
   })

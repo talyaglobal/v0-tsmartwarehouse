@@ -63,7 +63,6 @@ export class EventEmitter {
     subscriptions.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
 
     if (this.options.enableLogging) {
-      console.log(`[EventEmitter] Subscribed to ${eventType} with ID: ${subscriptionId}`)
     }
 
     return subscriptionId
@@ -105,7 +104,6 @@ export class EventEmitter {
     subscriptions.splice(index, 1)
 
     if (this.options.enableLogging) {
-      console.log(`[EventEmitter] Unsubscribed from ${eventType} with ID: ${subscriptionId}`)
     }
 
     return true
@@ -118,12 +116,10 @@ export class EventEmitter {
     if (eventType) {
       this.subscriptions.delete(eventType)
       if (this.options.enableLogging) {
-        console.log(`[EventEmitter] Removed all listeners for ${eventType}`)
       }
     } else {
       this.subscriptions.clear()
       if (this.options.enableLogging) {
-        console.log('[EventEmitter] Removed all listeners')
       }
     }
   }
@@ -136,7 +132,6 @@ export class EventEmitter {
     const subscriptions = this.subscriptions.get(eventType) || []
 
     if (this.options.enableLogging) {
-      console.log(`[EventEmitter] Emitting ${eventType} to ${subscriptions.length} listeners`)
     }
 
     // Execute handlers in priority order

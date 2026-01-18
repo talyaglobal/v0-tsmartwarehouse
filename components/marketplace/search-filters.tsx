@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 // Slider component not available - using Input fields for price range
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RatingStars } from "./rating-stars"
 import { X, Filter } from "lucide-react"
 import type { WarehouseSearchParams } from "@/types/marketplace"
@@ -28,30 +27,43 @@ interface SearchFiltersProps {
 }
 
 const WAREHOUSE_TYPES = [
-  { value: "general-dry-ambient", label: "General (Dry/Ambient)" },
-  { value: "food-beverage-fda", label: "Food & Beverage (FDA)" },
+  { value: "general-dry-ambient", label: "FMCG" },
+  { value: "food-beverage-fda", label: "Food Stuff" },
   { value: "pharmaceutical-fda-cgmp", label: "Pharmaceutical (FDA/cGMP)" },
-  { value: "medical-devices-fda", label: "Medical Devices (FDA)" },
-  { value: "cold-storage", label: "Cold Storage" },
-  { value: "hazardous-materials-hazmat", label: "Hazardous Materials" },
+  { value: "medical-devices-fda", label: "Medical Devices (FDA Registered)" },
+  { value: "nutraceuticals-supplements-fda", label: "Nutraceuticals & Supplements (FDA)" },
+  { value: "cosmetics-fda", label: "Cosmetics (FDA)" },
+  { value: "hazardous-materials-hazmat", label: "Hazardous Materials (Hazmat Certified)" },
+  { value: "cold-storage", label: "Cold Storage (Refrigerated/Frozen)" },
+  { value: "alcohol-tobacco-ttb", label: "Alcohol & Tobacco (TTB Licensed)" },
+  { value: "consumer-electronics", label: "Consumer Electronics" },
+  { value: "automotive-parts", label: "Automotive Parts" },
+  { value: "ecommerce-high-velocity", label: "E-commerce / High-velocity Fulfillment" },
+  { value: "spare-parts", label: "Spare Parts" },
+  { value: "aerospace-civil", label: "Aero Space (Civil)" },
+  { value: "aerospace-pentagon-approved", label: "Aero Space (Pentagon Approved)" },
 ] as const
 
 
 const TEMPERATURE_TYPES = [
-  { value: "ambient-with-ac", label: "Ambient (with A/C)" },
-  { value: "ambient-without-ac", label: "Ambient (without A/C)" },
-  { value: "chilled", label: "Chilled" },
-  { value: "frozen", label: "Frozen" },
+  { value: "ambient-with-ac", label: "Ambient with A/C" },
+  { value: "ambient-without-ac", label: "Ambient without A/C" },
+  { value: "ambient-with-heater", label: "Ambient with Heater" },
+  { value: "ambient-without-heater", label: "Ambient without Heater" },
+  { value: "chilled", label: "Chilled (2-8°C)" },
+  { value: "frozen", label: "Frozen (-18°C or below)" },
+  { value: "open-area-with-tent", label: "Open Area with Tent" },
+  { value: "open-area", label: "Open Area" },
 ] as const
 
-const AMENITIES = [
-  "24/7 Access",
-  "Security",
-  "Loading Dock",
-  "Forklift Available",
-  "Climate Controlled",
-  "Fire Suppression",
-  "Insurance",
+const SECURITY_OPTIONS = [
+  "24/7 Security",
+  "Indoor Surveillance",
+  "Access Control",
+  "Alarm System",
+  "Guarded",
+  "Fenced",
+  "Fire Sprinkler System",
 ] as const
 
 export function SearchFilters({
@@ -68,7 +80,7 @@ export function SearchFilters({
     onFiltersChange({ ...filters, [key]: value })
   }
 
-  const toggleArrayFilter = (key: "warehouse_type" | "temperature_types" | "amenities", value: string) => {
+  const toggleArrayFilter = (key: "warehouse_type" | "temperature_types" | "security", value: string) => {
     const current = (filters[key] as string[]) || []
     const updated = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -89,7 +101,7 @@ export function SearchFilters({
   const hasActiveFilters = 
     (filters.warehouse_type && filters.warehouse_type.length > 0) ||
     (filters.temperature_types && filters.temperature_types.length > 0) ||
-    (filters.amenities && filters.amenities.length > 0) ||
+    (filters.security && filters.security.length > 0) ||
     filters.min_price ||
     filters.max_price ||
     filters.min_rating
@@ -100,7 +112,7 @@ export function SearchFilters({
       ...searchCriteria, // Preserve search criteria
       warehouse_type: undefined,
       temperature_types: undefined,
-      amenities: undefined,
+      security: undefined,
       min_price: undefined,
       max_price: undefined,
       min_rating: undefined,
@@ -112,20 +124,6 @@ export function SearchFilters({
 
   const content = (
     <div className="space-y-6">
-      {/* Type Toggle */}
-      <div className="space-y-2">
-        <Label>Storage Type</Label>
-        <Tabs
-          value={filters.type || "pallet"}
-          onValueChange={(value) => updateFilter("type", value as "pallet" | "area-rental")}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="pallet">Pallet</TabsTrigger>
-            <TabsTrigger value="area-rental">Space Storage</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
       {/* Price Range */}
       <div className="space-y-2">
         <Label>Price Range</Label>
@@ -230,22 +228,22 @@ export function SearchFilters({
         </div>
       </div>
 
-      {/* Amenities */}
+      {/* Security */}
       <div className="space-y-2">
-        <Label>Amenities</Label>
+        <Label>Security</Label>
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {AMENITIES.map((amenity) => (
-            <div key={amenity} className="flex items-center space-x-2">
+          {SECURITY_OPTIONS.map((option) => (
+            <div key={option} className="flex items-center space-x-2">
               <Checkbox
-                id={`amenity-${amenity}`}
-                checked={(filters.amenities || []).includes(amenity)}
-                onCheckedChange={() => toggleArrayFilter("amenities", amenity)}
+                id={`security-${option}`}
+                checked={(filters.security || []).includes(option)}
+                onCheckedChange={() => toggleArrayFilter("security", option)}
               />
               <label
-                htmlFor={`amenity-${amenity}`}
+                htmlFor={`security-${option}`}
                 className="text-sm font-normal cursor-pointer"
               >
-                {amenity}
+                {option}
               </label>
             </div>
           ))}
@@ -277,7 +275,7 @@ export function SearchFilters({
               {[
                 filters.warehouse_type?.length,
                 filters.temperature_types?.length,
-                filters.amenities?.length,
+                filters.security?.length,
                 filters.min_price,
                 filters.max_price,
                 filters.min_rating,

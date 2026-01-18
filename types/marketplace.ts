@@ -25,7 +25,8 @@ export interface WarehouseSearchParams {
   warehouse_type?: string[]
   storage_type?: string[]
   temperature_types?: string[]
-  amenities?: string[]
+  amenities?: string[] // Legacy - kept for backward compatibility
+  security?: string[]
   min_price?: number
   max_price?: number
   min_rating?: number
@@ -61,6 +62,7 @@ export interface WarehouseSearchResult {
   photos: string[]
   
   min_price: number
+  average_pallet_price?: number // Average price per pallet per day
   pricing: {
     type: string
     price: number

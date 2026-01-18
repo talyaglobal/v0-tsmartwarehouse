@@ -265,18 +265,15 @@ export default function FloorPlanCanvas({
     const loadData = async () => {
       // Skip if no warehouse ID
       if (!warehouseId) {
-        console.log('No warehouse ID, using defaults')
         setIsInitialized(true)
         return
       }
       
       try {
-        console.log('Loading floor plan for:', warehouseId)
         const result = await loadFloorPlan(warehouseId)
         
         if (result.success && result.data) {
           const data = result.data
-          console.log('Floor plan loaded:', data)
           
           if (data.vertices && data.vertices.length >= 3) {
             setVertices(data.vertices)
@@ -307,7 +304,6 @@ export default function FloorPlanCanvas({
           setHistory([{ vertices: data.vertices || SHAPE_TEMPLATES.rectangle, items: historyItems }])
           setHistoryIndex(0)
         } else {
-          console.log('No existing floor plan, using defaults')
         }
       } catch (error) {
         console.error('Failed to load floor plan:', error)
@@ -1233,11 +1229,31 @@ export default function FloorPlanCanvas({
     }
   }, [vertices, items, getGridPos, isPointOnLine, saveToHistory])
   
-  // Mouse wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? 0.9 : 1.1
-    setZoom(z => Math.min(Math.max(z * delta, 0.5), 3))
+  // Mouse wheel zoom - handled via useEffect to use non-passive listener
+  const handleWheelRef = useRef<((e: WheelEvent) => void) | null>(null)
+  
+  // Update the wheel handler ref when zoom changes
+  useEffect(() => {
+    handleWheelRef.current = (e: WheelEvent) => {
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? 0.9 : 1.1
+      setZoom(z => Math.min(Math.max(z * delta, 0.5), 3))
+    }
+  }, [])
+  
+  // Attach non-passive wheel listener
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const wheelHandler = (e: WheelEvent) => {
+      handleWheelRef.current?.(e)
+    }
+    
+    canvas.addEventListener('wheel', wheelHandler, { passive: false })
+    return () => {
+      canvas.removeEventListener('wheel', wheelHandler)
+    }
   }, [])
   
   const handleDragStart = useCallback((item: CatalogItem) => {
@@ -1784,7 +1800,6 @@ export default function FloorPlanCanvas({
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onDoubleClick={handleDoubleClick}
-                onWheel={handleWheel}
                 onContextMenu={handleCanvasContextMenu}
               />
               

@@ -41,6 +41,7 @@ export default function FindWarehousesPage() {
       storage_type: searchParams.get("storage_type")?.split(",").filter(Boolean),
       temperature_types: searchParams.get("temperature_types")?.split(",").filter(Boolean),
       amenities: searchParams.get("amenities")?.split(",").filter(Boolean),
+      security: searchParams.get("security")?.split(",").filter(Boolean),
       min_price: searchParams.get("min_price") ? parseFloat(searchParams.get("min_price")!) : undefined,
       max_price: searchParams.get("max_price") ? parseFloat(searchParams.get("max_price")!) : undefined,
       min_rating: searchParams.get("min_rating") ? parseFloat(searchParams.get("min_rating")!) : undefined,
@@ -375,6 +376,7 @@ export default function FindWarehousesPage() {
                         warehouse={warehouse}
                         viewMode={viewMode}
                         searchParams={{
+                          location: filters.city || searchParams.get("location") || undefined,
                           type: filters.type,
                           palletCount: filters.type === "pallet" && filters.quantity ? filters.quantity.toString() : undefined,
                           areaSqFt: filters.type === "area-rental" && filters.quantity ? filters.quantity.toString() : undefined,

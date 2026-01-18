@@ -59,7 +59,6 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
         setTimeout(() => reject(new Error('SMTP verification timeout')), 5000)
       )
       await Promise.race([verifyPromise, timeoutPromise])
-      console.log('SMTP connection verified successfully')
     } catch (verifyError) {
       console.error('SMTP connection verification failed:', verifyError)
       // Don't fail completely, try to send anyway
@@ -67,8 +66,6 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     }
 
     // Send email with timeout
-    console.log('Attempting to send email to:', options.to)
-    console.log('Email subject:', options.subject)
     
     // Generate Message-ID
     const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 9)}@${smtpFromEmail.split('@')[1] || 'Warebnb.com'}>`
@@ -99,12 +96,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       setTimeout(() => reject(new Error('Email send timeout after 15 seconds')), 15000)
     )
     
-    const info = await Promise.race([sendPromise, timeoutPromise]) as any
-
-    console.log('Email sent successfully!')
-    console.log('  Message ID:', info.messageId)
-    console.log('  To:', options.to)
-    console.log('  From:', smtpFromEmail)
+    await Promise.race([sendPromise, timeoutPromise])
     
     return { success: true }
   } catch (error) {

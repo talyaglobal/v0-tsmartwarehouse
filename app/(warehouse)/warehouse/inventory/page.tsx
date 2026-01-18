@@ -88,7 +88,6 @@ export default function InventoryPage() {
         return []
       }
       const items = result.data || []
-      console.log('Fetched inventory items:', items.length, 'for warehouse:', selectedWarehouseId || 'all assigned')
       return items
     },
     enabled: warehouseIds.length > 0, // Enable when we have warehouse IDs (even if no specific warehouse selected)

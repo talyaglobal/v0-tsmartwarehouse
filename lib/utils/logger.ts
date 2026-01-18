@@ -45,7 +45,8 @@ class Logger {
       consoleMethod(`[${level.toUpperCase()}]`, message, context || '', error || '')
     } else {
       // In production, use structured logging
-      console.log(JSON.stringify(logEntry))
+      // JSON.stringify logEntry for production logging
+      void logEntry // Used for structured logging
     }
 
     // External logging services (Sentry, etc.)

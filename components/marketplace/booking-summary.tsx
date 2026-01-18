@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { formatCurrency } from "@/lib/utils/format"
-import { Package, Ruler, Calendar } from "lucide-react"
+import { Package, Ruler, Calendar, AlertTriangle } from "lucide-react"
 import type { PalletBookingDetails, PriceBreakdown } from "@/types/marketplace"
 
 interface BookingSummaryProps {
@@ -48,9 +49,43 @@ export function BookingSummary({
     : 0
   const resolvedQuantity = palletDetails ? totalPalletQuantity : quantity
 
+  // Check if pallet details are complete
+  const isPalletDetailsComplete = useMemo(() => {
+    if (type !== "pallet") return true
+    if (!palletDetails) return false
+    if (palletDetails.pallets.length === 0) return false
+    
+    // Check if total quantity matches required quantity
+    if (totalPalletQuantity !== quantity) return false
+    
+    // Check each pallet has required fields
+    const hasIncompletePallet = palletDetails.pallets.some((pallet) => {
+      // All pallets need quantity, height, and weight
+      if (!pallet.quantity || pallet.quantity <= 0) return true
+      if (!pallet.height_cm || pallet.height_cm <= 0) return true
+      if (!pallet.weight_kg || pallet.weight_kg <= 0) return true
+      
+      // Custom pallets also need length and width
+      if (pallet.pallet_type === "custom") {
+        if (!pallet.length_cm || pallet.length_cm <= 0) return true
+        if (!pallet.width_cm || pallet.width_cm <= 0) return true
+      }
+      
+      return false
+    })
+    
+    return !hasIncompletePallet
+  }, [type, palletDetails, totalPalletQuantity, quantity])
+
   // Calculate price when booking details change
   useEffect(() => {
     async function calculatePrice() {
+      // Don't calculate if pallet details are incomplete for pallet bookings
+      if (type === "pallet" && !isPalletDetailsComplete) {
+        setPriceBreakdown(null)
+        return
+      }
+      
       if (!warehouseId || !startDate || !endDate || resolvedQuantity <= 0) {
         setPriceBreakdown(null)
         return
@@ -83,7 +118,7 @@ export function BookingSummary({
     }
 
     calculatePrice()
-  }, [warehouseId, type, quantity, resolvedQuantity, startDate, endDate, palletDetails])
+  }, [warehouseId, type, quantity, resolvedQuantity, startDate, endDate, palletDetails, isPalletDetailsComplete])
 
   return (
     <Card className={className}>
@@ -170,7 +205,19 @@ export function BookingSummary({
         <Separator />
 
         {/* Price Breakdown */}
-        {priceLoading ? (
+        {type === "pallet" && !isPalletDetailsComplete ? (
+          <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              Please fill in all pallet details (quantity, height, and weight for each pallet) to see the total price.
+              {totalPalletQuantity !== quantity && (
+                <span className="block mt-1 font-medium">
+                  Pallet count: {totalPalletQuantity} / {quantity} required
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        ) : priceLoading ? (
           <div className="text-center py-4 text-muted-foreground text-sm">
             Calculating price...
           </div>
@@ -190,7 +237,7 @@ export function BookingSummary({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  {quantity} {type === "pallet" ? "pallets" : "sq ft"} ×{" "}
+                  {resolvedQuantity} {type === "pallet" ? "pallets" : "sq ft"} ×{" "}
                   {priceBreakdown.billable_days ?? days}{" "}
                   {(priceBreakdown.billable_days ?? days) === 1 ? "day" : "days"}:
                 </span>

@@ -34,12 +34,6 @@ export function logSearchQuery(log: SearchQueryLog) {
   try {
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Marketplace Search]', {
-        params: log.params,
-        resultCount: log.resultCount,
-        duration: `${log.duration}ms`,
-        error: log.error,
-      })
     }
 
     // Track in Sentry for production monitoring
@@ -81,12 +75,6 @@ export function logSearchQuery(log: SearchQueryLog) {
 export function logListingView(log: ListingViewLog) {
   try {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Marketplace Listing View]', {
-        warehouseId: log.warehouseId,
-        userId: log.userId,
-        source: log.source,
-        duration: log.duration ? `${log.duration}ms` : undefined,
-      })
     }
 
     if (process.env.NODE_ENV === 'production') {
@@ -112,11 +100,6 @@ export function logListingView(log: ListingViewLog) {
 export function logBookingRequest(warehouseId: string, bookingId: string, error?: string) {
   try {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Marketplace Booking Request]', {
-        warehouseId,
-        bookingId,
-        error,
-      })
     }
 
     if (process.env.NODE_ENV === 'production') {
@@ -162,12 +145,6 @@ export function logListingAction(
 ) {
   try {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Marketplace Listing Action]', {
-        action,
-        warehouseId,
-        success,
-        error,
-      })
     }
 
     if (process.env.NODE_ENV === 'production') {

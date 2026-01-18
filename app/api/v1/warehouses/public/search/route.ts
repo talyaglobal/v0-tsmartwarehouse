@@ -29,6 +29,7 @@ const searchParamsSchema = z.object({
   storage_type: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
   temperature_types: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
   amenities: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
+  security: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
 
   // Pricing
   min_price: z.coerce.number().min(0).optional(),
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest) {
       storage_type: params.storage_type,
       temperature_types: params.temperature_types,
       amenities: params.amenities,
+      security: params.security,
       min_price: params.min_price,
       max_price: params.max_price,
       min_rating: params.min_rating,

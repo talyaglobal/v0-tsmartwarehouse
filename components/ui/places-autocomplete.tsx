@@ -17,25 +17,42 @@ interface PlacesAutocompleteProps {
 // Load Google Maps script dynamically
 const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
   return new Promise((resolve, reject) => {
+    // Check if already available
     if (window.google && window.google.maps && window.google.maps.places) {
       resolve()
       return
     }
 
-    // Check if script is already being loaded
-    const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`)
-    if (existingScript) {
-      // Wait for existing script to load
-      existingScript.addEventListener('load', () => {
+    // Function to check if Google Maps is ready
+    const checkGoogleMapsReady = (attempts = 0): Promise<void> => {
+      return new Promise((res, rej) => {
         if (window.google && window.google.maps && window.google.maps.places) {
-          resolve()
+          res()
+        } else if (attempts < 50) { // Try for up to 5 seconds
+          setTimeout(() => {
+            checkGoogleMapsReady(attempts + 1).then(res).catch(rej)
+          }, 100)
         } else {
-          reject(new Error("Google Maps script loaded but API not available"))
+          rej(new Error("Google Maps API not available after loading"))
         }
       })
-      existingScript.addEventListener('error', () => {
-        reject(new Error("Failed to load Google Maps script"))
-      })
+    }
+
+    // Check if script is already being loaded or loaded
+    const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`)
+    if (existingScript) {
+      // Script exists, wait for API to be ready
+      checkGoogleMapsReady()
+        .then(resolve)
+        .catch(() => {
+          // Script exists but API isn't available - this is normal during initial load
+          // Just wait a bit more
+          setTimeout(() => {
+            checkGoogleMapsReady()
+              .then(resolve)
+              .catch(reject)
+          }, 500)
+        })
       return
     }
 
@@ -44,11 +61,9 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
     script.async = true
     script.defer = true
     script.onload = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        resolve()
-      } else {
-        reject(new Error("Google Maps script loaded but API not available"))
-      }
+      checkGoogleMapsReady()
+        .then(resolve)
+        .catch(reject)
     }
     script.onerror = () => {
       reject(new Error("Failed to load Google Maps script"))
@@ -83,7 +98,6 @@ export function PlacesAutocomplete({
 
     loadGoogleMapsScript(apiKey)
       .then(() => {
-        console.log("[PlacesAutocomplete] Google Maps script loaded successfully")
         setIsScriptLoaded(true)
       })
       .catch((error) => {

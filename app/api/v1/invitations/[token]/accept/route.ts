@@ -175,7 +175,6 @@ export async function POST(
           console.error('Error creating auth user:', createUserError)
           // Continue anyway - we'll try to update the profile
         } else {
-          console.log(`✅ Auth user created for profile ${profile.id}`)
         }
       } catch (createError) {
         console.error('Error creating auth user:', createError)
@@ -193,9 +192,6 @@ export async function POST(
       status: true, // Always set status to true when invitation is accepted
       // Keep invited_by for reference
     }
-
-    console.log(`✅ Accepting invitation for profile ${profile.id}, setting company_id: ${companyId}, status: true`)
-
     // Use admin client to bypass RLS
     const { error: updateError } = await supabaseAdmin
       .from('profiles')

@@ -74,7 +74,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   }
 
   // TODO: Send confirmation email to customer
-  console.log("Booking confirmed:", booking.id)
+
 }
 
 async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentIntent) {
@@ -106,7 +106,7 @@ async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentInt
   }
 
   // TODO: Send failure notification email to customer
-  console.log("Payment failed for booking:", booking.id)
+
 }
 
 /**

@@ -255,7 +255,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify profile was created by trigger, if not create it manually
-    console.log('Checking if profile exists...')
     const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
       .select('id')
@@ -268,7 +267,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
 
     if (profileCheckError || !existingProfile) {
       // Profile doesn't exist, create it manually
-      console.log('Profile not found, creating manually...')
       
       // For warehouse clients, brokers, and finders, skip company creation
       if (isCustomer || isReseller || isFinder) {
@@ -292,7 +290,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           console.error('Profile creation error:', profileCreateError)
           try {
             await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-            console.log('User deleted after profile creation failure')
           } catch (deleteError) {
             console.error('Failed to cleanup after profile creation error:', deleteError)
           }
@@ -314,7 +311,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         // Try to delete the user if company name is missing
         try {
           await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-          console.log('User deleted after missing company name')
         } catch (deleteError) {
           console.error('Failed to delete user:', deleteError)
         }
@@ -362,7 +358,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         if (profileUpdateError) {
           console.error('Profile update error:', profileUpdateError)
         } else {
-          console.log('User profile updated with company_id and warehouse_admin role')
         }
       } else {
         // No exact match - create new company
@@ -381,7 +376,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           // Company already exists - user should select it
           try {
             await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-            console.log('User deleted - company already exists')
           } catch (deleteError) {
             console.error('Failed to delete user:', deleteError)
           }
@@ -406,7 +400,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           console.error('Company creation error:', companyCreateError)
           try {
             await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-            console.log('User deleted after company creation failure')
           } catch (deleteError) {
             console.error('Failed to delete user after company creation error:', deleteError)
           }
@@ -432,7 +425,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         if (profileUpdateError) {
           console.error('Profile update error:', profileUpdateError)
         } else {
-          console.log('User profile updated with company_id and warehouse_owner role')
         }
       }
 
@@ -465,7 +457,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         // Try to delete the user if profile creation fails
         try {
           await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-          console.log('User deleted after profile creation failure')
         } catch (deleteError) {
           console.error('Failed to cleanup after profile creation error:', deleteError)
         }
@@ -477,7 +468,6 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       }
       console.log('Profile created manually:', insertedProfile?.id)
     } else {
-      console.log('Profile already exists (created by trigger)')
     }
 
     // Registration successful - user can login immediately (no email sent)

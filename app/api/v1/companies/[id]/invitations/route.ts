@@ -440,7 +440,6 @@ export async function POST(
           }
           return NextResponse.json(errorData, { status: 500 })
         }
-        console.log('✅ Profile updated with invitation token')
       } else {
         // Profile doesn't exist, create it with invitation token, role, and password (no company_id)
         // If reactivating, set status = true
@@ -475,7 +474,6 @@ export async function POST(
           }
           return NextResponse.json(errorData, { status: 500 })
         }
-        console.log('✅ Profile created with invitation token')
       }
     } else if (existingAuthUser && !existingProfile) {
       // User exists in Auth but not in profiles - create profile with invitation token, role, and password
@@ -505,7 +503,6 @@ export async function POST(
         }
         return NextResponse.json(errorData, { status: 500 })
       }
-      console.log('✅ Profile created for existing auth user with invitation token')
     } else if (existingProfile) {
       // User exists in profiles (either active or soft-deleted)
       // Update with invitation token, role, and password (if new user was created)
@@ -547,7 +544,6 @@ export async function POST(
         }
         return NextResponse.json(errorData, { status: 500 })
       }
-      console.log('✅ Existing profile updated with invitation token')
     }
 
     // Get company and inviter information for email
@@ -629,7 +625,6 @@ export async function POST(
           console.error('  SMTP_FROM_EMAIL:', process.env.SMTP_FROM_EMAIL || 'Using default')
           console.error('  SMTP_FROM_NAME:', process.env.SMTP_FROM_NAME || 'Using default')
         } else {
-          console.log('✅ Invitation email sent successfully')
           console.log(`   To: ${email.toLowerCase().trim()}`)
         }
       } catch (emailError) {

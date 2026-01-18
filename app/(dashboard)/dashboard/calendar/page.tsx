@@ -73,9 +73,7 @@ export default function CalendarPage() {
       const booking = event.resource.data as Booking
       router.push(`/dashboard/bookings/${booking.id}`)
     } else if (event.resource.originalType === 'task') {
-      const task = event.resource.data as Task
-      // Navigate to task detail if available, or show info
-      console.log('Task selected:', task)
+      // TODO: Navigate to task detail if available
     }
   }
 

@@ -17,6 +17,7 @@ interface WarehouseCardProps {
   warehouse: WarehouseSearchResult
   viewMode?: "list" | "grid"
   searchParams?: {
+    location?: string
     type?: string
     palletCount?: string
     areaSqFt?: string
@@ -36,22 +37,44 @@ export function WarehouseCard({
   
   // Get pricing based on selected type (pallet or area-rental)
   const selectedType = searchParams?.type || 'pallet'
-  const pricing = warehouse.pricing?.find(
-    (p) => p.type === (selectedType === 'pallet' ? 'pallet' : 'area-rental')
-  ) || warehouse.pricing?.[0]
   
-  const price = pricing?.price || warehouse.min_price
-  // For area-rental, ensure unit is displayed as "Per Sqft Per Month"
-  let unit = formatPricingUnit(pricing?.unit)
-  if (selectedType === 'area-rental') {
+  // Find pricing matching the selected type
+  const palletPricingEntry = warehouse.pricing?.find((p) => p.type === 'pallet')
+  const areaPricing = warehouse.pricing?.find((p) => p.type === 'area-rental')
+  
+  // Select appropriate pricing based on type
+  const pricing = selectedType === 'pallet' 
+    ? (palletPricingEntry || areaPricing) 
+    : (areaPricing || palletPricingEntry)
+  
+  // For pallet storage, use average_pallet_price if available
+  // For area-rental, use the regular pricing
+  let price: number
+  let unit: string
+  
+  if (selectedType === 'pallet') {
+    // Use average pallet price for more accurate representation
+    if (warehouse.average_pallet_price && warehouse.average_pallet_price > 0) {
+      price = warehouse.average_pallet_price
+      unit = 'Avg. Per Pallet Per Day'
+    } else {
+      price = pricing?.price || warehouse.min_price
+      unit = 'Per Pallet Per Day'
+    }
+  } else {
+    price = pricing?.price || warehouse.min_price
     // For area-rental, always show "Per Sqft Per Month"
-    if (unit && unit.toLowerCase().includes('sqft')) {
-      unit = unit.replace(/Per Day/gi, 'Per Month')
-      if (!unit.toLowerCase().includes('per month')) {
-        unit = unit.replace(/Per Sqft/gi, 'Per Sqft Per Month')
+    if (areaPricing?.unit) {
+      unit = formatPricingUnit(areaPricing.unit)
+      if (unit.toLowerCase().includes('sqft')) {
+        unit = unit.replace(/Per Day/gi, 'Per Month')
+        if (!unit.toLowerCase().includes('per month')) {
+          unit = unit.replace(/Per Sqft/gi, 'Per Sqft Per Month')
+        }
+      } else {
+        unit = 'Per Sqft Per Month'
       }
     } else {
-      // If no unit or unit doesn't contain sqft, default to "Per Sqft Per Month"
       unit = 'Per Sqft Per Month'
     }
   }
@@ -119,6 +142,7 @@ export function WarehouseCard({
 
   // Build link with search params
   const linkParams = new URLSearchParams()
+  if (searchParams?.location) linkParams.set('location', searchParams.location)
   if (searchParams?.type) linkParams.set('type', searchParams.type)
   if (searchParams?.startDate) linkParams.set('startDate', searchParams.startDate)
   if (searchParams?.endDate) linkParams.set('endDate', searchParams.endDate)

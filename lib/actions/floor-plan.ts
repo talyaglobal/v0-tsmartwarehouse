@@ -109,7 +109,6 @@ export async function loadFloorPlan(warehouseId: string): Promise<FloorPlanResul
     if (error) {
       // Table might not exist
       if (error.code === '42P01') {
-        console.log('floor_plans table does not exist')
         return { success: true, data: null }
       }
       console.error('Load error:', error)

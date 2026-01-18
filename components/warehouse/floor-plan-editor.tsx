@@ -882,10 +882,29 @@ export function FloorPlanEditor({ warehouseId, warehouseName, initialData, onSav
     setIsDraggingItem(false)
   }, [isDraggingVertex, isDraggingItem, draggedCatalogItem, dragPosition, isValidPlacement, saveToHistory])
   
-  const handleCanvasWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? 0.9 : 1.1
-    setZoom(prev => Math.max(0.25, Math.min(3, prev * delta)))
+  // Wheel zoom - use useEffect with non-passive listener to prevent warnings
+  const handleWheelRef = useRef<((e: WheelEvent) => void) | null>(null)
+  
+  useEffect(() => {
+    handleWheelRef.current = (e: WheelEvent) => {
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? 0.9 : 1.1
+      setZoom(prev => Math.max(0.25, Math.min(3, prev * delta)))
+    }
+  }, [])
+  
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const wheelHandler = (e: WheelEvent) => {
+      handleWheelRef.current?.(e)
+    }
+    
+    canvas.addEventListener('wheel', wheelHandler, { passive: false })
+    return () => {
+      canvas.removeEventListener('wheel', wheelHandler)
+    }
   }, [])
   
   // -------------------------------------------------------------------------
@@ -1232,7 +1251,6 @@ export function FloorPlanEditor({ warehouseId, warehouseName, initialData, onSav
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseUp}
-              onWheel={handleCanvasWheel}
               className="w-full h-full cursor-crosshair"
             />
           ) : (
