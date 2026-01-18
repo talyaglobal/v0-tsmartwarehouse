@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, warehouse_type, storage_type, temperature_types, photos, videos, description, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, access_info, product_acceptance_time_slots, product_departure_time_slots, overtime_price, working_days, warehouse_in_fee, warehouse_out_fee, ports, free_storage_rules, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, goods_type, storage_type, temperature_types, photos, videos, description, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, access_info, product_acceptance_time_slots, product_departure_time_slots, overtime_price, working_days, warehouse_in_fee, warehouse_out_fee, ports, free_storage_rules, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -70,7 +70,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       latitude,
       longitude,
       owner_company_id,
-      warehouse_type,
+      goods_type,
       storage_type,
       temperature_types,
       photos,
@@ -195,7 +195,7 @@ export async function createWarehouse(
       available_pallet_storage: warehouse.totalPalletStorage, // Initialize available with total
       latitude: warehouse.latitude,
       longitude: warehouse.longitude,
-      warehouse_type: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : [warehouse.warehouseType || 'general-dry-ambient'], // Now array
+      goods_type: Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : [warehouse.warehouseType || 'general-dry-ambient'], // Now array
       storage_type: Array.isArray(warehouse.storageType) ? warehouse.storageType : (warehouse.storageType ? [warehouse.storageType] : ['rack-space']), // Now array
       temperature_types: warehouse.temperatureTypes,
       photos: warehouse.photos,
@@ -252,7 +252,7 @@ export async function updateWarehouse(
   if (updates.totalPalletStorage !== undefined) updateData.total_pallet_storage = updates.totalPalletStorage
   if (updates.latitude !== undefined) updateData.latitude = updates.latitude
   if (updates.longitude !== undefined) updateData.longitude = updates.longitude
-  if (updates.warehouseType !== undefined) updateData.warehouse_type = Array.isArray(updates.warehouseType) ? updates.warehouseType : [updates.warehouseType || 'general-dry-ambient'] // Now array
+  if (updates.warehouseType !== undefined) updateData.goods_type = Array.isArray(updates.warehouseType) ? updates.warehouseType : [updates.warehouseType || 'general-dry-ambient'] // Now array
   if (updates.storageType !== undefined) updateData.storage_type = Array.isArray(updates.storageType) ? updates.storageType : (updates.storageType ? [updates.storageType] : ['rack-space']) // Now array
   if (updates.temperatureTypes !== undefined) updateData.temperature_types = updates.temperatureTypes
   if (updates.photos !== undefined) updateData.photos = updates.photos
@@ -469,7 +469,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     availablePalletStorage: row.available_pallet_storage || undefined,
     latitude: row.latitude ? parseFloat(row.latitude) : undefined,
     longitude: row.longitude ? parseFloat(row.longitude) : undefined,
-    warehouseType: row.warehouse_type ? (Array.isArray(row.warehouse_type) ? row.warehouse_type : [row.warehouse_type]) : [],
+    warehouseType: row.goods_type ? (Array.isArray(row.goods_type) ? row.goods_type : [row.goods_type]) : [],
     storageType: row.storage_type ? (Array.isArray(row.storage_type) ? row.storage_type : [row.storage_type]) : [], // Now array
     temperatureTypes: Array.isArray(row.temperature_types) ? row.temperature_types : (row.temperature_types ? [row.temperature_types] : []),
     photos: Array.isArray(row.photos) ? row.photos : [],

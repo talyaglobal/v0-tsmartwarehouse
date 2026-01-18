@@ -37,7 +37,7 @@ export default function FindWarehousesPage() {
         : undefined,
       start_date: searchParams.get("startDate") || undefined,
       end_date: searchParams.get("endDate") || undefined,
-      warehouse_type: searchParams.get("warehouse_type")?.split(",").filter(Boolean),
+      goods_type: searchParams.get("goods_type")?.split(",").filter(Boolean),
       storage_type: searchParams.get("storage_type")?.split(",").filter(Boolean),
       temperature_types: searchParams.get("temperature_types")?.split(",").filter(Boolean),
       amenities: searchParams.get("amenities")?.split(",").filter(Boolean),

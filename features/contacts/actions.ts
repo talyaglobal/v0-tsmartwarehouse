@@ -49,7 +49,7 @@ function mapContactToCRM(contact: any): Contact {
     pipelineMilestone: contact.pipeline_milestone,
     priority: contact.priority,
     warehouseSizeSqm: contact.warehouse_size_sqm,
-    warehouseType: contact.warehouse_type,
+    warehouseType: contact.goods_type,
     availableServices: contact.available_services,
     estimatedCapacity: contact.estimated_capacity,
     currentUtilizationPercent: contact.current_utilization_percent,

@@ -61,34 +61,10 @@ interface WarehouseListGridProps {
   }
 }
 
-const WAREHOUSE_TYPE_LABELS: Record<string, string> = {
-  "general-dry-ambient": "General (Dry/Ambient)",
-  "food-beverage-fda": "Food & Beverage (FDA Registered)",
-  "pharmaceutical-fda-cgmp": "Pharmaceutical (FDA/cGMP)",
-  "medical-devices-fda": "Medical Devices (FDA Registered)",
-  "nutraceuticals-supplements-fda": "Nutraceuticals & Supplements (FDA)",
-  "cosmetics-fda": "Cosmetics (FDA)",
-  "hazardous-materials-hazmat": "Hazardous Materials (Hazmat Certified)",
-  "cold-storage": "Cold Storage (Refrigerated/Frozen)",
-  "alcohol-tobacco-ttb": "Alcohol & Tobacco (TTB Licensed)",
-  "consumer-electronics": "Consumer Electronics",
-  "automotive-parts": "Automotive Parts",
-  "ecommerce-high-velocity": "E-commerce / High-velocity Fulfillment",
-  // Legacy support
-  "general": "General",
-  "food-and-beverages": "Food & Beverages",
-  "dangerous-goods": "Dangerous Goods",
-  "chemicals": "Chemicals",
-  "medical": "Medical",
-  "pharma": "Pharma",
-}
+// Use centralized warehouse type labels
+import { formatGoodsType } from "@/lib/constants/warehouse-types"
 
-const formatLabel = (value: string): string => {
-  return WAREHOUSE_TYPE_LABELS[value] || value
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
+const formatLabel = formatGoodsType
 
 export function WarehouseListGrid({ warehouses, viewMode, searchParams }: WarehouseListGridProps) {
   const [currentPhotoIndexes, setCurrentPhotoIndexes] = useState<Record<string, number>>({})

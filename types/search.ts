@@ -18,7 +18,7 @@ export interface WarehouseSearchParams {
   end_date?: string // ISO date string
 
   // Filters
-  warehouse_type?: string[]
+  goods_type?: string[]
   storage_type?: string[]
   temperature_types?: string[]
   amenities?: string[]

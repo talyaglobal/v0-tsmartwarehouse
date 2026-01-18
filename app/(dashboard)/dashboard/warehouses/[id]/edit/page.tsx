@@ -25,24 +25,7 @@ import { TemperatureSelect } from "@/components/warehouse/temperature-select"
 import { Progress } from "@/components/ui/progress"
 import { ArrowRight, CheckCircle2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-
-const WAREHOUSE_TYPES = [
-  { value: "general-dry-ambient", label: "FMCG" },
-  { value: "food-beverage-fda", label: "Food Stuff" },
-  { value: "pharmaceutical-fda-cgmp", label: "Pharmaceutical (FDA/cGMP)" },
-  { value: "medical-devices-fda", label: "Medical Devices (FDA Registered)" },
-  { value: "nutraceuticals-supplements-fda", label: "Nutraceuticals & Supplements (FDA)" },
-  { value: "cosmetics-fda", label: "Cosmetics (FDA)" },
-  { value: "hazardous-materials-hazmat", label: "Hazardous Materials (Hazmat Certified)" },
-  { value: "cold-storage", label: "Cold Storage (Refrigerated/Frozen)" },
-  { value: "alcohol-tobacco-ttb", label: "Alcohol & Tobacco (TTB Licensed)" },
-  { value: "consumer-electronics", label: "Consumer Electronics" },
-  { value: "automotive-parts", label: "Automotive Parts" },
-  { value: "ecommerce-high-velocity", label: "E-commerce / High-velocity Fulfillment" },
-  { value: "spare-parts", label: "Spare Parts" },
-  { value: "aerospace-civil", label: "Aero Space (Civil)" },
-  { value: "aerospace-pentagon-approved", label: "Aero Space (Pentagon Approved)" },
-] as const
+import { GOODS_TYPES } from "@/lib/constants/warehouse-types"
 
 const STORAGE_TYPES = [
   { value: "bulk-space", label: "Bulk Space" },
@@ -1041,10 +1024,10 @@ export default function EditWarehousePage() {
             <div className="space-y-4">
               <div className="space-y-3">
                 <Label>
-                  Warehouse Type <span className="text-destructive">*</span>
+                  Goods Type <span className="text-destructive">*</span>
                 </Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {WAREHOUSE_TYPES.map((type) => (
+                  {GOODS_TYPES.map((type) => (
                     <div key={type.value} className="flex items-center space-x-2">
                       <Checkbox
                         id={`warehouse-type-${type.value}`}

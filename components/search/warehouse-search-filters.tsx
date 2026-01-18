@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Star } from "lucide-react"
 import { MapPin } from "@/components/icons"
 import { cn } from "@/lib/utils"
+import { GOODS_TYPES } from "@/lib/constants/warehouse-types"
 
 interface WarehouseSearchFiltersProps {
   location: string
   onLocationChange: (location: string) => void
-  warehouseType: string[]
-  onWarehouseTypeChange: (types: string[]) => void
+  goodsType: string[]
+  onGoodsTypeChange: (types: string[]) => void
   storageType: string[]
   onStorageTypeChange: (types: string[]) => void
   temperature: string[]
@@ -22,21 +23,6 @@ interface WarehouseSearchFiltersProps {
   rating: number | null
   onRatingChange: (rating: number | null) => void
 }
-
-const WAREHOUSE_TYPES = [
-  { value: "general-dry-ambient", label: "General (Dry/Ambient)" },
-  { value: "food-beverage-fda", label: "Food & Beverage (FDA Registered)" },
-  { value: "pharmaceutical-fda-cgmp", label: "Pharmaceutical (FDA/cGMP)" },
-  { value: "medical-devices-fda", label: "Medical Devices (FDA Registered)" },
-  { value: "nutraceuticals-supplements-fda", label: "Nutraceuticals & Supplements (FDA)" },
-  { value: "cosmetics-fda", label: "Cosmetics (FDA)" },
-  { value: "hazardous-materials-hazmat", label: "Hazardous Materials (Hazmat Certified)" },
-  { value: "cold-storage", label: "Cold Storage (Refrigerated/Frozen)" },
-  { value: "alcohol-tobacco-ttb", label: "Alcohol & Tobacco (TTB Licensed)" },
-  { value: "consumer-electronics", label: "Consumer Electronics" },
-  { value: "automotive-parts", label: "Automotive Parts" },
-  { value: "ecommerce-high-velocity", label: "E-commerce / High-velocity Fulfillment" },
-] as const
 
 const STORAGE_TYPES = [
   "bulk-space",
@@ -70,8 +56,8 @@ const formatLabel = (value: string): string => {
 export function WarehouseSearchFilters({
   location,
   onLocationChange,
-  warehouseType,
-  onWarehouseTypeChange,
+  goodsType,
+  onGoodsTypeChange,
   storageType,
   onStorageTypeChange,
   temperature,
@@ -80,11 +66,11 @@ export function WarehouseSearchFilters({
   onRatingChange,
 }: WarehouseSearchFiltersProps) {
 
-  const handleWarehouseTypeToggle = (type: string, checked: boolean) => {
+  const handleGoodsTypeToggle = (type: string, checked: boolean) => {
     if (checked) {
-      onWarehouseTypeChange([...warehouseType, type])
+      onGoodsTypeChange([...goodsType, type])
     } else {
-      onWarehouseTypeChange(warehouseType.filter((t) => t !== type))
+      onGoodsTypeChange(goodsType.filter((t) => t !== type))
     }
   }
 
@@ -105,13 +91,13 @@ export function WarehouseSearchFilters({
   }
 
   const hasActiveFilters =
-    warehouseType.length > 0 ||
+    goodsType.length > 0 ||
     storageType.length > 0 ||
     temperature.length > 0 ||
     rating !== null
 
   const handleClearFilters = () => {
-    onWarehouseTypeChange([])
+    onGoodsTypeChange([])
     onStorageTypeChange([])
     onTemperatureChange([])
     onRatingChange(null)
@@ -152,19 +138,19 @@ export function WarehouseSearchFilters({
 
         <Separator />
 
-        {/* Warehouse Type */}
+        {/* Goods Type */}
         <div className="space-y-3">
-          <Label>Warehouse Type</Label>
+          <Label>Goods Type</Label>
           <div className="space-y-2">
-            {WAREHOUSE_TYPES.map((type) => (
+            {GOODS_TYPES.map((type) => (
               <div key={type.value} className="flex items-center space-x-2">
                 <Checkbox
-                  id={`warehouse-type-${type.value}`}
-                  checked={warehouseType.includes(type.value)}
-                  onCheckedChange={(checked) => handleWarehouseTypeToggle(type.value, checked as boolean)}
+                  id={`goods-type-${type.value}`}
+                  checked={goodsType.includes(type.value)}
+                  onCheckedChange={(checked) => handleGoodsTypeToggle(type.value, checked as boolean)}
                 />
                 <Label
-                  htmlFor={`warehouse-type-${type.value}`}
+                  htmlFor={`goods-type-${type.value}`}
                   className="text-sm font-normal cursor-pointer"
                 >
                   {type.label}

@@ -13,6 +13,7 @@ import { Star } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
+import { formatGoodsType } from "@/lib/constants/warehouse-types"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
@@ -653,40 +654,13 @@ export default function WarehouseDetailPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-muted-foreground mb-2">Warehouse Type</div>
+                      <div className="text-sm text-muted-foreground mb-2">Goods Type</div>
                       <div className="flex flex-wrap gap-2">
-                        {(Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : (warehouse.warehouseType ? [warehouse.warehouseType] : [])).map((type, idx) => {
-                          const typeLabels: Record<string, string> = {
-                            "general-dry-ambient": "General (Dry/Ambient)",
-                            "food-beverage-fda": "Food & Beverage (FDA Registered)",
-                            "pharmaceutical-fda-cgmp": "Pharmaceutical (FDA/cGMP)",
-                            "medical-devices-fda": "Medical Devices (FDA Registered)",
-                            "nutraceuticals-supplements-fda": "Nutraceuticals & Supplements (FDA)",
-                            "cosmetics-fda": "Cosmetics (FDA)",
-                            "hazardous-materials-hazmat": "Hazardous Materials (Hazmat Certified)",
-                            "cold-storage": "Cold Storage (Refrigerated/Frozen)",
-                            "alcohol-tobacco-ttb": "Alcohol & Tobacco (TTB Licensed)",
-                            "consumer-electronics": "Consumer Electronics",
-                            "automotive-parts": "Automotive Parts",
-                            "ecommerce-high-velocity": "E-commerce / High-velocity Fulfillment",
-                            // Legacy support
-                            "general": "General",
-                            "food-and-beverages": "Food & Beverages",
-                            "dangerous-goods": "Dangerous Goods",
-                            "chemicals": "Chemicals",
-                            "medical": "Medical",
-                            "pharma": "Pharma",
-                          }
-                          const label = typeLabels[type] || type
-                            .split("-")
-                            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                            .join(" ")
-                          return (
-                            <Badge key={idx} variant="secondary">
-                              {label}
-                            </Badge>
-                          )
-                        })}
+                        {(Array.isArray(warehouse.warehouseType) ? warehouse.warehouseType : (warehouse.warehouseType ? [warehouse.warehouseType] : [])).map((type, idx) => (
+                          <Badge key={idx} variant="secondary">
+                            {formatGoodsType(type)}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                     <div>

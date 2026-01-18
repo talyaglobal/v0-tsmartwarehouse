@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { formatCurrency } from "@/lib/utils/format"
+import { formatGoodsType } from "@/lib/constants/warehouse-types"
 import { Package, Ruler, Calendar, AlertTriangle } from "lucide-react"
 import type { PalletBookingDetails, PriceBreakdown } from "@/types/marketplace"
 
@@ -31,11 +32,6 @@ export function BookingSummary({
   className,
   palletDetails,
 }: BookingSummaryProps) {
-  const formatGoodsType = (value: string) =>
-    value
-      .split(/[-_ ]+/)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ")
   const [priceBreakdown, setPriceBreakdown] = useState<PriceBreakdown | null>(null)
   const [priceLoading, setPriceLoading] = useState(false)
 

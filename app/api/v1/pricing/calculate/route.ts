@@ -6,8 +6,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    console.log('[pricing API] Request body:', JSON.stringify(body, null, 2))
-    
     const params: PriceCalculation = {
       warehouse_id: body.warehouse_id,
       type: body.type,
@@ -30,15 +28,9 @@ export async function POST(request: NextRequest) {
 
     const breakdown = await calculatePrice(params)
 
-    // Add debug info to response
     return NextResponse.json({
       success: true,
       breakdown,
-      _debug: {
-        hasPalletDetails: !!body.pallet_details,
-        palletDetailsCount: body.pallet_details?.pallets?.length ?? 0,
-        requestedType: body.type,
-      }
     })
   } catch (error) {
     console.error("Error calculating price:", error)

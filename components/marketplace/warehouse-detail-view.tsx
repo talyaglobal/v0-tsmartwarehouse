@@ -855,17 +855,17 @@ export function WarehouseDetailView({
           </Card>
         )}
 
-        {/* Warehouse Type & Storage Type */}
+        {/* Goods Type & Storage Type */}
         <Card>
           <CardHeader>
-            <CardTitle>Warehouse Type & Storage</CardTitle>
+            <CardTitle>Goods Type & Storage</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {warehouse.warehouse_type && (
+            {warehouse.goods_type && (
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Warehouse Type</p>
+                <p className="text-sm text-muted-foreground mb-1">Goods Type</p>
                 <div className="flex flex-wrap gap-1">
-                  {(Array.isArray(warehouse.warehouse_type) ? warehouse.warehouse_type : [warehouse.warehouse_type]).map((type, idx) => (
+                  {(Array.isArray(warehouse.goods_type) ? warehouse.goods_type : [warehouse.goods_type]).map((type, idx) => (
                     <Badge key={idx} variant="secondary" className="text-sm">
                       {typeof type === 'string' ? type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : type}
                     </Badge>

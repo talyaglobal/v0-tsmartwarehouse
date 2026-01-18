@@ -69,10 +69,10 @@ function buildWhereClause(params: WarehouseSearchParams): any {
     where.zipCode = params.zipCode
   }
 
-  // Warehouse type filter
-  if (params.warehouse_type && params.warehouse_type.length > 0) {
+  // Goods type filter
+  if (params.goods_type && params.goods_type.length > 0) {
     where.warehouseType = {
-      in: params.warehouse_type,
+      in: params.goods_type,
     }
   }
 
@@ -226,7 +226,7 @@ export async function searchWarehouses(
         totalPalletStorage: wh.total_pallet_storage,
         availableSqFt: wh.available_sq_ft,
         availablePalletStorage: wh.available_pallet_storage,
-        warehouseType: wh.warehouse_type,
+        warehouseType: wh.goods_type,
         storageTypes: wh.storage_type ? [wh.storage_type] : [],
         temperatureTypes: wh.temperature_types || [],
         amenities: wh.amenities || [],
@@ -348,7 +348,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       totalPalletStorage: warehouse.total_pallet_storage,
       availableSqFt: warehouse.available_sq_ft,
       availablePalletStorage: warehouse.available_pallet_storage,
-      warehouseType: warehouse.warehouse_type,
+      warehouseType: warehouse.goods_type,
       storageTypes: warehouse.storage_type ? [warehouse.storage_type] : [],
       temperatureTypes: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],

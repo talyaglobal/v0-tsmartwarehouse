@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
         location: locationValue ? `SRID=4326;${locationValue}` : null,
         // Warehouse supplier fields
         warehouse_size_sqm: validatedData.warehouseSizeSqm || null,
-        warehouse_type: validatedData.warehouseType || null,
+        goods_type: validatedData.warehouseType || null,
         available_services: validatedData.availableServices || null,
         estimated_capacity: validatedData.estimatedCapacity || null,
         current_utilization_percent: validatedData.currentUtilizationPercent || null,

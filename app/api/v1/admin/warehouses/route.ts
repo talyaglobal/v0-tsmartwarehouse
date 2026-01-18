@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         total_pallet_storage,
         available_sq_ft,
         available_pallet_storage,
-        warehouse_type,
+        goods_type,
         storage_type,
         temperature_types,
         photos,
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
     // Apply type filter
     if (type && type !== 'all') {
-      query = query.contains('warehouse_type', [type])
+      query = query.contains('goods_type', [type])
     }
 
     // Apply search filter
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
       total_pallet_storage: w.total_pallet_storage,
       available_sq_ft: w.available_sq_ft,
       available_pallet_storage: w.available_pallet_storage,
-      warehouse_type: w.warehouse_type || [],
+      goods_type: w.goods_type || [],
       storage_type: w.storage_type || [],
       temperature_types: w.temperature_types || [],
       photos: w.photos || [],

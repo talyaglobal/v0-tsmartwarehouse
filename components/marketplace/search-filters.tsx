@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 // Slider component not available - using Input fields for price range
 import { RatingStars } from "./rating-stars"
 import { X, Filter } from "lucide-react"
+import { GOODS_TYPES } from "@/lib/constants/warehouse-types"
 import type { WarehouseSearchParams } from "@/types/marketplace"
 
 interface SearchFiltersProps {
@@ -25,24 +26,6 @@ interface SearchFiltersProps {
     end_date?: string
   }
 }
-
-const WAREHOUSE_TYPES = [
-  { value: "general-dry-ambient", label: "FMCG" },
-  { value: "food-beverage-fda", label: "Food Stuff" },
-  { value: "pharmaceutical-fda-cgmp", label: "Pharmaceutical (FDA/cGMP)" },
-  { value: "medical-devices-fda", label: "Medical Devices (FDA Registered)" },
-  { value: "nutraceuticals-supplements-fda", label: "Nutraceuticals & Supplements (FDA)" },
-  { value: "cosmetics-fda", label: "Cosmetics (FDA)" },
-  { value: "hazardous-materials-hazmat", label: "Hazardous Materials (Hazmat Certified)" },
-  { value: "cold-storage", label: "Cold Storage (Refrigerated/Frozen)" },
-  { value: "alcohol-tobacco-ttb", label: "Alcohol & Tobacco (TTB Licensed)" },
-  { value: "consumer-electronics", label: "Consumer Electronics" },
-  { value: "automotive-parts", label: "Automotive Parts" },
-  { value: "ecommerce-high-velocity", label: "E-commerce / High-velocity Fulfillment" },
-  { value: "spare-parts", label: "Spare Parts" },
-  { value: "aerospace-civil", label: "Aero Space (Civil)" },
-  { value: "aerospace-pentagon-approved", label: "Aero Space (Pentagon Approved)" },
-] as const
 
 
 const TEMPERATURE_TYPES = [
@@ -80,7 +63,7 @@ export function SearchFilters({
     onFiltersChange({ ...filters, [key]: value })
   }
 
-  const toggleArrayFilter = (key: "warehouse_type" | "temperature_types" | "security", value: string) => {
+  const toggleArrayFilter = (key: "goods_type" | "temperature_types" | "security", value: string) => {
     const current = (filters[key] as string[]) || []
     const updated = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -99,7 +82,7 @@ export function SearchFilters({
 
   // Active filters (should be cleared) - exclude search criteria
   const hasActiveFilters = 
-    (filters.warehouse_type && filters.warehouse_type.length > 0) ||
+    (filters.goods_type && filters.goods_type.length > 0) ||
     (filters.temperature_types && filters.temperature_types.length > 0) ||
     (filters.security && filters.security.length > 0) ||
     filters.min_price ||
@@ -110,7 +93,7 @@ export function SearchFilters({
   const handleClearFilters = () => {
     const clearedFilters: Partial<WarehouseSearchParams> = {
       ...searchCriteria, // Preserve search criteria
-      warehouse_type: undefined,
+      goods_type: undefined,
       temperature_types: undefined,
       security: undefined,
       min_price: undefined,
@@ -183,16 +166,16 @@ export function SearchFilters({
         </div>
       </div>
 
-      {/* Warehouse Type */}
+      {/* Goods Type */}
       <div className="space-y-2">
-        <Label>Warehouse Type</Label>
+        <Label>Goods Type</Label>
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {WAREHOUSE_TYPES.map((type) => (
+          {GOODS_TYPES.map((type) => (
             <div key={type.value} className="flex items-center space-x-2">
               <Checkbox
                 id={`warehouse-type-${type.value}`}
-                checked={(filters.warehouse_type || []).includes(type.value)}
-                onCheckedChange={() => toggleArrayFilter("warehouse_type", type.value)}
+                checked={(filters.goods_type || []).includes(type.value)}
+                onCheckedChange={() => toggleArrayFilter("goods_type", type.value)}
               />
               <label
                 htmlFor={`warehouse-type-${type.value}`}
@@ -273,7 +256,7 @@ export function SearchFilters({
           {hasActiveFilters && (
             <span className="ml-2 px-2 py-0.5 bg-primary text-primary-foreground rounded-full text-xs">
               {[
-                filters.warehouse_type?.length,
+                filters.goods_type?.length,
                 filters.temperature_types?.length,
                 filters.security?.length,
                 filters.min_price,

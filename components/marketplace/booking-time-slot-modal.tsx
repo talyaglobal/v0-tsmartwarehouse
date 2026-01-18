@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Calendar, Clock, Loader2, Info, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react"
 import { formatDate } from "@/lib/utils/format"
+import { formatGoodsType } from "@/lib/constants/warehouse-types"
 import { BookingSummary } from "./booking-summary"
 import { api } from "@/lib/api/client"
 import type { PalletBookingDetails, WarehouseSearchResult } from "@/types/marketplace"
@@ -103,11 +104,6 @@ export function BookingTimeSlotModal({
 
   const normalizeGoodsType = (value?: string) =>
     (value || "general").trim().toLowerCase()
-  const formatGoodsType = (value: string) =>
-    value
-      .split(/[-_ ]+/)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ")
   const normalizeList = (value: string | string[] | undefined) => {
     if (!value) return []
     if (Array.isArray(value)) return value.filter(Boolean).map(String)
@@ -117,8 +113,8 @@ export function BookingTimeSlotModal({
       .filter(Boolean)
   }
   const goodsTypeOptions = useMemo(() => {
-    const warehouseTypes = normalizeList((warehouse as any).warehouse_type)
-    const source = warehouseTypes.length > 0 ? warehouseTypes : ["general"]
+    const goodsTypes = normalizeList((warehouse as any).goods_type)
+    const source = goodsTypes.length > 0 ? goodsTypes : ["general"]
     return Array.from(new Set(source.map((type) => normalizeGoodsType(type))))
   }, [warehouse])
 

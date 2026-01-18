@@ -220,7 +220,7 @@ export async function PATCH(
     if (validatedData.country !== undefined) updateData.country = validatedData.country || null
     if (validatedData.postalCode !== undefined) updateData.postal_code = validatedData.postalCode || null
     if (validatedData.warehouseSizeSqm !== undefined) updateData.warehouse_size_sqm = validatedData.warehouseSizeSqm || null
-    if (validatedData.warehouseType !== undefined) updateData.warehouse_type = validatedData.warehouseType || null
+    if (validatedData.warehouseType !== undefined) updateData.goods_type = validatedData.warehouseType || null
     if (validatedData.availableServices !== undefined) updateData.available_services = validatedData.availableServices || null
     if (validatedData.estimatedCapacity !== undefined) updateData.estimated_capacity = validatedData.estimatedCapacity || null
     if (validatedData.currentUtilizationPercent !== undefined) updateData.current_utilization_percent = validatedData.currentUtilizationPercent || null

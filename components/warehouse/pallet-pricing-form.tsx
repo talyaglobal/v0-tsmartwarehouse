@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, X } from "lucide-react"
 import { PalletPricing, PalletType, PricingPeriod, HeightRangePricing, WeightRangePricing, CustomPalletDimensions, CustomPalletSize } from "@/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatGoodsType } from "@/lib/constants/warehouse-types"
 
 interface PalletPricingFormProps {
   onPricingChange: (pricing: PalletPricing[]) => void
@@ -42,11 +43,6 @@ export function PalletPricingForm({
   ] as const
   const normalizeGoodsType = (value?: string) =>
     (value || "general").trim().toLowerCase()
-  const formatGoodsType = (value: string) =>
-    value
-      .split(/[-_ ]+/)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ")
   // Local state for custom dimensions inputs to allow typing
   const [customDimensionInputs, setCustomDimensionInputs] = useState<Record<string, string>>({})
   const [rangeErrors, setRangeErrors] = useState<Record<string, string>>({})

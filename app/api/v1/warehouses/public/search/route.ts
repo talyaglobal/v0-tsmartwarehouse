@@ -25,7 +25,7 @@ const searchParamsSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 
   // Filters
-  warehouse_type: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
+  goods_type: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
   storage_type: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
   temperature_types: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
   amenities: z.string().transform((s) => s ? s.split(',') : undefined).optional(),
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
       quantity: params.quantity,
       start_date: params.start_date,
       end_date: params.end_date,
-      warehouse_type: params.warehouse_type,
+      goods_type: params.goods_type,
       storage_type: params.storage_type,
       temperature_types: params.temperature_types,
       amenities: params.amenities,

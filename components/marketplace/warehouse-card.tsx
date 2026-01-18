@@ -192,7 +192,7 @@ export function WarehouseCard({
     )
   }
 
-  const warehouseTypeBadges = normalizeList((warehouse as any).warehouse_type)
+  const goodsTypeBadges = normalizeList((warehouse as any).goods_type)
   const securityBadges = normalizeList((warehouse as any).security)
 
   if (viewMode === "list") {
@@ -299,11 +299,11 @@ export function WarehouseCard({
                     </div>
                   )}
                 </div>
-                {(warehouseTypeBadges.length > 0 || securityBadges.length > 0) && (
+                {(goodsTypeBadges.length > 0 || securityBadges.length > 0) && (
                   <div className="mt-2 space-y-2">
-                    {warehouseTypeBadges.length > 0 && (
+                    {goodsTypeBadges.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {warehouseTypeBadges.map((type) => (
+                        {goodsTypeBadges.map((type) => (
                           <Badge key={`type-${type}`} variant="secondary">
                             {formatWarehouseType(type)}
                           </Badge>
@@ -404,11 +404,11 @@ export function WarehouseCard({
               <span>• {warehouse.available_pallet_storage.toLocaleString()} pallets</span>
             )}
           </div>
-          {(warehouseTypeBadges.length > 0 || securityBadges.length > 0) && (
+          {(goodsTypeBadges.length > 0 || securityBadges.length > 0) && (
             <div className="mb-3 space-y-2">
-              {warehouseTypeBadges.length > 0 && (
+              {goodsTypeBadges.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {warehouseTypeBadges.map((type) => (
+                  {goodsTypeBadges.map((type) => (
                     <Badge key={`type-${type}`} variant="secondary">
                       {formatWarehouseType(type)}
                     </Badge>

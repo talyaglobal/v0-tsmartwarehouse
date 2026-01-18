@@ -22,7 +22,7 @@ export interface WarehouseSearchParams {
   end_date?: string
   
   // Filters
-  warehouse_type?: string[]
+  goods_type?: string[]
   storage_type?: string[]
   temperature_types?: string[]
   amenities?: string[] // Legacy - kept for backward compatibility
@@ -54,7 +54,7 @@ export interface WarehouseSearchResult {
   total_pallet_storage: number
   available_pallet_storage: number
   
-  warehouse_type: string
+  goods_type: string
   storage_type: string
   temperature_types: string[]
   amenities: string[]

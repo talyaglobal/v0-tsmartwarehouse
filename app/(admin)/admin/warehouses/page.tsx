@@ -15,6 +15,7 @@ import {
   MapPin, Building2, Package, Trash2, MoreHorizontal, CheckCircle, XCircle
 } from "@/components/icons"
 import { formatNumber } from "@/lib/utils/format"
+import { formatGoodsType, GOODS_TYPES } from "@/lib/constants/warehouse-types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,7 +45,7 @@ interface WarehouseData {
   total_pallet_storage: number
   available_sq_ft: number
   available_pallet_storage: number
-  warehouse_type: string[]
+  goods_type: string[]
   storage_type: string[]
   temperature_types: string[]
   photos: string[]
@@ -67,16 +68,6 @@ interface WarehouseStats {
   usedSqFt: number
   usedPallets: number
 }
-
-const WAREHOUSE_TYPE_LABELS: Record<string, string> = {
-  'general-dry-ambient': 'General Dry',
-  'cold-storage': 'Cold Storage',
-  'frozen-storage': 'Frozen',
-  'hazmat': 'Hazmat',
-  'bonded': 'Bonded',
-  'climate-controlled': 'Climate Controlled',
-}
-
 
 export default function WarehousesPage() {
   const { toast } = useToast()
@@ -301,12 +292,12 @@ export default function WarehousesPage() {
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Warehouse Type" />
+                <SelectValue placeholder="Goods Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {Object.entries(WAREHOUSE_TYPE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                {GOODS_TYPES.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -383,14 +374,14 @@ export default function WarehousesPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {(warehouse.warehouse_type || []).slice(0, 2).map((type) => (
+                            {(warehouse.goods_type || []).slice(0, 2).map((type) => (
                               <Badge key={type} variant="secondary" className="text-xs">
-                                {WAREHOUSE_TYPE_LABELS[type] || type}
+                                {formatGoodsType(type)}
                               </Badge>
                             ))}
-                            {(warehouse.warehouse_type || []).length > 2 && (
+                            {(warehouse.goods_type || []).length > 2 && (
                               <Badge variant="outline" className="text-xs">
-                                +{warehouse.warehouse_type.length - 2}
+                                +{warehouse.goods_type.length - 2}
                               </Badge>
                             )}
                           </div>

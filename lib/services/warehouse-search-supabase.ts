@@ -152,7 +152,7 @@ export async function searchWarehouses(
         search_lat: params.lat,
         search_lng: params.lng,
         radius_km: params.radius_km || 50,
-        warehouse_type_filter: params.warehouse_type?.length ? params.warehouse_type : null,
+        goods_type_filter: params.goods_type?.length ? params.goods_type : null,
         storage_type_filter: params.storage_type?.length ? params.storage_type : null,
         min_pallet_capacity: params.type === 'pallet' ? params.quantity : null,
         min_area_sqft: params.type === 'area-rental' ? params.quantity : null,
@@ -181,7 +181,7 @@ export async function searchWarehouses(
           available_sq_ft: wh.available_sq_ft || 0,
           total_pallet_storage: wh.total_pallet_storage || 0,
           available_pallet_storage: wh.available_pallet_storage || 0,
-          warehouse_type: wh.warehouse_type || '',
+          goods_type: wh.goods_type || '',
           storage_type: wh.storage_type || '',
           temperature_types: wh.temperature_types || [],
           amenities: wh.amenities || [],
@@ -349,7 +349,7 @@ export async function searchWarehouses(
         available_sq_ft,
         total_pallet_storage,
         available_pallet_storage,
-        warehouse_type,
+        goods_type,
         storage_type,
         temperature_types,
         amenities,
@@ -386,8 +386,8 @@ export async function searchWarehouses(
       }
     }
 
-    if (params.warehouse_type?.length) {
-      query = query.overlaps('warehouse_type', params.warehouse_type)
+    if (params.goods_type?.length) {
+      query = query.overlaps('goods_type', params.goods_type)
     }
 
     if (params.storage_type?.length) {
@@ -491,7 +491,7 @@ export async function searchWarehouses(
         available_sq_ft: wh.available_sq_ft || 0,
         total_pallet_storage: wh.total_pallet_storage || 0,
         available_pallet_storage: wh.available_pallet_storage || 0,
-        warehouse_type: wh.warehouse_type || '',
+        goods_type: wh.goods_type || '',
         storage_type: wh.storage_type || '',
         temperature_types: wh.temperature_types || [],
         amenities: wh.amenities || [],
@@ -648,7 +648,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       available_sq_ft: warehouse.available_sq_ft || 0,
       total_pallet_storage: warehouse.total_pallet_storage || 0,
       available_pallet_storage: warehouse.available_pallet_storage || 0,
-      warehouse_type: warehouse.warehouse_type || '',
+      goods_type: warehouse.goods_type || '',
       storage_type: warehouse.storage_type || '',
       temperature_types: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],

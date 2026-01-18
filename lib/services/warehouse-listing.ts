@@ -43,7 +43,7 @@ export async function createWarehouseListing(data: {
         total_pallet_storage: data.totalPalletStorage,
         available_sq_ft: data.totalSqFt,
         available_pallet_storage: data.totalPalletStorage || 0,
-        warehouse_type: data.warehouseType,
+        goods_type: data.warehouseType,
         storage_type: data.storageType,
         temperature_types: data.temperatureTypes,
         amenities: data.amenities || [],
@@ -97,7 +97,7 @@ export async function updateWarehouseListing(
     if (data.longitude !== undefined) updateData.longitude = data.longitude.toString()
     if (data.totalSqFt !== undefined) updateData.total_sq_ft = data.totalSqFt
     if (data.totalPalletStorage !== undefined) updateData.total_pallet_storage = data.totalPalletStorage
-    if (data.warehouseType !== undefined) updateData.warehouse_type = data.warehouseType
+    if (data.warehouseType !== undefined) updateData.goods_type = data.warehouseType
     if (data.storageType !== undefined) updateData.storage_type = data.storageType
     if (data.temperatureTypes !== undefined) updateData.temperature_types = data.temperatureTypes
     if (data.amenities !== undefined) updateData.amenities = data.amenities
@@ -144,7 +144,7 @@ export async function getWarehouseListing(id: string): Promise<WarehouseListing 
       totalPalletStorage: warehouse.total_pallet_storage,
       availableSqFt: warehouse.available_sq_ft,
       availablePalletStorage: warehouse.available_pallet_storage,
-      warehouseType: warehouse.warehouse_type,
+      warehouseType: warehouse.goods_type,
       storageType: warehouse.storage_type,
       temperatureTypes: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],
