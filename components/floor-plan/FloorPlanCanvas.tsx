@@ -60,6 +60,17 @@ const CATALOG: Record<string, CatalogItem[]> = {
     { id: 'emergency', name: 'Emergency Exit', w: 4, h: 1, color: '#22c55e', pallets: 0, wallItem: true, doorHeight: 7 },
     { id: 'window', name: 'Window', w: 5, h: 1, color: '#06b6d4', pallets: 0, wallItem: true, doorHeight: 4 },
   ],
+  columns: [
+    { id: 'round-12', name: 'Round Column 12"', w: 1, h: 1, color: '#6b7280', pallets: 0, columnType: 'round', columnSize: 12 },
+    { id: 'round-18', name: 'Round Column 18"', w: 1.5, h: 1.5, color: '#6b7280', pallets: 0, columnType: 'round', columnSize: 18 },
+    { id: 'round-24', name: 'Round Column 24"', w: 2, h: 2, color: '#6b7280', pallets: 0, columnType: 'round', columnSize: 24 },
+    { id: 'square-12', name: 'Square Column 12"', w: 1, h: 1, color: '#4b5563', pallets: 0, columnType: 'square', columnSize: 12 },
+    { id: 'square-18', name: 'Square Column 18"', w: 1.5, h: 1.5, color: '#4b5563', pallets: 0, columnType: 'square', columnSize: 18 },
+    { id: 'square-24', name: 'Square Column 24"', w: 2, h: 2, color: '#4b5563', pallets: 0, columnType: 'square', columnSize: 24 },
+    { id: 'rect-12x18', name: 'Rect Column 12"x18"', w: 1, h: 1.5, color: '#374151', pallets: 0, columnType: 'rectangular', columnSize: 12, columnDepth: 18 },
+    { id: 'rect-18x24', name: 'Rect Column 18"x24"', w: 1.5, h: 2, color: '#374151', pallets: 0, columnType: 'rectangular', columnSize: 18, columnDepth: 24 },
+    { id: 'custom', name: 'Custom Column', w: 1, h: 1, color: '#1f2937', pallets: 0, columnType: 'custom', columnSize: 12, isCustomColumn: true },
+  ],
   zones: [
     { id: 'staging', name: 'Staging Area', w: 6, h: 4, color: '#fbbf24', pallets: 0 },
     { id: 'packing', name: 'Packing Station', w: 5, h: 3, color: '#10b981', pallets: 0 },
@@ -88,6 +99,11 @@ interface CatalogItem {
   pallets: number
   wallItem?: boolean
   doorHeight?: number
+  // Column properties
+  columnType?: 'round' | 'square' | 'rectangular' | 'custom'
+  columnSize?: number  // diameter or width in inches
+  columnDepth?: number // depth in inches (for rectangular)
+  isCustomColumn?: boolean
 }
 
 interface PlacedItem extends CatalogItem {
@@ -97,7 +113,7 @@ interface PlacedItem extends CatalogItem {
   instanceId: number
   
   // Item type classification
-  type?: 'rack' | 'zone' | 'equipment' | 'door' | 'pallet'
+  type?: 'rack' | 'zone' | 'equipment' | 'door' | 'pallet' | 'column'
   
   // 3D height (feet)
   height?: number
@@ -107,6 +123,9 @@ interface PlacedItem extends CatalogItem {
   bayWidth?: number
   palletPositions?: number
   aisleWidth?: number
+  
+  // Column-specific properties (inherited from CatalogItem but can be customized)
+  // columnType, columnSize, columnDepth already in CatalogItem
   
   // Custom properties
   customLabel?: string
@@ -184,6 +203,11 @@ export default function FloorPlanCanvas({
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D')
   const [category, setCategory] = useState('racking')
   const [editingVertex, setEditingVertex] = useState<number | null>(null)
+  
+  // Custom column state
+  const [customColumnType, setCustomColumnType] = useState<'round' | 'square' | 'rectangular'>('round')
+  const [customColumnWidth, setCustomColumnWidth] = useState('12')
+  const [customColumnDepth, setCustomColumnDepth] = useState('18')
   
   // Zoom & Pan
   const [zoom, setZoom] = useState(1)
@@ -664,28 +688,79 @@ export default function FloorPlanCanvas({
         ctx.translate(-cx, -cy)
       }
       
-      ctx.fillStyle = item.color + 'cc'
-      ctx.fillRect(x, y, w, h)
-      ctx.strokeStyle = selectedItem === idx ? '#22c55e' : 'rgba(255,255,255,0.5)'
-      ctx.lineWidth = (selectedItem === idx ? 3 : 1) / zoom
-      ctx.strokeRect(x, y, w, h)
-      
-      // Item label (use customLabel if available)
-      const displayName = item.customLabel || item.name
-      ctx.font = `bold ${11 / zoom}px Inter, Arial, sans-serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      
-      // Text shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'
-      ctx.fillText(displayName, x + w/2 + 1/zoom, y + h/2 + 1/zoom)
-      ctx.fillStyle = '#fff'
-      ctx.fillText(displayName, x + w/2, y + h/2)
-      
-      if (item.pallets > 0) {
-        ctx.font = `${10 / zoom}px Inter, Arial, sans-serif`
-        ctx.fillStyle = '#a3e635'
-        ctx.fillText(`${item.pallets} pallets`, x + w/2, y + h/2 + 14/zoom)
+      // Check if this is a column
+      if (item.columnType) {
+        const centerX = x + w / 2
+        const centerY = y + h / 2
+        
+        if (item.columnType === 'round') {
+          // Draw round column as circle
+          const radius = w / 2
+          ctx.beginPath()
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+          ctx.fillStyle = item.color + 'cc'
+          ctx.fill()
+          ctx.strokeStyle = selectedItem === idx ? '#22c55e' : 'rgba(255,255,255,0.7)'
+          ctx.lineWidth = (selectedItem === idx ? 3 : 2) / zoom
+          ctx.stroke()
+          
+          // Inner detail circle
+          ctx.beginPath()
+          ctx.arc(centerX, centerY, radius * 0.6, 0, Math.PI * 2)
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+          ctx.lineWidth = 1 / zoom
+          ctx.stroke()
+        } else {
+          // Draw square/rectangular column
+          ctx.fillStyle = item.color + 'cc'
+          ctx.fillRect(x, y, w, h)
+          ctx.strokeStyle = selectedItem === idx ? '#22c55e' : 'rgba(255,255,255,0.7)'
+          ctx.lineWidth = (selectedItem === idx ? 3 : 2) / zoom
+          ctx.strokeRect(x, y, w, h)
+          
+          // Inner detail
+          const inset = 3 / zoom
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+          ctx.lineWidth = 1 / zoom
+          ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2)
+        }
+        
+        // Column size label
+        const sizeLabel = item.columnDepth 
+          ? `${item.columnSize}"×${item.columnDepth}"`
+          : `${item.columnSize}"`
+        ctx.font = `bold ${9 / zoom}px Inter, Arial, sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'
+        ctx.fillText(sizeLabel, centerX + 1/zoom, centerY + 1/zoom)
+        ctx.fillStyle = '#fff'
+        ctx.fillText(sizeLabel, centerX, centerY)
+      } else {
+        // Regular item rendering
+        ctx.fillStyle = item.color + 'cc'
+        ctx.fillRect(x, y, w, h)
+        ctx.strokeStyle = selectedItem === idx ? '#22c55e' : 'rgba(255,255,255,0.5)'
+        ctx.lineWidth = (selectedItem === idx ? 3 : 1) / zoom
+        ctx.strokeRect(x, y, w, h)
+        
+        // Item label (use customLabel if available)
+        const displayName = item.customLabel || item.name
+        ctx.font = `bold ${11 / zoom}px Inter, Arial, sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        
+        // Text shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'
+        ctx.fillText(displayName, x + w/2 + 1/zoom, y + h/2 + 1/zoom)
+        ctx.fillStyle = '#fff'
+        ctx.fillText(displayName, x + w/2, y + h/2)
+        
+        if (item.pallets > 0) {
+          ctx.font = `${10 / zoom}px Inter, Arial, sans-serif`
+          ctx.fillStyle = '#a3e635'
+          ctx.fillText(`${item.pallets} pallets`, x + w/2, y + h/2 + 14/zoom)
+        }
       }
       
       ctx.restore()
@@ -1259,6 +1334,29 @@ export default function FloorPlanCanvas({
   const handleDragStart = useCallback((item: CatalogItem) => {
     setDragItem({ ...item, x: 0, y: 0, rotation: 0 })
   }, [])
+  
+  const handleCustomColumnDragStart = useCallback(() => {
+    const width = parseFloat(customColumnWidth) || 12
+    const depth = customColumnType === 'rectangular' ? (parseFloat(customColumnDepth) || 18) : width
+    
+    // Convert inches to feet
+    const wFeet = width / 12
+    const hFeet = depth / 12
+    
+    const customItem: CatalogItem = {
+      id: `custom-col-${Date.now()}`,
+      name: `Custom ${customColumnType.charAt(0).toUpperCase() + customColumnType.slice(1)} Column`,
+      w: wFeet,
+      h: customColumnType === 'rectangular' ? hFeet : wFeet,
+      color: '#1f2937',
+      pallets: 0,
+      columnType: customColumnType,
+      columnSize: width,
+      columnDepth: customColumnType === 'rectangular' ? depth : undefined
+    }
+    
+    setDragItem({ ...customItem, x: 0, y: 0, rotation: 0 })
+  }, [customColumnType, customColumnWidth, customColumnDepth])
   
   const deleteSelected = useCallback(() => {
     if (selectedItem !== null) {
@@ -2303,33 +2401,112 @@ export default function FloorPlanCanvas({
         <div className="flex-1 overflow-y-auto p-3">
           <div className="space-y-2">
             {CATALOG[category]?.map(item => (
-              <div
-                key={item.id}
-                className="p-3 bg-slate-700 rounded-lg cursor-grab hover:bg-slate-600 active:cursor-grabbing transition-colors"
-                draggable
-                onDragStart={() => handleDragStart(item)}
-                onMouseDown={() => handleDragStart(item)}
-              >
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-10 h-10 rounded flex items-center justify-center text-white text-lg flex-shrink-0"
-                    style={{ backgroundColor: item.color }}
-                  >
-                    {item.wallItem ? (item.id === 'window' ? '🪟' : '🚪') : (item.id.includes('pallet') ? '📦' : '🏭')}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm truncate">{item.name}</div>
-                    <div className="text-xs text-slate-400">
-                      {item.wallItem ? `${item.w} ft wide` : `${item.w} ft × ${item.h} ft`}
+              <div key={item.id}>
+                {item.isCustomColumn ? (
+                  // Custom column with size input
+                  <div className="p-3 bg-slate-700 rounded-lg">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg flex-shrink-0 border-2 border-dashed border-slate-500"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        🏛️
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm">{item.name}</div>
+                        <div className="text-xs text-slate-400">Enter dimensions below</div>
+                      </div>
                     </div>
-                    {item.pallets > 0 && (
-                      <div className="text-xs text-green-400">{item.pallets} pallets</div>
-                    )}
-                    {item.wallItem && (
-                      <div className="text-xs text-blue-400">Drag to wall</div>
-                    )}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-slate-400 w-16">Type:</label>
+                        <select
+                          value={customColumnType}
+                          onChange={(e) => setCustomColumnType(e.target.value as 'round' | 'square' | 'rectangular')}
+                          className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs"
+                        >
+                          <option value="round">Round</option>
+                          <option value="square">Square</option>
+                          <option value="rectangular">Rectangular</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-slate-400 w-16">{customColumnType === 'round' ? 'Diameter:' : 'Width:'}</label>
+                        <input
+                          type="number"
+                          value={customColumnWidth}
+                          onChange={(e) => setCustomColumnWidth(e.target.value)}
+                          placeholder="12"
+                          className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs"
+                          min="6"
+                          max="48"
+                        />
+                        <span className="text-xs text-slate-400">in</span>
+                      </div>
+                      {customColumnType === 'rectangular' && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-slate-400 w-16">Depth:</label>
+                          <input
+                            type="number"
+                            value={customColumnDepth}
+                            onChange={(e) => setCustomColumnDepth(e.target.value)}
+                            placeholder="18"
+                            className="flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-xs"
+                            min="6"
+                            max="48"
+                          />
+                          <span className="text-xs text-slate-400">in</span>
+                        </div>
+                      )}
+                      <button
+                        className="w-full mt-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium cursor-grab active:cursor-grabbing"
+                        draggable
+                        onDragStart={() => handleCustomColumnDragStart()}
+                        onMouseDown={() => handleCustomColumnDragStart()}
+                      >
+                        Drag Custom Column
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // Regular catalog item
+                  <div
+                    className="p-3 bg-slate-700 rounded-lg cursor-grab hover:bg-slate-600 active:cursor-grabbing transition-colors"
+                    draggable
+                    onDragStart={() => handleDragStart(item)}
+                    onMouseDown={() => handleDragStart(item)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className={`w-10 h-10 flex items-center justify-center text-white text-lg flex-shrink-0 ${
+                          item.columnType === 'round' ? 'rounded-full' : 'rounded'
+                        }`}
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {item.columnType ? '🏛️' : item.wallItem ? (item.id === 'window' ? '🪟' : '🚪') : (item.id.includes('pallet') ? '📦' : '🏭')}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">{item.name}</div>
+                        <div className="text-xs text-slate-400">
+                          {item.columnType ? (
+                            item.columnType === 'rectangular' 
+                              ? `${item.columnSize}" × ${item.columnDepth}" (${item.columnType})`
+                              : `${item.columnSize}" ${item.columnType}`
+                          ) : item.wallItem ? `${item.w} ft wide` : `${item.w} ft × ${item.h} ft`}
+                        </div>
+                        {item.pallets > 0 && (
+                          <div className="text-xs text-green-400">{item.pallets} pallets</div>
+                        )}
+                        {item.wallItem && (
+                          <div className="text-xs text-blue-400">Drag to wall</div>
+                        )}
+                        {item.columnType && (
+                          <div className="text-xs text-purple-400">Structural column</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -2369,6 +2546,10 @@ export default function FloorPlanCanvas({
             <div className="flex justify-between">
               <span className="text-slate-400">Doors/Windows</span>
               <span className="font-medium text-blue-400">{wallOpenings.length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Columns</span>
+              <span className="font-medium text-purple-400">{items.filter(i => i.columnType).length}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Vertices</span>

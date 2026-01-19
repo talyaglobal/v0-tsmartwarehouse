@@ -557,11 +557,69 @@ export default function FloorPlan3DSimple({
       group.position.set(item.x + item.w / 2, 0, item.y + item.h / 2)
 
       const isRack = item.name?.toLowerCase().includes('rack')
-      const itemHeight = isRack ? 16 : 4
+      const isColumn = !!(item as { columnType?: string }).columnType
+      const columnType = (item as { columnType?: string }).columnType
+      const itemHeight = isRack ? 16 : (isColumn ? wallHeight : 4)
       const color = new THREE.Color(item.color || '#f97316')
       const isSelected = selectedItemId === item.instanceId
 
-      if (isRack) {
+      if (isColumn) {
+        // Structural column
+        const columnMat = new THREE.MeshStandardMaterial({ 
+          color: 0x4b5563, 
+          metalness: 0.3, 
+          roughness: 0.7 
+        })
+        
+        if (columnType === 'round') {
+          // Cylindrical column
+          const radius = item.w / 2
+          const columnGeom = new THREE.CylinderGeometry(radius, radius, itemHeight, 16)
+          const column = new THREE.Mesh(columnGeom, columnMat)
+          column.position.y = itemHeight / 2
+          column.castShadow = true
+          column.userData.itemId = item.instanceId
+          group.add(column)
+          
+          // Column base (wider)
+          const baseMat = new THREE.MeshStandardMaterial({ color: 0x374151 })
+          const baseGeom = new THREE.CylinderGeometry(radius * 1.3, radius * 1.3, 0.5, 16)
+          const base = new THREE.Mesh(baseGeom, baseMat)
+          base.position.y = 0.25
+          base.userData.itemId = item.instanceId
+          group.add(base)
+          
+          // Column top cap
+          const capGeom = new THREE.CylinderGeometry(radius * 1.2, radius * 1.2, 0.3, 16)
+          const cap = new THREE.Mesh(capGeom, baseMat)
+          cap.position.y = itemHeight - 0.15
+          cap.userData.itemId = item.instanceId
+          group.add(cap)
+        } else {
+          // Rectangular/square column
+          const columnGeom = new THREE.BoxGeometry(item.w, itemHeight, item.h)
+          const column = new THREE.Mesh(columnGeom, columnMat)
+          column.position.y = itemHeight / 2
+          column.castShadow = true
+          column.userData.itemId = item.instanceId
+          group.add(column)
+          
+          // Column base
+          const baseMat = new THREE.MeshStandardMaterial({ color: 0x374151 })
+          const baseGeom = new THREE.BoxGeometry(item.w + 0.3, 0.5, item.h + 0.3)
+          const base = new THREE.Mesh(baseGeom, baseMat)
+          base.position.y = 0.25
+          base.userData.itemId = item.instanceId
+          group.add(base)
+          
+          // Column top cap
+          const capGeom = new THREE.BoxGeometry(item.w + 0.2, 0.3, item.h + 0.2)
+          const cap = new THREE.Mesh(capGeom, baseMat)
+          cap.position.y = itemHeight - 0.15
+          cap.userData.itemId = item.instanceId
+          group.add(cap)
+        }
+      } else if (isRack) {
         // Rack structure with posts and shelves
         const postGeom = new THREE.BoxGeometry(0.25, itemHeight, 0.25)
         const postMat = new THREE.MeshStandardMaterial({ color })
@@ -643,13 +701,20 @@ export default function FloorPlan3DSimple({
       ctx.font = 'bold 18px Arial'
       ctx.fillStyle = '#ffffff'
       ctx.textAlign = 'center'
-      ctx.fillText(item.name, 128, 30)
+      
+      // Use appropriate label
+      const labelText = isColumn 
+        ? (item as { columnSize?: number; columnDepth?: number }).columnDepth
+          ? `${(item as { columnSize?: number }).columnSize}"×${(item as { columnDepth?: number }).columnDepth}"`
+          : `${(item as { columnSize?: number }).columnSize}"`
+        : item.name
+      ctx.fillText(labelText, 128, 30)
 
       const sprite = new THREE.Sprite(
         new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true })
       )
-      sprite.scale.set(5, 1.2, 1)
-      sprite.position.y = (isRack ? 16 : 4) + 1.5
+      sprite.scale.set(isColumn ? 3 : 5, 1.2, 1)
+      sprite.position.y = itemHeight + 1.5
       group.add(sprite)
 
       t.scene!.add(group)
