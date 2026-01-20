@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, X } from "lucide-react"
-import { PalletPricing, PalletType, PricingPeriod, HeightRangePricing, WeightRangePricing, CustomPalletDimensions, CustomPalletSize } from "@/types"
+import { PalletPricing, PalletType, PricingPeriod, HeightRangePricing, WeightRangePricing, CustomPalletSize } from "@/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatGoodsType } from "@/lib/constants/warehouse-types"
 
@@ -30,8 +30,8 @@ export function PalletPricingForm({
   const [pricing, setPricing] = useState<PalletPricing[]>(initialPricing)
   const [selectedGoodsType, setSelectedGoodsType] = useState<string>("general")
   const adjustmentOptions = [
-    { value: "rate", label: "Rate (%)" },
-    { value: "plus_per_unit", label: "Plus per unit price (USD)" },
+    { value: "rate", label: "Price Increase (%)" },
+    { value: "plus_per_unit", label: "Additional Fee (+$)" },
   ] as const
   const lengthUnitOptions = [
     { value: "in", label: "in" },
@@ -488,45 +488,6 @@ export function PalletPricingForm({
     setPricing([...filteredPricing, ...sourceEntries, ...clonedEntries])
   }
 
-  const updatePalletPricing = (palletType: PalletType, period: PricingPeriod, updates: Partial<PalletPricing>) => {
-    const updated = [...pricing]
-    const existingIndex = updated.findIndex(
-      (p) => isMatchingPricing(p, palletType, period)
-    )
-    
-    if (existingIndex !== -1) {
-      // Update existing pricing
-      updated[existingIndex] = { ...updated[existingIndex], ...updates }
-    } else {
-      // Create new pricing if it doesn't exist
-      // For custom pallet, try to get existing custom dimensions from other periods
-      let customDimensions: CustomPalletDimensions | undefined = undefined
-      if (palletType === "custom") {
-        const existingCustomPricing = updated.find(
-          (p) => isMatchingPricing(p, palletType, p.pricingPeriod) && p.customDimensions
-        )
-        customDimensions = existingCustomPricing?.customDimensions || { length: 0, width: 0, height: 0, unit: "in" }
-      }
-      
-      const newPricing: PalletPricing = {
-        goodsType: normalizeGoodsType(selectedGoodsType),
-        palletType,
-        pricingPeriod: period,
-        heightRanges: [],
-        weightRanges: [],
-        stackableAdjustmentType: "plus_per_unit",
-        stackableAdjustmentValue: 0,
-        unstackableAdjustmentType: "plus_per_unit",
-        unstackableAdjustmentValue: 0,
-        ...(customDimensions ? { customDimensions } : {}),
-        ...updates,
-      }
-      updated.push(newPricing)
-    }
-    
-    updatePricing(updated)
-  }
-
   const addHeightRange = (palletType: PalletType, _period: PricingPeriod) => {
     // Add the same range to all periods (day, week, month) with empty price
     // First, ensure all periods have pricing entries
@@ -560,16 +521,16 @@ export function PalletPricingForm({
       let heightMin = 0
       let heightMax = 0
       if (existingRanges.length === 0) {
+        // First range always starts from 0
+        heightMin = 0
         if (palletType === "euro") {
-          heightMin = 120
           heightMax = 150
         } else {
-          heightMin = 100
           heightMax = 150
         }
       } else if (Number.isFinite(prevMax) && prevMax !== null) {
         heightMin = prevMax + 1
-        heightMax = prevMax + 2
+        heightMax = prevMax + 50
       }
       const rangeForPeriod: HeightRangePricing = {
         heightMinCm: heightMin,
@@ -631,7 +592,7 @@ export function PalletPricingForm({
     period: PricingPeriod,
     index: number,
     field: keyof HeightRangePricing,
-    value: number | undefined
+    value: number | string | undefined
   ) => {
     let updatedPricing = [...pricing]
     
@@ -656,7 +617,7 @@ export function PalletPricingForm({
       palletPricing = newPricing
     }
 
-    if (field === "heightMinCm" && value != null) {
+    if (field === "heightMinCm" && value != null && typeof value === 'number') {
       const prevMax = getPrevRangeLimit(
         palletPricing.heightRanges || [],
         index,
@@ -760,16 +721,16 @@ export function PalletPricingForm({
       let weightMin = 0
       let weightMax = 0
       if (existingRanges.length === 0) {
+        // First range always starts from 0
+        weightMin = 0
         if (palletType === "euro") {
-          weightMin = 400
           weightMax = 800
         } else {
-          weightMin = 880
-          weightMax = 1760
+          weightMax = 1000
         }
       } else if (Number.isFinite(prevMax) && prevMax !== null) {
         weightMin = prevMax + 1
-        weightMax = prevMax + 2
+        weightMax = prevMax + 500
       }
       const rangeForPeriod: WeightRangePricing = {
         weightMinKg: weightMin,
@@ -831,7 +792,7 @@ export function PalletPricingForm({
     period: PricingPeriod,
     index: number,
     field: keyof WeightRangePricing,
-    value: number | undefined
+    value: number | string | undefined
   ) => {
     let updatedPricing = [...pricing]
     
@@ -856,7 +817,7 @@ export function PalletPricingForm({
       palletPricing = newPricing
     }
 
-    if (field === "weightMinKg" && value != null) {
+    if (field === "weightMinKg" && value != null && typeof value === 'number') {
       const prevMax = getPrevRangeLimit(
         palletPricing.weightRanges || [],
         index,
@@ -1074,11 +1035,12 @@ export function PalletPricingForm({
               let heightMin = 0
               let heightMax = 0
               if (existingRanges.length === 0) {
-                heightMin = 100
+                // First range always starts from 0
+                heightMin = 0
                 heightMax = 150
               } else if (Number.isFinite(prevMax) && prevMax !== null) {
                 heightMin = prevMax + 1
-                heightMax = prevMax + 2
+                heightMax = prevMax + 50
               }
               const newRange: HeightRangePricing = {
                 heightMinCm: heightMin,
@@ -1136,14 +1098,14 @@ export function PalletPricingForm({
     sizeIndex: number,
     rangeIndex: number,
     field: keyof HeightRangePricing,
-    value: number | undefined
+    value: number | string | undefined
   ) => {
     if (palletType !== 'custom') return
     
     const allPeriods: PricingPeriod[] = ['day', 'week', 'month']
     let updatedPricing = [...pricing]
 
-    if (field === "heightMinCm" && value != null) {
+    if (field === "heightMinCm" && value != null && typeof value === 'number') {
       const pricingForPeriod = updatedPricing.find((pr) => isMatchingPricing(pr, palletType, period))
       const sizeRanges = pricingForPeriod?.customSizes?.[sizeIndex]?.heightRanges || []
       const prevMax = getPrevRangeLimit(sizeRanges, rangeIndex, "heightMinCm", "heightMaxCm")
@@ -1343,90 +1305,6 @@ export function PalletPricingForm({
 
               return (
                 <TabsContent key={period} value={period} className="space-y-4">
-                  {/* Stackable/Unstackable Adjustments */}
-                  {palletType !== "custom" && (
-                    <div className="space-y-3">
-                      <Label>
-                        Stackable / Unstackable Adjustments <span className="text-destructive">*</span>
-                      </Label>
-                      <div className="grid gap-3 lg:grid-cols-2">
-                        <div className="space-y-2 rounded-lg border p-3">
-                          <Label className="text-xs text-muted-foreground">Stackable</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Select
-                              value={palletPricing.stackableAdjustmentType ?? "plus_per_unit"}
-                              onValueChange={(value) =>
-                                updatePalletPricing(palletType, period, {
-                                  stackableAdjustmentType: value as "rate" | "plus_per_unit",
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {adjustmentOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={palletPricing.stackableAdjustmentValue ?? ""}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                updatePalletPricing(palletType, period, {
-                                  stackableAdjustmentValue:
-                                    value === "" ? undefined : Number(value),
-                                })
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 rounded-lg border p-3">
-                          <Label className="text-xs text-muted-foreground">Unstackable</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Select
-                              value={palletPricing.unstackableAdjustmentType ?? "plus_per_unit"}
-                              onValueChange={(value) =>
-                                updatePalletPricing(palletType, period, {
-                                  unstackableAdjustmentType: value as "rate" | "plus_per_unit",
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {adjustmentOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={palletPricing.unstackableAdjustmentValue ?? ""}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                updatePalletPricing(palletType, period, {
-                                  unstackableAdjustmentValue:
-                                    value === "" ? undefined : Number(value),
-                                })
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Height Range Pricing */}
                   {palletType === "custom" ? (
                     <div className="space-y-6">
@@ -1610,101 +1488,6 @@ export function PalletPricingForm({
                                 </div>
                               </div>
 
-                              <div className="space-y-2 rounded-lg border p-3">
-                                <Label className="text-xs text-muted-foreground">
-                                  Stackable / Unstackable Adjustments
-                                </Label>
-                                <div className="grid gap-3 lg:grid-cols-2">
-                                  <div className="space-y-2 rounded-lg border p-3">
-                                    <Label className="text-xs text-muted-foreground">Stackable</Label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <Select
-                                        value={size.stackableAdjustmentType ?? "plus_per_unit"}
-                                        onValueChange={(value) =>
-                                          updateCustomPalletSize(
-                                            palletType,
-                                            period,
-                                            sizeIndex,
-                                            "stackableAdjustmentType",
-                                            value as "rate" | "plus_per_unit"
-                                          )
-                                        }
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {adjustmentOptions.map((option) => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                              {option.label}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={size.stackableAdjustmentValue ?? ""}
-                                        onChange={(e) => {
-                                          const value = e.target.value
-                                          updateCustomPalletSize(
-                                            palletType,
-                                            period,
-                                            sizeIndex,
-                                            "stackableAdjustmentValue",
-                                            value === "" ? "" : Number(value)
-                                          )
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-2 rounded-lg border p-3">
-                                    <Label className="text-xs text-muted-foreground">Unstackable</Label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <Select
-                                        value={size.unstackableAdjustmentType ?? "plus_per_unit"}
-                                        onValueChange={(value) =>
-                                          updateCustomPalletSize(
-                                            palletType,
-                                            period,
-                                            sizeIndex,
-                                            "unstackableAdjustmentType",
-                                            value as "rate" | "plus_per_unit"
-                                          )
-                                        }
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {adjustmentOptions.map((option) => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                              {option.label}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={size.unstackableAdjustmentValue ?? ""}
-                                        onChange={(e) => {
-                                          const value = e.target.value
-                                          updateCustomPalletSize(
-                                            palletType,
-                                            period,
-                                            sizeIndex,
-                                            "unstackableAdjustmentValue",
-                                            value === "" ? "" : Number(value)
-                                          )
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                   <Label>
@@ -1731,7 +1514,9 @@ export function PalletPricingForm({
                                       <TableRow>
                                         <TableHead>Min Height</TableHead>
                                         <TableHead>Max Height</TableHead>
-                                        <TableHead>Price per Unit (USD)</TableHead>
+                                        <TableHead>Stackable Price ($)</TableHead>
+                                        <TableHead>Unstackable Calculation</TableHead>
+                                        <TableHead>Unstackable Price</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                       </TableRow>
                                     </TableHeader>
@@ -1936,6 +1721,74 @@ export function PalletPricingForm({
                                             })()}
                                           </TableCell>
                                           <TableCell>
+                                            <div className="flex gap-1 items-center">
+                                              <Select
+                                                value={(range as any).unstackableMethod ?? "rate"}
+                                                onValueChange={(value) =>
+                                                  updateHeightRangeInCustomSize(
+                                                    palletType,
+                                                    period,
+                                                    sizeIndex,
+                                                    rangeIndex,
+                                                    "unstackableMethod" as any,
+                                                    value
+                                                  )
+                                                }
+                                              >
+                                                <SelectTrigger className="w-[120px]">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {adjustmentOptions.map((option) => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                      {option.label}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                              <Input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                className="w-[80px]"
+                                                value={(range as any).unstackableValue ?? ''}
+                                                onFocus={(e) => {
+                                                  if (e.target.value === '0') {
+                                                    e.target.select()
+                                                  }
+                                                }}
+                                                onChange={(e) =>
+                                                  updateHeightRangeInCustomSize(
+                                                    palletType,
+                                                    period,
+                                                    sizeIndex,
+                                                    rangeIndex,
+                                                    "unstackableValue" as any,
+                                                    e.target.value === "" ? undefined : Number(e.target.value)
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {(() => {
+                                              const stackablePrice = Number(range.pricePerUnit || 0)
+                                              const method = (range as any).unstackableMethod ?? "rate"
+                                              const value = Number((range as any).unstackableValue || 0)
+                                              let unstackablePrice = stackablePrice
+                                              if (method === "rate" && value > 0) {
+                                                unstackablePrice = stackablePrice * (1 + value / 100)
+                                              } else if (method === "plus_per_unit" && value > 0) {
+                                                unstackablePrice = stackablePrice + value
+                                              }
+                                              return (
+                                                <div className="font-medium text-green-600">
+                                                  ${unstackablePrice.toFixed(2)}
+                                                </div>
+                                              )
+                                            })()}
+                                          </TableCell>
+                                          <TableCell>
                                             <Button
                                               type="button"
                                               variant="ghost"
@@ -1982,7 +1835,9 @@ export function PalletPricingForm({
                                       <TableRow>
                                         <TableHead>Min Weight</TableHead>
                                         <TableHead>Max Weight</TableHead>
-                                        <TableHead>Price per Pallet (USD)</TableHead>
+                                        <TableHead>Stackable Price ($)</TableHead>
+                                        <TableHead>Unstackable Calculation</TableHead>
+                                        <TableHead>Unstackable Price</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                       </TableRow>
                                     </TableHeader>
@@ -2183,6 +2038,72 @@ export function PalletPricingForm({
                                             })()}
                                           </TableCell>
                                           <TableCell>
+                                            <div className="flex gap-1 items-center">
+                                              <Select
+                                                value={(range as any).unstackableMethod ?? "rate"}
+                                                onValueChange={(value) =>
+                                                  updateWeightRange(
+                                                    palletType,
+                                                    period,
+                                                    rangeIndex,
+                                                    "unstackableMethod" as any,
+                                                    value
+                                                  )
+                                                }
+                                              >
+                                                <SelectTrigger className="w-[120px]">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {adjustmentOptions.map((option) => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                      {option.label}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                              <Input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                className="w-[80px]"
+                                                value={(range as any).unstackableValue ?? ''}
+                                                onFocus={(e) => {
+                                                  if (e.target.value === '0') {
+                                                    e.target.select()
+                                                  }
+                                                }}
+                                                onChange={(e) =>
+                                                  updateWeightRange(
+                                                    palletType,
+                                                    period,
+                                                    rangeIndex,
+                                                    "unstackableValue" as any,
+                                                    e.target.value === "" ? undefined : Number(e.target.value)
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {(() => {
+                                              const stackablePrice = Number(range.pricePerPallet || 0)
+                                              const method = (range as any).unstackableMethod ?? "rate"
+                                              const value = Number((range as any).unstackableValue || 0)
+                                              let unstackablePrice = stackablePrice
+                                              if (method === "rate" && value > 0) {
+                                                unstackablePrice = stackablePrice * (1 + value / 100)
+                                              } else if (method === "plus_per_unit" && value > 0) {
+                                                unstackablePrice = stackablePrice + value
+                                              }
+                                              return (
+                                                <div className="font-medium text-green-600">
+                                                  ${unstackablePrice.toFixed(2)}
+                                                </div>
+                                              )
+                                            })()}
+                                          </TableCell>
+                                          <TableCell>
                                             <Button
                                               type="button"
                                               variant="ghost"
@@ -2232,9 +2153,11 @@ export function PalletPricingForm({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Min Height ({sizeUnitLabel})</TableHead>
-                              <TableHead>Max Height ({sizeUnitLabel})</TableHead>
-                              <TableHead>Price per Unit (USD)</TableHead>
+                              <TableHead>Min ({sizeUnitLabel})</TableHead>
+                              <TableHead>Max ({sizeUnitLabel})</TableHead>
+                              <TableHead>Stackable Price ($)</TableHead>
+                              <TableHead>Unstackable Calculation</TableHead>
+                              <TableHead>Unstackable Price</TableHead>
                               <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                           </TableHeader>
@@ -2397,6 +2320,72 @@ export function PalletPricingForm({
                                   })()}
                                 </TableCell>
                                 <TableCell>
+                                  <div className="flex gap-1 items-center">
+                                    <Select
+                                      value={(range as any).unstackableMethod ?? "rate"}
+                                      onValueChange={(value) =>
+                                        updateHeightRange(
+                                          palletType,
+                                          period,
+                                          index,
+                                          "unstackableMethod" as any,
+                                          value
+                                        )
+                                      }
+                                    >
+                                      <SelectTrigger className="w-[120px]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {adjustmentOptions.map((option) => (
+                                          <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="w-[80px]"
+                                      value={(range as any).unstackableValue ?? ''}
+                                      onFocus={(e) => {
+                                        if (e.target.value === '0') {
+                                          e.target.select()
+                                        }
+                                      }}
+                                      onChange={(e) =>
+                                        updateHeightRange(
+                                          palletType,
+                                          period,
+                                          index,
+                                          "unstackableValue" as any,
+                                          e.target.value === "" ? undefined : Number(e.target.value)
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {(() => {
+                                    const stackablePrice = Number(range.pricePerUnit || 0)
+                                    const method = (range as any).unstackableMethod ?? "rate"
+                                    const value = Number((range as any).unstackableValue || 0)
+                                    let unstackablePrice = stackablePrice
+                                    if (method === "rate" && value > 0) {
+                                      unstackablePrice = stackablePrice * (1 + value / 100)
+                                    } else if (method === "plus_per_unit" && value > 0) {
+                                      unstackablePrice = stackablePrice + value
+                                    }
+                                    return (
+                                      <div className="font-medium text-green-600">
+                                        ${unstackablePrice.toFixed(2)}
+                                      </div>
+                                    )
+                                  })()}
+                                </TableCell>
+                                <TableCell>
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -2441,9 +2430,11 @@ export function PalletPricingForm({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Min Weight ({weightUnitLabel})</TableHead>
-                            <TableHead>Max Weight ({weightUnitLabel})</TableHead>
-                            <TableHead>Price per Pallet (USD)</TableHead>
+                            <TableHead>Min ({weightUnitLabel})</TableHead>
+                            <TableHead>Max ({weightUnitLabel})</TableHead>
+                            <TableHead>Stackable Price ($)</TableHead>
+                            <TableHead>Unstackable Calculation</TableHead>
+                            <TableHead>Unstackable Price</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -2604,6 +2595,72 @@ export function PalletPricingForm({
                                         <p className="text-xs text-destructive">{priceError}</p>
                                       )}
                                     </>
+                                  )
+                                })()}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1 items-center">
+                                  <Select
+                                    value={(range as any).unstackableMethod ?? "rate"}
+                                    onValueChange={(value) =>
+                                      updateWeightRange(
+                                        palletType,
+                                        period,
+                                        index,
+                                        "unstackableMethod" as any,
+                                        value
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[120px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {adjustmentOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="w-[80px]"
+                                    value={(range as any).unstackableValue ?? ''}
+                                    onFocus={(e) => {
+                                      if (e.target.value === '0') {
+                                        e.target.select()
+                                      }
+                                    }}
+                                    onChange={(e) =>
+                                      updateWeightRange(
+                                        palletType,
+                                        period,
+                                        index,
+                                        "unstackableValue" as any,
+                                        e.target.value === "" ? undefined : Number(e.target.value)
+                                      )
+                                    }
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const stackablePrice = Number(range.pricePerPallet || 0)
+                                  const method = (range as any).unstackableMethod ?? "rate"
+                                  const value = Number((range as any).unstackableValue || 0)
+                                  let unstackablePrice = stackablePrice
+                                  if (method === "rate" && value > 0) {
+                                    unstackablePrice = stackablePrice * (1 + value / 100)
+                                  } else if (method === "plus_per_unit" && value > 0) {
+                                    unstackablePrice = stackablePrice + value
+                                  }
+                                  return (
+                                    <div className="font-medium text-green-600">
+                                      ${unstackablePrice.toFixed(2)}
+                                    </div>
                                   )
                                 })()}
                               </TableCell>

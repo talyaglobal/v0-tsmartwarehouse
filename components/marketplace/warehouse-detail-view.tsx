@@ -1026,7 +1026,7 @@ export function WarehouseDetailView({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Security Features
+                Health &amp; Safety
               </CardTitle>
             </CardHeader>
             <CardContent>

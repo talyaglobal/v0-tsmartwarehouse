@@ -350,7 +350,7 @@ export default function FloorPlan3DSimple({
     t.renderer = new THREE.WebGLRenderer({ antialias: true })
     t.renderer.setSize(w, h)
     t.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    t.renderer.shadowMap.enabled = true
+    t.renderer.shadowMap.enabled = false // Shadows disabled
     t.renderer.domElement.style.touchAction = 'none'
     container.appendChild(t.renderer.domElement)
 
@@ -361,17 +361,20 @@ export default function FloorPlan3DSimple({
     t.controls.dampingFactor = 0.1
     t.controls.maxPolarAngle = Math.PI / 2 - 0.05
 
-    // Lights
-    t.scene.add(new THREE.AmbientLight(0xffffff, 0.5))
-    t.scene.add(new THREE.HemisphereLight(0x87ceeb, 0x1e3a5f, 0.3))
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8)
+    // Lights (no shadows)
+    t.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+    t.scene.add(new THREE.HemisphereLight(0x87ceeb, 0x1e3a5f, 0.4))
+    const sun = new THREE.DirectionalLight(0xffffff, 0.7)
     sun.position.set(bounds.cx + 30, 50, bounds.cy + 30)
-    sun.castShadow = true
+    // sun.castShadow = false - shadows disabled globally
     t.scene.add(sun)
 
-    // Grid
-    const grid = new THREE.GridHelper(100, 100, 0x334155, 0x1e293b)
-    grid.position.set(50, -0.05, 50)
+    // Grid - covers entire scene, centered on warehouse
+    const gridSize = 500
+    const gridDivisions = 500 // 1 foot per square
+    const grid = new THREE.GridHelper(gridSize, gridDivisions, 0x334155, 0x1e293b)
+    // Center grid on warehouse bounds
+    grid.position.set(bounds.cx, -0.02, bounds.cy)
     t.scene.add(grid)
 
     // Groups for organized updates
@@ -382,9 +385,9 @@ export default function FloorPlan3DSimple({
     t.scene.add(t.wallGroup)
     t.scene.add(t.openingsGroup)
 
-    // Drag preview
+    // Drag preview - base geometry is 1x1x1, scale will set actual size
     t.dragPreview = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({ color: 0x22c55e, transparent: true, opacity: 0.5 })
     )
     t.dragPreview.visible = false
@@ -464,7 +467,7 @@ export default function FloorPlan3DSimple({
         new THREE.MeshStandardMaterial({ color: 0x1e3a5f, side: THREE.DoubleSide })
       )
       floor.rotation.x = -Math.PI / 2
-      floor.receiveShadow = true
+      // floor.receiveShadow = false // Shadows disabled
       floorGroup.add(floor)
     }
   }, [safeVertices])
@@ -486,12 +489,18 @@ export default function FloorPlan3DSimple({
         const v2 = safeVertices[(i + 1) % safeVertices.length]
         const len = Math.hypot(v2.x - v1.x, v2.y - v1.y)
         const wall = new THREE.Mesh(
-          new THREE.BoxGeometry(len, wallHeight, 0.5),
-          new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.6 })
+          new THREE.BoxGeometry(len, wallHeight, 0.8),
+          new THREE.MeshStandardMaterial({ 
+            color: 0x64748b, 
+            transparent: true, 
+            opacity: 0.35,  // More transparent to see items behind
+            side: THREE.DoubleSide,
+            depthWrite: false  // Prevents z-fighting with objects behind
+          })
         )
         wall.position.set((v1.x + v2.x) / 2, wallHeight / 2, (v1.y + v2.y) / 2)
         wall.rotation.y = -Math.atan2(v2.y - v1.y, v2.x - v1.x)
-        wall.castShadow = true
+        wall.renderOrder = 1  // Render walls after other objects
         wallGroup.add(wall)
       })
     }
@@ -577,7 +586,7 @@ export default function FloorPlan3DSimple({
           const columnGeom = new THREE.CylinderGeometry(radius, radius, itemHeight, 16)
           const column = new THREE.Mesh(columnGeom, columnMat)
           column.position.y = itemHeight / 2
-          column.castShadow = true
+          // column.castShadow = false // Shadows disabled
           column.userData.itemId = item.instanceId
           group.add(column)
           
@@ -600,7 +609,7 @@ export default function FloorPlan3DSimple({
           const columnGeom = new THREE.BoxGeometry(item.w, itemHeight, item.h)
           const column = new THREE.Mesh(columnGeom, columnMat)
           column.position.y = itemHeight / 2
-          column.castShadow = true
+          // column.castShadow = false // Shadows disabled
           column.userData.itemId = item.instanceId
           group.add(column)
           
@@ -634,7 +643,7 @@ export default function FloorPlan3DSimple({
         postPositions.forEach(([px, pz]) => {
           const post = new THREE.Mesh(postGeom, postMat)
           post.position.set(px, itemHeight / 2, pz)
-          post.castShadow = true
+          // post.castShadow = false // Shadows disabled
           post.userData.itemId = item.instanceId
           group.add(post)
         })
@@ -675,7 +684,7 @@ export default function FloorPlan3DSimple({
           new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.9 })
         )
         body.position.y = boxHeight / 2
-        body.castShadow = true
+        // body.castShadow = false // Shadows disabled
         body.userData.itemId = item.instanceId
         group.add(body)
       }
@@ -726,7 +735,19 @@ export default function FloorPlan3DSimple({
   useEffect(() => {
     const t = threeRef.current
     if (t.dragPreview && dragItem) {
-      t.dragPreview.scale.set(dragItem.w || 4, 1, dragItem.h || 4)
+      // Use actual item dimensions for preview
+      const previewW = dragItem.w || 2
+      const previewH = dragItem.h || 2
+      // Height based on item type
+      const isRack = dragItem.name?.toLowerCase().includes('rack')
+      const isZone = dragItem.name?.toLowerCase().includes('zone') || 
+                     dragItem.name?.toLowerCase().includes('area') ||
+                     dragItem.name?.toLowerCase().includes('station')
+      const previewY = isRack ? 8 : (isZone ? 0.5 : 4)
+      
+      t.dragPreview.scale.set(previewW, previewY, previewH)
+      t.dragPreview.position.y = previewY / 2
+      
       const color = parseInt(dragItem.color?.replace('#', '0x') || '0x22c55e', 16)
       if (t.dragPreview.material instanceof THREE.MeshStandardMaterial) {
         t.dragPreview.material.color.setHex(color)

@@ -398,9 +398,9 @@ export async function searchWarehouses(
       query = query.gte('available_pallet_storage', params.quantity)
     }
 
-    if (params.type === 'area-rental' && params.quantity) {
-      query = query.gte('available_sq_ft', params.quantity)
-    }
+    // Note: area-rental filtering is done after query to support min/max sqft logic
+    // If min_sq_ft/max_sq_ft is set, customer's requested quantity must be within range
+    // If not set, warehouse's total_sq_ft must be >= customer's requested quantity
 
     // Filter by rent method (storage type)
     if (params.type) {
@@ -491,6 +491,8 @@ export async function searchWarehouses(
         available_sq_ft: wh.available_sq_ft || 0,
         total_pallet_storage: wh.total_pallet_storage || 0,
         available_pallet_storage: wh.available_pallet_storage || 0,
+        min_sq_ft: wh.min_sq_ft || undefined,
+        max_sq_ft: wh.max_sq_ft || undefined,
         goods_type: wh.goods_type || '',
         storage_type: wh.storage_type || '',
         temperature_types: wh.temperature_types || [],
@@ -513,6 +515,28 @@ export async function searchWarehouses(
     // Filter by min_rating if provided (done after fetching since rating is from another table)
     if (params.min_rating) {
       warehouses = warehouses.filter((w) => w.average_rating >= params.min_rating!)
+    }
+
+    // Filter for area-rental (Space Storage) with min/max sqft logic
+    // If min_sq_ft/max_sq_ft is set, customer's requested quantity must be within range
+    // If not set, warehouse's total_sq_ft must be >= customer's requested quantity
+    if (params.type === 'area-rental' && params.quantity) {
+      const requestedSqFt = params.quantity
+      warehouses = warehouses.filter((w: any) => {
+        const minSqFt = w.min_sq_ft
+        const maxSqFt = w.max_sq_ft
+        const totalSqFt = w.total_sq_ft || 0
+        
+        // If min/max limits are set, check if requested amount is within range
+        if (minSqFt != null || maxSqFt != null) {
+          const meetsMin = minSqFt == null || requestedSqFt >= minSqFt
+          const meetsMax = maxSqFt == null || requestedSqFt <= maxSqFt
+          return meetsMin && meetsMax
+        }
+        
+        // If no limits set, warehouse capacity must meet customer's requirements
+        return totalSqFt >= requestedSqFt
+      })
     }
 
     return {

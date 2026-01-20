@@ -763,7 +763,7 @@ export default function WarehouseDetailPage() {
                   <CardContent className="space-y-4">
                     {warehouse.security && warehouse.security.length > 0 && (
                       <div>
-                        <div className="text-sm text-muted-foreground mb-2">Security Features</div>
+                        <div className="text-sm text-muted-foreground mb-2">Health &amp; Safety</div>
                         <div className="flex flex-wrap gap-2">
                           {warehouse.security.map((sec, idx) => (
                             <Badge key={idx} variant="secondary">
