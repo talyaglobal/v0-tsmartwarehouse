@@ -737,7 +737,7 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
   const progress = (currentStep / 4) * 100
 
   return (
-    <div className="container max-w-5xl mx-auto py-6 px-4 sm:px-6">
+    <div className="w-full max-w-full mx-auto py-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link href="/dashboard/warehouses">

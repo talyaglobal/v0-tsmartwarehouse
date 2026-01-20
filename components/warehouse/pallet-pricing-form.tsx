@@ -30,8 +30,8 @@ export function PalletPricingForm({
   const [pricing, setPricing] = useState<PalletPricing[]>(initialPricing)
   const [selectedGoodsType, setSelectedGoodsType] = useState<string>("general")
   const adjustmentOptions = [
-    { value: "rate", label: "Price Increase (%)" },
-    { value: "plus_per_unit", label: "Additional Fee (+$)" },
+    { value: "rate", label: "Price Increase (%)", shortLabel: "(%)" },
+    { value: "plus_per_unit", label: "Additional Fee (+$)", shortLabel: "(+$)" },
   ] as const
   const lengthUnitOptions = [
     { value: "in", label: "in" },
@@ -1512,16 +1512,19 @@ export function PalletPricingForm({
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead>Min Height</TableHead>
-                                        <TableHead>Max Height</TableHead>
-                                        <TableHead>Stackable Price ($)</TableHead>
-                                        <TableHead>Unstackable Calculation</TableHead>
-                                        <TableHead>Unstackable Price</TableHead>
+                                        <TableHead className="min-w-[140px]">Min Height</TableHead>
+                                        <TableHead className="min-w-[140px]">Max Height</TableHead>
+                                        <TableHead className="min-w-[70px]">Stackable<br/>Price ($)</TableHead>
+                                        <TableHead className="min-w-[120px]">Unstackable<br/>Calculation</TableHead>
+                                        <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {size.heightRanges.map((range, rangeIndex) => (
+                                      {size.heightRanges.map((range, rangeIndex) => {
+                                        const isFirstItem = rangeIndex === 0
+                                        const isLastItem = rangeIndex === (size.heightRanges?.length || 0) - 1
+                                        return (
                                         <TableRow key={rangeIndex}>
                                           <TableCell>
                                             <div className="space-y-1">
@@ -1548,25 +1551,29 @@ export function PalletPricingForm({
                                                 <Input
                                                   type="number"
                                                   min="0"
-                                                  value={range.heightMinCm || ""}
+                                                  value={isFirstItem ? 0 : (range.heightMinCm || "")}
+                                                  disabled={isFirstItem}
+                                                  className={`min-w-[70px] ${isFirstItem ? "bg-muted" : ""}`}
                                                   onFocus={(e) => {
                                                     if (e.target.value === "0") {
                                                       e.target.select()
                                                     }
                                                   }}
-                                                  onChange={(e) =>
-                                            updateHeightRangeInCustomSize(
+                                                  onChange={(e) => {
+                                                    if (isFirstItem) return
+                                                    updateHeightRangeInCustomSize(
                                                       palletType,
                                                       period,
                                                       sizeIndex,
                                                       rangeIndex,
                                                       "heightMinCm",
-                                              e.target.value === "" ? undefined : Number(e.target.value)
+                                                      e.target.value === "" ? undefined : Number(e.target.value)
                                                     )
-                                                  }
+                                                  }}
                                                 />
                                               </div>
                                               {(() => {
+                                                if (isFirstItem) return null
                                                 const errorKey = getRangeErrorKey(
                                                   "height",
                                                   palletType,
@@ -1642,6 +1649,7 @@ export function PalletPricingForm({
                                                         type="number"
                                                         min="0"
                                                         value={range.heightMaxCm || ""}
+                                                        placeholder={isLastItem ? "∞" : ""}
                                                         onFocus={(e) => {
                                                           if (e.target.value === "0") {
                                                             e.target.select()
@@ -1657,7 +1665,7 @@ export function PalletPricingForm({
                                                             e.target.value === "" ? undefined : Number(e.target.value)
                                                           )
                                                         }
-                                                        className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                                        className={`min-w-[70px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                                       />
                                                     </div>
                                                     {serverError && (
@@ -1735,8 +1743,10 @@ export function PalletPricingForm({
                                                   )
                                                 }
                                               >
-                                                <SelectTrigger className="w-[120px]">
-                                                  <SelectValue />
+                                                <SelectTrigger className="w-[70px]">
+                                                  <span className="truncate">
+                                                    {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
+                                                  </span>
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                   {adjustmentOptions.map((option) => (
@@ -1750,7 +1760,7 @@ export function PalletPricingForm({
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                className="w-[80px]"
+                                                className="w-[70px]"
                                                 value={(range as any).unstackableValue ?? ''}
                                                 onFocus={(e) => {
                                                   if (e.target.value === '0') {
@@ -1801,7 +1811,7 @@ export function PalletPricingForm({
                                             </Button>
                                           </TableCell>
                                         </TableRow>
-                                      ))}
+                                      )})}
                                     </TableBody>
                                   </Table>
                                 ) : (
@@ -1833,16 +1843,19 @@ export function PalletPricingForm({
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead>Min Weight</TableHead>
-                                        <TableHead>Max Weight</TableHead>
-                                        <TableHead>Stackable Price ($)</TableHead>
-                                        <TableHead>Unstackable Calculation</TableHead>
-                                        <TableHead>Unstackable Price</TableHead>
+                                        <TableHead className="min-w-[140px]">Min Weight</TableHead>
+                                        <TableHead className="min-w-[140px]">Max Weight</TableHead>
+                                        <TableHead className="min-w-[70px]">Stackable<br/>Price ($)</TableHead>
+                                        <TableHead className="min-w-[120px]">Unstackable<br/>Calculation</TableHead>
+                                        <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {palletPricing.weightRanges.map((range, rangeIndex) => (
+                                      {palletPricing.weightRanges.map((range, rangeIndex) => {
+                                        const isFirstItem = rangeIndex === 0
+                                        const isLastItem = rangeIndex === (palletPricing.weightRanges?.length || 0) - 1
+                                        return (
                                         <TableRow key={rangeIndex}>
                                           <TableCell>
                                             <div className="space-y-1">
@@ -1869,24 +1882,28 @@ export function PalletPricingForm({
                                                 <Input
                                                   type="number"
                                                   min="0"
-                                                  value={range.weightMinKg || ""}
+                                                  value={isFirstItem ? 0 : (range.weightMinKg || "")}
+                                                  disabled={isFirstItem}
+                                                  className={`min-w-[70px] ${isFirstItem ? "bg-muted" : ""}`}
                                                   onFocus={(e) => {
                                                     if (e.target.value === "0") {
                                                       e.target.select()
                                                     }
                                                   }}
-                                                  onChange={(e) =>
-                                          updateWeightRange(
+                                                  onChange={(e) => {
+                                                    if (isFirstItem) return
+                                                    updateWeightRange(
                                                       palletType,
                                                       period,
                                                       rangeIndex,
                                                       "weightMinKg",
-                                            e.target.value === "" ? undefined : Number(e.target.value)
+                                                      e.target.value === "" ? undefined : Number(e.target.value)
                                                     )
-                                                  }
+                                                  }}
                                                 />
                                               </div>
                                               {(() => {
+                                                if (isFirstItem) return null
                                                 const errorKey = getRangeErrorKey(
                                                   "weight",
                                                   palletType,
@@ -1957,6 +1974,7 @@ export function PalletPricingForm({
                                                         type="number"
                                                         min="0"
                                                         value={range.weightMaxKg || ""}
+                                                        placeholder={isLastItem ? "∞" : ""}
                                                         onFocus={(e) => {
                                                           if (e.target.value === "0") {
                                                             e.target.select()
@@ -1971,7 +1989,7 @@ export function PalletPricingForm({
                                                             e.target.value === "" ? undefined : Number(e.target.value)
                                                           )
                                                         }
-                                                        className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                                        className={`min-w-[70px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                                       />
                                                     </div>
                                                     {serverError && (
@@ -2051,8 +2069,10 @@ export function PalletPricingForm({
                                                   )
                                                 }
                                               >
-                                                <SelectTrigger className="w-[120px]">
-                                                  <SelectValue />
+                                                <SelectTrigger className="w-[70px]">
+                                                  <span className="truncate">
+                                                    {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
+                                                  </span>
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                   {adjustmentOptions.map((option) => (
@@ -2066,7 +2086,7 @@ export function PalletPricingForm({
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                className="w-[80px]"
+                                                className="w-[70px]"
                                                 value={(range as any).unstackableValue ?? ''}
                                                 onFocus={(e) => {
                                                   if (e.target.value === '0') {
@@ -2114,7 +2134,7 @@ export function PalletPricingForm({
                                             </Button>
                                           </TableCell>
                                         </TableRow>
-                                      ))}
+                                      )})}
                                     </TableBody>
                                   </Table>
                                 ) : (
@@ -2153,29 +2173,35 @@ export function PalletPricingForm({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Min ({sizeUnitLabel})</TableHead>
-                              <TableHead>Max ({sizeUnitLabel})</TableHead>
-                              <TableHead>Stackable Price ($)</TableHead>
-                              <TableHead>Unstackable Calculation</TableHead>
-                              <TableHead>Unstackable Price</TableHead>
+                              <TableHead className="min-w-[90px]">Min ({sizeUnitLabel})</TableHead>
+                              <TableHead className="min-w-[90px]">Max ({sizeUnitLabel})</TableHead>
+                              <TableHead className="min-w-[70px]">Stackable<br/>Price ($)</TableHead>
+                              <TableHead className="min-w-[120px]">Unstackable<br/>Calculation</TableHead>
+                              <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
                               <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {palletPricing.heightRanges.map((range, index) => (
+                            {palletPricing.heightRanges.map((range, index) => {
+                              const isFirstItem = index === 0
+                              const isLastItem = index === (palletPricing.heightRanges?.length || 0) - 1
+                              return (
                               <TableRow key={index}>
                                 <TableCell>
                                   <div className="space-y-1">
                                     <Input
                                       type="number"
                                       min="0"
-                                      value={range.heightMinCm || ''}
+                                      value={isFirstItem ? 0 : (range.heightMinCm || '')}
+                                      disabled={isFirstItem}
+                                      className={`min-w-[80px] ${isFirstItem ? "bg-muted" : ""}`}
                                     onFocus={(e) => {
                                       if (e.target.value === '0') {
                                         e.target.select()
                                       }
                                     }}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                      if (isFirstItem) return
                                       updateHeightRange(
                                         palletType,
                                         period,
@@ -2183,9 +2209,10 @@ export function PalletPricingForm({
                                         "heightMinCm",
                                         e.target.value === "" ? undefined : Number(e.target.value)
                                       )
-                                    }
+                                    }}
                                     />
                                     {(() => {
+                                      if (isFirstItem) return null
                                       const errorKey = getRangeErrorKey(
                                         "height",
                                         palletType,
@@ -2240,6 +2267,7 @@ export function PalletPricingForm({
                                             type="number"
                                             min="0"
                                             value={range.heightMaxCm || ''}
+                                            placeholder={isLastItem ? "∞" : ""}
                                             onFocus={(e) => {
                                               if (e.target.value === '0') {
                                                 e.target.select()
@@ -2254,7 +2282,7 @@ export function PalletPricingForm({
                                                 e.target.value === "" ? undefined : Number(e.target.value)
                                               )
                                             }
-                                            className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                            className={`min-w-[80px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                           />
                                           {serverError && (
                                             <p className="text-xs text-destructive">{serverError}</p>
@@ -2333,8 +2361,10 @@ export function PalletPricingForm({
                                         )
                                       }
                                     >
-                                      <SelectTrigger className="w-[120px]">
-                                        <SelectValue />
+                                      <SelectTrigger className="w-[70px]">
+                                        <span className="truncate">
+                                          {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
+                                        </span>
                                       </SelectTrigger>
                                       <SelectContent>
                                         {adjustmentOptions.map((option) => (
@@ -2348,7 +2378,7 @@ export function PalletPricingForm({
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      className="w-[80px]"
+                                      className="w-[70px]"
                                       value={(range as any).unstackableValue ?? ''}
                                       onFocus={(e) => {
                                         if (e.target.value === '0') {
@@ -2396,7 +2426,7 @@ export function PalletPricingForm({
                                   </Button>
                                 </TableCell>
                               </TableRow>
-                            ))}
+                            )})}
                           </TableBody>
                         </Table>
                       ) : (
@@ -2430,16 +2460,19 @@ export function PalletPricingForm({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Min ({weightUnitLabel})</TableHead>
-                            <TableHead>Max ({weightUnitLabel})</TableHead>
-                            <TableHead>Stackable Price ($)</TableHead>
-                            <TableHead>Unstackable Calculation</TableHead>
-                            <TableHead>Unstackable Price</TableHead>
+                            <TableHead className="min-w-[90px]">Min ({weightUnitLabel})</TableHead>
+                            <TableHead className="min-w-[90px]">Max ({weightUnitLabel})</TableHead>
+                            <TableHead className="min-w-[70px]">Stackable<br/>Price ($)</TableHead>
+                            <TableHead className="min-w-[120px]">Unstackable<br/>Calculation</TableHead>
+                            <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {palletPricing.weightRanges.map((range, index) => (
+                          {palletPricing.weightRanges.map((range, index) => {
+                            const isFirstItem = index === 0
+                            const isLastItem = index === (palletPricing.weightRanges?.length || 0) - 1
+                            return (
                             <TableRow key={index}>
                               <TableCell>
                                 <div className="space-y-1">
@@ -2447,13 +2480,16 @@ export function PalletPricingForm({
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    value={range.weightMinKg || ""}
+                                    value={isFirstItem ? 0 : (range.weightMinKg || "")}
+                                    disabled={isFirstItem}
+                                    className={`min-w-[80px] ${isFirstItem ? "bg-muted" : ""}`}
                                     onFocus={(e) => {
                                       if (e.target.value === "0") {
                                         e.target.select()
                                       }
                                     }}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                      if (isFirstItem) return
                                       updateWeightRange(
                                         palletType,
                                         period,
@@ -2461,9 +2497,10 @@ export function PalletPricingForm({
                                         "weightMinKg",
                                         e.target.value === "" ? undefined : Number(e.target.value)
                                       )
-                                    }
+                                    }}
                                   />
                                   {(() => {
+                                    if (isFirstItem) return null
                                     const errorKey = getRangeErrorKey(
                                       "weight",
                                       palletType,
@@ -2519,6 +2556,7 @@ export function PalletPricingForm({
                                           min="0"
                                           step="0.01"
                                           value={range.weightMaxKg || ""}
+                                          placeholder={isLastItem ? "∞" : ""}
                                           onFocus={(e) => {
                                             if (e.target.value === "0") {
                                               e.target.select()
@@ -2533,7 +2571,7 @@ export function PalletPricingForm({
                                               e.target.value === "" ? undefined : Number(e.target.value)
                                             )
                                           }
-                                          className={serverError ? "border-destructive focus-visible:ring-destructive" : ""}
+                                          className={`min-w-[80px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                         />
                                         {serverError && (
                                           <p className="text-xs text-destructive">{serverError}</p>
@@ -2612,8 +2650,10 @@ export function PalletPricingForm({
                                       )
                                     }
                                   >
-                                    <SelectTrigger className="w-[120px]">
-                                      <SelectValue />
+                                    <SelectTrigger className="w-[70px]">
+                                      <span className="truncate">
+                                        {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
+                                      </span>
                                     </SelectTrigger>
                                     <SelectContent>
                                       {adjustmentOptions.map((option) => (
@@ -2627,7 +2667,7 @@ export function PalletPricingForm({
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    className="w-[80px]"
+                                    className="w-[70px]"
                                     value={(range as any).unstackableValue ?? ''}
                                     onFocus={(e) => {
                                       if (e.target.value === '0') {
@@ -2675,7 +2715,7 @@ export function PalletPricingForm({
                                 </Button>
                               </TableCell>
                             </TableRow>
-                          ))}
+                          )})}
                         </TableBody>
                       </Table>
                     ) : (

@@ -129,19 +129,25 @@ const updateWarehouseSchema = z.object({
       unstackableAdjustmentValue: z.number().nonnegative().optional(),
       heightRanges: z.array(z.object({
         heightMinCm: z.number().nonnegative(),
-        heightMaxCm: z.number().positive(),
+        heightMaxCm: z.number().positive().optional(), // Optional for last range (infinity)
         pricePerUnit: z.number().positive(),
+        unstackableMethod: z.enum(["rate", "plus_per_unit"]).optional(),
+        unstackableValue: z.number().nonnegative().optional(),
       })),
     })).optional(),
     heightRanges: z.array(z.object({
       heightMinCm: z.number().nonnegative(),
-      heightMaxCm: z.number().positive(),
+      heightMaxCm: z.number().positive().optional(), // Optional for last range (infinity)
       pricePerUnit: z.number().positive(),
+      unstackableMethod: z.enum(["rate", "plus_per_unit"]).optional(),
+      unstackableValue: z.number().nonnegative().optional(),
     })).optional(),
     weightRanges: z.array(z.object({
       weightMinKg: z.number().nonnegative(),
-      weightMaxKg: z.number().positive(),
+      weightMaxKg: z.number().positive().optional(), // Optional for last range (infinity)
       pricePerPallet: z.number().positive(),
+      unstackableMethod: z.enum(["rate", "plus_per_unit"]).optional(),
+      unstackableValue: z.number().nonnegative().optional(),
     })).optional(),
   })).optional(), // New field
   workingDays: z.array(z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])).optional(),
@@ -581,6 +587,8 @@ export async function PUT(
                   height_min_cm: range.heightMinCm,
                   height_max_cm: range.heightMaxCm,
                   price_per_unit: range.pricePerUnit,
+                  unstackable_method: range.unstackableMethod || 'rate',
+                  unstackable_value: range.unstackableValue ?? 0,
                   status: true,
                 }))
               })
@@ -598,6 +606,8 @@ export async function PUT(
                 height_min_cm: range.heightMinCm,
                 height_max_cm: range.heightMaxCm,
                 price_per_unit: range.pricePerUnit,
+                unstackable_method: range.unstackableMethod || 'rate',
+                unstackable_value: range.unstackableValue ?? 0,
                 status: true,
               }))
             )
@@ -611,6 +621,8 @@ export async function PUT(
                 weight_min_kg: range.weightMinKg,
                 weight_max_kg: range.weightMaxKg,
                 price_per_pallet: range.pricePerPallet,
+                unstackable_method: range.unstackableMethod || 'rate',
+                unstackable_value: range.unstackableValue ?? 0,
                 status: true,
               }))
             )

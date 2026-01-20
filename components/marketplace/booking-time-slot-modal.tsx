@@ -16,8 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Calendar, Clock, Loader2, Info, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Calendar, Clock, Loader2, Info, ChevronLeft, ChevronRight, Plus, Trash2, Check, Package } from "lucide-react"
 import { formatDate } from "@/lib/utils/format"
 import { formatGoodsType } from "@/lib/constants/warehouse-types"
 import { BookingSummary } from "./booking-summary"
@@ -37,7 +37,6 @@ interface BookingTimeSlotModalProps {
     selectedTime: string,
     palletDetails?: PalletBookingDetails
   ) => Promise<void>
-  // Legacy props - kept for backwards compatibility but not used
   selectedServices?: string[]
   onServicesChange?: (serviceIds: string[]) => void
 }
@@ -54,20 +53,43 @@ interface DayAvailability {
   timeSlots: TimeSlot[]
 }
 
-interface PalletItemInput {
+interface PalletTypeInput {
   id: string
   palletType: "standard" | "euro" | "custom"
   quantity: number
-  length: number
-  width: number
-  height: number
-  weight: number
+  heightRangeId: string // Selected height range ID
+  weightRangeId: string // Selected weight range ID
+  goodsType: string
+  stacking: "stackable" | "unstackable"
+  // For custom pallets only
+  customLength?: number
+  customWidth?: number
 }
 
 // Standard pallet dimensions
 const STANDARD_PALLET_DIMENSIONS = {
-  standard: { length: 48, width: 40, unit: "in" }, // 48" x 40" GMA Pallet
-  euro: { length: 120, width: 80, unit: "cm" }, // 120cm x 80cm Euro Pallet
+  standard: { length: 48, width: 40, unit: "in", lengthCm: 121.92, widthCm: 101.6 },
+  euro: { length: 120, width: 80, unit: "cm", lengthCm: 120, widthCm: 80 },
+}
+
+// Helper to get height range label
+const getHeightRangeLabel = (range: { heightMinCm: number; heightMaxCm?: number; pricePerUnit: number }, unit: string) => {
+  const min = unit === "cm" ? range.heightMinCm : Math.round(range.heightMinCm / 2.54)
+  const max = range.heightMaxCm ? (unit === "cm" ? range.heightMaxCm : Math.round(range.heightMaxCm / 2.54)) : null
+  if (max) {
+    return `${min} - ${max} ${unit} ($${range.pricePerUnit})`
+  }
+  return `${min}+ ${unit} ($${range.pricePerUnit})`
+}
+
+// Helper to get weight range label
+const getWeightRangeLabel = (range: { weightMinKg: number; weightMaxKg?: number; pricePerPallet: number }, unit: string) => {
+  const min = unit === "kg" ? range.weightMinKg : Math.round(range.weightMinKg * 2.205)
+  const max = range.weightMaxKg ? (unit === "kg" ? range.weightMaxKg : Math.round(range.weightMaxKg * 2.205)) : null
+  if (max) {
+    return `${min} - ${max} ${unit} ($${range.pricePerPallet})`
+  }
+  return `${min}+ ${unit} ($${range.pricePerPallet})`
 }
 
 export function BookingTimeSlotModal({
@@ -80,28 +102,21 @@ export function BookingTimeSlotModal({
   endDate,
   onConfirm,
 }: BookingTimeSlotModalProps) {
+  // Stepper state
+  const [currentStep, setCurrentStep] = useState(1)
+  const totalSteps = type === "pallet" ? 2 : 1
+
+  // Date/Time state
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [selectedTime, setSelectedTime] = useState<string>("")
   const [dayAvailabilities, setDayAvailabilities] = useState<DayAvailability[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false)
-  const [goodsType, setGoodsType] = useState<string>("general")
-  const [stackableChoice, setStackableChoice] = useState<"stackable" | "unstackable">("stackable")
-  const [palletItems, setPalletItems] = useState<PalletItemInput[]>([])
 
-  const createPalletItem = (quantityOverride?: number, palletType: "standard" | "euro" | "custom" = "standard"): PalletItemInput => {
-    const standardDims = STANDARD_PALLET_DIMENSIONS[palletType as keyof typeof STANDARD_PALLET_DIMENSIONS]
-    return {
-      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      palletType,
-      quantity: quantityOverride ?? 0,
-      length: standardDims?.length ?? 0,
-      width: standardDims?.width ?? 0,
-      height: 0,
-      weight: 0,
-    }
-  }
+  // Pallet state
+  const [palletTypes, setPalletTypes] = useState<PalletTypeInput[]>([])
 
+  // Get goods type options from warehouse
   const normalizeGoodsType = (value?: string) =>
     (value || "general").trim().toLowerCase()
   const normalizeList = (value: string | string[] | undefined) => {
@@ -118,12 +133,62 @@ export function BookingTimeSlotModal({
     return Array.from(new Set(source.map((type) => normalizeGoodsType(type))))
   }, [warehouse])
 
-  useEffect(() => {
-    if (!open || type !== "pallet") return
+  // Get pallet pricing from warehouse
+  const palletPricing = useMemo(() => {
+    return warehouse.palletPricing || []
+  }, [warehouse.palletPricing])
+
+  // Get pricing period based on booking duration
+  const pricingPeriod = useMemo((): "day" | "week" | "month" => {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    if (days < 7) return "day"
+    if (days < 30) return "week"
+    return "month"
+  }, [startDate, endDate])
+
+  // Get height ranges for a specific pallet type and goods type
+  const getHeightRanges = (palletType: string, goodsType: string) => {
+    const pricing = palletPricing.find(
+      p => p.palletType === palletType && 
+      p.pricingPeriod === pricingPeriod &&
+      (!p.goodsType || p.goodsType === goodsType || p.goodsType === "general")
+    )
+    return pricing?.heightRanges || []
+  }
+
+  // Get weight ranges for a specific pallet type and goods type
+  const getWeightRanges = (palletType: string, goodsType: string) => {
+    const pricing = palletPricing.find(
+      p => p.palletType === palletType && 
+      p.pricingPeriod === pricingPeriod &&
+      (!p.goodsType || p.goodsType === goodsType || p.goodsType === "general")
+    )
+    return pricing?.weightRanges || []
+  }
+
+  // Create a new pallet type entry
+  const createPalletType = (quantityOverride?: number): PalletTypeInput => {
     const defaultGoodsType = goodsTypeOptions.length > 0 ? goodsTypeOptions[0] : "general"
-    setGoodsType(defaultGoodsType)
-    setStackableChoice("stackable")
-    setPalletItems((prev) => (prev.length > 0 ? prev : [createPalletItem(quantity)]))
+    return {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      palletType: "standard",
+      quantity: quantityOverride ?? 0,
+      heightRangeId: "",
+      weightRangeId: "",
+      goodsType: defaultGoodsType,
+      stacking: "stackable",
+    }
+  }
+
+  // Initialize pallet types on open
+  useEffect(() => {
+    if (!open) return
+    setCurrentStep(1)
+    if (type === "pallet") {
+      setPalletTypes((prev) => (prev.length > 0 ? prev : [createPalletType(quantity)]))
+    }
   }, [open, type, quantity, goodsTypeOptions])
 
   // Generate day availabilities
@@ -141,22 +206,19 @@ export function BookingTimeSlotModal({
       while (current <= end) {
         const dateString = current.toISOString().split("T")[0]
         const dayName = current.toLocaleDateString("en-US", { weekday: "long" })
-        
-        // Check if this day is a working day
         const isWorkingDay = workingDays.length === 0 || workingDays.includes(dayName)
         
         days.push({
           date: dateString,
           dayName,
           isAvailable: isWorkingDay,
-          timeSlots: [], // Will be loaded when date is selected
+          timeSlots: [],
         })
 
         current.setDate(current.getDate() + 1)
       }
 
       setDayAvailabilities(days)
-      // Auto-select first available date
       const firstAvailable = days.find((d) => d.isAvailable)
       if (firstAvailable) {
         setSelectedDate(firstAvailable.date)
@@ -170,7 +232,7 @@ export function BookingTimeSlotModal({
   // Load time slots for selected date
   const loadTimeSlotsForDate = async (date: string) => {
     setLoadingTimeSlots(true)
-    setSelectedTime("") // Clear previous selection while loading
+    setSelectedTime("")
     try {
       const result = await api.get<{
         date: string
@@ -179,76 +241,182 @@ export function BookingTimeSlotModal({
         showToast: false,
       })
 
-      console.log(`[BookingTimeSlotModal] API response for ${date}:`, result)
-
       if (result.success && result.data) {
         const timeSlots = (result.data.timeSlots || []).map((slot) => ({
           time: slot.time,
           available: slot.available,
         }))
 
-        console.log(`[BookingTimeSlotModal] Parsed ${timeSlots.length} time slots for ${date}`)
-        console.log(`[BookingTimeSlotModal] Available slots: ${timeSlots.filter(s => s.available).length}`)
-        console.log(`[BookingTimeSlotModal] All slots:`, timeSlots.slice(0, 5))
-
-        // Update day availabilities with loaded time slots
         setDayAvailabilities((prev) =>
           prev.map((day) =>
-            day.date === date
-              ? { ...day, timeSlots }
-              : day
+            day.date === date ? { ...day, timeSlots } : day
           )
         )
 
-        // Auto-select first available time slot
         const firstAvailable = timeSlots.find((slot) => slot.available)
         if (firstAvailable) {
           setSelectedTime(firstAvailable.time)
-          console.log(`[BookingTimeSlotModal] Auto-selected first available slot: ${firstAvailable.time}`)
-        } else if (timeSlots.length > 0) {
-          // If there are slots but none are available, still allow selection (user can see why)
-          console.warn(`[BookingTimeSlotModal] No available time slots for ${date}, but ${timeSlots.length} total slots exist`)
-          setSelectedTime("")
-        } else {
-          setSelectedTime("")
-          console.warn(`[BookingTimeSlotModal] No time slots returned for ${date}`)
         }
-      } else {
-        console.error(`[BookingTimeSlotModal] API call failed or no data:`, result)
-        setSelectedTime("")
-        // Update day availabilities with empty slots to show error state
-        setDayAvailabilities((prev) =>
-          prev.map((day) =>
-            day.date === date
-              ? { ...day, timeSlots: [] }
-              : day
-          )
-        )
       }
     } catch (error) {
       console.error("[BookingTimeSlotModal] Error loading time slots:", error)
-      setSelectedTime("")
-      // Update day availabilities with empty slots to show error state
-      setDayAvailabilities((prev) =>
-        prev.map((day) =>
-          day.date === date
-            ? { ...day, timeSlots: [] }
-            : day
-        )
-      )
     } finally {
       setLoadingTimeSlots(false)
     }
   }
 
-  // When date is selected, load time slots
   useEffect(() => {
     if (selectedDate && open) {
       loadTimeSlotsForDate(selectedDate)
     }
   }, [selectedDate, open])
 
+  // Update pallet type
+  const updatePalletType = (id: string, updates: Partial<PalletTypeInput>) => {
+    setPalletTypes((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item
+        
+        // If pallet type is changing, reset height/weight ranges
+        if (updates.palletType && updates.palletType !== item.palletType) {
+          return {
+            ...item,
+            ...updates,
+            heightRangeId: "",
+            weightRangeId: "",
+          }
+        }
+        
+        // If goods type is changing, reset height/weight ranges
+        if (updates.goodsType && updates.goodsType !== item.goodsType) {
+          return {
+            ...item,
+            ...updates,
+            heightRangeId: "",
+            weightRangeId: "",
+          }
+        }
+        
+        return { ...item, ...updates }
+      })
+    )
+  }
 
+  const addPalletType = () => {
+    setPalletTypes((prev) => [...prev, createPalletType(0)])
+  }
+
+  const removePalletType = (id: string) => {
+    setPalletTypes((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  const totalPalletQuantity = palletTypes.reduce(
+    (sum, item) => sum + (item.quantity || 0),
+    0
+  )
+
+  // Build pallet details for API
+  const buildPalletDetails = (): PalletBookingDetails => {
+    const pallets = palletTypes.map((item) => {
+      const isEuro = item.palletType === "euro"
+      const isStandard = item.palletType === "standard"
+      
+      // Get selected height and weight ranges
+      const heightRanges = getHeightRanges(item.palletType, item.goodsType)
+      const weightRanges = getWeightRanges(item.palletType, item.goodsType)
+      
+      const selectedHeightRange = heightRanges.find(r => r.id === item.heightRangeId || `${r.heightMinCm}-${r.heightMaxCm}` === item.heightRangeId)
+      const selectedWeightRange = weightRanges.find(r => r.id === item.weightRangeId || `${r.weightMinKg}-${r.weightMaxKg}` === item.weightRangeId)
+      
+      let lengthCm: number
+      let widthCm: number
+      let heightCm: number
+      let weightKg: number
+      
+      if (isEuro) {
+        lengthCm = STANDARD_PALLET_DIMENSIONS.euro.lengthCm
+        widthCm = STANDARD_PALLET_DIMENSIONS.euro.widthCm
+        heightCm = selectedHeightRange?.heightMinCm || 0
+        weightKg = selectedWeightRange?.weightMinKg || 0
+      } else if (isStandard) {
+        lengthCm = STANDARD_PALLET_DIMENSIONS.standard.lengthCm
+        widthCm = STANDARD_PALLET_DIMENSIONS.standard.widthCm
+        heightCm = selectedHeightRange?.heightMinCm || 0
+        weightKg = selectedWeightRange?.weightMinKg || 0
+      } else {
+        // Custom - convert from inches to cm
+        lengthCm = (item.customLength || 0) * 2.54
+        widthCm = (item.customWidth || 0) * 2.54
+        heightCm = selectedHeightRange?.heightMinCm || 0
+        weightKg = selectedWeightRange?.weightMinKg || 0
+      }
+
+      return {
+        pallet_type: item.palletType,
+        quantity: item.quantity || 0,
+        length_cm: Number.isFinite(lengthCm) ? Number(lengthCm.toFixed(2)) : undefined,
+        width_cm: Number.isFinite(widthCm) ? Number(widthCm.toFixed(2)) : undefined,
+        height_cm: Number.isFinite(heightCm) ? Number(heightCm.toFixed(2)) : undefined,
+        weight_kg: Number.isFinite(weightKg) ? Number(weightKg.toFixed(2)) : undefined,
+        goods_type: item.goodsType,
+        stackable: item.stacking === "stackable",
+        height_range_id: item.heightRangeId,
+        weight_range_id: item.weightRangeId,
+      }
+    })
+
+    return {
+      goods_type: palletTypes[0]?.goodsType || "general",
+      stackable: palletTypes[0]?.stacking === "stackable",
+      pallets,
+    }
+  }
+
+  // Validate pallet details
+  const validatePalletDetails = () => {
+    if (palletTypes.length === 0) {
+      return "Please add at least one pallet type."
+    }
+    
+    for (const item of palletTypes) {
+      if (!item.quantity || item.quantity <= 0) {
+        return "Please enter quantity for all pallet types."
+      }
+      if (!item.heightRangeId) {
+        return "Please select height range for all pallet types."
+      }
+      if (!item.weightRangeId) {
+        return "Please select weight range for all pallet types."
+      }
+      if (item.palletType === "custom" && (!item.customLength || !item.customWidth)) {
+        return "Please enter length and width for custom pallets."
+      }
+    }
+    
+    if (totalPalletQuantity !== quantity) {
+      return `Total pallet quantity must be ${quantity}.`
+    }
+    
+    return null
+  }
+
+  // Handle step navigation
+  const handleNext = () => {
+    if (type === "pallet" && currentStep === 1) {
+      const error = validatePalletDetails()
+      if (error) {
+        alert(error)
+        return
+      }
+    }
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps))
+  }
+
+  const handleBack = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1))
+  }
+
+  // Handle confirm
   const handleConfirm = async () => {
     if (!selectedDate || !selectedTime) {
       alert("Please select a date and time")
@@ -257,27 +425,9 @@ export function BookingTimeSlotModal({
 
     let palletDetails: PalletBookingDetails | undefined = undefined
     if (type === "pallet") {
-      if (palletItems.length === 0) {
-        alert("Please add at least one pallet size.")
-        return
-      }
-      const hasInvalid = palletItems.some((item) => {
-        // All pallets need quantity, height, and weight
-        if (!item.quantity || item.quantity <= 0 || item.height <= 0 || item.weight <= 0) {
-          return true
-        }
-        // Custom pallets also need length and width
-        if (item.palletType === "custom" && (item.length <= 0 || item.width <= 0)) {
-          return true
-        }
-        return false
-      })
-      if (hasInvalid) {
-        alert("Please fill in all required pallet details (quantity, height, and weight). Custom pallets also require length and width.")
-        return
-      }
-      if (totalPalletQuantity !== quantity) {
-        alert(`Total pallet quantity must be ${quantity}.`)
+      const error = validatePalletDetails()
+      if (error) {
+        alert(error)
         return
       }
       palletDetails = buildPalletDetails()
@@ -300,202 +450,117 @@ export function BookingTimeSlotModal({
   const previousDay = selectedIndex > 0 ? dayAvailabilities[selectedIndex - 1] : null
   const nextDay = selectedIndex < dayAvailabilities.length - 1 ? dayAvailabilities[selectedIndex + 1] : null
 
-  const handlePreviousDate = () => {
-    if (previousDay && previousDay.isAvailable) {
-      setSelectedDate(previousDay.date)
-      setSelectedTime("")
-    }
-  }
+  // Determine if step is complete
+  const isStep1Complete = type !== "pallet" || (palletTypes.length > 0 && !validatePalletDetails())
 
-  const handleNextDate = () => {
-    if (nextDay && nextDay.isAvailable) {
-      setSelectedDate(nextDay.date)
-      setSelectedTime("")
-    }
-  }
-
-  const totalPalletQuantity = palletItems.reduce(
-    (sum, item) => sum + (item.quantity || 0),
-    0
-  )
-
-  const buildPalletDetails = (): PalletBookingDetails => {
-    const pallets = palletItems.map((item) => {
-      const isEuro = item.palletType === "euro"
-      const isStandard = item.palletType === "standard"
-      
-      // Use standard dimensions for standard/euro, user-provided for custom
-      let lengthCm: number
-      let widthCm: number
-      let heightCm: number
-      let weightKg: number
-      
-      if (isEuro) {
-        // Euro pallet: user enters in cm
-        lengthCm = STANDARD_PALLET_DIMENSIONS.euro.length
-        widthCm = STANDARD_PALLET_DIMENSIONS.euro.width
-        heightCm = item.height // cm
-        weightKg = item.weight // kg
-      } else if (isStandard) {
-        // Standard pallet: user enters in inches/lbs, convert to cm/kg
-        lengthCm = STANDARD_PALLET_DIMENSIONS.standard.length * 2.54 // 48" -> cm
-        widthCm = STANDARD_PALLET_DIMENSIONS.standard.width * 2.54 // 40" -> cm
-        heightCm = item.height * 2.54 // inches to cm
-        weightKg = item.weight * 0.453592 // lbs to kg
-      } else {
-        // Custom pallet: user enters in inches/lbs, convert to cm/kg
-        lengthCm = item.length * 2.54
-        widthCm = item.width * 2.54
-        heightCm = item.height * 2.54
-        weightKg = item.weight * 0.453592
-      }
-
-      return {
-        pallet_type: item.palletType,
-        quantity: item.quantity || 0,
-        length_cm: Number.isFinite(lengthCm) ? Number(lengthCm.toFixed(2)) : undefined,
-        width_cm: Number.isFinite(widthCm) ? Number(widthCm.toFixed(2)) : undefined,
-        height_cm: Number.isFinite(heightCm) ? Number(heightCm.toFixed(2)) : undefined,
-        weight_kg: Number.isFinite(weightKg) ? Number(weightKg.toFixed(2)) : undefined,
-      }
-    })
-
-    return {
-      goods_type: goodsType || "general",
-      stackable: stackableChoice === "stackable",
-      pallets,
-    }
-  }
-
-  const updatePalletItem = (id: string, updates: Partial<PalletItemInput>) => {
-    setPalletItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item
-        
-        // If pallet type is changing, update dimensions to standard values
-        if (updates.palletType && updates.palletType !== item.palletType) {
-          const standardDims = STANDARD_PALLET_DIMENSIONS[updates.palletType as keyof typeof STANDARD_PALLET_DIMENSIONS]
-          return {
-            ...item,
-            ...updates,
-            length: standardDims?.length ?? 0,
-            width: standardDims?.width ?? 0,
-          }
-        }
-        
-        return { ...item, ...updates }
-      })
-    )
-  }
-
-  const addPalletItem = () => {
-    setPalletItems((prev) => [...prev, createPalletItem(0)])
-  }
-
-  const removePalletItem = (id: string) => {
-    setPalletItems((prev) => prev.filter((item) => item.id !== id))
-  }
+  // Step titles
+  const steps = type === "pallet" 
+    ? [{ title: "Pallet Details", icon: Package }, { title: "Date & Time", icon: Calendar }]
+    : [{ title: "Date & Time", icon: Calendar }]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Complete Your Booking</DialogTitle>
           <DialogDescription>
-            Review your booking details and select a date and time for drop-off
+            {type === "pallet" 
+              ? `Step ${currentStep} of ${totalSteps}: ${steps[currentStep - 1]?.title}`
+              : "Select a date and time for drop-off"
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-          {/* Left: Booking Summary */}
-          <div className="space-y-4">
-            <BookingSummary
-              warehouseId={warehouse.id}
-              type={type}
-              quantity={quantity}
-              startDate={startDate}
-              endDate={endDate}
-              palletDetails={
-                type === "pallet" && palletItems.length > 0 ? buildPalletDetails() : undefined
-              }
-            />
+        {/* Stepper Progress */}
+        {totalSteps > 1 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              {steps.map((step, index) => {
+                const stepNum = index + 1
+                const isActive = currentStep === stepNum
+                const isComplete = currentStep > stepNum || (stepNum === 1 && isStep1Complete && currentStep > 1)
+                const StepIcon = step.icon
+                
+                return (
+                  <div 
+                    key={stepNum}
+                    className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
+                          isActive 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : isComplete 
+                            ? "border-green-500 bg-green-500 text-white"
+                            : "border-muted-foreground/30 text-muted-foreground"
+                        }`}
+                      >
+                        {isComplete ? <Check className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
+                      </div>
+                      <span className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                        {step.title}
+                      </span>
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className={`flex-1 h-0.5 mx-4 ${isComplete ? "bg-green-500" : "bg-muted"}`} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <Progress value={(currentStep / totalSteps) * 100} className="h-1" />
           </div>
+        )}
 
-          {/* Right: Date and Time Selection */}
-          <div className="space-y-4">
-            {type === "pallet" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* Left: Main Content (2 columns) */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Step 1: Pallet Details */}
+            {type === "pallet" && currentStep === 1 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Pallet Details</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Pallet Details
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Goods Type</Label>
-                      <Select value={goodsType} onValueChange={setGoodsType}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select goods type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(goodsTypeOptions.length > 0 ? goodsTypeOptions : ["general"]).map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {formatGoodsType(option)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Stacking</Label>
-                      <RadioGroup
-                        value={stackableChoice}
-                        onValueChange={(value) =>
-                          setStackableChoice(value as "stackable" | "unstackable")
-                        }
-                        className="flex gap-4"
-                      >
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="stackable" id="stackable" />
-                          <Label htmlFor="stackable">Stackable</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="unstackable" id="unstackable" />
-                          <Label htmlFor="unstackable">Unstackable</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  </div>
-
-                  {palletItems.map((item, index) => {
+                  {palletTypes.map((item, index) => {
                     const isCustom = item.palletType === "custom"
                     const isEuro = item.palletType === "euro"
                     const dimensionUnit = isEuro ? "cm" : "in"
                     const weightUnit = isEuro ? "kg" : "lb"
                     const standardDims = STANDARD_PALLET_DIMENSIONS[item.palletType as keyof typeof STANDARD_PALLET_DIMENSIONS]
                     
+                    const heightRanges = getHeightRanges(item.palletType, item.goodsType)
+                    const weightRanges = getWeightRanges(item.palletType, item.goodsType)
+                    
                     return (
-                      <div key={item.id} className="border rounded-lg p-3 space-y-3">
+                      <div key={item.id} className="border rounded-lg p-4 space-y-4 bg-card">
                         <div className="flex items-center justify-between">
-                          <Label>Pallet Size {index + 1}</Label>
-                          {palletItems.length > 1 && (
+                          <Label className="text-base font-semibold">Pallet Type {index + 1}</Label>
+                          {palletTypes.length > 1 && (
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => removePalletItem(item.id)}
+                              onClick={() => removePalletType(item.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        
+                        {/* Row 1: Pallet Type, Quantity, Goods Type, Stacking */}
+                        <div className="grid gap-3 sm:grid-cols-4">
                           <div className="space-y-2">
-                            <Label>Pallet Type</Label>
+                            <Label className="text-xs text-muted-foreground">Pallet Type</Label>
                             <Select
                               value={item.palletType}
                               onValueChange={(value) =>
-                                updatePalletItem(item.id, {
-                                  palletType: value as PalletItemInput["palletType"],
+                                updatePalletType(item.id, {
+                                  palletType: value as PalletTypeInput["palletType"],
                                 })
                               }
                             >
@@ -509,22 +574,93 @@ export function BookingTimeSlotModal({
                               </SelectContent>
                             </Select>
                           </div>
+                          
                           <div className="space-y-2">
-                            <Label>Quantity</Label>
+                            <Label className="text-xs text-muted-foreground">Quantity</Label>
                             <Input
                               type="number"
-                              min="0"
+                              min="1"
                               value={item.quantity || ""}
-                              onChange={(event) =>
-                                updatePalletItem(item.id, {
-                                  quantity: Number(event.target.value) || 0,
+                              onChange={(e) =>
+                                updatePalletType(item.id, {
+                                  quantity: Number(e.target.value) || 0,
                                 })
                               }
+                              placeholder="0"
                             />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Goods Type</Label>
+                            <Select 
+                              value={item.goodsType} 
+                              onValueChange={(value) => updatePalletType(item.id, { goodsType: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select goods" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(goodsTypeOptions.length > 0 ? goodsTypeOptions : ["general"]).map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {formatGoodsType(option)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Stacking</Label>
+                            <Select 
+                              value={item.stacking} 
+                              onValueChange={(value) => updatePalletType(item.id, { stacking: value as "stackable" | "unstackable" })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="stackable">Stackable</SelectItem>
+                                <SelectItem value="unstackable">Unstackable</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                         
-                        {/* Show standard dimensions info for standard/euro pallets */}
+                        {/* Custom Pallet Dimensions */}
+                        {isCustom && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Length (in)</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.customLength || ""}
+                                onChange={(e) =>
+                                  updatePalletType(item.id, {
+                                    customLength: Number(e.target.value) || 0,
+                                  })
+                                }
+                                placeholder="48"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Width (in)</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.customWidth || ""}
+                                onChange={(e) =>
+                                  updatePalletType(item.id, {
+                                    customWidth: Number(e.target.value) || 0,
+                                  })
+                                }
+                                placeholder="40"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Standard Dimensions Info */}
                         {!isCustom && standardDims && (
                           <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-2">
                             <span className="font-medium">Standard Dimensions:</span>{" "}
@@ -532,288 +668,343 @@ export function BookingTimeSlotModal({
                           </div>
                         )}
                         
+                        {/* Row 2: Height Range, Weight Range */}
                         <div className="grid gap-3 sm:grid-cols-2">
-                          {/* Length and Width only for custom pallets */}
-                          {isCustom && (
-                            <>
-                              <div className="space-y-2">
-                                <Label>Length ({dimensionUnit})</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={item.length || ""}
-                                  onChange={(event) =>
-                                    updatePalletItem(item.id, {
-                                      length: Number(event.target.value) || 0,
-                                    })
-                                  }
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Width ({dimensionUnit})</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={item.width || ""}
-                                  onChange={(event) =>
-                                    updatePalletItem(item.id, {
-                                      width: Number(event.target.value) || 0,
-                                    })
-                                  }
-                                />
-                              </div>
-                            </>
-                          )}
-                          
-                          {/* Height and Weight for all pallet types */}
                           <div className="space-y-2">
-                            <Label>Height ({dimensionUnit})</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={item.height || ""}
-                              onChange={(event) =>
-                                updatePalletItem(item.id, {
-                                  height: Number(event.target.value) || 0,
-                                })
-                              }
-                            />
+                            <Label className="text-xs text-muted-foreground">Height Range ({dimensionUnit})</Label>
+                            {heightRanges.length > 0 ? (
+                              <Select 
+                                value={item.heightRangeId} 
+                                onValueChange={(value) => updatePalletType(item.id, { heightRangeId: value })}
+                              >
+                                <SelectTrigger className={!item.heightRangeId ? "border-orange-300" : ""}>
+                                  <SelectValue placeholder="Select height range" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {heightRanges.map((range) => {
+                                    const rangeId = range.id || `${range.heightMinCm}-${range.heightMaxCm}`
+                                    return (
+                                      <SelectItem key={rangeId} value={rangeId}>
+                                        {getHeightRangeLabel(range, dimensionUnit)}
+                                      </SelectItem>
+                                    )
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="text-sm text-muted-foreground py-2 px-3 bg-muted/50 rounded-md">
+                                No height ranges available for this configuration
+                              </div>
+                            )}
                           </div>
+                          
                           <div className="space-y-2">
-                            <Label>Weight ({weightUnit})</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={item.weight || ""}
-                              onChange={(event) =>
-                                updatePalletItem(item.id, {
-                                  weight: Number(event.target.value) || 0,
-                                })
-                              }
-                            />
+                            <Label className="text-xs text-muted-foreground">Weight Range ({weightUnit})</Label>
+                            {weightRanges.length > 0 ? (
+                              <Select 
+                                value={item.weightRangeId} 
+                                onValueChange={(value) => updatePalletType(item.id, { weightRangeId: value })}
+                              >
+                                <SelectTrigger className={!item.weightRangeId ? "border-orange-300" : ""}>
+                                  <SelectValue placeholder="Select weight range" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {weightRanges.map((range) => {
+                                    const rangeId = range.id || `${range.weightMinKg}-${range.weightMaxKg}`
+                                    return (
+                                      <SelectItem key={rangeId} value={rangeId}>
+                                        {getWeightRangeLabel(range, weightUnit)}
+                                      </SelectItem>
+                                    )
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="text-sm text-muted-foreground py-2 px-3 bg-muted/50 rounded-md">
+                                No weight ranges available for this configuration
+                              </div>
+                            )}
                           </div>
                         </div>
+                        
+                        {/* Unstackable Notice */}
+                        {item.stacking === "unstackable" && (
+                          <Alert>
+                            <Info className="h-4 w-4" />
+                            <AlertDescription className="text-xs">
+                              Unstackable pallets may have additional charges based on warehouse pricing.
+                            </AlertDescription>
+                          </Alert>
+                        )}
                       </div>
                     )
                   })}
 
-                  <div className="flex items-center justify-between">
-                    <Button type="button" variant="outline" onClick={addPalletItem}>
+                  <div className="flex items-center justify-between pt-2">
+                    <Button type="button" variant="outline" onClick={addPalletType}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Pallet Size
+                      Add Another Pallet Type
                     </Button>
                     <Badge variant={totalPalletQuantity === quantity ? "default" : "destructive"}>
-                      Total: {totalPalletQuantity} / {quantity}
+                      Total: {totalPalletQuantity} / {quantity} pallets
                     </Badge>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Select Date and Time
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Time Slots - On Top */}
-                {selectedDay && selectedDay.isAvailable ? (
+            {/* Step 2 (or Step 1 for area-rental): Date & Time Selection */}
+            {(type === "area-rental" || (type === "pallet" && currentStep === 2)) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Select Date and Time
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Time Slots */}
+                  {selectedDay && selectedDay.isAvailable ? (
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Available Time Slots for {selectedDay ? formatDate(selectedDay.date) : "..."}
+                      </label>
+                      {loadingTimeSlots ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                          <span className="text-sm text-muted-foreground">Loading available times...</span>
+                        </div>
+                      ) : selectedDay.timeSlots && selectedDay.timeSlots.length > 0 ? (
+                        <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
+                          {selectedDay.timeSlots.map((slot) => (
+                            <button
+                              key={slot.time}
+                              onClick={() => setSelectedTime(slot.time)}
+                              disabled={!slot.available}
+                              className={`p-3 rounded-lg border text-sm transition-colors ${
+                                selectedTime === slot.time
+                                  ? "border-primary bg-primary text-primary-foreground font-medium"
+                                  : slot.available
+                                  ? "border-border hover:bg-muted hover:border-primary/50"
+                                  : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
+                              }`}
+                            >
+                              <Clock className="h-4 w-4 inline-block mr-1" />
+                              {slot.time}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg bg-muted/30">
+                          No available time slots for this date
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedDay && !selectedDay.isAvailable ? (
+                    <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg bg-muted/30">
+                      This date is not available (not a working day)
+                    </div>
+                  ) : null}
+
+                  <Separator />
+
+                  {/* Date Navigation */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Available Time Slots for {selectedDay ? formatDate(selectedDay.date) : "..."}
-                    </label>
-                    {loadingTimeSlots ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        <span className="text-sm text-muted-foreground">Loading available times...</span>
-                      </div>
-                    ) : selectedDay.timeSlots && selectedDay.timeSlots.length > 0 ? (
-                      <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
-                        {selectedDay.timeSlots.map((slot) => (
-                          <button
-                            key={slot.time}
-                            onClick={() => setSelectedTime(slot.time)}
-                            disabled={!slot.available}
-                            className={`p-3 rounded-lg border text-sm transition-colors ${
-                              selectedTime === slot.time
-                                ? "border-primary bg-primary text-primary-foreground font-medium"
-                                : slot.available
-                                ? "border-border hover:bg-muted hover:border-primary/50"
-                                : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
-                            }`}
-                          >
-                            <Clock className="h-4 w-4 inline-block mr-1" />
-                            {slot.time}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg bg-muted/30">
-                        No available time slots for this date
-                      </div>
-                    )}
-                  </div>
-                ) : selectedDay && !selectedDay.isAvailable ? (
-                  <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg bg-muted/30">
-                    This date is not available (not a working day)
-                  </div>
-                ) : null}
-
-                <Separator />
-
-                {/* Date Navigation - Previous, Current, Next */}
-                <div>
-                  <label className="text-sm font-medium mb-3 block">Select Date</label>
-                  <div className="flex items-center justify-center gap-4">
-                    {/* Previous Date */}
-                    {previousDay && (
-                      <button
-                        onClick={handlePreviousDate}
-                        disabled={!previousDay.isAvailable}
-                        className={`flex flex-col items-center p-4 rounded-lg border transition-colors min-w-[100px] ${
-                          previousDay.isAvailable
-                            ? "border-border hover:bg-muted cursor-pointer"
-                            : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
-                        }`}
-                      >
-                        <ChevronLeft className="h-4 w-4 text-muted-foreground mb-1" />
-                        <div className="text-xs text-muted-foreground">
-                          {previousDay.dayName.substring(0, 3)}
-                        </div>
-                        <div className="text-sm font-medium">
-                          {new Date(previousDay.date).getDate()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(previousDay.date).split(',')[0]}
-                        </div>
-                      </button>
-                    )}
-
-                    {/* Current Selected Date */}
-                    {selectedDay && (
-                      <button
-                        className="flex flex-col items-center p-6 rounded-lg border-2 border-primary bg-primary/5 min-w-[140px] cursor-default"
-                      >
-                        <div className="text-sm font-semibold text-primary mb-1">
-                          {selectedDay.dayName}
-                        </div>
-                        <div className="text-2xl font-bold text-primary mb-1">
-                          {new Date(selectedDay.date).getDate()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(selectedDay.date)}
-                        </div>
-                        {!selectedDay.isAvailable && (
-                          <Badge variant="secondary" className="mt-2 text-xs">
-                            Not Available
-                          </Badge>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Next Date */}
-                    {nextDay && (
-                      <button
-                        onClick={handleNextDate}
-                        disabled={!nextDay.isAvailable}
-                        className={`flex flex-col items-center p-4 rounded-lg border transition-colors min-w-[100px] ${
-                          nextDay.isAvailable
-                            ? "border-border hover:bg-muted cursor-pointer"
-                            : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
-                        }`}
-                      >
-                        <ChevronRight className="h-4 w-4 text-muted-foreground mb-1" />
-                        <div className="text-xs text-muted-foreground">
-                          {nextDay.dayName.substring(0, 3)}
-                        </div>
-                        <div className="text-sm font-medium">
-                          {new Date(nextDay.date).getDate()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(nextDay.date).split(',')[0]}
-                        </div>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* All Available Dates - Scrollable List */}
-                  <div className="mt-4">
-                    <label className="text-xs text-muted-foreground mb-2 block">Or select from all available dates:</label>
-                    <div className="grid grid-cols-4 gap-2 max-h-[120px] overflow-y-auto">
-                      {dayAvailabilities.map((day, index) => (
+                    <label className="text-sm font-medium mb-3 block">Select Date</label>
+                    <div className="flex items-center justify-center gap-4">
+                      {previousDay && (
                         <button
-                          key={`${day.date}-${index}`}
                           onClick={() => {
-                            if (day.isAvailable) {
-                              setSelectedDate(day.date)
+                            if (previousDay.isAvailable) {
+                              setSelectedDate(previousDay.date)
                               setSelectedTime("")
                             }
                           }}
-                          disabled={!day.isAvailable}
-                          className={`p-2 rounded-lg border text-xs transition-colors ${
-                            selectedDate === day.date
-                              ? "border-primary bg-primary/5 font-medium"
-                              : day.isAvailable
-                              ? "border-border hover:bg-muted"
+                          disabled={!previousDay.isAvailable}
+                          className={`flex flex-col items-center p-4 rounded-lg border transition-colors min-w-[100px] ${
+                            previousDay.isAvailable
+                              ? "border-border hover:bg-muted cursor-pointer"
                               : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
                           }`}
                         >
-                          <div className="font-medium">{day.dayName.substring(0, 3)}</div>
-                          <div className="text-muted-foreground">
-                            {new Date(day.date).getDate()}
+                          <ChevronLeft className="h-4 w-4 text-muted-foreground mb-1" />
+                          <div className="text-xs text-muted-foreground">
+                            {previousDay.dayName.substring(0, 3)}
+                          </div>
+                          <div className="text-sm font-medium">
+                            {new Date(previousDay.date).getDate()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(previousDay.date).split(',')[0]}
                           </div>
                         </button>
-                      ))}
+                      )}
+
+                      {selectedDay && (
+                        <button
+                          className="flex flex-col items-center p-6 rounded-lg border-2 border-primary bg-primary/5 min-w-[140px] cursor-default"
+                        >
+                          <div className="text-sm font-semibold text-primary mb-1">
+                            {selectedDay.dayName}
+                          </div>
+                          <div className="text-2xl font-bold text-primary mb-1">
+                            {new Date(selectedDay.date).getDate()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(selectedDay.date)}
+                          </div>
+                          {!selectedDay.isAvailable && (
+                            <Badge variant="secondary" className="mt-2 text-xs">
+                              Not Available
+                            </Badge>
+                          )}
+                        </button>
+                      )}
+
+                      {nextDay && (
+                        <button
+                          onClick={() => {
+                            if (nextDay.isAvailable) {
+                              setSelectedDate(nextDay.date)
+                              setSelectedTime("")
+                            }
+                          }}
+                          disabled={!nextDay.isAvailable}
+                          className={`flex flex-col items-center p-4 rounded-lg border transition-colors min-w-[100px] ${
+                            nextDay.isAvailable
+                              ? "border-border hover:bg-muted cursor-pointer"
+                              : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
+                          }`}
+                        >
+                          <ChevronRight className="h-4 w-4 text-muted-foreground mb-1" />
+                          <div className="text-xs text-muted-foreground">
+                            {nextDay.dayName.substring(0, 3)}
+                          </div>
+                          <div className="text-sm font-medium">
+                            {new Date(nextDay.date).getDate()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(nextDay.date).split(',')[0]}
+                          </div>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* All Dates Grid */}
+                    <div className="mt-4">
+                      <label className="text-xs text-muted-foreground mb-2 block">Or select from all available dates:</label>
+                      <div className="grid grid-cols-5 gap-2 max-h-[120px] overflow-y-auto">
+                        {dayAvailabilities.map((day, index) => (
+                          <button
+                            key={`${day.date}-${index}`}
+                            onClick={() => {
+                              if (day.isAvailable) {
+                                setSelectedDate(day.date)
+                                setSelectedTime("")
+                              }
+                            }}
+                            disabled={!day.isAvailable}
+                            className={`p-2 rounded-lg border text-xs transition-colors ${
+                              selectedDate === day.date
+                                ? "border-primary bg-primary/5 font-medium"
+                                : day.isAvailable
+                                ? "border-border hover:bg-muted"
+                                : "border-border bg-muted/50 opacity-50 cursor-not-allowed"
+                            }`}
+                          >
+                            <div className="font-medium">{day.dayName.substring(0, 3)}</div>
+                            <div className="text-muted-foreground">
+                              {new Date(day.date).getDate()}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Selected Date and Time Display */}
-                {selectedDate && selectedTime && (
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Selected:</span>
-                      <span className="font-medium">
-                        {formatDate(selectedDate)} at {selectedTime}
-                      </span>
+                  {/* Selected Summary */}
+                  {selectedDate && selectedTime && (
+                    <div className="pt-4 border-t">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-muted-foreground">Selected:</span>
+                        <span className="font-medium">
+                          {formatDate(selectedDate)} at {selectedTime}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Responsibility Notice - Always Visible */}
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    {selectedTime 
-                      ? `You are responsible for delivering your items to the warehouse at the selected time (${selectedTime}).`
-                      : "You are responsible for delivering your items to the warehouse at the selected time."
-                    }
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      {selectedTime 
+                        ? `You are responsible for delivering your items to the warehouse at the selected time (${selectedTime}).`
+                        : "You are responsible for delivering your items to the warehouse at the selected time."
+                      }
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-            {/* Confirm Button */}
+          {/* Right: Booking Summary (1 column) */}
+          <div className="space-y-4">
+            <BookingSummary
+              warehouseId={warehouse.id}
+              type={type}
+              quantity={quantity}
+              startDate={startDate}
+              endDate={endDate}
+              palletDetails={
+                type === "pallet" && palletTypes.length > 0 ? buildPalletDetails() : undefined
+              }
+            />
+
+            {/* Navigation Buttons */}
             <div className="space-y-2">
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleConfirm}
-                disabled={!selectedDate || !selectedTime || submitting || loadingTimeSlots}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating Booking...
-                  </>
-                ) : (
-                  "Confirm Booking"
+              {/* Step Navigation */}
+              <div className="flex gap-2">
+                {currentStep > 1 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleBack}
+                    className="flex-1"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
                 )}
-              </Button>
+                
+                {currentStep < totalSteps ? (
+                  <Button
+                    onClick={handleNext}
+                    className="flex-1"
+                    disabled={type === "pallet" && currentStep === 1 && !!validatePalletDetails()}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                ) : (
+                  <Button
+                    className="flex-1"
+                    onClick={handleConfirm}
+                    disabled={!selectedDate || !selectedTime || submitting || loadingTimeSlots}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Confirm Booking"
+                    )}
+                  </Button>
+                )}
+              </div>
               
-              {(!selectedDate || !selectedTime) && !loadingTimeSlots && (
+              {/* Helper Text */}
+              {currentStep === totalSteps && (!selectedDate || !selectedTime) && !loadingTimeSlots && (
                 <p className="text-xs text-center text-muted-foreground">
                   {!selectedDate 
                     ? "Please select a date to continue"
@@ -824,9 +1015,9 @@ export function BookingTimeSlotModal({
                 </p>
               )}
               
-              {selectedDate && selectedTime && (
+              {currentStep === totalSteps && selectedDate && selectedTime && (
                 <p className="text-xs text-center text-muted-foreground">
-                  Your booking will be created with status "pending". Warehouse staff will review and confirm.
+                  Your booking will be created with status &quot;pending&quot;. Warehouse staff will review and confirm.
                 </p>
               )}
             </div>
@@ -836,4 +1027,3 @@ export function BookingTimeSlotModal({
     </Dialog>
   )
 }
-

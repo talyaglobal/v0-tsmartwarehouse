@@ -100,8 +100,8 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts),
       warehouse_pallet_pricing(
         id, pallet_type, pricing_period, goods_type, stackable, stackable_adjustment_type, stackable_adjustment_value, unstackable_adjustment_type, unstackable_adjustment_value, custom_length_cm, custom_width_cm, custom_height_cm,
-        warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
-        warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet),
+        warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit, unstackable_method, unstackable_value),
+        warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet, unstackable_method, unstackable_value),
         warehouse_custom_pallet_sizes(
           id,
           length_cm,
@@ -114,7 +114,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
           stackable_adjustment_value,
           unstackable_adjustment_type,
           unstackable_adjustment_value,
-          warehouse_custom_pallet_size_height_pricing(id, height_min_cm, height_max_cm, price_per_unit)
+          warehouse_custom_pallet_size_height_pricing(id, height_min_cm, height_max_cm, price_per_unit, unstackable_method, unstackable_value)
         )
       ),
       warehouse_floors(
@@ -342,14 +342,18 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
       const heightPricing = (pp.warehouse_pallet_height_pricing || []).map((hp: any) => ({
         id: hp.id,
         heightMinCm: hp.height_min_cm,
-        heightMaxCm: hp.height_max_cm,
+        heightMaxCm: hp.height_max_cm != null ? hp.height_max_cm : undefined,
         pricePerUnit: parseFloat(hp.price_per_unit.toString()),
+        unstackableMethod: hp.unstackable_method || 'rate',
+        unstackableValue: hp.unstackable_value != null ? parseFloat(hp.unstackable_value.toString()) : 0,
       }))
       const weightPricing = (pp.warehouse_pallet_weight_pricing || []).map((wp: any) => ({
         id: wp.id,
         weightMinKg: parseFloat(wp.weight_min_kg.toString()),
-        weightMaxKg: parseFloat(wp.weight_max_kg.toString()),
+        weightMaxKg: wp.weight_max_kg != null ? parseFloat(wp.weight_max_kg.toString()) : undefined,
         pricePerPallet: parseFloat(wp.price_per_pallet.toString()),
+        unstackableMethod: wp.unstackable_method || 'rate',
+        unstackableValue: wp.unstackable_value != null ? parseFloat(wp.unstackable_value.toString()) : 0,
       }))
       const customSizes = (pp.warehouse_custom_pallet_sizes || []).map((size: any) => ({
         id: size.id,
@@ -364,8 +368,10 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
         heightRanges: (size.warehouse_custom_pallet_size_height_pricing || []).map((hr: any) => ({
           id: hr.id,
           heightMinCm: hr.height_min_cm,
-          heightMaxCm: hr.height_max_cm,
+          heightMaxCm: hr.height_max_cm != null ? hr.height_max_cm : undefined,
           pricePerUnit: parseFloat(hr.price_per_unit.toString()),
+          unstackableMethod: hr.unstackable_method || 'rate',
+          unstackableValue: hr.unstackable_value != null ? parseFloat(hr.unstackable_value.toString()) : 0,
         })),
       }))
 
