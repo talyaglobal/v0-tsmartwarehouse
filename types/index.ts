@@ -92,7 +92,7 @@ export interface CustomPalletDimensions {
 export interface HeightRangePricing {
   id?: string
   heightMinCm: number // Minimum height in inches (inclusive) - keeping name for backward compatibility
-  heightMaxCm: number // Maximum height in inches (exclusive) - keeping name for backward compatibility
+  heightMaxCm?: number // Maximum height in inches (exclusive), undefined = infinity
   pricePerUnit: number // Price per pallet for this height range (Stackable)
   unstackableMethod?: 'rate' | 'plus_per_unit' // Method to calculate unstackable price
   unstackableValue?: number // Value for unstackable calculation (% or fixed amount)
@@ -101,7 +101,7 @@ export interface HeightRangePricing {
 export interface WeightRangePricing {
   id?: string
   weightMinKg: number // Minimum weight in lbs (inclusive) - keeping name for backward compatibility
-  weightMaxKg: number // Maximum weight in lbs (exclusive) - keeping name for backward compatibility
+  weightMaxKg?: number // Maximum weight in lbs (exclusive), undefined = infinity
   pricePerPallet: number // Price per pallet for this weight range (Stackable)
   unstackableMethod?: 'rate' | 'plus_per_unit' // Method to calculate unstackable price
   unstackableValue?: number // Value for unstackable calculation (% or fixed amount)

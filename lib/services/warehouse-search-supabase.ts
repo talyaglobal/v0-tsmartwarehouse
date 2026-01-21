@@ -181,6 +181,8 @@ export async function searchWarehouses(
           available_sq_ft: wh.available_sq_ft || 0,
           total_pallet_storage: wh.total_pallet_storage || 0,
           available_pallet_storage: wh.available_pallet_storage || 0,
+          min_sq_ft: wh.min_sq_ft || undefined,
+          max_sq_ft: wh.max_sq_ft || undefined,
           goods_type: wh.goods_type || '',
           storage_type: wh.storage_type || '',
           temperature_types: wh.temperature_types || [],
@@ -215,10 +217,10 @@ export async function searchWarehouses(
           .select('warehouse_id, average_rating, total_reviews')
           .in('warehouse_id', warehouseIds)
 
-        // Get company info and rent_methods
+        // Get company info, rent_methods, and min/max sq_ft
         const { data: warehouseData } = await supabase
           .from('warehouses')
-          .select('id, owner_company_id, rent_methods, companies(id, name, logo_url, verification_status)')
+          .select('id, owner_company_id, rent_methods, min_sq_ft, max_sq_ft, companies(id, name, logo_url, verification_status)')
           .in('id', warehouseIds)
 
         // Merge data
@@ -244,6 +246,8 @@ export async function searchWarehouses(
             min_price: minPrice,
             pricing,
             rent_methods: warehouse?.rent_methods || [],
+            min_sq_ft: warehouse?.min_sq_ft || wh.min_sq_ft || undefined,
+            max_sq_ft: warehouse?.max_sq_ft || wh.max_sq_ft || undefined,
             average_rating: review?.average_rating ? parseFloat(review.average_rating) : 0,
             total_reviews: review?.total_reviews || 0,
             company_name: company?.name || '',
@@ -301,6 +305,26 @@ export async function searchWarehouses(
         })
       }
 
+      // Filter for area-rental (Space Storage) with min/max sqft logic
+      if (params.type === 'area-rental' && params.quantity) {
+        const requestedSqFt = params.quantity
+        results = results.filter((w: any) => {
+          const minSqFt = w.min_sq_ft
+          const maxSqFt = w.max_sq_ft
+          const totalSqFt = w.total_sq_ft || 0
+          
+          // If min/max limits are set, check if requested amount is within range
+          if (minSqFt != null || maxSqFt != null) {
+            const meetsMin = minSqFt == null || requestedSqFt >= minSqFt
+            const meetsMax = maxSqFt == null || requestedSqFt <= maxSqFt
+            return meetsMin && meetsMax
+          }
+          
+          // If no limits set, warehouse capacity must meet customer's requirements
+          return totalSqFt >= requestedSqFt
+        })
+      }
+
       // Sorting
       const sortBy = params.sort_by || 'distance'
       const sortOrder = params.sort_order || 'asc'
@@ -349,6 +373,8 @@ export async function searchWarehouses(
         available_sq_ft,
         total_pallet_storage,
         available_pallet_storage,
+        min_sq_ft,
+        max_sq_ft,
         goods_type,
         storage_type,
         temperature_types,

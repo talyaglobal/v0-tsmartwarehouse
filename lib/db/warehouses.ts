@@ -154,6 +154,20 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
     throw new Error(`Failed to fetch warehouse: ${error.message}`)
   }
 
+  // Debug: Log raw pallet pricing data from database
+  console.log('[DB] Raw warehouse_pallet_pricing count:', data?.warehouse_pallet_pricing?.length || 0)
+  if (data?.warehouse_pallet_pricing?.length > 0) {
+    const first = data.warehouse_pallet_pricing[0]
+    console.log('[DB] First raw pallet pricing:', {
+      id: first.id,
+      pallet_type: first.pallet_type,
+      pricing_period: first.pricing_period,
+      goods_type: first.goods_type,
+      height_pricing_count: first.warehouse_pallet_height_pricing?.length || 0,
+      weight_pricing_count: first.warehouse_pallet_weight_pricing?.length || 0,
+    })
+  }
+
   return transformWarehouseRow(data)
 }
 
@@ -250,6 +264,38 @@ export async function updateWarehouse(
   if (updates.zipCode !== undefined) updateData.zip_code = updates.zipCode
   if (updates.totalSqFt !== undefined) updateData.total_sq_ft = updates.totalSqFt
   if (updates.totalPalletStorage !== undefined) updateData.total_pallet_storage = updates.totalPalletStorage
+
+  // If total capacity is being updated, we need to ensure available doesn't exceed the new total
+  // First, get current warehouse data to check available values
+  if (updates.totalSqFt !== undefined || updates.totalPalletStorage !== undefined) {
+    const { data: currentWarehouse } = await supabase
+      .from('warehouses')
+      .select('total_sq_ft, available_sq_ft, total_pallet_storage, available_pallet_storage')
+      .eq('id', id)
+      .single()
+    
+    if (currentWarehouse) {
+      // If totalSqFt is updated, ensure available_sq_ft doesn't exceed new total
+      if (updates.totalSqFt !== undefined) {
+        const newTotal = updates.totalSqFt
+        const currentAvailable = currentWarehouse.available_sq_ft ?? currentWarehouse.total_sq_ft
+        // If available > new total, cap it. If available was equal to old total (no rentals), set to new total
+        if (currentAvailable > newTotal || currentAvailable === currentWarehouse.total_sq_ft) {
+          updateData.available_sq_ft = newTotal
+        }
+      }
+      
+      // If totalPalletStorage is updated, ensure available_pallet_storage doesn't exceed new total
+      if (updates.totalPalletStorage !== undefined) {
+        const newTotal = updates.totalPalletStorage
+        const currentAvailable = currentWarehouse.available_pallet_storage ?? currentWarehouse.total_pallet_storage
+        // If available > new total, cap it. If available was equal to old total (no rentals), set to new total
+        if (currentAvailable > newTotal || currentAvailable === currentWarehouse.total_pallet_storage) {
+          updateData.available_pallet_storage = newTotal
+        }
+      }
+    }
+  }
   if (updates.latitude !== undefined) updateData.latitude = updates.latitude
   if (updates.longitude !== undefined) updateData.longitude = updates.longitude
   if (updates.warehouseType !== undefined) updateData.goods_type = Array.isArray(updates.warehouseType) ? updates.warehouseType : [updates.warehouseType || 'general-dry-ambient'] // Now array
@@ -355,7 +401,17 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
         unstackableMethod: wp.unstackable_method || 'rate',
         unstackableValue: wp.unstackable_value != null ? parseFloat(wp.unstackable_value.toString()) : 0,
       }))
-      const customSizes = (pp.warehouse_custom_pallet_sizes || []).map((size: any) => ({
+      const rawCustomSizes = pp.warehouse_custom_pallet_sizes || []
+      if (pp.pallet_type === 'custom' && rawCustomSizes.length > 0) {
+        console.log(`[DB] Custom pallet ${pp.pricing_period} - raw custom sizes:`, rawCustomSizes.length, 
+          rawCustomSizes[0] ? {
+            id: rawCustomSizes[0].id,
+            lengthMinCm: rawCustomSizes[0].length_min_cm,
+            lengthMaxCm: rawCustomSizes[0].length_max_cm,
+            heightPricingCount: rawCustomSizes[0].warehouse_custom_pallet_size_height_pricing?.length || 0
+          } : 'empty')
+      }
+      const customSizes = rawCustomSizes.map((size: any) => ({
         id: size.id,
         lengthMin: size.length_min_cm ?? size.length_cm,
         lengthMax: size.length_max_cm ?? size.length_cm,

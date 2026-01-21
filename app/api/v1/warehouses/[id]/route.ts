@@ -6,6 +6,7 @@ import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
 import { z } from "zod"
 
 const freeStorageRuleSchema = z.object({
@@ -193,6 +194,19 @@ export async function GET(
         { success: false, error: "Warehouse not found" },
         { status: 404 }
       )
+    }
+
+    // Debug: Log palletPricing data
+    console.log('[GET API] palletPricing count:', (warehouse as any).palletPricing?.length || 0)
+    if ((warehouse as any).palletPricing?.length > 0) {
+      const firstEntry = (warehouse as any).palletPricing[0]
+      console.log('[GET API] First entry:', {
+        palletType: firstEntry.palletType,
+        pricingPeriod: firstEntry.pricingPeriod,
+        goodsType: firstEntry.goodsType,
+        heightRangesCount: firstEntry.heightRanges?.length || 0,
+        weightRangesCount: firstEntry.weightRanges?.length || 0,
+      })
     }
 
     return NextResponse.json({
@@ -439,6 +453,25 @@ export async function PUT(
     if (validated.ports !== undefined) updateData.ports = validated.ports
     if (validated.state !== undefined) updateData.state = validated.state
 
+    // Regenerate warehouse name if city, warehouseType, or state is updated
+    if (validated.city !== undefined || validated.warehouseType !== undefined || validated.state !== undefined) {
+      // Get existing warehouse data for fields that aren't being updated
+      const existingWarehouse = await getWarehouseByIdFromDb(warehouseId)
+      
+      const city = validated.city ?? existingWarehouse?.city ?? ''
+      const state = validated.state ?? (existingWarehouse as any)?.state ?? ''
+      const warehouseType = validated.warehouseType ?? (existingWarehouse as any)?.warehouseType ?? ['general']
+      
+      // Generate new name based on updated values
+      const newName = generateWarehouseName(
+        city,
+        Array.isArray(warehouseType) ? warehouseType[0] : warehouseType || 'general',
+        state
+      )
+      updateData.name = newName
+      console.log('[EDIT API] Regenerated warehouse name:', newName)
+    }
+
     // Update warehouse
     const updatedWarehouse = await updateWarehouse(warehouseId, updateData)
 
@@ -471,34 +504,66 @@ export async function PUT(
     // If palletPricing is undefined, don't touch existing records
     // If palletPricing is an empty array, delete all existing records
     // If palletPricing has entries, replace all existing records
+    console.log('[EDIT API] palletPricing received:', validated.palletPricing ? `${validated.palletPricing.length} entries` : 'undefined')
+    
     if (validated.palletPricing !== undefined) {
+      console.log('[EDIT API] Processing pallet pricing update...')
       const supabase = createServerSupabaseClient()
       
       // Get existing pallet pricing IDs to delete related records
-      const { data: existingPalletPricing } = await supabase
+      const { data: existingPalletPricing, error: fetchError } = await supabase
         .from('warehouse_pallet_pricing')
         .select('id')
         .eq('warehouse_id', warehouseId)
+      
+      console.log('[EDIT API] Existing pallet pricing:', existingPalletPricing?.length || 0, 'records, fetchError:', fetchError?.message)
 
       if (existingPalletPricing && existingPalletPricing.length > 0) {
         const palletPricingIds = existingPalletPricing.map(p => p.id)
+        console.log('[EDIT API] Deleting existing pallet pricing IDs:', palletPricingIds)
+        
+        // Delete custom pallet size height pricing first
+        const { error: customSizeHeightDeleteError } = await supabase
+          .from('warehouse_custom_pallet_size_height_pricing')
+          .delete()
+          .in('custom_pallet_size_id', 
+            (await supabase
+              .from('warehouse_custom_pallet_sizes')
+              .select('id')
+              .in('pallet_pricing_id', palletPricingIds)
+            ).data?.map((s: any) => s.id) || []
+          )
+        
+        // Delete custom pallet sizes
+        const { error: customSizeDeleteError } = await supabase
+          .from('warehouse_custom_pallet_sizes')
+          .delete()
+          .in('pallet_pricing_id', palletPricingIds)
         
         // Delete height and weight pricing
-        await supabase
+        const { error: heightDeleteError } = await supabase
           .from('warehouse_pallet_height_pricing')
           .delete()
           .in('pallet_pricing_id', palletPricingIds)
         
-        await supabase
+        const { error: weightDeleteError } = await supabase
           .from('warehouse_pallet_weight_pricing')
           .delete()
           .in('pallet_pricing_id', palletPricingIds)
         
         // Delete base pallet pricing
-        await supabase
+        const { error: baseDeleteError } = await supabase
           .from('warehouse_pallet_pricing')
           .delete()
           .eq('warehouse_id', warehouseId)
+        
+        console.log('[EDIT API] Delete results:', {
+          customSizeHeightDeleteError: customSizeHeightDeleteError?.message,
+          customSizeDeleteError: customSizeDeleteError?.message,
+          heightDeleteError: heightDeleteError?.message,
+          weightDeleteError: weightDeleteError?.message,
+          baseDeleteError: baseDeleteError?.message,
+        })
       }
 
       // Only insert new records if array is not empty
@@ -555,6 +620,17 @@ export async function PUT(
             continue
           }
 
+          // Log custom sizes for debugging
+          if (palletPrice.palletType === 'custom') {
+            console.log(`[EDIT API] Custom pallet ${palletPrice.pricingPeriod} - customSizes:`, 
+              palletPrice.customSizes ? `${palletPrice.customSizes.length} sizes` : 'undefined',
+              palletPrice.customSizes?.[0] ? {
+                lengthMin: palletPrice.customSizes[0].lengthMin,
+                lengthMax: palletPrice.customSizes[0].lengthMax,
+                heightRangesCount: palletPrice.customSizes[0].heightRanges?.length || 0
+              } : 'no size data')
+          }
+
           if (palletPrice.palletType === 'custom' && palletPrice.customSizes && palletPrice.customSizes.length > 0) {
             const { data: sizeRows, error: sizeError } = await supabase
               .from('warehouse_custom_pallet_sizes')
@@ -593,59 +669,80 @@ export async function PUT(
                 }))
               })
               if (heightRows.length > 0) {
-                await supabase.from('warehouse_custom_pallet_size_height_pricing').insert(heightRows)
+                console.log(`[EDIT API] Inserting ${heightRows.length} custom size height ranges`)
+                const { error: customHeightError } = await supabase.from('warehouse_custom_pallet_size_height_pricing').insert(heightRows)
+                if (customHeightError) {
+                  console.error('[EDIT API] Error inserting custom size height pricing:', customHeightError.message)
+                } else {
+                  console.log(`[EDIT API] Successfully inserted custom size height pricing`)
+                }
+              } else {
+                console.log(`[EDIT API] No custom size height ranges to insert`)
               }
             }
           }
 
           // Insert height range pricing
           if (palletPrice.heightRanges && palletPrice.heightRanges.length > 0) {
-            await supabase.from('warehouse_pallet_height_pricing').insert(
-              palletPrice.heightRanges.map(range => ({
-                pallet_pricing_id: palletPricingRecord.id,
-                height_min_cm: range.heightMinCm,
-                height_max_cm: range.heightMaxCm,
-                price_per_unit: range.pricePerUnit,
-                unstackable_method: range.unstackableMethod || 'rate',
-                unstackable_value: range.unstackableValue ?? 0,
-                status: true,
-              }))
-            )
+            console.log(`[EDIT API] Inserting ${palletPrice.heightRanges.length} height ranges for ${palletPrice.palletType} ${palletPrice.pricingPeriod}`)
+            const heightData = palletPrice.heightRanges.map(range => ({
+              pallet_pricing_id: palletPricingRecord.id,
+              height_min_cm: range.heightMinCm,
+              height_max_cm: range.heightMaxCm !== undefined ? range.heightMaxCm : null,
+              price_per_unit: range.pricePerUnit,
+              unstackable_method: range.unstackableMethod || 'rate',
+              unstackable_value: range.unstackableValue ?? 0,
+              status: true,
+            }))
+            console.log('[EDIT API] Height data sample:', JSON.stringify(heightData[0]))
+            const { error: heightError } = await supabase.from('warehouse_pallet_height_pricing').insert(heightData)
+            if (heightError) {
+              console.error('[EDIT API] Error inserting height pricing:', heightError.message, heightError.details, heightError.hint)
+            }
+          } else {
+            console.log(`[EDIT API] No height ranges for ${palletPrice.palletType} ${palletPrice.pricingPeriod}`)
           }
 
           // Insert weight range pricing
           if (palletPrice.weightRanges && palletPrice.weightRanges.length > 0) {
-            await supabase.from('warehouse_pallet_weight_pricing').insert(
-              palletPrice.weightRanges.map(range => ({
-                pallet_pricing_id: palletPricingRecord.id,
-                weight_min_kg: range.weightMinKg,
-                weight_max_kg: range.weightMaxKg,
-                price_per_pallet: range.pricePerPallet,
-                unstackable_method: range.unstackableMethod || 'rate',
-                unstackable_value: range.unstackableValue ?? 0,
-                status: true,
-              }))
-            )
+            console.log(`[EDIT API] Inserting ${palletPrice.weightRanges.length} weight ranges for ${palletPrice.palletType} ${palletPrice.pricingPeriod}`)
+            const weightData = palletPrice.weightRanges.map(range => ({
+              pallet_pricing_id: palletPricingRecord.id,
+              weight_min_kg: range.weightMinKg,
+              weight_max_kg: range.weightMaxKg !== undefined ? range.weightMaxKg : null,
+              price_per_pallet: range.pricePerPallet,
+              unstackable_method: range.unstackableMethod || 'rate',
+              unstackable_value: range.unstackableValue ?? 0,
+              status: true,
+            }))
+            const { error: weightError } = await supabase.from('warehouse_pallet_weight_pricing').insert(weightData)
+            if (weightError) {
+              console.error('[EDIT API] Error inserting weight pricing:', weightError.message, weightError.details, weightError.hint)
+            }
+          } else {
+            console.log(`[EDIT API] No weight ranges for ${palletPrice.palletType} ${palletPrice.pricingPeriod}`)
           }
         }
       }
+    }
 
     if (validated.floorPlans) {
-      const { data: existingFloors } = await supabase
+      const supabaseFloors = createServerSupabaseClient()
+      const { data: existingFloors } = await supabaseFloors
         .from('warehouse_floors')
         .select('id')
         .eq('warehouse_id', warehouseId)
 
       const floorIds = (existingFloors || []).map((floor) => floor.id)
       if (floorIds.length > 0) {
-        await supabase.from('warehouse_floor_zones').delete().in('floor_id', floorIds)
-        await supabase.from('warehouse_floor_aisle_defs').delete().in('floor_id', floorIds)
-        await supabase.from('warehouse_floor_pallet_layouts').delete().in('floor_id', floorIds)
-        await supabase.from('warehouse_floors').delete().in('id', floorIds)
+        await supabaseFloors.from('warehouse_floor_zones').delete().in('floor_id', floorIds)
+        await supabaseFloors.from('warehouse_floor_aisle_defs').delete().in('floor_id', floorIds)
+        await supabaseFloors.from('warehouse_floor_pallet_layouts').delete().in('floor_id', floorIds)
+        await supabaseFloors.from('warehouse_floors').delete().in('id', floorIds)
       }
 
       if (validated.floorPlans.length > 0) {
-        const { data: floorRows, error: floorError } = await supabase
+        const { data: floorRows, error: floorError } = await supabaseFloors
           .from('warehouse_floors')
           .insert(
             validated.floorPlans.map((floor) => ({
@@ -692,7 +789,7 @@ export async function PUT(
             }))
           })
           if (zoneRows.length > 0) {
-            await supabase.from('warehouse_floor_zones').insert(zoneRows)
+            await supabaseFloors.from('warehouse_floor_zones').insert(zoneRows)
           }
 
           const aisleRows = floorRows.flatMap((floorRow, index) => {
@@ -705,11 +802,10 @@ export async function PUT(
             ]
           })
           if (aisleRows.length > 0) {
-            await supabase.from('warehouse_floor_aisle_defs').insert(aisleRows)
+            await supabaseFloors.from('warehouse_floor_aisle_defs').insert(aisleRows)
           }
         }
       }
-    }
     }
 
     const responseData: ApiResponse = {

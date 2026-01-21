@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ArrowLeft, ArrowRight, Save, CheckCircle2 } from "lucide-react"
+import { Loader2, ArrowLeft, ArrowRight, Save, CheckCircle2, MapPin } from "lucide-react"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
@@ -143,6 +143,35 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
       ...prev,
       freeStorageRules: prev.freeStorageRules.filter((_, i) => i !== index),
     }))
+  }
+
+  // Helper function to convert duration to days for comparison
+  const convertToDays = (value: number, unit: 'day' | 'week' | 'month'): number => {
+    switch (unit) {
+      case 'day': return value
+      case 'week': return value * 7
+      case 'month': return value * 30
+      default: return value
+    }
+  }
+
+  // Validate if free amount exceeds min duration
+  const isFreeAmountExceedsMinDuration = (rule: {
+    minDuration: string
+    durationUnit: 'day' | 'week' | 'month'
+    freeAmount: string
+    freeUnit: 'day' | 'week' | 'month'
+  }): boolean => {
+    const minDurationValue = parseInt(rule.minDuration, 10)
+    const freeAmountValue = parseInt(rule.freeAmount, 10)
+    
+    if (isNaN(minDurationValue) || isNaN(freeAmountValue)) return false
+    if (minDurationValue <= 0 || freeAmountValue <= 0) return false
+    
+    const minDurationInDays = convertToDays(minDurationValue, rule.durationUnit)
+    const freeAmountInDays = convertToDays(freeAmountValue, rule.freeUnit)
+    
+    return freeAmountInDays > minDurationInDays
   }
 
   const [formData, setFormData] = useState({
@@ -391,6 +420,19 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
         }
         return true
       case 4:
+        // Validate Min Space doesn't exceed Max Space
+        if (formData.minSqFt && formData.maxSqFt) {
+          const minSqFt = parseInt(parseNumberInput(formData.minSqFt))
+          const maxSqFt = parseInt(parseNumberInput(formData.maxSqFt))
+          if (minSqFt > maxSqFt) {
+            addNotification({
+              type: 'error',
+              message: `Minimum Space (${formData.minSqFt} sq ft) cannot exceed Maximum Space (${formData.maxSqFt} sq ft)`,
+              duration: 5000,
+            })
+            return false
+          }
+        }
         // Validate Max Space doesn't exceed Total Space
         if (formData.maxSqFt && formData.totalSqFt) {
           const maxSqFt = parseInt(parseNumberInput(formData.maxSqFt))
@@ -403,6 +445,16 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
             })
             return false
           }
+        }
+        // Validate Free Storage Rules - free amount cannot exceed min duration
+        const invalidFreeStorageRules = formData.freeStorageRules.filter(rule => isFreeAmountExceedsMinDuration(rule))
+        if (invalidFreeStorageRules.length > 0) {
+          addNotification({
+            type: 'error',
+            message: `Free storage amount cannot exceed booking duration. Please check your free storage rules.`,
+            duration: 5000,
+          })
+          return false
         }
         return true
       default:
@@ -426,13 +478,9 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
     setIsLoading(true)
     try {
       const normalizeGoodsType = (value?: string) => (value || "general").trim().toLowerCase()
-      const inchesToCm = (inches: number) => inches * 2.54
-      const lbsToKg = (lbs: number) => lbs * 0.453592
       
       const sanitizePalletPricing = (entries: typeof formData.palletPricing) =>
         entries.map((entry) => {
-          const isEuro = entry.palletType === 'euro'
-          
           // Filter valid height ranges (min required, max can be empty for last item)
           const filteredHeightRanges = entry.heightRanges
             ?.filter((range) => range.heightMinCm != null)
@@ -461,8 +509,9 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                 const heightMax = range.heightMaxCm ? Number(range.heightMaxCm) : (isLastItem ? undefined : heightMin)
                 return {
                   ...range,
-                  heightMinCm: isEuro ? heightMin : inchesToCm(heightMin),
-                  heightMaxCm: heightMax !== undefined ? (isEuro ? heightMax : inchesToCm(heightMax)) : undefined,
+                  // No conversion - save values as-is (inches for standard, cm for euro)
+                  heightMinCm: heightMin,
+                  heightMaxCm: heightMax !== undefined ? heightMax : undefined,
                   pricePerUnit: range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
                 }
               }),
@@ -474,8 +523,9 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                 const weightMax = range.weightMaxKg ? Number(range.weightMaxKg) : (isLastItem ? undefined : weightMin)
                 return {
                   ...range,
-                  weightMinKg: isEuro ? weightMin : lbsToKg(weightMin),
-                  weightMaxKg: weightMax !== undefined ? (isEuro ? weightMax : lbsToKg(weightMax)) : undefined,
+                  // No conversion - save values as-is (lbs for standard, kg for euro)
+                  weightMinKg: weightMin,
+                  weightMaxKg: weightMax !== undefined ? weightMax : undefined,
                   pricePerPallet: range.pricePerPallet != null && range.pricePerPallet > 0 ? range.pricePerPallet : 1,
                 }
               }),
@@ -490,10 +540,11 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
               
               return {
                 ...size,
-                lengthMin: size.lengthMin != null ? inchesToCm(Number(size.lengthMin)) : undefined,
-                lengthMax: size.lengthMax != null ? inchesToCm(Number(size.lengthMax)) : undefined,
-                widthMin: size.widthMin != null ? inchesToCm(Number(size.widthMin)) : undefined,
-                widthMax: size.widthMax != null ? inchesToCm(Number(size.widthMax)) : undefined,
+                // No conversion - save values as-is in inches
+                lengthMin: size.lengthMin != null ? Number(size.lengthMin) : undefined,
+                lengthMax: size.lengthMax != null ? Number(size.lengthMax) : undefined,
+                widthMin: size.widthMin != null ? Number(size.widthMin) : undefined,
+                widthMax: size.widthMax != null ? Number(size.widthMax) : undefined,
                 heightRanges: filteredCustomHeightRanges
                   ?.map((range, idx, arr) => {
                     const heightMin = Number(range.heightMinCm) || 0
@@ -501,8 +552,9 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                     const heightMax = range.heightMaxCm ? Number(range.heightMaxCm) : (isLastItem ? undefined : heightMin)
                     return {
                       ...range,
-                      heightMinCm: inchesToCm(heightMin),
-                      heightMaxCm: heightMax !== undefined ? inchesToCm(heightMax) : undefined,
+                      // No conversion - save values as-is in inches
+                      heightMinCm: heightMin,
+                      heightMaxCm: heightMax !== undefined ? heightMax : undefined,
                       pricePerUnit: range.pricePerUnit != null && range.pricePerUnit > 0 ? range.pricePerUnit : 1,
                     }
                   }),
@@ -512,92 +564,135 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
         })
 
       const palletPricingToValidate = sanitizePalletPricing(formData.palletPricing)
-      const goodsTypeOptions =
-        formData.warehouseType.length > 0
-          ? formData.warehouseType.map((type) => normalizeGoodsType(type))
-          : ["general"]
-      const requiredPalletTypes = ["standard", "euro", "custom"] as const
-      const periods: Array<"day" | "week" | "month"> = ["day", "week", "month"]
+      console.log('[FORM] palletPricing before sanitize:', formData.palletPricing.length, 'entries')
+      console.log('[FORM] palletPricing after sanitize:', palletPricingToValidate.length, 'entries')
+      
+      // Log custom pallet data for debugging
+      const customPalletEntries = palletPricingToValidate.filter(p => p.palletType === 'custom')
+      customPalletEntries.forEach(entry => {
+        console.log(`[FORM] Custom pallet ${entry.pricingPeriod}:`, {
+          goodsType: entry.goodsType,
+          customSizesCount: entry.customSizes?.length || 0,
+          firstSize: entry.customSizes?.[0] ? {
+            lengthMin: entry.customSizes[0].lengthMin,
+            lengthMax: entry.customSizes[0].lengthMax,
+            widthMin: entry.customSizes[0].widthMin,
+            widthMax: entry.customSizes[0].widthMax,
+            heightRangesCount: entry.customSizes[0].heightRanges?.length || 0
+          } : 'no size'
+        })
+      })
       const fieldErrors: Record<string, string> = {}
       const sectionErrors: Record<string, string> = {}
       let hasPricingErrors = false
 
-      goodsTypeOptions.forEach((goodsType) => {
-        requiredPalletTypes.forEach((palletType) => {
-          periods.forEach((period) => {
-            const pricingIndex = palletPricingToValidate.findIndex(
-              (entry) =>
-                normalizeGoodsType(entry.goodsType) === goodsType &&
-                entry.palletType === palletType &&
-                entry.pricingPeriod === period
-            )
-            const entry = pricingIndex >= 0 ? palletPricingToValidate[pricingIndex] : undefined
-            const baseSectionKey = `${goodsType}|${palletType}|${period}`
+      // Only validate pallet pricing if "pallet" is selected in rent methods
+      if (formData.rentMethods.includes('pallet')) {
+        const goodsTypeOptions =
+          formData.warehouseType.length > 0
+            ? formData.warehouseType.map((type) => normalizeGoodsType(type))
+            : ["general"]
+        const requiredPalletTypes = ["standard", "euro", "custom"] as const
+        const periods: Array<"day" | "week" | "month"> = ["day", "week", "month"]
 
-            if (!entry) {
-              sectionErrors[`${baseSectionKey}|heightRanges`] = "At least one height range is required."
-              sectionErrors[`${baseSectionKey}|weightRanges`] = "At least one weight range is required."
-              if (palletType === "custom") {
-                sectionErrors[`${baseSectionKey}|customSizes`] = "Add at least one custom size."
-              }
-              hasPricingErrors = true
-              return
-            }
+        goodsTypeOptions.forEach((goodsType) => {
+          requiredPalletTypes.forEach((palletType) => {
+            periods.forEach((period) => {
+              const pricingIndex = palletPricingToValidate.findIndex(
+                (entry) =>
+                  normalizeGoodsType(entry.goodsType) === goodsType &&
+                  entry.palletType === palletType &&
+                  entry.pricingPeriod === period
+              )
+              const entry = pricingIndex >= 0 ? palletPricingToValidate[pricingIndex] : undefined
+              const baseSectionKey = `${goodsType}|${palletType}|${period}`
 
-            if (palletType === "custom") {
-              if (!entry.customSizes || entry.customSizes.length === 0) {
-                sectionErrors[`${baseSectionKey}|customSizes`] = "Add at least one custom size."
+              if (!entry) {
+                sectionErrors[`${baseSectionKey}|heightRanges`] = "At least one height range is required."
+                sectionErrors[`${baseSectionKey}|weightRanges`] = "At least one weight range is required."
+                if (palletType === "custom") {
+                  sectionErrors[`${baseSectionKey}|customSizes`] = "Add at least one custom size."
+                }
                 hasPricingErrors = true
+                return
               }
-              entry.customSizes?.forEach((size, sizeIndex) => {
-                if (!size.heightRanges || size.heightRanges.length === 0) {
-                  sectionErrors[`${baseSectionKey}|heightRanges`] =
-                    "Add at least one height range for each custom size."
+
+              if (palletType === "custom") {
+                if (!entry.customSizes || entry.customSizes.length === 0) {
+                  sectionErrors[`${baseSectionKey}|customSizes`] = "Add at least one custom size."
                   hasPricingErrors = true
                 }
-                size.heightRanges?.forEach((range, rangeIndex) => {
+                entry.customSizes?.forEach((size, sizeIndex) => {
+                  if (!size.heightRanges || size.heightRanges.length === 0) {
+                    sectionErrors[`${baseSectionKey}|heightRanges`] =
+                      "Add at least one height range for each custom size."
+                    hasPricingErrors = true
+                  }
+                  size.heightRanges?.forEach((range, rangeIndex) => {
+                    if (!Number.isFinite(range.pricePerUnit) || range.pricePerUnit <= 0) {
+                      fieldErrors[
+                        `${pricingIndex}.customSizes.${sizeIndex}.heightRanges.${rangeIndex}.pricePerUnit`
+                      ] = "Price per unit is required."
+                      hasPricingErrors = true
+                    }
+                  })
+                })
+              } else {
+                if (!entry.heightRanges || entry.heightRanges.length === 0) {
+                  sectionErrors[`${baseSectionKey}|heightRanges`] = "At least one height range is required."
+                  hasPricingErrors = true
+                }
+                entry.heightRanges?.forEach((range, rangeIndex) => {
                   if (!Number.isFinite(range.pricePerUnit) || range.pricePerUnit <= 0) {
-                    fieldErrors[
-                      `${pricingIndex}.customSizes.${sizeIndex}.heightRanges.${rangeIndex}.pricePerUnit`
-                    ] = "Price per unit is required."
+                    fieldErrors[`${pricingIndex}.heightRanges.${rangeIndex}.pricePerUnit`] =
+                      "Price per unit is required."
                     hasPricingErrors = true
                   }
                 })
-              })
-            } else {
-              if (!entry.heightRanges || entry.heightRanges.length === 0) {
-                sectionErrors[`${baseSectionKey}|heightRanges`] = "At least one height range is required."
+              }
+
+              if (!entry.weightRanges || entry.weightRanges.length === 0) {
+                sectionErrors[`${baseSectionKey}|weightRanges`] = "At least one weight range is required."
                 hasPricingErrors = true
               }
-              entry.heightRanges?.forEach((range, rangeIndex) => {
-                if (!Number.isFinite(range.pricePerUnit) || range.pricePerUnit <= 0) {
-                  fieldErrors[`${pricingIndex}.heightRanges.${rangeIndex}.pricePerUnit`] =
-                    "Price per unit is required."
+              entry.weightRanges?.forEach((range, rangeIndex) => {
+                if (!Number.isFinite(range.pricePerPallet) || range.pricePerPallet <= 0) {
+                  fieldErrors[`${pricingIndex}.weightRanges.${rangeIndex}.pricePerPallet`] =
+                    "Price per pallet is required."
                   hasPricingErrors = true
                 }
               })
-            }
-
-            if (!entry.weightRanges || entry.weightRanges.length === 0) {
-              sectionErrors[`${baseSectionKey}|weightRanges`] = "At least one weight range is required."
-              hasPricingErrors = true
-            }
-            entry.weightRanges?.forEach((range, rangeIndex) => {
-              if (!Number.isFinite(range.pricePerPallet) || range.pricePerPallet <= 0) {
-                fieldErrors[`${pricingIndex}.weightRanges.${rangeIndex}.pricePerPallet`] =
-                  "Price per pallet is required."
-                hasPricingErrors = true
-              }
             })
           })
         })
-      })
+      }
 
       if (hasPricingErrors) {
         setPalletPricingErrors(fieldErrors)
         setPalletPricingSectionErrors(sectionErrors)
         setIsLoading(false)
         setCurrentStep(4)
+        
+        // Count missing goods types
+        const missingGoodsTypes = new Set<string>()
+        Object.keys(sectionErrors).forEach(key => {
+          const parts = key.split('|')
+          if (parts.length >= 1) {
+            missingGoodsTypes.add(parts[0])
+          }
+        })
+        
+        // Show user-friendly toast notification
+        const errorCount = Object.keys(sectionErrors).length + Object.keys(fieldErrors).length
+        const goodsTypeCount = missingGoodsTypes.size
+        
+        addNotification({
+          type: 'error',
+          message: goodsTypeCount > 0 
+            ? `Pallet pricing is incomplete. Please fill in pricing for all ${goodsTypeCount} goods type(s): ${Array.from(missingGoodsTypes).map(gt => gt.replace(/-/g, ' ')).join(', ')}`
+            : `Pallet pricing has ${errorCount} validation error(s). Please check all required fields.`,
+          duration: 8000,
+        })
         return
       }
 
@@ -638,8 +733,10 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
         temperatureTypes: formData.temperatureTypes,
         rentMethods: formData.rentMethods,
         security: formData.security,
-        accessType: formData.accessType,
-        accessControl: formData.accessControl,
+        accessInfo: {
+          accessType: formData.accessType || undefined,
+          accessControl: formData.accessControl || undefined,
+        },
         productAcceptanceTimeSlots: formData.productAcceptanceTimeSlots,
         productDepartureTimeSlots: formData.productDepartureTimeSlots,
         workingDays: formData.workingDays,
@@ -669,7 +766,8 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
               freeUnit: rule.freeUnit,
             }
           }),
-        palletPricing: sanitizePalletPricing(formData.palletPricing),
+        // Only include pallet pricing if "pallet" is selected in rent methods
+        palletPricing: formData.rentMethods.includes('pallet') ? palletPricingToValidate : [],
         photos: warehousePhotos,
         // Convert pricing object to array format expected by API
         pricing: Object.entries(pricingData).map(([pricingType, data]: [string, any]) => ({
@@ -803,7 +901,18 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
           {currentStep === 1 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="address">Street Address *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="address">Street Address *</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMapPicker(true)}
+                    className="flex items-center gap-1"
+                  >
+                    <MapPin className="h-4 w-4" /> Pick on Map
+                  </Button>
+                </div>
                 <PlacesAutocomplete
                   value={formData.address}
                   onChange={(val, place) => {
@@ -882,19 +991,61 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                 </div>
               </div>
 
-              {/* Hidden MapLocationPicker - coordinates are set automatically from address */}
+              {/* MapLocationPicker Dialog */}
               <MapLocationPicker
                 open={showMapPicker}
                 onOpenChange={setShowMapPicker}
                 initialLat={parseFloat(formData.latitude) || undefined}
                 initialLng={parseFloat(formData.longitude) || undefined}
                 onLocationSelect={(location) => {
+                  // Parse address components to extract city, state, and zip code
+                  let streetNumber = ""
+                  let route = ""
+                  let city = ""
+                  let stateValue = ""
+                  let zipCode = ""
+
+                  if (location.addressComponents) {
+                    location.addressComponents.forEach((component: any) => {
+                      const types = component.types
+                      if (types.includes("street_number")) {
+                        streetNumber = component.long_name
+                      } else if (types.includes("route")) {
+                        route = component.long_name
+                      } else if (types.includes("locality")) {
+                        city = component.long_name
+                      } else if (types.includes("postal_town") && !city) {
+                        city = component.long_name
+                      } else if (types.includes("sublocality_level_1") && !city) {
+                        city = component.long_name
+                      } else if (types.includes("administrative_area_level_3") && !city) {
+                        city = component.long_name
+                      } else if (types.includes("administrative_area_level_1")) {
+                        stateValue = component.short_name
+                      } else if (types.includes("postal_code")) {
+                        zipCode = component.long_name
+                      }
+                    })
+                  }
+
+                  const fullAddress = streetNumber && route 
+                    ? `${streetNumber} ${route}` 
+                    : location.address?.split(',')[0] || formData.address
+
+                  const cityState = city && stateValue ? `${city}, ${stateValue}` : city || stateValue
+
                   setFormData({
                     ...formData,
                     latitude: location.lat.toString(),
                     longitude: location.lng.toString(),
-                    address: location.address || formData.address,
+                    address: fullAddress,
+                    city: cityState || formData.city,
+                    zipCode: zipCode || formData.zipCode,
                   })
+                  
+                  if (stateValue) {
+                    setState(stateValue)
+                  }
                 }}
               />
 
@@ -1390,7 +1541,19 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                             value={formData.minSqFt}
                             onChange={(e) => setFormData({ ...formData, minSqFt: formatNumberInput(e.target.value) })}
                             placeholder="Optional - e.g. 100"
+                            className={
+                              formData.minSqFt && formData.maxSqFt && 
+                              parseInt(parseNumberInput(formData.minSqFt)) > parseInt(parseNumberInput(formData.maxSqFt))
+                                ? "border-red-500 focus:border-red-500"
+                                : ""
+                            }
                           />
+                          {formData.minSqFt && formData.maxSqFt && 
+                           parseInt(parseNumberInput(formData.minSqFt)) > parseInt(parseNumberInput(formData.maxSqFt)) && (
+                            <p className="text-xs text-red-500">
+                              Min Space cannot exceed Max Space ({formData.maxSqFt} sq ft)
+                            </p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="maxSqFt">Maximum Space (sq ft)</Label>
@@ -1400,8 +1563,10 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                             onChange={(e) => setFormData({ ...formData, maxSqFt: formatNumberInput(e.target.value) })}
                             placeholder="Optional - e.g. 10,000"
                             className={
-                              formData.maxSqFt && formData.totalSqFt && 
-                              parseInt(parseNumberInput(formData.maxSqFt)) > parseInt(parseNumberInput(formData.totalSqFt))
+                              (formData.maxSqFt && formData.totalSqFt && 
+                              parseInt(parseNumberInput(formData.maxSqFt)) > parseInt(parseNumberInput(formData.totalSqFt))) ||
+                              (formData.minSqFt && formData.maxSqFt && 
+                              parseInt(parseNumberInput(formData.minSqFt)) > parseInt(parseNumberInput(formData.maxSqFt)))
                                 ? "border-red-500 focus:border-red-500"
                                 : ""
                             }
@@ -1540,6 +1705,7 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                                     updateFreeStorageRule(index, { freeAmount: e.target.value })
                                   }
                                   placeholder="e.g. 7"
+                                  className={isFreeAmountExceedsMinDuration(rule) ? "border-red-500 focus:border-red-500" : ""}
                                 />
                                 <Select
                                   value={rule.freeUnit}
@@ -1549,7 +1715,7 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                                     })
                                   }
                                 >
-                                  <SelectTrigger className="w-[100px]">
+                                  <SelectTrigger className={`w-[100px] ${isFreeAmountExceedsMinDuration(rule) ? "border-red-500 focus:border-red-500" : ""}`}>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1561,6 +1727,11 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                                   </SelectContent>
                                 </Select>
                               </div>
+                              {isFreeAmountExceedsMinDuration(rule) && (
+                                <p className="text-xs text-red-500">
+                                  Free amount ({rule.freeAmount} {rule.freeUnit}s) cannot exceed min duration ({rule.minDuration} {rule.durationUnit}s)
+                                </p>
+                              )}
                             </div>
                             <Button
                               type="button"

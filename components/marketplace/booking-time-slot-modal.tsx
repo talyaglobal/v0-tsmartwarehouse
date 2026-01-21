@@ -569,7 +569,7 @@ export function BookingTimeSlotModal({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="standard">Standard (48&quot; x 40&quot;)</SelectItem>
-                                <SelectItem value="euro">Euro (120cm x 80cm)</SelectItem>
+                                <SelectItem value="euro">Euro (80cm x 120cm)</SelectItem>
                                 <SelectItem value="custom">Custom</SelectItem>
                               </SelectContent>
                             </Select>

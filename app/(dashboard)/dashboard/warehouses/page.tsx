@@ -445,13 +445,13 @@ export default function WarehousesPage() {
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Rented:</span>
                               <span className="font-medium text-orange-600">
-                                {formatNumber(warehouse.totalSqFt - warehouse.availableSqFt)} sq ft
+                                {formatNumber(Math.max(0, warehouse.totalSqFt - Math.min(warehouse.totalSqFt, warehouse.availableSqFt)))} sq ft
                               </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Available:</span>
                               <span className="font-medium text-green-600">
-                                {formatNumber(warehouse.availableSqFt)} sq ft
+                                {formatNumber(Math.min(warehouse.totalSqFt, warehouse.availableSqFt))} sq ft
                               </span>
                             </div>
                           </>
@@ -474,13 +474,13 @@ export default function WarehousesPage() {
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Rented:</span>
                                 <span className="font-medium text-orange-600">
-                                  {formatNumber(warehouse.totalPalletStorage - warehouse.availablePalletStorage)} pallets
+                                  {formatNumber(Math.max(0, warehouse.totalPalletStorage - Math.min(warehouse.totalPalletStorage, warehouse.availablePalletStorage)))} pallets
                                 </span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Available:</span>
                                 <span className="font-medium text-green-600">
-                                  {formatNumber(warehouse.availablePalletStorage)} pallets
+                                  {formatNumber(Math.min(warehouse.totalPalletStorage, warehouse.availablePalletStorage))} pallets
                                 </span>
                               </div>
                             </>
@@ -599,10 +599,10 @@ export default function WarehousesPage() {
                           {warehouse.availableSqFt !== undefined && (
                             <div className="text-xs space-x-2">
                               <span className="text-orange-600">
-                                Rented: {formatNumber(warehouse.totalSqFt - warehouse.availableSqFt)}
+                                Rented: {formatNumber(Math.max(0, warehouse.totalSqFt - Math.min(warehouse.totalSqFt, warehouse.availableSqFt)))}
                               </span>
                               <span className="text-green-600">
-                                Available: {formatNumber(warehouse.availableSqFt)}
+                                Available: {formatNumber(Math.min(warehouse.totalSqFt, warehouse.availableSqFt))}
                               </span>
                             </div>
                           )}
@@ -616,10 +616,10 @@ export default function WarehousesPage() {
                             {warehouse.availablePalletStorage !== undefined && (
                               <div className="text-xs space-x-2">
                                 <span className="text-orange-600">
-                                  Rented: {formatNumber(warehouse.totalPalletStorage - warehouse.availablePalletStorage)}
+                                  Rented: {formatNumber(Math.max(0, warehouse.totalPalletStorage - Math.min(warehouse.totalPalletStorage, warehouse.availablePalletStorage)))}
                                 </span>
                                 <span className="text-green-600">
-                                  Available: {formatNumber(warehouse.availablePalletStorage)}
+                                  Available: {formatNumber(Math.min(warehouse.totalPalletStorage, warehouse.availablePalletStorage))}
                                 </span>
                               </div>
                             )}
