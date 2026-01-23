@@ -18,14 +18,19 @@ import {
   ShoppingCart,
   Receipt,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { useRealtimeNotifications } from "@/lib/realtime/hooks"
 import { createClient } from "@/lib/supabase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
+
+const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 
 // NEW ROLE SYSTEM (2026-01-11):
 // warehouse_admin (owner), warehouse_supervisor, warehouse_client, warehouse_staff,
@@ -96,6 +101,28 @@ export function DashboardSidebar() {
   const [logoError, setLogoError] = useState(false)
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
   const [selectedTestRole, setSelectedTestRole] = useState<string | null>(null)
+  const [isCollapsed, setIsCollapsed] = useState(false)
+
+  // Load collapsed state from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+      if (saved !== null) {
+        setIsCollapsed(JSON.parse(saved))
+      }
+    }
+  }, [])
+
+  // Save collapsed state to localStorage
+  const toggleCollapsed = () => {
+    const newState = !isCollapsed
+    setIsCollapsed(newState)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, JSON.stringify(newState))
+      // Dispatch event for layout to listen
+      window.dispatchEvent(new CustomEvent('sidebar-collapsed-change', { detail: newState }))
+    }
+  }
 
   // Load selected test role from localStorage (only for root users)
   useEffect(() => {
@@ -294,122 +321,215 @@ export function DashboardSidebar() {
   }
 
   return (
-    <div className={cn("flex h-full w-64 flex-col", getSidebarColors(actualRole))}>
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b px-6">
-        {profile?.companyLogo && !logoError ? (
-          <img 
-            src={profile.companyLogo} 
-            alt={profile?.company || 'Company logo'} 
-            className="h-8 w-8 object-contain rounded"
-            onError={() => setLogoError(true)}
-          />
-        ) : (
-          <Warehouse className="h-6 w-6 text-primary" />
-        )}
-        <span className="font-bold">
-          {profile?.company || (actualRole === 'warehouse_client' ? 'Warebnb' : 'Warebnb')}
-        </span>
-      </div>
+    <TooltipProvider delayDuration={0}>
+      <div className={cn(
+        "flex h-full flex-col transition-all duration-300 relative",
+        isCollapsed ? "w-16" : "w-64",
+        getSidebarColors(actualRole)
+      )}>
+        {/* Collapse Toggle Button */}
+        <button
+          onClick={toggleCollapsed}
+          className="absolute -right-3 top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-md hover:bg-muted transition-colors"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </button>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 mt-4">
+        {/* Logo */}
+        <div className={cn(
+          "flex h-16 items-center gap-2 border-b",
+          isCollapsed ? "justify-center px-2" : "px-6"
+        )}>
+          {profile?.companyLogo && !logoError ? (
+            <img 
+              src={profile.companyLogo} 
+              alt={profile?.company || 'Company logo'} 
+              className="h-8 w-8 object-contain rounded flex-shrink-0"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <Warehouse className="h-6 w-6 text-primary flex-shrink-0" />
+          )}
+          {!isCollapsed && (
+            <span className="font-bold truncate">
+              {profile?.company || (actualRole === 'warehouse_client' ? 'Warebnb' : 'Warebnb')}
+            </span>
+          )}
+        </div>
+
+        {/* Navigation */}
+        <nav className={cn("flex-1 space-y-1 mt-4", isCollapsed ? "px-2" : "px-3")}>
+          {(() => {
+            // Determine which navigation array to use
+            let userRole = profile?.role || 'warehouse_client'
+            if (profile?.role === 'root' && selectedTestRole) {
+              userRole = selectedTestRole
+            }
+
+            let navigationToUse = baseNavigation
+            if (userRole === 'warehouse_finder') {
+              navigationToUse = warehouseFinderNavigation
+            } else if (userRole === 'warehouse_broker') {
+              navigationToUse = brokerNavigation
+            } else if (userRole === 'end_delivery_party') {
+              navigationToUse = endDeliveryNavigation
+            } else if (userRole === 'local_transport') {
+              navigationToUse = localTransportNavigation
+            } else if (userRole === 'international_transport') {
+              navigationToUse = internationalTransportNavigation
+            }
+
+            return navigationToUse
+              .filter((item) => {
+                return item.roles.includes(userRole)
+              })
+              .map((item) => {
+              // For Dashboard, only match exact path to avoid matching child routes
+              // For other items, match exact path or child routes
+              const isActive = item.href === "/dashboard"
+                ? pathname === item.href
+                : pathname === item.href || pathname.startsWith(item.href + "/")
+              
+              const linkContent = (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isCollapsed && "justify-center px-2",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  {!isCollapsed && (
+                    <>
+                      <span className="truncate">{item.name}</span>
+                      {/* Show badge for Bookings if there are pending bookings */}
+                      {item.name === "Bookings" && pendingCount > 0 && (
+                        <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                          {pendingCount}
+                        </Badge>
+                      )}
+                      {/* Show badge for Claims if there are under-review claims */}
+                      {item.name === "Claims" && underReviewCount > 0 && (
+                        <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                          {underReviewCount}
+                        </Badge>
+                      )}
+                      {/* Show badge for Notifications */}
+                      {item.name === "Notifications" && unreadCount > 0 && (
+                        <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
+                          {unreadCount}
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                  {/* Show mini badge when collapsed */}
+                  {isCollapsed && (
+                    <>
+                      {item.name === "Bookings" && pendingCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                          {pendingCount}
+                        </span>
+                      )}
+                      {item.name === "Claims" && underReviewCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                          {underReviewCount}
+                        </span>
+                      )}
+                      {item.name === "Notifications" && unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Link>
+              )
+
+              if (isCollapsed) {
+                return (
+                  <Tooltip key={item.name}>
+                    <TooltipTrigger asChild>
+                      <div className="relative">
+                        {linkContent}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="flex items-center gap-2">
+                      {item.name}
+                      {item.name === "Bookings" && pendingCount > 0 && (
+                        <Badge variant="default" className="h-5 px-1.5">{pendingCount}</Badge>
+                      )}
+                      {item.name === "Claims" && underReviewCount > 0 && (
+                        <Badge variant="default" className="h-5 px-1.5">{underReviewCount}</Badge>
+                      )}
+                      {item.name === "Notifications" && unreadCount > 0 && (
+                        <Badge variant="default" className="h-5 px-1.5">{unreadCount}</Badge>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              }
+
+              return linkContent
+            })
+          })()}
+        </nav>
+
+        {/* My Company Section - Only for Company Admin */}
         {(() => {
-          // Determine which navigation array to use
+          // Determine if My Company should be shown based on role
           let userRole = profile?.role || 'warehouse_client'
           if (profile?.role === 'root' && selectedTestRole) {
             userRole = selectedTestRole
           }
+          const showMyCompany = isCompanyAdmin || ['warehouse_admin', 'warehouse_supervisor'].includes(userRole)
 
-          let navigationToUse = baseNavigation
-          if (userRole === 'warehouse_finder') {
-            navigationToUse = warehouseFinderNavigation
-          } else if (userRole === 'warehouse_broker') {
-            navigationToUse = brokerNavigation
-          } else if (userRole === 'end_delivery_party') {
-            navigationToUse = endDeliveryNavigation
-          } else if (userRole === 'local_transport') {
-            navigationToUse = localTransportNavigation
-          } else if (userRole === 'international_transport') {
-            navigationToUse = internationalTransportNavigation
-          }
+          if (!showMyCompany) return null
 
-          return navigationToUse
-            .filter((item) => {
-              return item.roles.includes(userRole)
-            })
-            .map((item) => {
-            // For Dashboard, only match exact path to avoid matching child routes
-            // For other items, match exact path or child routes
-            const isActive = item.href === "/dashboard"
-              ? pathname === item.href
-              : pathname === item.href || pathname.startsWith(item.href + "/")
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.name}
-                {/* Show badge for Bookings if there are pending bookings */}
-                {item.name === "Bookings" && pendingCount > 0 && (
-                  <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                    {pendingCount}
-                  </Badge>
-                )}
-                {/* Show badge for Claims if there are under-review claims */}
-                {item.name === "Claims" && underReviewCount > 0 && (
-                  <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                    {underReviewCount}
-                  </Badge>
-                )}
-                {/* Show badge for Notifications */}
-                {item.name === "Notifications" && unreadCount > 0 && (
-                  <Badge variant={isActive ? "secondary" : "default"} className="ml-auto h-5 px-1.5">
-                    {unreadCount}
-                  </Badge>
-                )}
-                {/* Other badges are handled per item type */}
-              </Link>
-            )
-          })
-        })()}
-      </nav>
-
-      {/* My Company Section - Only for Company Admin */}
-      {(() => {
-        // Determine if My Company should be shown based on role
-        let userRole = profile?.role || 'warehouse_client'
-        if (profile?.role === 'root' && selectedTestRole) {
-          userRole = selectedTestRole
-        }
-        const showMyCompany = isCompanyAdmin || ['warehouse_admin', 'warehouse_supervisor'].includes(userRole)
-
-        return showMyCompany && (
-          <div className="border-t p-4">
+          const myCompanyContent = (
             <Link href="/dashboard/my-company">
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-2",
+                  "w-full gap-2",
+                  isCollapsed ? "justify-center px-2" : "justify-start",
                   pathname === "/dashboard/my-company" || pathname.startsWith("/dashboard/my-company/")
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <Building2 className="h-4 w-4" />
-                My Company
+                <Building2 className="h-4 w-4 flex-shrink-0" />
+                {!isCollapsed && <span>My Company</span>}
               </Button>
             </Link>
-          </div>
-        )
-      })()}
-    </div>
+          )
+
+          return (
+            <div className={cn("border-t", isCollapsed ? "p-2" : "p-4")}>
+              {isCollapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {myCompanyContent}
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    My Company
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                myCompanyContent
+              )}
+            </div>
+          )
+        })()}
+      </div>
+    </TooltipProvider>
   )
 }

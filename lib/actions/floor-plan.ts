@@ -13,6 +13,13 @@ interface FloorPlanData {
   totalArea?: number
   equipmentArea?: number
   palletCapacity?: number
+  floorNumber?: number
+  name?: string
+  zoom?: number
+  panX?: number
+  panY?: number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  areas?: any[]
 }
 
 interface FloorPlanResult {
@@ -22,7 +29,19 @@ interface FloorPlanResult {
   error?: string
 }
 
-export async function saveFloorPlan(warehouseId: string, data: FloorPlanData): Promise<FloorPlanResult> {
+interface FloorInfo {
+  id: string
+  floorNumber: number
+  name: string
+  updatedAt: string
+}
+
+// Save a floor plan for a specific floor number
+export async function saveFloorPlan(
+  warehouseId: string, 
+  data: FloorPlanData, 
+  floorNumber: number = 1
+): Promise<FloorPlanResult> {
   try {
     const supabase = await createClient()
     
@@ -33,6 +52,8 @@ export async function saveFloorPlan(warehouseId: string, data: FloorPlanData): P
     // Prepare the data
     const floorPlanData = {
       warehouse_id: warehouseId,
+      floor_number: floorNumber,
+      name: data.name || `Floor ${floorNumber}`,
       vertices: data.vertices || [],
       items: data.items || [],
       wall_openings: data.wallOpenings || [],
@@ -40,14 +61,19 @@ export async function saveFloorPlan(warehouseId: string, data: FloorPlanData): P
       total_area: data.totalArea || 0,
       equipment_area: data.equipmentArea || 0,
       pallet_capacity: data.palletCapacity || 0,
+      zoom: data.zoom || 1,
+      pan_x: data.panX || 0,
+      pan_y: data.panY || 0,
+      areas: data.areas || [],
       updated_at: new Date().toISOString()
     }
 
-    // Check if floor plan exists for this warehouse
+    // Check if floor plan exists for this warehouse and floor number
     const { data: existing, error: checkError } = await supabase
       .from('floor_plans')
       .select('id')
       .eq('warehouse_id', warehouseId)
+      .eq('floor_number', floorNumber)
       .maybeSingle()
 
     if (checkError) {
@@ -67,6 +93,7 @@ export async function saveFloorPlan(warehouseId: string, data: FloorPlanData): P
         .from('floor_plans')
         .update(floorPlanData)
         .eq('warehouse_id', warehouseId)
+        .eq('floor_number', floorNumber)
         .select()
         .single()
     } else {
@@ -96,7 +123,11 @@ export async function saveFloorPlan(warehouseId: string, data: FloorPlanData): P
   }
 }
 
-export async function loadFloorPlan(warehouseId: string): Promise<FloorPlanResult> {
+// Load a specific floor plan by floor number
+export async function loadFloorPlan(
+  warehouseId: string, 
+  floorNumber: number = 1
+): Promise<FloorPlanResult> {
   try {
     const supabase = await createClient()
 
@@ -104,6 +135,7 @@ export async function loadFloorPlan(warehouseId: string): Promise<FloorPlanResul
       .from('floor_plans')
       .select('*')
       .eq('warehouse_id', warehouseId)
+      .eq('floor_number', floorNumber)
       .maybeSingle()
 
     if (error) {
@@ -122,6 +154,72 @@ export async function loadFloorPlan(warehouseId: string): Promise<FloorPlanResul
   }
 }
 
+// Load all floors for a warehouse (returns list of floor numbers and names)
+export async function loadAllFloors(warehouseId: string): Promise<{
+  success: boolean
+  floors?: FloorInfo[]
+  error?: string
+}> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('floor_plans')
+      .select('id, floor_number, name, updated_at')
+      .eq('warehouse_id', warehouseId)
+      .order('floor_number', { ascending: true })
+
+    if (error) {
+      // Table might not exist
+      if (error.code === '42P01') {
+        return { success: true, floors: [] }
+      }
+      console.error('Load all floors error:', error)
+      return { success: false, error: error.message }
+    }
+
+    const floors: FloorInfo[] = (data || []).map(f => ({
+      id: f.id,
+      floorNumber: f.floor_number,
+      name: f.name || `Floor ${f.floor_number}`,
+      updatedAt: f.updated_at
+    }))
+
+    return { success: true, floors }
+  } catch (error) {
+    console.error('loadAllFloors error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+// Delete a specific floor
+export async function deleteFloor(
+  warehouseId: string, 
+  floorNumber: number
+): Promise<FloorPlanResult> {
+  try {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('floor_plans')
+      .delete()
+      .eq('warehouse_id', warehouseId)
+      .eq('floor_number', floorNumber)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath(`/dashboard/warehouses/${warehouseId}/floor-plan`)
+    
+    return { success: true }
+  } catch (error) {
+    console.error('deleteFloor error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+// Delete all floors for a warehouse
 export async function deleteFloorPlan(warehouseId: string): Promise<FloorPlanResult> {
   try {
     const supabase = await createClient()

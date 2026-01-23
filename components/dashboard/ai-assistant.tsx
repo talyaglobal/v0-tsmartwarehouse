@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -93,11 +94,17 @@ const saveCollapseStateToStorage = (isCollapsed: boolean) => {
 }
 
 export function AIAssistant() {
+  const pathname = usePathname()
   const { user } = useUser()
   const [isOpen, setIsOpen] = useState(true) // Default to open on desktop
   // Initialize with false to avoid hydration mismatch, then update from localStorage after mount
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMounted, setIsMounted] = useState(false) // Track if component is mounted (client-side)
+  
+  // Hide AI Assistant on floor-plan pages
+  if (pathname?.includes('/floor-plan')) {
+    return null
+  }
   
   // Fetch user avatar for chat messages
   const { data: userAvatar } = useQuery({

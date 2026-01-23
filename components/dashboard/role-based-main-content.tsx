@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { usePathname } from "next/navigation"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -13,8 +14,12 @@ interface RoleBasedMainContentProps {
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 
 export function RoleBasedMainContent({ children }: RoleBasedMainContentProps) {
+  const pathname = usePathname()
   const { user } = useUser()
   const [selectedTestRole, setSelectedTestRole] = useState<string | null>(null)
+  
+  // Check if we're on a floor-plan page (no padding needed)
+  const isFloorPlanPage = pathname?.includes('/floor-plan')
 
   // Load selected test role from localStorage (only for root users)
   useEffect(() => {
@@ -76,7 +81,11 @@ export function RoleBasedMainContent({ children }: RoleBasedMainContentProps) {
   }
 
   return (
-    <main className={cn("flex-1 overflow-y-auto p-6", getBackgroundColors(actualRole))}>
+    <main className={cn(
+      "flex-1 overflow-y-auto", 
+      isFloorPlanPage ? "p-0" : "p-6",
+      getBackgroundColors(actualRole)
+    )}>
       {children}
     </main>
   )

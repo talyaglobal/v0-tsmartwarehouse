@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
+import { useEffect, useRef, useMemo, useState, useCallback, memo } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
@@ -40,7 +40,7 @@ interface Props {
   onDropItem?: (x: number, y: number) => void
 }
 
-export default function FloorPlan3DSimple({
+function FloorPlan3DSimple({
   vertices,
   items,
   wallOpenings = [],
@@ -360,6 +360,15 @@ export default function FloorPlan3DSimple({
     t.controls.enableDamping = true
     t.controls.dampingFactor = 0.1
     t.controls.maxPolarAngle = Math.PI / 2 - 0.05
+    // Configure mouse buttons: Left=Rotate, Middle=Dolly (zoom), Right=Pan
+    t.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN
+    }
+    // Enable scroll wheel zoom
+    t.controls.enableZoom = true
+    t.controls.zoomSpeed = 1.2
 
     // Lights (no shadows)
     t.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
@@ -564,6 +573,11 @@ export default function FloorPlan3DSimple({
       const group = new THREE.Group()
       group.userData.itemId = item.instanceId
       group.position.set(item.x + item.w / 2, 0, item.y + item.h / 2)
+      
+      // Apply rotation from 2D (convert degrees to radians, negate for correct direction)
+      if (item.rotation) {
+        group.rotation.y = -(item.rotation * Math.PI) / 180
+      }
 
       const isRack = item.name?.toLowerCase().includes('rack')
       const isColumn = !!(item as { columnType?: string }).columnType
@@ -775,7 +789,11 @@ export default function FloorPlan3DSimple({
   }, [bounds, wallHeight])
 
   return (
-    <div ref={containerRef} className="w-full h-full relative bg-slate-900 rounded-lg overflow-hidden">
+    <div 
+      ref={containerRef} 
+      className="w-full h-full relative bg-slate-900 rounded-lg overflow-hidden"
+      onContextMenu={(e) => e.preventDefault()} // Prevent context menu, allow right-click for panning
+    >
       {/* Camera Presets */}
       <div className="absolute top-4 left-4 flex gap-2 z-10">
         <button 
@@ -812,7 +830,8 @@ export default function FloorPlan3DSimple({
       {/* Help */}
       <div className="absolute bottom-4 left-4 bg-black/60 text-white text-xs px-3 py-2 rounded z-10">
         🖱️ <span className="text-green-400">Click item:</span> Select & Drag • 
-        <span className="text-yellow-300"> Drag empty:</span> Rotate • 
+        <span className="text-yellow-300"> Left drag:</span> Rotate • 
+        <span className="text-cyan-400">Right drag:</span> Pan • 
         Right: Pan • Scroll: Zoom
       </div>
       
@@ -825,3 +844,6 @@ export default function FloorPlan3DSimple({
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders which can cause hook count issues
+export default memo(FloorPlan3DSimple)
