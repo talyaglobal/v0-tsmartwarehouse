@@ -59,12 +59,6 @@ export async function GET(request: NextRequest) {
     console.log('[min-space] Matching warehouses:', matchingWarehouses.length, matchingWarehouses.map(w => ({ name: w.name, city: w.city, min_sq_ft: w.min_sq_ft })))
     
     const data = matchingWarehouses
-    const error = null
-
-    if (error) {
-      console.error('[min-space] Query error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
 
     // If found, return the minimum min_sq_ft from matching warehouses
     if (data && data.length > 0) {

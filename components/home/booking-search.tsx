@@ -23,12 +23,6 @@ const US_STATES: Record<string, string> = {
   'wisconsin': 'WI', 'wyoming': 'WY', 'district of columbia': 'DC',
 }
 
-// Get state abbreviation from full name (exact match)
-function getStateAbbreviation(searchTerm: string): string | null {
-  const lower = searchTerm.toLowerCase().trim()
-  return US_STATES[lower] || null
-}
-
 // Get all state abbreviations that match partial state name
 function getMatchingStateAbbreviations(searchTerm: string): string[] {
   const lower = searchTerm.toLowerCase().trim()
