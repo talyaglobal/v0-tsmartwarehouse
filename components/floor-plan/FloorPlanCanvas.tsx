@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { saveFloorPlan, loadFloorPlan, loadAllFloors, deleteFloor } from '@/lib/actions/floor-plan'
 import { exportToPNG, exportToPDF, export3DScreenshot } from '@/lib/utils/floor-plan-export'
 import { useToast } from '@/lib/hooks/use-toast'
+import { formatNumber } from '@/lib/utils/format'
 
 interface FloorInfo {
   id: string
@@ -188,6 +189,10 @@ interface PlacedItem extends CatalogItem {
   aisleWidth?: number
   uprightDepth?: number  // Upright frame depth in inches
   
+  // Door-specific properties
+  doorWidth?: number  // Door width in feet
+  // doorHeight inherited from CatalogItem
+  
   // Column-specific properties (inherited from CatalogItem but can be customized)
   // columnType, columnSize, columnDepth already in CatalogItem
   
@@ -341,6 +346,8 @@ export default function FloorPlanCanvas({
   const [isPanning, setIsPanning] = useState(false)
   const [lastPan, setLastPan] = useState({ x: 0, y: 0 })
   const [wasPanning, setWasPanning] = useState(false) // Track if we just finished panning
+  const [rightClickStart, setRightClickStart] = useState<{ x: number; y: number } | null>(null) // Track right-click start for pan vs context menu
+  const [rightClickMoved, setRightClickMoved] = useState(false) // Track if mouse moved during right-click
   
   // Auto-fit warehouse to canvas
   const fitToScreen = useCallback((verts: Vertex[], cSize: { w: number; h: number }) => {
@@ -1423,7 +1430,7 @@ export default function FloorPlanCanvas({
       ctx.fillStyle = area.color
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      ctx.fillText(`${area.type.replace('-', ' ')} • ${areaSize.toLocaleString()} sq ft`, center.x * GRID_SIZE, center.y * GRID_SIZE + labelH / 2 + 4 / zoom)
+      ctx.fillText(`${area.type.replace('-', ' ')} • ${formatNumber(areaSize)} sq ft`, center.x * GRID_SIZE, center.y * GRID_SIZE + labelH / 2 + 4 / zoom)
     })
     
     // Draw area being drawn (in progress)
@@ -1636,7 +1643,7 @@ export default function FloorPlanCanvas({
         // Area size
         ctx.font = `${10 / zoom}px Inter, Arial, sans-serif`
         ctx.fillStyle = '#fff'
-        ctx.fillText(`${(item.w * item.h).toLocaleString()} sq ft`, x + w/2, y + h/2)
+        ctx.fillText(`${formatNumber(item.w * item.h)} sq ft`, x + w/2, y + h/2)
         
         // Tenant name if set
         if (item.tenantName) {
@@ -1949,7 +1956,7 @@ export default function FloorPlanCanvas({
     }
     
     ctx.restore()
-  }, [vertices, items, wallOpenings, selectedItem, selectedOpening, dragItem, editingVertex, editingWall, zoom, pan, isInsideWarehouse, hasCollision, findClosestWall, wallEditMode, selectedWallIdx, selectedVertexIdx, isRotating, canvasSize, areas, selectedAreaId, selectedAreaVertexIdx, areaDrawMode, drawingAreaVertices, isDraggingArea, snapLines, isAreaInsideAnother, getAreaBounds])
+  }, [vertices, items, wallOpenings, selectedItem, selectedOpening, dragItem, editingVertex, editingWall, zoom, pan, isInsideWarehouse, hasCollision, findClosestWall, wallEditMode, selectedWallIdx, selectedVertexIdx, isRotating, canvasSize, areas, selectedAreaId, selectedAreaVertexIdx, areaDrawMode, drawingAreaVertices, isDraggingArea, snapLines, isAreaInsideAnother, getAreaBounds, viewMode])
   
   // Get closest point on wall segment (for wall click detection)
   const getClosestPointOnWall = useCallback((mousePos: { x: number; y: number }, wallIdx: number): { t: number; dist: number } => {
@@ -2020,10 +2027,17 @@ export default function FloorPlanCanvas({
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault()
     
-    // Don't show context menu if we were just panning
-    if (wasPanning || isPanning) {
+    // Don't show context menu if we were panning (moved during right-click)
+    if (rightClickMoved || wasPanning || isPanning) {
+      // Reset right-click tracking
+      setRightClickStart(null)
+      setRightClickMoved(false)
       return
     }
+    
+    // Reset right-click tracking
+    setRightClickStart(null)
+    setRightClickMoved(false)
     
     const pos = getGridPos(e)
     
@@ -2064,7 +2078,7 @@ export default function FloorPlanCanvas({
     // Right-clicked on empty space - hide menus
     setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
     setAreaContextMenu({ visible: false, x: 0, y: 0, areaId: null })
-  }, [items, areas, getGridPos, isPointInPolygon, wasPanning, isPanning])
+  }, [items, areas, getGridPos, isPointInPolygon, wasPanning, isPanning, rightClickMoved])
   
   // Open edit modal for item
   const openEditModal = useCallback((itemIndex: number) => {
@@ -2167,11 +2181,23 @@ export default function FloorPlanCanvas({
   
   // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Middle mouse (button 1) or Right mouse (button 2) for panning
-    if (e.button === 1 || e.button === 2) {
+    // Middle mouse (button 1) for panning immediately
+    if (e.button === 1) {
       e.preventDefault()
       setIsPanning(true)
       setLastPan({ x: e.clientX, y: e.clientY })
+      return
+    }
+    
+    // Right mouse (button 2) - start tracking for pan OR context menu
+    if (e.button === 2) {
+      e.preventDefault()
+      setRightClickStart({ x: e.clientX, y: e.clientY })
+      setLastPan({ x: e.clientX, y: e.clientY })
+      setRightClickMoved(false)
+      // Hide any existing context menus
+      setContextMenu({ visible: false, x: 0, y: 0, itemIndex: null })
+      setAreaContextMenu({ visible: false, x: 0, y: 0, areaId: null })
       return
     }
     
@@ -2400,7 +2426,7 @@ export default function FloorPlanCanvas({
   }, [vertices, items, wallOpenings, areas, getGridPos, getCanvasPos, isPointOnLine, isPointInPolygon, wallEditMode, areaDrawMode, drawingAreaVertices, drawingAreaType, findVertexAtPos, findWallAtPos, selectedItem, selectedAreaId, zoom, pan, toast, getAreaCenter, getAreaBounds, rotateVertices])
   
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Panning
+    // Panning (already started)
     if (isPanning) {
       setPan(p => ({
         x: p.x + (e.clientX - lastPan.x),
@@ -2408,6 +2434,25 @@ export default function FloorPlanCanvas({
       }))
       setLastPan({ x: e.clientX, y: e.clientY })
       return
+    }
+    
+    // Right-click drag detection - start panning if moved enough
+    if (rightClickStart && !isPanning) {
+      const dx = e.clientX - rightClickStart.x
+      const dy = e.clientY - rightClickStart.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      
+      // If moved more than 5 pixels, start panning
+      if (distance > 5) {
+        setIsPanning(true)
+        setRightClickMoved(true)
+        setPan(p => ({
+          x: p.x + (e.clientX - lastPan.x),
+          y: p.y + (e.clientY - lastPan.y)
+        }))
+        setLastPan({ x: e.clientX, y: e.clientY })
+        return
+      }
     }
     
     const pos = getGridPos(e)
@@ -2547,14 +2592,22 @@ export default function FloorPlanCanvas({
     if (dragItem) {
       setDragItem({ ...dragItem, x: pos.x, y: pos.y })
     }
-  }, [editingVertex, selectedItem, dragItem, vertices, items, areas, dragOffset, getGridPos, isPanning, lastPan, wallEditMode, isDraggingVertex, selectedVertexIdx, isRotating, rotationStartAngle, itemStartRotation, isDraggingAreaVertex, selectedAreaId, selectedAreaVertexIdx, isDraggingArea, areaDragStart, areaOriginalVertices, findSnapPoints, isRotatingArea, areaRotationStart, areaOriginalRotation, rotateVertices])
+  }, [editingVertex, selectedItem, dragItem, vertices, items, areas, dragOffset, getGridPos, isPanning, lastPan, wallEditMode, isDraggingVertex, selectedVertexIdx, isRotating, rotationStartAngle, itemStartRotation, isDraggingAreaVertex, selectedAreaId, selectedAreaVertexIdx, isDraggingArea, areaDragStart, areaOriginalVertices, findSnapPoints, isRotatingArea, areaRotationStart, areaOriginalRotation, rotateVertices, rightClickStart])
   
   const handleMouseUp = useCallback(() => {
+    // Reset right-click tracking
+    if (rightClickStart) {
+      setRightClickStart(null)
+    }
+    
     if (isPanning) {
       setIsPanning(false)
       setWasPanning(true) // Mark that we just finished panning
       // Reset wasPanning after a short delay so context menu doesn't show
-      setTimeout(() => setWasPanning(false), 100)
+      setTimeout(() => {
+        setWasPanning(false)
+        setRightClickMoved(false)
+      }, 100)
       return
     }
     
@@ -2638,7 +2691,7 @@ export default function FloorPlanCanvas({
     }
     
     setEditingVertex(null)
-  }, [dragItem, items, vertices, wallOpenings, editingVertex, isPanning, isInsideWarehouse, hasCollision, saveToHistory, findClosestWall, wallEditMode, isDraggingVertex, isRotating, isDraggingAreaVertex, isDraggingArea, isRotatingArea])
+  }, [dragItem, items, vertices, wallOpenings, editingVertex, isPanning, isInsideWarehouse, hasCollision, saveToHistory, findClosestWall, wallEditMode, isDraggingVertex, isRotating, isDraggingAreaVertex, isDraggingArea, isRotatingArea, rightClickStart])
   
   // Double click to add vertex
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -2672,8 +2725,11 @@ export default function FloorPlanCanvas({
     }
   }, [])
   
-  // Attach non-passive wheel listener
+  // Attach non-passive wheel listener (re-attach when viewMode changes to 2D)
   useEffect(() => {
+    // Only attach when in 2D mode
+    if (viewMode !== '2D') return
+    
     const canvas = canvasRef.current
     if (!canvas) return
     
@@ -2685,7 +2741,7 @@ export default function FloorPlanCanvas({
     return () => {
       canvas.removeEventListener('wheel', wheelHandler)
     }
-  }, [])
+  }, [viewMode])
   
   // Dynamic canvas sizing based on container
   useEffect(() => {
@@ -3462,7 +3518,7 @@ export default function FloorPlanCanvas({
           <div className="flex items-center gap-4 text-sm">
             <span className="flex items-center gap-1">
               <span className="text-slate-400">📐</span>
-              <span className="font-medium">{totalArea.toLocaleString()} sq ft</span>
+              <span className="font-medium">{formatNumber(totalArea)} sq ft</span>
             </span>
             <span className="flex items-center gap-1">
               <span className="text-slate-400">📊</span>
@@ -3499,7 +3555,11 @@ export default function FloorPlanCanvas({
           <div className="flex gap-1 bg-slate-700 rounded p-1">
             <button 
               className={`px-4 py-1 rounded text-sm font-medium transition-colors ${viewMode === '2D' ? 'bg-blue-600' : 'hover:bg-slate-600'}`}
-              onClick={() => setViewMode('2D')}
+              onClick={() => {
+                setViewMode('2D')
+                // Force fit to screen after switching to 2D
+                setTimeout(() => fitToScreen(vertices, canvasSize), 100)
+              }}
             >2D</button>
             <button 
               className={`px-4 py-1 rounded text-sm font-medium transition-colors ${viewMode === '3D' ? 'bg-blue-600' : 'hover:bg-slate-600'}`}
@@ -4049,7 +4109,7 @@ export default function FloorPlanCanvas({
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-slate-400">📐 Footprint:</span>
-                                <span className="font-bold">{(editingItem.w * editingItem.h).toLocaleString()} sq ft</span>
+                                <span className="font-bold">{formatNumber(editingItem.w * editingItem.h)} sq ft</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-slate-400">🏗️ Bay Count:</span>
@@ -4155,6 +4215,210 @@ export default function FloorPlanCanvas({
                         </div>
                       )}
                       
+                      {/* Column Configuration */}
+                      {editingItem.columnType && (
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                            <span>🏛️</span> Column Configuration
+                          </h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Column Type</label>
+                              <select
+                                value={editingItem.columnType}
+                                onChange={(e) => {
+                                  const newType = e.target.value as 'round' | 'square' | 'rectangular' | 'custom'
+                                  setEditingItem(prev => prev ? { 
+                                    ...prev, 
+                                    columnType: newType,
+                                    // For rectangular, add depth; for round/square, keep same
+                                    columnDepth: newType === 'rectangular' ? (prev.columnDepth || prev.columnSize || 12) : undefined,
+                                    // Make width/height equal for round and square
+                                    h: (newType === 'round' || newType === 'square') ? prev.w : prev.h
+                                  } : null)
+                                }}
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                              >
+                                <option value="round">⚪ Round</option>
+                                <option value="square">⬜ Square</option>
+                                <option value="rectangular">▬ Rectangular</option>
+                                <option value="custom">🔧 Custom</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">
+                                {editingItem.columnType === 'round' ? 'Diameter (in)' : 'Width (in)'}
+                              </label>
+                              <input
+                                type="number"
+                                value={editingItem.columnSize || 12}
+                                onChange={(e) => {
+                                  const size = Number(e.target.value) || 12
+                                  const sizeInFeet = size / 12
+                                  setEditingItem(prev => prev ? { 
+                                    ...prev, 
+                                    columnSize: size,
+                                    w: sizeInFeet,
+                                    // For round/square, keep height equal to width
+                                    h: (prev.columnType === 'round' || prev.columnType === 'square') ? sizeInFeet : prev.h
+                                  } : null)
+                                }}
+                                min="6"
+                                max="48"
+                                step="1"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                            {(editingItem.columnType === 'rectangular' || editingItem.columnType === 'custom') && (
+                              <div>
+                                <label className="text-xs text-slate-500 block mb-1">Depth (in)</label>
+                                <input
+                                  type="number"
+                                  value={editingItem.columnDepth || editingItem.columnSize || 12}
+                                  onChange={(e) => {
+                                    const depth = Number(e.target.value) || 12
+                                    setEditingItem(prev => prev ? { 
+                                      ...prev, 
+                                      columnDepth: depth,
+                                      h: depth / 12
+                                    } : null)
+                                  }}
+                                  min="6"
+                                  max="48"
+                                  step="1"
+                                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                                />
+                              </div>
+                            )}
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Height (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.height || 10}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, height: Number(e.target.value) || 10 } : null)}
+                                min="6"
+                                max="40"
+                                step="1"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Column Info */}
+                          <div className="mt-4 p-3 bg-slate-900 rounded-lg text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">🏷️ Type:</span>
+                              <span className="font-bold capitalize">
+                                {editingItem.columnType === 'round' ? '⚪ Round Column' : 
+                                 editingItem.columnType === 'square' ? '⬜ Square Column' :
+                                 editingItem.columnType === 'rectangular' ? '▬ Rectangular Column' :
+                                 '🔧 Custom Column'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between mt-2">
+                              <span className="text-slate-400">📏 Dimensions:</span>
+                              <span className="font-bold">
+                                {editingItem.columnType === 'round' 
+                                  ? `${editingItem.columnSize || 12}" diameter`
+                                  : editingItem.columnType === 'rectangular' || editingItem.columnType === 'custom'
+                                    ? `${editingItem.columnSize || 12}" × ${editingItem.columnDepth || editingItem.columnSize || 12}"`
+                                    : `${editingItem.columnSize || 12}" × ${editingItem.columnSize || 12}"`
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Door Configuration */}
+                      {editingItem.wallItem && (editingItem.id === 'door' || editingItem.id === 'double-door' || editingItem.name?.toLowerCase().includes('door')) && (
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                            <span>🚪</span> Door Configuration
+                          </h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Door Width (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.doorWidth || editingItem.w || 3}
+                                onChange={(e) => {
+                                  const width = Number(e.target.value) || 3
+                                  setEditingItem(prev => prev ? { ...prev, doorWidth: width, w: width } : null)
+                                }}
+                                min="2"
+                                max="20"
+                                step="0.5"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Door Height (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.doorHeight || editingItem.height || 7}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, doorHeight: Number(e.target.value) || 7, height: Number(e.target.value) || 7 } : null)}
+                                min="6"
+                                max="20"
+                                step="0.5"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Door Info */}
+                          <div className="mt-4 p-3 bg-slate-900 rounded-lg text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">🏷️ Type:</span>
+                              <span className="font-bold">
+                                {editingItem.id === 'double-door' || (editingItem.doorWidth || editingItem.w || 3) >= 6 
+                                  ? '🚪🚪 Double Door' 
+                                  : '🚪 Single Door'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between mt-2">
+                              <span className="text-slate-400">📏 Opening Size:</span>
+                              <span className="font-bold">{editingItem.doorWidth || editingItem.w || 3} ft × {editingItem.doorHeight || editingItem.height || 7} ft</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Window Configuration */}
+                      {editingItem.wallItem && editingItem.id === 'window' && (
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                            <span>🪟</span> Window Configuration
+                          </h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Window Width (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.w || 4}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, w: Number(e.target.value) || 4 } : null)}
+                                min="1"
+                                max="20"
+                                step="0.5"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 block mb-1">Window Height (ft)</label>
+                              <input
+                                type="number"
+                                value={editingItem.height || 4}
+                                onChange={(e) => setEditingItem(prev => prev ? { ...prev, height: Number(e.target.value) || 4 } : null)}
+                                min="1"
+                                max="12"
+                                step="0.5"
+                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-center focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Cage Configuration */}
                       {editingItem.barrierType === 'cage' && (
                         <div>
@@ -4190,7 +4454,7 @@ export default function FloorPlanCanvas({
                           <div className="mt-4 p-3 bg-slate-900 rounded-lg text-sm">
                             <div className="flex justify-between">
                               <span className="text-slate-400">📐 Cage Area:</span>
-                              <span className="font-bold">{(editingItem.w * editingItem.h).toLocaleString()} sq ft</span>
+                              <span className="font-bold">{formatNumber(editingItem.w * editingItem.h)} sq ft</span>
                             </div>
                           </div>
                         </div>
@@ -4232,7 +4496,7 @@ export default function FloorPlanCanvas({
                           <div className="mt-4 p-3 bg-slate-900 rounded-lg grid grid-cols-2 gap-3 text-sm">
                             <div className="flex justify-between">
                               <span className="text-slate-400">📐 Area:</span>
-                              <span className="font-bold">{(editingItem.w * editingItem.h).toLocaleString()} sq ft</span>
+                              <span className="font-bold">{formatNumber(editingItem.w * editingItem.h)} sq ft</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-400">🏷️ Type:</span>
@@ -4431,7 +4695,7 @@ export default function FloorPlanCanvas({
               <span className="text-yellow-400">[Del] Delete</span>
               <span className="text-yellow-400">[Ctrl+D] Dup</span>
               <span className="text-yellow-400">[Scroll] Zoom</span>
-              <span className="text-yellow-400">[Mid] Pan</span>
+              <span className="text-yellow-400">[Right+Drag] Pan</span>
               {selectedItem !== null && (
                 <button 
                   onClick={deleteSelected} 
@@ -4592,7 +4856,7 @@ export default function FloorPlanCanvas({
               📊 Summary
               {summaryCollapsed && (
                 <span className="text-xs font-normal text-slate-400 ml-2">
-                  {totalArea.toLocaleString()} sq ft • {utilization}% • {totalPallets} pallets
+                  {formatNumber(totalArea)} sq ft • {utilization}% • {formatNumber(totalPallets)} pallets
                 </span>
               )}
             </h3>
@@ -4605,15 +4869,15 @@ export default function FloorPlanCanvas({
             <div className="px-4 pb-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-400">Total Area</span>
-                <span className="font-medium">{totalArea.toLocaleString()} sq ft</span>
+                <span className="font-medium">{formatNumber(totalArea)} sq ft</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Equipment</span>
-                <span className="font-medium">{equipArea.toLocaleString()} sq ft</span>
+                <span className="font-medium">{formatNumber(equipArea)} sq ft</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Open Area</span>
-                <span className="font-medium">{Math.max(0, totalArea - equipArea).toLocaleString()} sq ft</span>
+                <span className="font-medium">{formatNumber(Math.max(0, totalArea - equipArea))} sq ft</span>
               </div>
               
               {/* Zone Stats */}
@@ -4621,15 +4885,15 @@ export default function FloorPlanCanvas({
               <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Rental Zones</div>
               <div className="flex justify-between">
                 <span className="text-slate-400">📦 Pallet Zones</span>
-                <span className="font-medium text-blue-400">{palletZones.length} ({palletZoneArea.toLocaleString()} sq ft)</span>
+                <span className="font-medium text-blue-400">{palletZones.length} ({formatNumber(palletZoneArea)} sq ft)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">📐 Space Zones</span>
-                <span className="font-medium text-purple-400">{spaceZones.length} ({spaceZoneArea.toLocaleString()} sq ft)</span>
+                <span className="font-medium text-purple-400">{spaceZones.length} ({formatNumber(spaceZoneArea)} sq ft)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">🔒 Rented Spaces</span>
-                <span className="font-medium text-green-400">{rentedMarkers.length} ({rentedArea.toLocaleString()} sq ft)</span>
+                <span className="font-medium text-green-400">{rentedMarkers.length} ({formatNumber(rentedArea)} sq ft)</span>
               </div>
               
               <div className="h-px bg-slate-700 my-2" />
@@ -4770,7 +5034,7 @@ export default function FloorPlanCanvas({
                         <span className="text-xs text-slate-400 capitalize">{area.type.replace('-', ' ')}</span>
                       </div>
                       <div className="text-xs text-slate-400 mt-1">
-                        {area.vertices?.length || 0} vertices • {areaSize.toLocaleString()} sq ft
+                        {area.vertices?.length || 0} vertices • {formatNumber(areaSize)} sq ft
                       </div>
                       {selectedAreaId === area.id && (
                         <div className="flex gap-2 mt-2 pt-2 border-t border-slate-600">
@@ -4807,13 +5071,13 @@ export default function FloorPlanCanvas({
                 <div>
                   <span className="text-slate-400">Pallet Storage:</span>
                   <span className="ml-1 font-medium text-blue-400">
-                    {areas.filter(a => a.type === 'pallet-storage').reduce((sum, a) => sum + calcPolygonArea(a.vertices || []), 0).toLocaleString()} sq ft
+                    {formatNumber(areas.filter(a => a.type === 'pallet-storage').reduce((sum, a) => sum + calcPolygonArea(a.vertices || []), 0))} sq ft
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400">Space Storage:</span>
                   <span className="ml-1 font-medium text-green-400">
-                    {areas.filter(a => a.type === 'space-storage').reduce((sum, a) => sum + calcPolygonArea(a.vertices || []), 0).toLocaleString()} sq ft
+                    {formatNumber(areas.filter(a => a.type === 'space-storage').reduce((sum, a) => sum + calcPolygonArea(a.vertices || []), 0))} sq ft
                   </span>
                 </div>
               </div>
@@ -4880,7 +5144,7 @@ export default function FloorPlanCanvas({
                   </div>
                   <div>
                     <span className="text-slate-400">Size:</span>
-                    <span className="ml-1 font-medium">{calcPolygonArea(editingArea.vertices || []).toLocaleString()} sq ft</span>
+                    <span className="ml-1 font-medium">{formatNumber(calcPolygonArea(editingArea.vertices || []))} sq ft</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">

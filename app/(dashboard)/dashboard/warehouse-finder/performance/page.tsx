@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatCard } from "@/components/ui/stat-card"
 import { TrendingUp, Calendar, Building2, Users } from "@/components/icons"
 import type { CRMPerformanceMetrics } from "@/types"
+import { formatNumber } from "@/lib/utils/format"
 
 export default function WarehouseFinderPerformancePage() {
   const [metrics, setMetrics] = useState<CRMPerformanceMetrics | null>(null)
@@ -134,7 +135,7 @@ export default function WarehouseFinderPerformancePage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-3xl font-bold">${(metrics.totalRevenueGenerated || 0).toLocaleString()}</div>
+              <div className="text-3xl font-bold">${formatNumber(metrics.totalRevenueGenerated || 0)}</div>
               <div className="text-sm text-muted-foreground mt-1">Total Revenue</div>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">

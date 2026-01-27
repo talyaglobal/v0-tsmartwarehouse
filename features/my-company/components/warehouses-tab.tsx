@@ -16,6 +16,7 @@ import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { api } from "@/lib/api/client"
 import Link from "next/link"
+import { formatNumber } from "@/lib/utils/format"
 
 interface WarehouseData {
   id: string
@@ -161,10 +162,10 @@ export function WarehousesTab() {
                       {warehouse.address}, {warehouse.city} {warehouse.zip_code}
                     </TableCell>
                     <TableCell>
-                      {warehouse.total_sq_ft?.toLocaleString()} sq ft
+                      {formatNumber(warehouse.total_sq_ft)} sq ft
                       {warehouse.total_pallet_storage && (
                         <span className="text-muted-foreground ml-2">
-                          • {warehouse.total_pallet_storage.toLocaleString()} pallets
+                          • {formatNumber(warehouse.total_pallet_storage)} pallets
                         </span>
                       )}
                     </TableCell>

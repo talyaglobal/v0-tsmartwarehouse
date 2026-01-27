@@ -342,7 +342,9 @@ function FloorPlan3DSimple({
 
     // Camera - initial position
     const dist = bounds.size * 1.2
-    t.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 500)
+    // Set far plane based on warehouse size to ensure visibility
+    const farPlane = Math.max(5000, bounds.size * 10)
+    t.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, farPlane)
     t.camera.position.set(bounds.cx + dist, dist * 0.7, bounds.cy + dist)
     t.camera.lookAt(bounds.cx, 0, bounds.cy)
 
@@ -378,13 +380,17 @@ function FloorPlan3DSimple({
     // sun.castShadow = false - shadows disabled globally
     t.scene.add(sun)
 
-    // Grid - covers entire scene, centered on warehouse
-    const gridSize = 500
-    const gridDivisions = 500 // 1 foot per square
+    // Grid - infinite appearance, centered on warehouse
+    const gridSize = 10000 // Very large grid for infinite appearance
+    const gridDivisions = 10000 // 1 foot per square
     const grid = new THREE.GridHelper(gridSize, gridDivisions, 0x334155, 0x1e293b)
-    // Center grid on warehouse bounds
     grid.position.set(bounds.cx, -0.02, bounds.cy)
     t.scene.add(grid)
+    
+    // Add a secondary major grid (every 10 feet)
+    const majorGrid = new THREE.GridHelper(gridSize, gridDivisions / 10, 0x475569, 0x334155)
+    majorGrid.position.set(bounds.cx, -0.01, bounds.cy)
+    t.scene.add(majorGrid)
 
     // Groups for organized updates
     t.floorGroup = new THREE.Group()
@@ -452,6 +458,36 @@ function FloorPlan3DSimple({
       t.initialized = false
     }
   }, [bounds.cx, bounds.cy, bounds.size, handlePointerDown, handlePointerMove, handlePointerUp])
+
+  // Update camera position when bounds change (after initialization)
+  useEffect(() => {
+    const t = threeRef.current
+    if (!t.initialized || !t.camera || !t.controls) return
+    
+    // Check if bounds have significantly changed (not default values)
+    const dist = bounds.size * 1.2
+    
+    // Update camera far plane for large warehouses
+    const farPlane = Math.max(5000, bounds.size * 10)
+    t.camera.far = farPlane
+    t.camera.updateProjectionMatrix()
+    
+    // Update camera position
+    t.camera.position.set(bounds.cx + dist, dist * 0.7, bounds.cy + dist)
+    t.camera.lookAt(bounds.cx, 0, bounds.cy)
+    
+    // Update controls target
+    t.controls.target.set(bounds.cx, 0, bounds.cy)
+    t.controls.update()
+    
+    // Update grid positions
+    if (t.scene) {
+      const grids = t.scene.children.filter(child => child instanceof THREE.GridHelper)
+      grids.forEach((grid, idx) => {
+        grid.position.set(bounds.cx, idx === 0 ? -0.02 : -0.01, bounds.cy)
+      })
+    }
+  }, [bounds.cx, bounds.cy, bounds.size])
 
   // Build floor when vertices change
   useEffect(() => {

@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MapPin, Heart, Package, Ruler, CheckCircle2 } from "lucide-react"
-import { formatCurrency } from "@/lib/utils/format"
+import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { formatPricingUnit } from "@/lib/utils/format-unit"
 import { RatingStars } from "./rating-stars"
 import { PhotoGallery } from "./photo-gallery"
@@ -289,13 +289,13 @@ export function WarehouseCard({
                   {warehouse.available_sq_ft > 0 && (
                     <div className="flex items-center gap-1">
                       <Ruler className="h-4 w-4" />
-                      <span>{warehouse.available_sq_ft.toLocaleString()} sq ft</span>
+                      <span>{formatNumber(warehouse.available_sq_ft)} sq ft</span>
                     </div>
                   )}
                   {warehouse.available_pallet_storage > 0 && (
                     <div className="flex items-center gap-1">
                       <Package className="h-4 w-4" />
-                      <span>{warehouse.available_pallet_storage.toLocaleString()} pallets</span>
+                      <span>{formatNumber(warehouse.available_pallet_storage)} pallets</span>
                     </div>
                   )}
                 </div>
@@ -398,10 +398,10 @@ export function WarehouseCard({
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
             {warehouse.available_sq_ft > 0 && (
-              <span>{warehouse.available_sq_ft.toLocaleString()} sq ft</span>
+              <span>{formatNumber(warehouse.available_sq_ft)} sq ft</span>
             )}
             {warehouse.available_pallet_storage > 0 && (
-              <span>• {warehouse.available_pallet_storage.toLocaleString()} pallets</span>
+              <span>• {formatNumber(warehouse.available_pallet_storage)} pallets</span>
             )}
           </div>
           {(goodsTypeBadges.length > 0 || securityBadges.length > 0) && (

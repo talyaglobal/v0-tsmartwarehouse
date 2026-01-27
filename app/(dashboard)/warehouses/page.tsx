@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Building2, MapPin, Package, Search } from '@/components/icons'
 import { api } from '@/lib/api/client'
 import type { Warehouse } from '@/types'
+import { formatNumber } from '@/lib/utils/format'
 
 export default function WarehouseMarketplacePage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -94,7 +95,7 @@ export default function WarehouseMarketplacePage() {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Package className="h-4 w-4" />
-                  <span>{warehouse.totalSqFt.toLocaleString()} sq ft</span>
+                  <span>{formatNumber(warehouse.totalSqFt)} sq ft</span>
                 </div>
                 <div className="pt-2 border-t">
                   <Link href={`/warehouses/${warehouse.id}/book`}>

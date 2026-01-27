@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ArrowLeft, Package, Building2, Loader2, CheckCircle, Edit, Calendar, MapPin, FileText, User } from "@/components/icons"
 import { Ruler } from "lucide-react"
-import { formatDate, formatDateTime, getBookingTypeLabel } from "@/lib/utils/format"
+import { formatDate, formatDateTime, getBookingTypeLabel, formatNumber } from "@/lib/utils/format"
 import type { Booking } from "@/types"
 import type { WarehouseSearchResult } from "@/types/marketplace"
 import { api } from "@/lib/api/client"
@@ -200,7 +200,7 @@ export default function WarehouseStaffBookingDetailPage({
                 <CardDescription>
                   {booking.type === "pallet"
                     ? `${booking.palletCount} pallets`
-                    : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+                    : `${formatNumber(booking.areaSqFt)} sq ft`}
                 </CardDescription>
               </div>
             </div>
@@ -305,7 +305,7 @@ export default function WarehouseStaffBookingDetailPage({
                 {booking.areaSqFt && (
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Area</span>
-                    <span className="text-sm font-medium">{booking.areaSqFt.toLocaleString()} sq ft</span>
+                    <span className="text-sm font-medium">{formatNumber(booking.areaSqFt)} sq ft</span>
                   </div>
                 )}
                 {booking.floorNumber && (
@@ -398,7 +398,7 @@ export default function WarehouseStaffBookingDetailPage({
                   <div>
                     <p className="text-sm text-muted-foreground">Total Area</p>
                     <p className="font-semibold">
-                      {warehouse.total_sq_ft.toLocaleString()} sq ft
+                      {formatNumber(warehouse.total_sq_ft)} sq ft
                     </p>
                   </div>
                 </div>
@@ -409,7 +409,7 @@ export default function WarehouseStaffBookingDetailPage({
                   <div>
                     <p className="text-sm text-muted-foreground">Pallet Storage</p>
                     <p className="font-semibold">
-                      {warehouse.total_pallet_storage.toLocaleString()} pallets
+                      {formatNumber(warehouse.total_pallet_storage)} pallets
                     </p>
                   </div>
                 </div>

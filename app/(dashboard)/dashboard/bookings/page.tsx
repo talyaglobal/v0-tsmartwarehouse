@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle, DollarSign } from "@/components/icons"
-import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
+import { formatCurrency, formatDate, getBookingTypeLabel, formatNumber } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
@@ -320,7 +320,7 @@ export default function BookingsPage() {
                   <TableCell>
                     {booking.type === "pallet"
                       ? `${booking.palletCount} pallets`
-                      : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+                      : `${formatNumber(booking.areaSqFt)} sq ft`}
                   </TableCell>
                   <TableCell>{formatDate(booking.startDate)}</TableCell>
                   <TableCell>{formatCurrency(booking.totalAmount)}</TableCell>

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { MapPin, Search, Loader2, Building2 } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import type { WarehouseDiscoveryResult } from "@/types"
+import { formatNumber } from "@/lib/utils/format"
 
 export default function WarehouseFinderMapPage() {
   const [warehouses, setWarehouses] = useState<WarehouseDiscoveryResult[]>([])
@@ -108,7 +109,7 @@ export default function WarehouseFinderMapPage() {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Total Size:</span>
-                        <span className="font-medium">{warehouse.totalSqFt.toLocaleString()} sq ft</span>
+                        <span className="font-medium">{formatNumber(warehouse.totalSqFt)} sq ft</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Distance:</span>

@@ -642,13 +642,13 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
         id: hp.id,
         heightMinCm: hp.height_min_cm,
         heightMaxCm: hp.height_max_cm,
-        pricePerUnit: parseFloat(hp.price_per_unit.toString()),
+        pricePerUnit: hp.price_per_unit != null ? parseFloat(hp.price_per_unit.toString()) : 0,
       }))
       const weightRanges = (pp.warehouse_pallet_weight_pricing || []).map((wp: any) => ({
         id: wp.id,
-        weightMinKg: parseFloat(wp.weight_min_kg.toString()),
-        weightMaxKg: parseFloat(wp.weight_max_kg.toString()),
-        pricePerPallet: parseFloat(wp.price_per_pallet.toString()),
+        weightMinKg: wp.weight_min_kg != null ? parseFloat(wp.weight_min_kg.toString()) : 0,
+        weightMaxKg: wp.weight_max_kg != null ? parseFloat(wp.weight_max_kg.toString()) : 0,
+        pricePerPallet: wp.price_per_pallet != null ? parseFloat(wp.price_per_pallet.toString()) : 0,
       }))
 
       return {

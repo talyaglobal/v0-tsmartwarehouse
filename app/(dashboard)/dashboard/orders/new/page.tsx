@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { PageHeader } from "@/components/ui/page-header"
 import { ShoppingCart, Plus, Trash, Loader2, DollarSign } from "@/components/icons"
-import { formatCurrency } from "@/lib/utils/format"
+import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import { useUser } from "@/lib/hooks/use-user"
@@ -205,7 +205,7 @@ export default function NewOrderPage() {
                           <SelectItem key={booking.id} value={booking.id}>
                             {booking.type === "pallet" 
                               ? `${booking.palletCount} pallets` 
-                              : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+                              : `${formatNumber(booking.areaSqFt)} sq ft`}
                           </SelectItem>
                         ))}
                       </>

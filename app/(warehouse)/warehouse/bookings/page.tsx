@@ -31,7 +31,7 @@ import {
   AlertCircle,
   MapPin
 } from "@/components/icons"
-import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
+import { formatCurrency, formatDate, getBookingTypeLabel, formatNumber } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
@@ -677,7 +677,7 @@ function EnhancedBookingCard({ booking }: { booking: BookingWithWarehouse }) {
           ) : booking.areaSqFt ? (
             <div>
               <span className="text-muted-foreground block text-xs mb-1">Area</span>
-              <span className="font-medium">{booking.areaSqFt.toLocaleString()} sq ft</span>
+              <span className="font-medium">{formatNumber(booking.areaSqFt)} sq ft</span>
             </div>
           ) : null}
         </div>

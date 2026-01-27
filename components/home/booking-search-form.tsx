@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Search } from "@/components/icons"
 import { cn } from "@/lib/utils"
+import { formatNumber } from "@/lib/utils/format"
 
 type StorageType = "pallet" | "area-rental"
 
@@ -49,7 +50,8 @@ export function BookingSearchForm({
   const [startDate, setStartDate] = useState(initialValues?.startDate || "")
   const [endDate, setEndDate] = useState(initialValues?.endDate || "")
   const [monthDuration, setMonthDuration] = useState<string>("1") // For area rental quick selection
-  const [minSpaceLimit, setMinSpaceLimit] = useState<number>(1000) // Dynamic minimum based on location
+  const [minSpaceLimit, setMinSpaceLimit] = useState<number | null>(null) // Dynamic minimum based on location
+  const [hasMinimumSpace, setHasMinimumSpace] = useState(false) // Whether location has minimum space defined
   const [isLoadingMinSpace, setIsLoadingMinSpace] = useState(false)
 
   // Fetch minimum space requirement for the selected location
@@ -64,14 +66,19 @@ export function BookingSearchForm({
       if (response.ok) {
         const data = await response.json()
         console.log("[BookingSearchForm] API response:", data)
-        const newMinSpace = data.minSpace || 1000
-        setMinSpaceLimit(newMinSpace)
         
-        // Update areaSqFt if current value is below new minimum or empty
-        const currentValue = parseInt(areaSqFt) || 0
-        if (currentValue < newMinSpace || areaSqFt === "") {
-          console.log("[BookingSearchForm] Updating areaSqFt to:", newMinSpace)
-          setAreaSqFt(newMinSpace.toString())
+        if (data.hasMinimum && data.minSpace) {
+          // Warehouse has minimum space defined
+          setMinSpaceLimit(data.minSpace)
+          setHasMinimumSpace(true)
+          setAreaSqFt(data.minSpace.toString())
+          console.log("[BookingSearchForm] Setting areaSqFt to minimum:", data.minSpace)
+        } else {
+          // No minimum space defined - leave field empty
+          setMinSpaceLimit(null)
+          setHasMinimumSpace(false)
+          setAreaSqFt("")
+          console.log("[BookingSearchForm] No minimum defined, clearing areaSqFt")
         }
       } else {
         console.error("[BookingSearchForm] API error:", response.status)
@@ -81,7 +88,7 @@ export function BookingSearchForm({
     } finally {
       setIsLoadingMinSpace(false)
     }
-  }, [areaSqFt])
+  }, [])
 
   // Fetch min space when location changes (for area-rental type)
   useEffect(() => {
@@ -113,6 +120,11 @@ export function BookingSearchForm({
     return startDate
   }
 
+  const handleAreaSqFtChange = (value: string) => {
+    const digitsOnly = value.replace(/\D/g, "")
+    setAreaSqFt(digitsOnly)
+  }
+
   // When start date changes for area rental, update end date based on duration
   const handleStartDateChange = (newStartDate: string) => {
     setStartDate(newStartDate)
@@ -142,7 +154,7 @@ export function BookingSearchForm({
     if (value === "pallet") {
       setPalletCount("1")
     } else {
-      setAreaSqFt(minSpaceLimit.toString()) // Use dynamic minimum for area rental
+      setAreaSqFt(minSpaceLimit ? minSpaceLimit.toString() : "") // Use dynamic minimum for area rental if defined
       setMonthDuration("1") // Reset to 1 month
       // Update end date if start date exists
       if (startDate) {
@@ -178,8 +190,13 @@ export function BookingSearchForm({
       return
     }
 
-    if (storageType === "area-rental" && areaSqFtNum < minSpaceLimit) {
-      alert(`In this area, you can search for a minimum of ${minSpaceLimit.toLocaleString()} sq ft. Please enter a value of ${minSpaceLimit.toLocaleString()} or higher.`)
+    if (storageType === "area-rental" && areaSqFtNum < 1) {
+      alert("Please enter a valid square footage")
+      return
+    }
+
+    if (storageType === "area-rental" && minSpaceLimit && areaSqFtNum < minSpaceLimit) {
+      alert(`In this area, you can search for a minimum of ${formatNumber(minSpaceLimit)} sq ft. Please enter a value of ${formatNumber(minSpaceLimit)} or higher.`)
       return
     }
 
@@ -284,15 +301,14 @@ export function BookingSearchForm({
                   </Label>
                   <Input
                     id="area-sqft"
-                    type="number"
-                    min={minSpaceLimit}
-                    step="1000"
-                    value={areaSqFt}
-                    onChange={(e) => setAreaSqFt(e.target.value)}
-                    placeholder={minSpaceLimit.toLocaleString()}
+                    type="text"
+                    inputMode="numeric"
+                    value={areaSqFt ? formatNumber(parseInt(areaSqFt, 10)) : ""}
+                    onChange={(e) => handleAreaSqFtChange(e.target.value)}
+                    placeholder={minSpaceLimit ? formatNumber(minSpaceLimit) : "Enter sq ft"}
                     required
                     className="h-10 w-full"
-                    title={location ? `Minimum available in this area: ${minSpaceLimit.toLocaleString()} sq ft` : "Enter area in square feet"}
+                    title={minSpaceLimit ? `Minimum available in this area: ${formatNumber(minSpaceLimit)} sq ft` : "Enter area in square feet"}
                   />
                 </div>
               )}
@@ -430,20 +446,19 @@ export function BookingSearchForm({
                     </Label>
                     <Input
                       id="area-sqft"
-                      type="number"
-                      min={minSpaceLimit}
-                      step="1000"
-                      value={areaSqFt}
-                      onChange={(e) => setAreaSqFt(e.target.value)}
-                      placeholder={minSpaceLimit.toLocaleString()}
+                      type="text"
+                      inputMode="numeric"
+                      value={areaSqFt ? formatNumber(parseInt(areaSqFt, 10)) : ""}
+                      onChange={(e) => handleAreaSqFtChange(e.target.value)}
+                      placeholder={minSpaceLimit ? formatNumber(minSpaceLimit) : "Enter sq ft"}
                       required
                       className="w-32"
-                      title={`Minimum available: ${minSpaceLimit.toLocaleString()} sq ft`}
+                      title={minSpaceLimit ? `Minimum available: ${formatNumber(minSpaceLimit)} sq ft` : "Enter area in square feet"}
                     />
                   </div>
-                  {location && (
+                  {location && hasMinimumSpace && (
                     <p className="text-xs text-muted-foreground text-right">
-                      {isLoadingMinSpace ? "Loading..." : `Minimum available: ${minSpaceLimit.toLocaleString()} sq ft`}
+                      {isLoadingMinSpace ? "Loading..." : `Minimum available: ${formatNumber(minSpaceLimit)} sq ft`}
                     </p>
                   )}
                 </div>

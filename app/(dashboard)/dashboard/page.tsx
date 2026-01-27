@@ -10,7 +10,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2, AlertCircle, Calendar, Settings, Truck, MapPin, Users, TrendingUp } from "@/components/icons"
-import { formatCurrency, formatDate } from "@/lib/utils/format"
+import { formatCurrency, formatDate, formatNumber } from "@/lib/utils/format"
 import type { Booking, Invoice, Claim, UserRole } from "@/types"
 import { api } from "@/lib/api/client"
 import { createClient } from "@/lib/supabase/client"
@@ -621,7 +621,7 @@ export default function CustomerDashboardPage() {
                         <p className="font-medium flex items-center gap-2">
                           {booking.type === "pallet"
                             ? `${booking.palletCount} Pallets`
-                            : `${booking.areaSqFt?.toLocaleString()} sq ft Area`}
+                            : `${formatNumber(booking.areaSqFt)} sq ft Area`}
                           {isTestDataSync(booking.customerId, rootUserIds) && (
                             <RootTestDataIndicator />
                           )}
@@ -761,7 +761,7 @@ function PendingActionCard({ booking }: { booking: Booking }) {
           </div>
           <div className="flex-1">
             <p className="font-medium">
-              Booking {booking.id} - {booking.type === "pallet" ? `${booking.palletCount} Pallets` : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+              Booking {booking.id} - {booking.type === "pallet" ? `${booking.palletCount} Pallets` : `${formatNumber(booking.areaSqFt)} sq ft`}
             </p>
             <p className="text-sm text-muted-foreground">
               {hasProposedDateTime

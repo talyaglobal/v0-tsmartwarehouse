@@ -6,6 +6,43 @@ import { Input } from "@/components/ui/input"
 import { MapPin, Loader2 } from "@/components/icons"
 import { cn } from "@/lib/utils"
 
+// US State abbreviations mapping (full name -> abbreviation)
+const US_STATES: Record<string, string> = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+  'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+  'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+  'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
+  'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
+  'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+  'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+  'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
+  'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
+  'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+  'wisconsin': 'WI', 'wyoming': 'WY', 'district of columbia': 'DC',
+}
+
+// Get state abbreviation from full name (exact match)
+function getStateAbbreviation(searchTerm: string): string | null {
+  const lower = searchTerm.toLowerCase().trim()
+  return US_STATES[lower] || null
+}
+
+// Get all state abbreviations that match partial state name
+function getMatchingStateAbbreviations(searchTerm: string): string[] {
+  const lower = searchTerm.toLowerCase().trim()
+  if (lower.length < 2) return []
+  
+  const matches: string[] = []
+  for (const [stateName, abbr] of Object.entries(US_STATES)) {
+    if (stateName.includes(lower) || stateName.startsWith(lower)) {
+      matches.push(abbr.toLowerCase())
+    }
+  }
+  return matches
+}
+
 interface BookingSearchProps {
   value: string
   onChange: (value: string) => void
@@ -70,9 +107,20 @@ export function BookingSearch({
     }
 
     const searchTerm = value.toLowerCase()
-    const matches = cities.filter((city) =>
-      city.toLowerCase().includes(searchTerm)
-    )
+    
+    // Check if search term matches any state name (partial or full) and get abbreviations
+    const matchingStateAbbrs = getMatchingStateAbbreviations(searchTerm)
+    
+    const matches = cities.filter((city) => {
+      const cityLower = city.toLowerCase()
+      // Match direct search term (city name, zip code, etc.)
+      if (cityLower.includes(searchTerm)) return true
+      // If search term matches any state name, also match cities with those state abbreviations
+      for (const abbr of matchingStateAbbrs) {
+        if (cityLower.includes(`, ${abbr}`)) return true
+      }
+      return false
+    })
 
     setFilteredCities(matches)
     setShowSuggestions(matches.length > 0)

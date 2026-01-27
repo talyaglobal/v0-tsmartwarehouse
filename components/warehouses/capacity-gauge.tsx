@@ -2,6 +2,7 @@
 
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils/format'
 
 interface CapacityGaugeProps {
   percentage: number
@@ -23,7 +24,7 @@ export function CapacityGauge({
       {showDetails && (
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">
-            {usedCapacity.toLocaleString()} / {totalCapacity.toLocaleString()}
+            {formatNumber(usedCapacity)} / {formatNumber(totalCapacity)}
           </span>
           <span className="font-semibold">{percentage.toFixed(1)}%</span>
         </div>

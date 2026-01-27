@@ -8,6 +8,7 @@ import { Warehouse } from "@/components/icons"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Building2, User, Check, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatNumber } from "@/lib/utils/format"
 
 // Note: This is a client component, so dynamic export is not needed
 
@@ -25,7 +26,7 @@ function formatStatWithThreshold(value: number): string {
   
   for (const threshold of thresholds) {
     if (value >= threshold) {
-      return `${threshold.toLocaleString()}+`
+      return `${formatNumber(threshold)}+`
     }
   }
   

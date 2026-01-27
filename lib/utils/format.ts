@@ -46,8 +46,10 @@ export function formatDateTime(date: string | Date | null | undefined): string {
   }).format(dateObj)
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat("en-US").format(num)
+export function formatNumber(num: number | null | undefined): string {
+  if (num === null || num === undefined) return "0"
+  // Use Turkish format with dot as thousands separator
+  return new Intl.NumberFormat("tr-TR").format(num)
 }
 
 export function formatSqFt(sqFt: number): string {

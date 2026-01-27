@@ -31,6 +31,7 @@ import { BookingTimeSlotModal } from "./booking-time-slot-modal"
 import { createBookingRequest } from "@/features/bookings/actions"
 import { useUser } from "@/lib/hooks/use-user"
 import type { PalletBookingDetails, WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
+import { formatNumber } from "@/lib/utils/format"
 
 // Helper function to get YouTube embed URL
 function getYouTubeEmbedUrl(url: string): string | null {
@@ -233,8 +234,8 @@ export function WarehouseDetailView({
           const data = await response.json()
           setIsFavorite(data.isFavorite)
         }
-      } catch (error) {
-        console.error("Error fetching favorite status:", error)
+      } catch {
+        // Silently ignore network errors (user may not be logged in or network issue)
       }
     }
     fetchFavoriteStatus()
@@ -811,10 +812,10 @@ export function WarehouseDetailView({
                   <div>
                     <p className="text-sm text-muted-foreground">Total Area</p>
                     <p className="font-semibold">
-                      {warehouse.total_sq_ft.toLocaleString()} sq ft
+                      {formatNumber(warehouse.total_sq_ft)} sq ft
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {warehouse.available_sq_ft.toLocaleString()} sq ft available
+                      {formatNumber(warehouse.available_sq_ft)} sq ft available
                     </p>
                   </div>
                 </div>
@@ -824,10 +825,10 @@ export function WarehouseDetailView({
                     <div>
                     <p className="text-sm text-muted-foreground">Pallet Storage</p>
                       <p className="font-semibold">
-                        {warehouse.total_pallet_storage.toLocaleString()} pallets
+                        {formatNumber(warehouse.total_pallet_storage)} pallets
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {warehouse.available_pallet_storage.toLocaleString()} pallets available
+                        {formatNumber(warehouse.available_pallet_storage)} pallets available
                       </p>
                     </div>
                   </div>
@@ -993,7 +994,7 @@ export function WarehouseDetailView({
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Space Storage Range</p>
                     <p className="font-medium">
-                      {warehouse.min_sq_ft ? `${warehouse.min_sq_ft.toLocaleString()}` : 'No minimum'} - {warehouse.max_sq_ft ? `${warehouse.max_sq_ft.toLocaleString()}` : 'No maximum'} sq ft
+                      {warehouse.min_sq_ft ? `${formatNumber(warehouse.min_sq_ft)}` : 'No minimum'} - {warehouse.max_sq_ft ? `${formatNumber(warehouse.max_sq_ft)}` : 'No maximum'} sq ft
                     </p>
                   </div>
                 )}
@@ -1195,8 +1196,8 @@ export function WarehouseDetailView({
         </div>
 
         {/* Booking Summary Sidebar - Right Side */}
-        <div className="hidden lg:block lg:col-span-1">
-          <div className="space-y-4">
+        <div className="hidden lg:block lg:col-span-1 h-fit">
+          <div className="sticky top-20 space-y-4">
             {(searchParams?.type || searchParams?.startDate || searchParams?.endDate) && (
               <BookingSummary
                 warehouseId={warehouse.id}

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ArrowLeft, Package, Building2, Calendar, MapPin, FileText, Loader2 } from "@/components/icons"
 import { Ruler, CheckCircle2 } from "lucide-react"
-import { formatCurrency, formatDate, getBookingTypeLabel } from "@/lib/utils/format"
+import { formatCurrency, formatDate, getBookingTypeLabel, formatNumber } from "@/lib/utils/format"
 import Link from "next/link"
 import type { Booking } from "@/types"
 import type { WarehouseSearchResult } from "@/types/marketplace"
@@ -155,7 +155,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <CardDescription>
                   {booking.type === "pallet"
                     ? `${booking.palletCount} pallets`
-                    : `${booking.areaSqFt?.toLocaleString()} sq ft`}
+                    : `${formatNumber(booking.areaSqFt)} sq ft`}
                 </CardDescription>
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Area</span>
-                  <span className="text-sm font-medium">{booking.areaSqFt?.toLocaleString()} sq ft</span>
+                  <span className="text-sm font-medium">{formatNumber(booking.areaSqFt)} sq ft</span>
                 </div>
                 {booking.floorNumber && (
                   <div className="flex justify-between">
@@ -359,7 +359,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   <div>
                     <p className="text-sm text-muted-foreground">Total Area</p>
                     <p className="font-semibold">
-                      {warehouse.total_sq_ft.toLocaleString()} sq ft
+                      {formatNumber(warehouse.total_sq_ft)} sq ft
                     </p>
                   </div>
                 </div>
@@ -370,7 +370,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   <div>
                     <p className="text-sm text-muted-foreground">Pallet Storage</p>
                     <p className="font-semibold">
-                      {warehouse.total_pallet_storage.toLocaleString()} pallets
+                      {formatNumber(warehouse.total_pallet_storage)} pallets
                     </p>
                   </div>
                 </div>

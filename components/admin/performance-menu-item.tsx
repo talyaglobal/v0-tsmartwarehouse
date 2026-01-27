@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import type { PerformanceMetrics } from "@/lib/db/performance"
+import { formatNumber } from "@/lib/utils/format"
 
 type FilterType = "all" | "floor" | "warehouse" | "customer" | "broker" | "customer_group"
 
@@ -142,7 +143,7 @@ export function PerformanceMenuItem({ className, compact = false }: PerformanceM
             </div>
             {metrics && (
               <div className="text-xs text-muted-foreground">
-                {metrics.occupiedCapacity.toLocaleString()} / {metrics.totalCapacity.toLocaleString()} sq ft
+                {formatNumber(metrics.occupiedCapacity)} / {formatNumber(metrics.totalCapacity)} sq ft
               </div>
             )}
           </div>

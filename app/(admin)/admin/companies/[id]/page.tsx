@@ -13,6 +13,7 @@ import {
   Mail, Phone, MapPin, Calendar, Trash2
 } from "@/components/icons"
 import { formatDistanceToNow } from "date-fns"
+import { formatNumber } from "@/lib/utils/format"
 
 interface Company {
   id: string
@@ -258,7 +259,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                       <TableRow key={warehouse.id}>
                         <TableCell className="font-medium">{warehouse.name}</TableCell>
                         <TableCell>{warehouse.city}</TableCell>
-                        <TableCell>{warehouse.total_sq_ft?.toLocaleString()} sq ft</TableCell>
+                        <TableCell>{formatNumber(warehouse.total_sq_ft)} sq ft</TableCell>
                         <TableCell>
                           <Badge variant={warehouse.status ? "default" : "secondary"}>
                             {warehouse.status ? "Active" : "Inactive"}

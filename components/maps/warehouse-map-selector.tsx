@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2 } from "@/components/icons"
 import type { WarehouseWithPricing } from "@/app/api/v1/warehouses/by-city/route"
+import { formatNumber } from "@/lib/utils/format"
 
 // Load Google Maps script dynamically
 const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
@@ -214,7 +215,7 @@ export function WarehouseMapSelector({
         ${warehouse.city} ${warehouse.zipCode}
       </p>
       <p class="text-xs text-muted-foreground mb-2">
-        ${warehouse.totalSqFt.toLocaleString()} sq ft
+        ${formatNumber(warehouse.totalSqFt)} sq ft
       </p>
     `
     content.appendChild(selectButton)
