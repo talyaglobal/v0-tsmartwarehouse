@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // POST - Add a new member directly to the client team
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerSupabaseClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {

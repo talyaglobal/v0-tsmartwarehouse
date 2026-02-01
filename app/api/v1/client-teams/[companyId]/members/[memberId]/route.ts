@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // PATCH - Update a client team member
@@ -8,7 +8,7 @@ export async function PATCH(
   { params }: { params: Promise<{ companyId: string; memberId: string }> }
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerSupabaseClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -102,11 +102,11 @@ export async function PATCH(
 
 // DELETE - Remove a member from the client team
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ companyId: string; memberId: string }> }
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerSupabaseClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {

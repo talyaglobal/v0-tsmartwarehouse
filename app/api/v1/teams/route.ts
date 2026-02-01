@@ -22,13 +22,13 @@ export async function GET(request: NextRequest) {
     let teams
     if (myTeams) {
       // Get teams the user is a member of
-      teams = await getUserTeams(authResult.userId)
+      teams = await getUserTeams(authResult.user.id)
     } else if (companyId) {
       // Get all teams in a company (requires permission)
-      teams = await getCompanyTeams(companyId, authResult.userId)
+      teams = await getCompanyTeams(companyId, authResult.user.id)
     } else {
       // Default to user's teams
-      teams = await getUserTeams(authResult.userId)
+      teams = await getUserTeams(authResult.user.id)
     }
 
     const responseData: ApiResponse = {
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       description: description?.trim(),
       companyId,
-      createdBy: authResult.userId,
+      createdBy: authResult.user.id,
     })
 
     const responseData: ApiResponse = {

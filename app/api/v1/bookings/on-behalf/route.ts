@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const { data: bookerProfile } = await supabase
       .from("profiles")
       .select("name, email")
-      .eq("id", authResult.userId)
+      .eq("id", authResult.user.id)
       .single()
 
     const result = await createBookingOnBehalf({
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       months,
       notes,
       membershipTier: customerProfile.membership_tier as MembershipTier | undefined,
-      bookedById: authResult.userId,
+      bookedById: authResult.user.id,
       bookedByName: bookerProfile?.name || bookerProfile?.email || "Team Admin",
       requiresApproval,
       requestMessage,

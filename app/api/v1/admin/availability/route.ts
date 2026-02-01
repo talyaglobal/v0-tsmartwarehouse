@@ -106,10 +106,10 @@ export async function GET() {
     if (companyIds.length > 0) {
       const { data: companies } = await supabase
         .from('companies')
-        .select('id, name')
+        .select('id, short_name')
         .in('id', companyIds)
       
-      companyMap = new Map(companies?.map(c => [c.id, c.name]) || [])
+      companyMap = new Map(companies?.map(c => [c.id, c.short_name]) || [])
     }
 
     // Get active bookings for each warehouse to calculate used capacity

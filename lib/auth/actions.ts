@@ -387,7 +387,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
             // Exact match found - join existing company as MEMBER
             clientCompanyId = existingClientCompany.id
             teamRole = 'member'
-            console.log('Joining existing client company as member:', existingClientCompany.name)
+            console.log('Joining existing client company as member:', existingClientCompany.short_name)
             
             // Find existing team for this company
             const { data: existingTeams } = await supabaseAdmin

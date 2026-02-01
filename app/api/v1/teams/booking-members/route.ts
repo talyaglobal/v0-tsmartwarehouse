@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       return authResult
     }
 
-    const members = await getTeamMembersForBooking(authResult.userId)
+    const members = await getTeamMembersForBooking(authResult.user.id)
 
     const responseData: ApiResponse = {
       success: true,

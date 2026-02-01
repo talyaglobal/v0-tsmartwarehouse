@@ -32,10 +32,14 @@ export async function getApprovals(filters?: GetApprovalsOptions): Promise<Booki
         id,
         customer_id,
         customer_name,
+        customer_email,
         warehouse_id,
         type,
         start_date,
         total_amount,
+        booking_status,
+        created_at,
+        updated_at,
         warehouses:warehouse_id (name)
       )
     `)
@@ -49,12 +53,19 @@ export async function getApprovals(filters?: GetApprovalsOptions): Promise<Booki
   }
 
   if (filters?.customerId) {
-    query = query.in('booking_id', 
-      supabase
-        .from('bookings')
-        .select('id')
-        .eq('customer_id', filters.customerId)
-    )
+    // Get booking IDs for this customer first
+    const { data: customerBookings } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('customer_id', filters.customerId)
+    
+    const bookingIds = customerBookings?.map(b => b.id) || []
+    if (bookingIds.length > 0) {
+      query = query.in('booking_id', bookingIds)
+    } else {
+      // No bookings found, return empty result
+      return []
+    }
   }
 
   if (filters?.status) {
@@ -323,13 +334,23 @@ export async function getApprovalStats(userId: string): Promise<{
   const supabase = await createServerSupabaseClient()
 
   // Get pending approvals where user is the customer
-  const { count: pendingCount } = await supabase
-    .from('booking_approvals')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'pending')
-    .in('booking_id',
-      supabase.from('bookings').select('id').eq('customer_id', userId)
-    )
+  // First, get the user's booking IDs
+  const { data: userBookings } = await supabase
+    .from('bookings')
+    .select('id')
+    .eq('customer_id', userId)
+  
+  const userBookingIds = userBookings?.map(b => b.id) || []
+  
+  let pendingCount = 0
+  if (userBookingIds.length > 0) {
+    const { count } = await supabase
+      .from('booking_approvals')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .in('booking_id', userBookingIds)
+    pendingCount = count || 0
+  }
 
   // Get approved/rejected approvals requested by user
   const { data: requestedStats } = await supabase
@@ -370,10 +391,14 @@ function transformApprovalRow(row: any): BookingApproval {
       id: row.bookings.id,
       customerId: row.bookings.customer_id,
       customerName: row.bookings.customer_name,
+      customerEmail: row.bookings.customer_email || '',
       warehouseId: row.bookings.warehouse_id,
       type: row.bookings.type,
       startDate: row.bookings.start_date,
       totalAmount: row.bookings.total_amount,
+      status: row.bookings.booking_status || 'pending',
+      createdAt: row.bookings.created_at,
+      updatedAt: row.bookings.updated_at,
     } : undefined,
     warehouseName: row.bookings?.warehouses?.name,
   }

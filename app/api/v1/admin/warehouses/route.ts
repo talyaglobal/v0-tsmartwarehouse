@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         longitude,
         created_at,
         updated_at,
-        companies:owner_company_id(name)
+        companies:owner_company_id(short_name)
       `)
       .order('created_at', { ascending: false })
 
@@ -138,7 +138,7 @@ export async function GET(request: Request) {
       photos: w.photos || [],
       status: w.status,
       company_id: w.owner_company_id,
-      company_name: w.companies?.name || null,
+      company_name: w.companies?.short_name || null,
       latitude: w.latitude,
       longitude: w.longitude,
       created_at: w.created_at,

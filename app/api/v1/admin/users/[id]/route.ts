@@ -32,7 +32,7 @@ export async function GET(
         role,
         company_id,
         created_at,
-        companies:company_id(id, name)
+        companies:company_id(id, short_name)
       `)
       .eq('id', id)
       .single()
@@ -44,7 +44,7 @@ export async function GET(
       )
     }
 
-    const companyData = profile.companies as unknown as { id: string; name: string } | null
+    const companyData = profile.companies as unknown as { id: string; short_name: string } | null
 
     return NextResponse.json({
       success: true,
@@ -55,7 +55,7 @@ export async function GET(
         full_name: profile.name,
         role: profile.role,
         company_id: profile.company_id,
-        company_name: companyData?.name || null,
+        company_name: companyData?.short_name || null,
         created_at: profile.created_at,
       },
       timestamp: new Date().toISOString(),

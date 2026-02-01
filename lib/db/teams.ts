@@ -26,7 +26,7 @@ export async function getTeams(filters?: GetTeamsOptions): Promise<ClientTeam[]>
     .from('client_teams')
     .select(`
       *,
-      companies:company_id (name),
+      companies:company_id (short_name),
       member_count:client_team_members(count)
     `)
 
@@ -71,7 +71,7 @@ export async function getTeamById(teamId: string): Promise<ClientTeam | null> {
     .from('client_teams')
     .select(`
       *,
-      companies:company_id (name),
+      companies:company_id (short_name),
       members:client_team_members (
         member_id,
         role,
@@ -350,7 +350,7 @@ export async function getUserTeams(userId: string): Promise<ClientTeam[]> {
         status,
         created_at,
         updated_at,
-        companies:company_id (name)
+        companies:company_id (short_name)
       )
     `)
     .eq('member_id', userId)
@@ -445,7 +445,7 @@ function transformTeamRow(row: any): ClientTeam {
     createdBy: row.created_by,
     status: row.status,
     memberCount: row.member_count?.[0]?.count || 0,
-    companyName: row.companies?.name,
+    companyName: row.companies?.short_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -466,7 +466,7 @@ function transformTeamRowWithMembers(row: any): ClientTeam {
       avatar: m.profiles?.avatar,
       clientType: m.profiles?.client_type,
     }))
-    team.memberCount = team.members.length
+    team.memberCount = team.members?.length || 0
   }
 
   return team

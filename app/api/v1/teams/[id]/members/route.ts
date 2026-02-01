@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { id } = await params
 
     // Check if user is a member of this team
-    const isMember = await isTeamMember(id, authResult.userId)
+    const isMember = await isTeamMember(id, authResult.user.id)
     if (!isMember) {
       const errorData: ErrorResponse = {
         success: false,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       teamId: id,
       memberId,
       role: role as TeamRole,
-      invitedBy: authResult.userId,
+      invitedBy: authResult.user.id,
     })
 
     const responseData: ApiResponse = {

@@ -220,7 +220,7 @@ export async function searchWarehouses(
         // Get company info, rent_methods, and min/max sq_ft
         const { data: warehouseData } = await supabase
           .from('warehouses')
-          .select('id, owner_company_id, rent_methods, min_sq_ft, max_sq_ft, companies(id, name, logo_url, verification_status)')
+          .select('id, owner_company_id, rent_methods, min_sq_ft, max_sq_ft, companies(id, short_name, logo_url, verification_status)')
           .in('id', warehouseIds)
 
         // Merge data
@@ -250,7 +250,7 @@ export async function searchWarehouses(
             max_sq_ft: warehouse?.max_sq_ft || wh.max_sq_ft || undefined,
             average_rating: review?.average_rating ? parseFloat(review.average_rating) : 0,
             total_reviews: review?.total_reviews || 0,
-            company_name: company?.name || '',
+            company_name: company?.short_name || '',
             company_logo: company?.logo_url || undefined,
             is_verified: company?.verification_status === 'verified',
           }
@@ -374,7 +374,7 @@ export async function searchWarehouses(
         external_reviews_count,
         external_rating_source,
         owner_company_id,
-        companies(id, name, logo_url, verification_status)
+        companies(id, short_name, logo_url, verification_status)
       `, { count: 'exact' })
       .eq('status', true)
 
@@ -512,7 +512,7 @@ export async function searchWarehouses(
         external_rating: wh.external_rating != null ? parseFloat(wh.external_rating) : undefined,
         external_reviews_count: wh.external_reviews_count || undefined,
         external_rating_source: wh.external_rating_source || undefined,
-        company_name: company?.name || '',
+        company_name: company?.short_name || '',
         company_logo: company?.logo_url || undefined,
         is_verified: company?.verification_status === 'verified',
       }
@@ -581,7 +581,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       .from('warehouses')
       .select(`
         *,
-        companies(id, name, logo_url, verification_status),
+        companies(id, short_name, logo_url, verification_status),
         warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts),
         warehouse_pallet_pricing(
           id,
@@ -704,7 +704,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       external_rating_source: warehouse.external_rating_source || undefined,
       average_rating: reviewSummary?.average_rating ? parseFloat(reviewSummary.average_rating) : 0,
       total_reviews: reviewSummary?.total_reviews || 0,
-      company_name: company?.name || '',
+      company_name: company?.short_name || '',
       company_logo: company?.logo_url || undefined,
       is_verified: company?.verification_status === 'verified',
       // Additional fields

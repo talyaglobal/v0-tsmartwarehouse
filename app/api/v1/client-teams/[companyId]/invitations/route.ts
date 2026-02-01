@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { nanoid } from 'nanoid'
 
 // POST - Create an invitation for a new team member
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerSupabaseClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -17,7 +17,7 @@ export async function POST(
 
     const { companyId } = await params
     const body = await request.json()
-    const { email, fullName, role } = body
+    const { email, role } = body
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -110,11 +110,11 @@ export async function POST(
 
 // GET - List pending invitations
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerSupabaseClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {

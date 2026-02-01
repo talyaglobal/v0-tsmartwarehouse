@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       id,
       memberId,
       role as TeamRole,
-      authResult.userId
+      authResult.user.id
     )
 
     const responseData: ApiResponse = {
@@ -73,7 +73,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id, memberId } = await params
 
-    await removeMemberWithValidation(id, memberId, authResult.userId)
+    await removeMemberWithValidation(id, memberId, authResult.user.id)
 
     const responseData: ApiResponse = {
       success: true,

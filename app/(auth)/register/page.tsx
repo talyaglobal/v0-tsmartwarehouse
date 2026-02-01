@@ -741,7 +741,7 @@ export default function RegisterPage() {
         
         {/* Horizontal stepper for mobile */}
         <div className="flex items-center gap-1 mb-4 overflow-x-auto pb-2">
-          {roles.map((role, index) => {
+          {roles.map((role) => {
             const isActive = role.id === activeTab
             const Icon = role.icon
             return (

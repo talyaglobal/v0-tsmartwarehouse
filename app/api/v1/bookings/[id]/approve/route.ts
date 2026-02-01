@@ -29,12 +29,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("name, email")
-      .eq("id", authResult.userId)
+      .eq("id", authResult.user.id)
       .single()
 
     const approval = await approveOnBehalfBooking(
       id,
-      authResult.userId,
+      authResult.user.id,
       profile?.name || profile?.email || "Customer",
       message
     )

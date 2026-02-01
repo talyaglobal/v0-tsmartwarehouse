@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
     let approvals
     if (type === "pending") {
       // Get approvals waiting for user to approve
-      approvals = await getPendingBookingApprovals(authResult.userId)
+      approvals = await getPendingBookingApprovals(authResult.user.id)
     } else if (type === "requested") {
       // Get approvals user has requested
-      approvals = await getApprovals({ requestedBy: authResult.userId })
+      approvals = await getApprovals({ requestedBy: authResult.user.id })
     } else {
       const errorData: ErrorResponse = {
         success: false,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get stats as well
-    const stats = await getApprovalStats(authResult.userId)
+    const stats = await getApprovalStats(authResult.user.id)
 
     const responseData: ApiResponse = {
       success: true,

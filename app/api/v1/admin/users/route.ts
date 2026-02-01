@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         role,
         company_id,
         created_at,
-        companies:company_id(name)
+        companies:company_id(short_name)
       `)
       .order('created_at', { ascending: false })
 
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
       full_name: row.name,
       role: row.role,
       company_id: row.company_id,
-      company_name: row.companies?.name || null,
+      company_name: row.companies?.short_name || null,
       created_at: row.created_at,
     }))
 

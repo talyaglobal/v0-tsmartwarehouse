@@ -9,13 +9,11 @@
  */
 
 import {
-  getTeams,
   getTeamsByCompany,
   getTeamById,
   createTeam as dbCreateTeam,
   updateTeam as dbUpdateTeam,
   deleteTeam as dbDeleteTeam,
-  getTeamMembers,
   addTeamMember as dbAddTeamMember,
   removeTeamMember as dbRemoveTeamMember,
   updateMemberRole as dbUpdateMemberRole,

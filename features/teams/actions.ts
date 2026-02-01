@@ -7,7 +7,6 @@ import {
   addMemberWithValidation,
   removeMemberWithValidation,
   updateMemberRoleWithValidation,
-  getCompanyTeams,
   getTeamDetails,
   getUserTeams,
   getTeamMembersForBooking,

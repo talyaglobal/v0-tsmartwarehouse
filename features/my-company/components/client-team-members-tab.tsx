@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus, Eye, EyeOff, Upload, User, X, Mail, Shield, Users } from "@/components/icons"
+import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus, Eye, EyeOff, User, Mail, Shield, Users } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
@@ -60,8 +60,6 @@ export function ClientTeamMembersTab() {
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ClientTeamMember | null>(null)
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
-  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showEditPassword, setShowEditPassword] = useState(false)
 
@@ -137,7 +135,7 @@ export function ClientTeamMembersTab() {
       }
 
       // Get team membership info for each profile
-      const profileIds = profiles?.map(p => p.id) || []
+      const profileIds = profiles?.map((p: { id: string }) => p.id) || []
       
       let teamMembersMap: Record<string, { role: string; joined_at: string | null }> = {}
       

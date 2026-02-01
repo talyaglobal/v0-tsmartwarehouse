@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         company_id,
         created_at,
         updated_at,
-        companies(name)
+        companies(short_name)
       `)
 
     // Apply filters
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         name: profile.name || '',
         role: profile.role as User['role'],
         companyId: profile.company_id || undefined,
-        companyName: company?.name || undefined,
+        companyName: company?.short_name || undefined,
         phone: profile.phone || undefined,
         avatar: profile.avatar_url || undefined,
         membershipTier: profile.membership_tier as User['membershipTier'] || undefined,

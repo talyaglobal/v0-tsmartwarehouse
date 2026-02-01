@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"

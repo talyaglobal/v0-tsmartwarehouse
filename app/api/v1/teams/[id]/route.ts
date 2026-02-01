@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
-    const team = await getTeamDetails(id, authResult.userId)
+    const team = await getTeamDetails(id, authResult.user.id)
 
     const responseData: ApiResponse = {
       success: true,
@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (name !== undefined) updates.name = name.trim()
     if (description !== undefined) updates.description = description?.trim()
 
-    const team = await updateTeamWithValidation(id, authResult.userId, updates)
+    const team = await updateTeamWithValidation(id, authResult.user.id, updates)
 
     const responseData: ApiResponse = {
       success: true,
@@ -88,7 +88,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
-    await deleteTeamWithValidation(id, authResult.userId)
+    await deleteTeamWithValidation(id, authResult.user.id)
 
     const responseData: ApiResponse = {
       success: true,
