@@ -242,45 +242,45 @@ export function BookingSearchForm({
 
   if (compact) {
     return (
-      <Card className={cn("w-full shadow-lg", className)}>
-        <CardContent className="p-4">
+      <Card className={cn("w-full shadow-lg border-2 overflow-visible", className)}>
+        <CardContent className="p-3 md:p-4 overflow-visible">
           <form onSubmit={handleSubmit}>
-            <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex items-end gap-2 md:gap-3 flex-nowrap">
               {/* Location Search */}
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="location" className="text-xs text-muted-foreground mb-1 block">
-                  Where do you want to store?
+              <div className="flex-1 min-w-[160px] md:min-w-[200px]">
+                <Label htmlFor="location" className="text-[10px] md:text-xs text-muted-foreground mb-1 block">
+                  Location
                 </Label>
                 <BookingSearch
                   value={location}
                   onChange={handleLocationChange}
-                  placeholder="Enter town, state or ZIP"
+                  placeholder="City or ZIP"
                   required
                   className="w-full"
-                  inputClassName="h-10"
+                  inputClassName="h-9 md:h-10 text-sm"
                 />
               </div>
 
               {/* Storage Type */}
-              <div className="flex-shrink-0 min-w-[170px]">
-                <Label htmlFor="storage-type" className="text-xs text-muted-foreground mb-1 block">
-                  Type of Storage
+              <div className="flex-shrink-0 w-[120px] md:w-[150px]">
+                <Label htmlFor="storage-type" className="text-[10px] md:text-xs text-muted-foreground mb-1 block">
+                  Type
                 </Label>
                 <Select value={storageType} onValueChange={handleStorageTypeChange}>
-                  <SelectTrigger id="storage-type" className="w-full h-10">
-                    <SelectValue placeholder="Select storage type" />
+                  <SelectTrigger id="storage-type" className="w-full h-9 md:h-10 text-sm">
+                    <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pallet">Pallet Storage</SelectItem>
-                    <SelectItem value="area-rental">Space Storage</SelectItem>
+                    <SelectItem value="pallet">Pallet</SelectItem>
+                    <SelectItem value="area-rental">Space</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Quantity Input - Inline with Storage Type */}
               {storageType === "pallet" ? (
-                <div className="flex-shrink-0 min-w-[110px]">
-                  <Label htmlFor="pallet-count" className="text-xs text-muted-foreground mb-1 block whitespace-nowrap">
+                <div className="flex-shrink-0 w-[70px] md:w-[90px]">
+                  <Label htmlFor="pallet-count" className="text-[10px] md:text-xs text-muted-foreground mb-1 block">
                     Pallets
                   </Label>
                   <Input
@@ -291,13 +291,13 @@ export function BookingSearchForm({
                     onChange={(e) => setPalletCount(e.target.value)}
                     placeholder="1"
                     required
-                    className="h-10 w-full"
+                    className="h-9 md:h-10 w-full text-sm"
                   />
                 </div>
               ) : (
-                <div className="flex-shrink-0 min-w-[140px]">
-                  <Label htmlFor="area-sqft" className="text-xs text-muted-foreground mb-1 block">
-                    Square feet {isLoadingMinSpace && <span className="animate-pulse">(loading...)</span>}
+                <div className="flex-shrink-0 w-[90px] md:w-[110px]">
+                  <Label htmlFor="area-sqft" className="text-[10px] md:text-xs text-muted-foreground mb-1 block truncate">
+                    Sq ft {isLoadingMinSpace && <span className="animate-pulse">...</span>}
                   </Label>
                   <Input
                     id="area-sqft"
@@ -305,18 +305,18 @@ export function BookingSearchForm({
                     inputMode="numeric"
                     value={areaSqFt ? formatNumber(parseInt(areaSqFt, 10)) : ""}
                     onChange={(e) => handleAreaSqFtChange(e.target.value)}
-                    placeholder={minSpaceLimit ? formatNumber(minSpaceLimit) : "Enter sq ft"}
+                    placeholder={minSpaceLimit ? formatNumber(minSpaceLimit) : "Sq ft"}
                     required
-                    className="h-10 w-full"
-                    title={minSpaceLimit ? `Minimum available in this area: ${formatNumber(minSpaceLimit)} sq ft` : "Enter area in square feet"}
+                    className="h-9 md:h-10 w-full text-sm"
+                    title={minSpaceLimit ? `Min: ${formatNumber(minSpaceLimit)} sq ft` : "Enter sq ft"}
                   />
                 </div>
               )}
 
               {/* Duration (for area rental) */}
-              {storageType === "area-rental" ? (
-                <div className="flex-shrink-0 min-w-[120px]">
-                  <Label htmlFor="duration" className="text-xs text-muted-foreground mb-1 block">
+              {storageType === "area-rental" && (
+                <div className="flex-shrink-0 w-[70px] md:w-[80px]">
+                  <Label htmlFor="duration" className="text-[10px] md:text-xs text-muted-foreground mb-1 block">
                     Months
                   </Label>
                   <Input
@@ -326,18 +326,17 @@ export function BookingSearchForm({
                     step="1"
                     value={monthDuration}
                     onChange={(e) => handleMonthDurationChange(e.target.value)}
-                    placeholder="e.g. 5"
+                    placeholder="1"
                     required
-                    className="h-10 w-full"
-                    title="Enter number of months (minimum 1)"
+                    className="h-9 md:h-10 w-full text-sm"
                   />
                 </div>
-              ) : null}
+              )}
 
               {/* Start Date */}
-              <div className="flex-shrink-0 min-w-[150px]">
-                <Label htmlFor="start-date" className="text-xs text-muted-foreground mb-1 block">
-                  Start Date
+              <div className="flex-shrink-0 w-[120px] md:w-[140px]">
+                <Label htmlFor="start-date" className="text-[10px] md:text-xs text-muted-foreground mb-1 block">
+                  Start
                 </Label>
                 <Input
                   id="start-date"
@@ -345,15 +344,15 @@ export function BookingSearchForm({
                   value={startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
                   min={today}
-                  className="h-10 w-full"
+                  className="h-9 md:h-10 w-full text-sm"
                   required
                 />
               </div>
 
               {/* End Date */}
-              <div className="flex-shrink-0 min-w-[150px]">
-                <Label htmlFor="end-date" className="text-xs text-muted-foreground mb-1 block">
-                  End Date
+              <div className="flex-shrink-0 w-[120px] md:w-[140px]">
+                <Label htmlFor="end-date" className="text-[10px] md:text-xs text-muted-foreground mb-1 block">
+                  End
                 </Label>
                 <Input
                   id="end-date"
@@ -367,17 +366,17 @@ export function BookingSearchForm({
                     }
                   }}
                   min={getMinEndDate()}
-                  className="h-10 w-full"
+                  className="h-9 md:h-10 w-full text-sm"
                   required
-                  disabled={storageType === "area-rental"} // Auto-calculated for area rental
+                  disabled={storageType === "area-rental"}
                 />
               </div>
 
               {/* Submit Button */}
               {showSubmitButton && (
-                <Button type="submit" className="h-10 px-5 gap-2 whitespace-nowrap flex-shrink-0">
+                <Button type="submit" className="h-9 md:h-10 px-4 md:px-6 gap-1.5 whitespace-nowrap flex-shrink-0 shadow-md">
                   <Search className="h-4 w-4" />
-                  Search
+                  <span className="hidden sm:inline">Search</span>
                 </Button>
               )}
             </div>

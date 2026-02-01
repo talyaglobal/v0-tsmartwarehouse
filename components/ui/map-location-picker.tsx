@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Loader2 } from "@/components/icons"
+import { Loader2, Search, MapPin } from "lucide-react"
 
 interface MapLocationPickerProps {
   open: boolean
@@ -11,6 +12,15 @@ interface MapLocationPickerProps {
   onLocationSelect: (location: { lat: number; lng: number; address?: string; addressComponents?: any[] }) => void
   initialLat?: number
   initialLng?: number
+}
+
+interface PlacePrediction {
+  description: string
+  place_id: string
+  structured_formatting?: {
+    main_text: string
+    secondary_text: string
+  }
 }
 
 // Load Google Maps script dynamically
@@ -118,11 +128,120 @@ export function MapLocationPicker({
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
+  const autocompleteServiceRef = useRef<any>(null)
+  const placesServiceRef = useRef<any>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isMapReady, setIsMapReady] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([])
+  const [showPredictions, setShowPredictions] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedAddress, setSelectedAddress] = useState<string>("")
+
+  // Search for places as user types
+  const searchPlaces = useCallback((query: string) => {
+    if (!query.trim() || !autocompleteServiceRef.current) {
+      setPredictions([])
+      setShowPredictions(false)
+      return
+    }
+
+    setIsSearching(true)
+    autocompleteServiceRef.current.getPlacePredictions(
+      {
+        input: query,
+        types: ['address'],
+      },
+      (results: PlacePrediction[] | null, status: string) => {
+        setIsSearching(false)
+        if (status === 'OK' && results) {
+          setPredictions(results)
+          setShowPredictions(true)
+        } else {
+          setPredictions([])
+          setShowPredictions(false)
+        }
+      }
+    )
+  }, [])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery) {
+        searchPlaces(searchQuery)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchPlaces])
+
+  // Handle place selection from predictions
+  const handleSelectPrediction = useCallback((prediction: PlacePrediction) => {
+    if (!placesServiceRef.current || !mapInstanceRef.current) return
+
+    setShowPredictions(false)
+    setIsSearching(true)
+    setSearchQuery(prediction.description)
+
+    placesServiceRef.current.getDetails(
+      {
+        placeId: prediction.place_id,
+        fields: ['geometry', 'formatted_address', 'address_components'],
+      },
+      (place: any, status: string) => {
+        setIsSearching(false)
+        if (status === 'OK' && place?.geometry?.location) {
+          const lat = place.geometry.location.lat()
+          const lng = place.geometry.location.lng()
+
+          // Place marker
+          if (markerRef.current) {
+            markerRef.current.setMap(null)
+          }
+
+          const marker = new window.google.maps.Marker({
+            position: { lat, lng },
+            map: mapInstanceRef.current,
+            draggable: true,
+            title: "Warehouse Location",
+          })
+
+          marker.addListener("dragend", (dragEvent: any) => {
+            const dragLat = dragEvent.latLng.lat()
+            const dragLng = dragEvent.latLng.lng()
+            setSelectedLocation({ lat: dragLat, lng: dragLng })
+            // Update address when marker is dragged
+            updateAddressFromLocation(dragLat, dragLng)
+          })
+
+          markerRef.current = marker
+          setSelectedLocation({ lat, lng })
+          setSelectedAddress(place.formatted_address || prediction.description)
+
+          // Center and zoom map
+          mapInstanceRef.current.setCenter({ lat, lng })
+          mapInstanceRef.current.setZoom(17)
+        }
+      }
+    )
+  }, [])
+
+  // Update address from coordinates (for drag and click)
+  const updateAddressFromLocation = useCallback((lat: number, lng: number) => {
+    if (!window.google?.maps?.Geocoder) return
+
+    const geocoder = new window.google.maps.Geocoder()
+    geocoder.geocode({ location: { lat, lng } }, (results: any, status: string) => {
+      if (status === 'OK' && results && results[0]) {
+        setSelectedAddress(results[0].formatted_address)
+        setSearchQuery(results[0].formatted_address)
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (!open) {
@@ -132,6 +251,11 @@ export function MapLocationPicker({
       setSelectedLocation(null)
       setIsLocating(false)
       setLocationError(null)
+      setSearchQuery("")
+      setPredictions([])
+      setShowPredictions(false)
+      setIsSearching(false)
+      setSelectedAddress("")
       return
     }
 
@@ -182,6 +306,24 @@ export function MapLocationPicker({
 
         mapInstanceRef.current = map
 
+        // Initialize autocomplete and places services
+        if (window.google.maps.places) {
+          autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService()
+          placesServiceRef.current = new window.google.maps.places.PlacesService(map)
+        }
+
+        // Helper function to get address from coordinates
+        const getAddressFromCoords = (lat: number, lng: number) => {
+          if (!window.google?.maps?.Geocoder) return
+          const geocoder = new window.google.maps.Geocoder()
+          geocoder.geocode({ location: { lat, lng } }, (results: any, status: string) => {
+            if (status === 'OK' && results && results[0]) {
+              setSelectedAddress(results[0].formatted_address)
+              setSearchQuery(results[0].formatted_address)
+            }
+          })
+        }
+
         // Add initial marker if coordinates provided
         if (initialLat && initialLng) {
           const marker = new window.google.maps.Marker({
@@ -192,6 +334,8 @@ export function MapLocationPicker({
           })
           markerRef.current = marker
           setSelectedLocation({ lat: initialLat, lng: initialLng })
+          // Get address for initial location
+          getAddressFromCoords(initialLat, initialLng)
         }
 
         const placeMarker = (lat: number, lng: number) => {
@@ -210,10 +354,14 @@ export function MapLocationPicker({
             const dragLat = dragEvent.latLng.lat()
             const dragLng = dragEvent.latLng.lng()
             setSelectedLocation({ lat: dragLat, lng: dragLng })
+            // Update address when marker is dragged
+            getAddressFromCoords(dragLat, dragLng)
           })
 
           markerRef.current = marker
           setSelectedLocation({ lat, lng })
+          // Update address when marker is placed
+          getAddressFromCoords(lat, lng)
         }
 
         const handleMapClick = (e: any) => {
@@ -230,6 +378,7 @@ export function MapLocationPicker({
             const lat = e.latLng.lat()
             const lng = e.latLng.lng()
             setSelectedLocation({ lat, lng })
+            getAddressFromCoords(lat, lng)
           })
         }
 
@@ -251,6 +400,8 @@ export function MapLocationPicker({
           markerRef.current = null
         }
         mapInstanceRef.current = null
+        autocompleteServiceRef.current = null
+        placesServiceRef.current = null
         setIsMapReady(false)
       }
     }
@@ -396,22 +547,94 @@ export function MapLocationPicker({
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Select Location on Map</DialogTitle>
           <DialogDescription>
-            Click on the map to select the warehouse location, or drag the marker to adjust
+            Search for an address or click on the map to select the warehouse location
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 relative px-6 pb-6 flex flex-col min-h-0 overflow-hidden">
-          <div className="mb-3 flex items-center justify-end">
+          {/* Search Input and Actions Row */}
+          <div className="mb-3 flex flex-col sm:flex-row gap-2">
+            {/* Address Search */}
+            <div className="relative flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search address..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    if (!e.target.value.trim()) {
+                      setPredictions([])
+                      setShowPredictions(false)
+                    }
+                  }}
+                  onFocus={() => {
+                    if (predictions.length > 0) {
+                      setShowPredictions(true)
+                    }
+                  }}
+                  className="pl-9 pr-9"
+                  disabled={!isMapReady}
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              
+              {/* Predictions Dropdown */}
+              {showPredictions && predictions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {predictions.map((prediction) => (
+                    <button
+                      key={prediction.place_id}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-muted transition-colors flex items-start gap-2 border-b last:border-b-0"
+                      onClick={() => handleSelectPrediction(prediction)}
+                    >
+                      <MapPin className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        {prediction.structured_formatting ? (
+                          <>
+                            <p className="text-sm font-medium truncate">
+                              {prediction.structured_formatting.main_text}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {prediction.structured_formatting.secondary_text}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm truncate">{prediction.description}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Use Current Location Button */}
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              size="default"
               onClick={handleUseCurrentLocation}
               disabled={!isMapReady || isLoading || isLocating}
+              className="whitespace-nowrap"
             >
-              {isLocating ? "Locating..." : "Use Current Location"}
+              {isLocating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Locating...
+                </>
+              ) : (
+                "Use Current Location"
+              )}
             </Button>
           </div>
+
+          {/* Map Loading State */}
           {isLoading && !isMapReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10 rounded-lg">
               <div className="flex flex-col items-center gap-2">
@@ -421,18 +644,28 @@ export function MapLocationPicker({
             </div>
           )}
 
+          {/* Map Container */}
           <div 
             ref={mapRef} 
-            className="w-full rounded-lg border" 
-            style={{ minHeight: '400px', height: 'calc(80vh - 200px)' }} 
+            className="w-full rounded-lg border flex-1" 
+            style={{ minHeight: '350px' }} 
+            onClick={() => setShowPredictions(false)}
           />
 
+          {/* Selected Location Info */}
           {selectedLocation && (
-            <div className="mt-4 p-3 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-1">Selected Coordinates:</p>
-              <p className="text-xs text-muted-foreground">
-                Latitude: {selectedLocation.lat.toFixed(6)}, Longitude: {selectedLocation.lng.toFixed(6)}
-              </p>
+            <div className="mt-3 p-3 bg-muted rounded-lg">
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {selectedAddress && (
+                    <p className="text-sm font-medium truncate mb-1">{selectedAddress}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Lat: {selectedLocation.lat.toFixed(6)}, Lng: {selectedLocation.lng.toFixed(6)}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
           {locationError && (

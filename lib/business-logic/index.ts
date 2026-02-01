@@ -48,9 +48,36 @@ export {
   activateBooking,
   completeBooking,
   cancelBooking,
+  createBookingOnBehalf,
+  approveOnBehalfBooking,
+  rejectOnBehalfBooking,
+  getPendingBookingApprovals,
   type CreateBookingInput,
   type CreateBookingResult,
+  type CreateOnBehalfBookingInput,
+  type CreateOnBehalfBookingResult,
 } from "./bookings"
+
+// Teams
+export {
+  createTeamWithValidation,
+  updateTeamWithValidation,
+  deleteTeamWithValidation,
+  addMemberWithValidation,
+  removeMemberWithValidation,
+  updateMemberRoleWithValidation,
+  getCompanyTeams,
+  getTeamDetails,
+  getUserTeams,
+  getTeamMembersForBooking,
+  canBookOnBehalf,
+  isTeamAdmin,
+  isTeamMember,
+  type CreateTeamInput,
+  type CreateTeamResult,
+  type AddMemberInput,
+  type AddMemberResult,
+} from "./teams"
 
 // Invoices
 export {

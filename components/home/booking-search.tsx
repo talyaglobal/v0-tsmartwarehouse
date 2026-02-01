@@ -206,7 +206,7 @@ export function BookingSearch({
       {showSuggestions && filteredCities.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto"
+          className="absolute left-0 z-[100] min-w-[280px] w-max mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto"
         >
           {filteredCities.map((city, index) => (
             <button
@@ -219,7 +219,7 @@ export function BookingSearch({
               )}
             >
               <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm">{city}</span>
+              <span className="text-sm whitespace-nowrap">{city}</span>
             </button>
           ))}
         </div>

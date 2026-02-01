@@ -20,6 +20,7 @@ const registerSchema = z.object({
   role: z.enum(['warehouse_client', 'root', 'warehouse_staff', 'warehouse_supervisor', 'warehouse_admin']).optional(),
   storageType: z.string().optional(),
   userType: z.enum(['owner', 'warehouse_client', 'warehouse_broker', 'warehouse_finder']).optional(),
+  clientType: z.enum(['individual', 'corporate']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -32,10 +33,14 @@ const registerSchema = z.object({
   if (data.userType === 'warehouse_broker' || data.userType === 'warehouse_finder') {
     return data.name && data.name.length >= 2
   }
-  // For customers, name and companyName are not required
+  // For corporate warehouse clients, companyName is required
+  if (data.userType === 'warehouse_client' && data.clientType === 'corporate') {
+    return data.companyName && data.companyName.length >= 2
+  }
+  // For individual customers, name and companyName are not required
   return true
 }, {
-  message: "Name is required for warehouse owners, brokers, and finders",
+  message: "Name is required for warehouse owners, brokers, and finders. Company name is required for corporate clients.",
   path: ['name'],
 })
 
@@ -127,6 +132,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const companyName = formData.get('companyName') as string | null
     const storageType = formData.get('storageType') as string | null
     const userType = formData.get('userType') as 'owner' | 'warehouse_client' | 'warehouse_broker' | 'warehouse_finder' | null
+    const clientType = formData.get('clientType') as 'individual' | 'corporate' | null
 
     // Validate input
     const validation = registerSchema.safeParse({
@@ -138,6 +144,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       companyName: companyName || undefined,
       storageType: storageType || undefined,
       userType: userType || 'owner', // Default to owner for backward compatibility
+      clientType: clientType || 'individual', // Default to individual for warehouse clients
     })
 
     if (!validation.success) {
@@ -268,18 +275,19 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     if (profileCheckError || !existingProfile) {
       // Profile doesn't exist, create it manually
       
-      // For warehouse clients, brokers, and finders, skip company creation
-      if (isCustomer || isReseller || isFinder) {
-        // Create profile for warehouse client/broker/finder (no company)
+      // For brokers and finders, skip company creation
+      if (isReseller || isFinder) {
+        // Create profile for warehouse broker/finder (no company)
         const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
           .from('profiles')
           .upsert({
             id: data.user.id,
             email: validation.data.email,
-            name: (isReseller || isFinder) ? validation.data.name : null, // Brokers and finders have name
+            name: validation.data.name || null,
             role: defaultRole,
             phone: validation.data.phone || null,
-            company_id: null, // No company for these roles
+            company_id: null,
+            client_type: 'individual',
           }, {
             onConflict: 'id'
           })
@@ -301,6 +309,220 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         }
         console.log(`${defaultRole} profile created:`, insertedProfile?.id)
         return { error: undefined }
+      }
+
+      // For warehouse clients, handle individual vs corporate
+      if (isCustomer) {
+        const clientTypeValue = validation.data.clientType || 'individual'
+        
+        if (clientTypeValue === 'individual') {
+          // Individual client - no company
+          const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
+            .from('profiles')
+            .upsert({
+              id: data.user.id,
+              email: validation.data.email,
+              name: null,
+              role: defaultRole,
+              phone: validation.data.phone || null,
+              company_id: null,
+              client_type: 'individual',
+            }, {
+              onConflict: 'id'
+            })
+            .select()
+            .single()
+
+          if (profileCreateError) {
+            console.error('Profile creation error:', profileCreateError)
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            } catch (deleteError) {
+              console.error('Failed to cleanup after profile creation error:', deleteError)
+            }
+            return {
+              error: {
+                message: `Account creation failed: ${profileCreateError.message}. Please try again.`,
+              },
+            }
+          }
+          console.log('Individual warehouse client profile created:', insertedProfile?.id)
+          return { error: undefined }
+        } else {
+          // Corporate client - needs company
+          const clientCompanyName = validation.data.companyName
+          
+          if (!clientCompanyName || !clientCompanyName.trim()) {
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            } catch (deleteError) {
+              console.error('Failed to delete user:', deleteError)
+            }
+            return {
+              error: {
+                message: 'Company name is required for corporate accounts.',
+              },
+            }
+          }
+
+          const trimmedClientCompanyName = clientCompanyName.trim()
+          
+          // Check if client company exists (exact match, case-insensitive)
+          const { data: existingClientCompanies } = await supabaseAdmin
+            .from('companies')
+            .select('id, short_name')
+            .eq('type', 'client_company')
+            .limit(100)
+          
+          const existingClientCompany = existingClientCompanies?.find(
+            (c) => c.short_name?.toLowerCase() === trimmedClientCompanyName.toLowerCase()
+          ) || null
+          
+          let clientCompanyId: string
+          let isNewCompany = false
+          let teamId: string | null = null
+          let teamRole: 'admin' | 'member' = 'member'
+
+          if (existingClientCompany) {
+            // Exact match found - join existing company as MEMBER
+            clientCompanyId = existingClientCompany.id
+            teamRole = 'member'
+            console.log('Joining existing client company as member:', existingClientCompany.name)
+            
+            // Find existing team for this company
+            const { data: existingTeams } = await supabaseAdmin
+              .from('client_teams')
+              .select('id, name')
+              .eq('company_id', clientCompanyId)
+              .eq('status', true)
+              .limit(1)
+            
+            if (existingTeams && existingTeams.length > 0) {
+              teamId = existingTeams[0].id
+              console.log('Found existing team:', existingTeams[0].name)
+            }
+          } else {
+            // No exact match - create new client company, user becomes ADMIN
+            isNewCompany = true
+            teamRole = 'admin'
+            
+            const { data: newClientCompany, error: clientCompanyCreateError } = await supabaseAdmin
+              .from('companies')
+              .insert({
+                short_name: trimmedClientCompanyName,
+                trading_name: trimmedClientCompanyName,
+                type: 'client_company',
+              })
+              .select()
+              .single()
+
+            if (clientCompanyCreateError) {
+              console.error('Client company creation error:', clientCompanyCreateError)
+              try {
+                await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+              } catch (deleteError) {
+                console.error('Failed to delete user after company creation error:', deleteError)
+              }
+              return {
+                error: {
+                  message: `Failed to create company: ${clientCompanyCreateError.message}. Please try again.`,
+                },
+              }
+            }
+            clientCompanyId = newClientCompany.id
+            console.log('Created new client company:', newClientCompany.short_name, '- User will be admin')
+          }
+
+          // Create profile with company_id first (we'll update default_team_id after creating/joining team)
+          const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
+            .from('profiles')
+            .upsert({
+              id: data.user.id,
+              email: validation.data.email,
+              name: null,
+              role: defaultRole,
+              phone: validation.data.phone || null,
+              company_id: clientCompanyId,
+              client_type: 'corporate',
+            }, {
+              onConflict: 'id'
+            })
+            .select()
+            .single()
+
+          if (profileCreateError) {
+            console.error('Profile creation error:', profileCreateError)
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            } catch (deleteError) {
+              console.error('Failed to cleanup after profile creation error:', deleteError)
+            }
+            return {
+              error: {
+                message: `Account creation failed: ${profileCreateError.message}. Please try again.`,
+              },
+            }
+          }
+
+          // Create or join team
+          if (isNewCompany || !teamId) {
+            // Create a default team for the company
+            const teamName = isNewCompany ? 'Default Team' : 'General'
+            const { data: newTeam, error: teamCreateError } = await supabaseAdmin
+              .from('client_teams')
+              .insert({
+                company_id: clientCompanyId,
+                name: teamName,
+                description: isNewCompany 
+                  ? `Default team for ${trimmedClientCompanyName}` 
+                  : `General team for new members`,
+                created_by: data.user.id,
+                status: true,
+              })
+              .select()
+              .single()
+
+            if (teamCreateError) {
+              console.error('Team creation error:', teamCreateError)
+              // Don't fail registration, just log the error
+            } else {
+              teamId = newTeam.id
+              console.log('Created new team:', newTeam.name, 'for company')
+            }
+          }
+
+          // Add user to team with appropriate role
+          if (teamId) {
+            const { error: memberError } = await supabaseAdmin
+              .from('client_team_members')
+              .insert({
+                team_id: teamId,
+                member_id: data.user.id,
+                role: teamRole,
+                invited_by: isNewCompany ? data.user.id : null, // Self-invited if created company
+              })
+
+            if (memberError) {
+              console.error('Team member add error:', memberError)
+              // Don't fail registration, just log the error
+            } else {
+              console.log(`Added user to team as ${teamRole}`)
+            }
+
+            // Update profile with default_team_id
+            const { error: updateError } = await supabaseAdmin
+              .from('profiles')
+              .update({ default_team_id: teamId })
+              .eq('id', data.user.id)
+
+            if (updateError) {
+              console.error('Failed to set default team:', updateError)
+              // Don't fail registration
+            }
+          }
+          console.log('Corporate warehouse client profile created:', insertedProfile?.id)
+          return { error: undefined }
+        }
       }
 
       // For warehouse owners, continue with company creation logic
@@ -327,13 +549,13 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       // Search for companies with similar names
       const { data: similarCompanies } = await supabaseAdmin
         .from('companies')
-        .select('id, name')
-        .ilike('name', `%${trimmedCompanyName}%`)
+        .select('id, short_name')
+        .ilike('short_name', `%${trimmedCompanyName}%`)
         .eq('type', 'customer_company')
       
       // Find exact match (case-insensitive)
       const existingCompany = similarCompanies?.find(
-        (c) => c.name.toLowerCase() === trimmedCompanyName.toLowerCase()
+        (c) => c.short_name?.toLowerCase() === trimmedCompanyName.toLowerCase()
       ) || null
       
       let companyId: string
@@ -343,7 +565,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         // Exact match found - but this should not happen in normal flow
         // User should have selected from suggestions, but handle it anyway
         companyId = existingCompany.id
-        console.log('Using existing company:', existingCompany.name)
+        console.log('Using existing company:', existingCompany.short_name)
         finalRole = 'warehouse_admin' // Use warehouse_admin for existing company
         
         // Update profile with company_id and role
@@ -364,12 +586,12 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         // But first check if company name already exists (prevent duplicates)
         const { data: duplicateCheck } = await supabaseAdmin
           .from('companies')
-          .select('id, name')
+          .select('id, short_name')
           .eq('type', 'customer_company')
           .limit(100) // Get all to check exact match
         
         const duplicate = duplicateCheck?.find(
-          (c) => c.name.toLowerCase() === trimmedCompanyName.toLowerCase()
+          (c) => c.short_name?.toLowerCase() === trimmedCompanyName.toLowerCase()
         )
         
         if (duplicate) {
@@ -381,7 +603,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           }
           return {
             error: {
-              message: `Company "${duplicate.name}" already exists. Please select it from the suggestions.`,
+              message: `Company "${duplicate.short_name}" already exists. Please select it from the suggestions.`,
             },
           }
         }
@@ -390,7 +612,8 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
         const { data: newCompany, error: companyCreateError } = await supabaseAdmin
           .from('companies')
           .insert({
-            name: trimmedCompanyName,
+            short_name: trimmedCompanyName,
+            trading_name: trimmedCompanyName,
             type: 'customer_company',
           })
           .select()
@@ -410,7 +633,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           }
         }
         companyId = newCompany.id
-        console.log('Created new company:', newCompany.name)
+        console.log('Created new company:', newCompany.short_name)
         finalRole = 'warehouse_admin' // New warehouse owner gets warehouse_admin role
         
         // Update profile with company_id and warehouse_owner role

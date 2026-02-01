@@ -358,10 +358,30 @@ export default function FindWarehousesPage() {
               ) : warehouses.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">No warehouses found matching your criteria.</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Try adjusting your filters or search location.
+                    <WarehouseIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-lg font-medium mb-2">No warehouses found</p>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      {initialStorageType === "area-rental" && initialAreaSqFt && initialAreaSqFt >= 50000 ? (
+                        <>
+                          No warehouses found with {initialAreaSqFt.toLocaleString()} sq ft capacity in this area.
+                          <br />
+                          <span className="text-sm">Try reducing the space requirement or searching in a different location.</span>
+                        </>
+                      ) : (
+                        <>
+                          No warehouses match your search criteria.
+                          <br />
+                          <span className="text-sm">Try adjusting your filters or search in a different location.</span>
+                        </>
+                      )}
                     </p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-4"
+                      onClick={handleClearFilters}
+                    >
+                      Clear Filters
+                    </Button>
                   </CardContent>
                 </Card>
               ) : (

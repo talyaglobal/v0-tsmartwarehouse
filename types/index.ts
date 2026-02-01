@@ -15,6 +15,92 @@ export type UserRole =
 
 export type MembershipTier = "bronze" | "silver" | "gold" | "platinum"
 
+// =====================================================
+// Client & Team Types (2026-01-29)
+// =====================================================
+
+// Client type: individual (like Airbnb user) or corporate (with company and teams)
+export type ClientType = 'individual' | 'corporate'
+
+// Billing type for companies: company-level, individual, or hybrid
+export type BillingType = 'company' | 'individual' | 'hybrid'
+
+// Team member role: admin can manage team and book on behalf, member is regular
+export type TeamRole = 'admin' | 'member'
+
+// Booking approval status for on-behalf bookings
+export type BookingApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired'
+
+// Client Team - teams within corporate companies
+export interface ClientTeam {
+  id: string
+  companyId: string
+  name: string
+  description?: string
+  createdBy?: string
+  status: boolean
+  memberCount?: number
+  createdAt: string
+  updatedAt: string
+  // Joined fields
+  companyName?: string
+  members?: TeamMember[]
+}
+
+// Team Member - membership record linking users to teams
+export interface TeamMember {
+  teamId: string
+  memberId: string
+  role: TeamRole
+  joinedAt: string
+  invitedBy?: string
+  // Joined profile data
+  name?: string
+  email?: string
+  avatar?: string
+  clientType?: ClientType
+}
+
+// Booking Approval - approval request for on-behalf bookings
+export interface BookingApproval {
+  id: string
+  bookingId: string
+  requestedBy: string
+  requestedByName?: string
+  respondedBy?: string
+  respondedByName?: string
+  status: BookingApprovalStatus
+  requestMessage?: string
+  responseMessage?: string
+  requestedAt: string
+  respondedAt?: string
+  expiresAt?: string
+  // Joined fields
+  booking?: Booking
+  warehouseName?: string
+}
+
+// Company with billing type
+export interface Company {
+  id: string
+  shortName: string
+  tradingName?: string
+  /** @deprecated Use shortName instead */
+  name?: string
+  logoUrl?: string
+  type?: 'warehouse_company' | 'customer_company' | 'client_company'
+  billingType?: BillingType
+  vat?: string
+  address?: string
+  postalCode?: string
+  city?: string
+  country?: string
+  isSystem?: boolean
+  status: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface User {
   id: string
   email: string
@@ -27,6 +113,11 @@ export interface User {
   avatar?: string
   membershipTier?: MembershipTier
   creditBalance?: number
+  // Client & Team fields (2026-01-29)
+  clientType?: ClientType
+  defaultTeamId?: string
+  teamRole?: TeamRole
+  teams?: ClientTeam[]
   createdAt: string
   updatedAt: string
 }
@@ -125,6 +216,7 @@ export interface PalletPricing {
   goodsType?: string
   palletType: PalletType
   pricingPeriod: PricingPeriod
+  enabled?: boolean // Whether this pallet type is available for booking (default: true)
   customDimensions?: CustomPalletDimensions // Only for custom pallet type (deprecated - use customSizes instead)
   customSizes?: CustomPalletSize[] // Multiple sizes for custom pallet type (each with its own height ranges)
   stackable?: boolean // Stackable or unstackable pallet option
@@ -301,6 +393,13 @@ export interface Booking {
   proposedStartTime?: string
   dateChangeRequestedAt?: string
   dateChangeRequestedBy?: string
+  // On-behalf booking fields (2026-01-29)
+  bookedById?: string           // User who created the booking (may differ from customerId)
+  bookedByName?: string         // Name of the user who booked
+  bookedOnBehalf?: boolean      // True if booked by team admin for another team member
+  requiresApproval?: boolean    // True if the booking requires customer approval
+  approvalStatus?: BookingApprovalStatus // pending, approved, rejected
+  approval?: BookingApproval    // Joined approval record
   createdAt: string
   updatedAt: string
 }

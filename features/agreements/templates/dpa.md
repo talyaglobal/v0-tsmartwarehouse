@@ -421,7 +421,7 @@ This DPA complies with:
 ## Appendix B: Data Processing Details
 
 ### B.1 Categories of Data Subjects
-- Customers (warehouse renters)
+- Customers (warehouse clients)
 - Warehouse owners
 - Company admins and staff
 - Resellers and warehouse finders

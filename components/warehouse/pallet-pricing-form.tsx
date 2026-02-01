@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, X } from "lucide-react"
+import { Plus, X, EyeOff, Eye, AlertTriangle } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { PalletPricing, PalletType, PricingPeriod, HeightRangePricing, WeightRangePricing, CustomPalletSize } from "@/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatGoodsType } from "@/lib/constants/warehouse-types"
@@ -30,14 +31,18 @@ export function PalletPricingForm({
   const [pricing, setPricing] = useState<PalletPricing[]>(initialPricing)
   const [selectedGoodsType, setSelectedGoodsType] = useState<string>("general")
   const adjustmentOptions = [
-    { value: "rate", label: "Price Increase (%)", shortLabel: "(%)" },
-    { value: "plus_per_unit", label: "Additional Fee (+$)", shortLabel: "(+$)" },
+    { value: "rate", label: "Price Increase (%)", shortLabel: "Rate (%)" },
+    { value: "plus_per_unit", label: "Additional Fee (+$)", shortLabel: "Fixed (+$)" },
   ] as const
   const normalizeGoodsType = (value?: string) =>
     (value || "general").trim().toLowerCase()
   // Local state for custom dimensions inputs to allow typing
   const [customDimensionInputs, setCustomDimensionInputs] = useState<Record<string, string>>({})
   const [rangeErrors, setRangeErrors] = useState<Record<string, string>>({})
+  
+  // Track hidden pallet types per goods type - key format: "goodsType|palletType"
+  const [hiddenPalletTypes, setHiddenPalletTypes] = useState<Set<string>>(new Set())
+  const [palletTypeError, setPalletTypeError] = useState<string | null>(null)
   
   // Track custom dimension inputs in a ref to check if user is typing
   const customDimensionInputsRef = useRef<Record<string, string>>({})
@@ -55,6 +60,16 @@ export function PalletPricingForm({
   // Unit switchers in UI handle display conversion for Euro/Custom pallets
 
   useEffect(() => {
+    // Initialize hidden pallet types from initial pricing (where enabled === false)
+    const hidden = new Set<string>()
+    initialPricing.forEach((entry) => {
+      if (entry.enabled === false) {
+        const key = `${normalizeGoodsType(entry.goodsType)}|${entry.palletType}`
+        hidden.add(key)
+      }
+    })
+    setHiddenPalletTypes(hidden)
+    
     setPricing(
       initialPricing.map((entry) => {
         // Map custom sizes with their height ranges
@@ -70,6 +85,7 @@ export function PalletPricingForm({
         return {
           ...entry,
           goodsType: normalizeGoodsType(entry.goodsType),
+          enabled: entry.enabled !== false, // default to true if not specified
           heightRanges: entry.heightRanges || [],
           weightRanges: entry.weightRanges || [],
           customSizes: mappedCustomSizes,
@@ -353,10 +369,14 @@ export function PalletPricingForm({
       periods.forEach((period) => {
         const key = `${palletType}-${period}`
         if (keys.has(key)) return
+        // Check if this pallet type is hidden for this goods type
+        const hiddenKey = `${normalizedType}|${palletType}`
+        const isHidden = hiddenPalletTypes.has(hiddenKey)
         const baseEntry: PalletPricing = {
           goodsType: normalizedType,
           palletType,
           pricingPeriod: period,
+          enabled: !isHidden,
           heightRanges: palletType === "custom" ? [] : normalizeHeightRanges([], palletType),
           weightRanges: normalizeWeightRanges([], palletType),
           stackableAdjustmentType: "plus_per_unit",
@@ -398,6 +418,54 @@ export function PalletPricingForm({
     )
 
     setPricing([...filteredPricing, ...sourceEntries, ...clonedEntries])
+  }
+
+  // Toggle pallet type visibility (hide/show)
+  const togglePalletTypeVisibility = (palletType: PalletType) => {
+    const key = `${normalizeGoodsType(selectedGoodsType)}|${palletType}`
+    const newHidden = new Set(hiddenPalletTypes)
+    
+    // Check if trying to hide - validate at least one will remain visible
+    if (!hiddenPalletTypes.has(key)) {
+      // Count currently visible pallet types for this goods type
+      const currentGoodsType = normalizeGoodsType(selectedGoodsType)
+      const palletTypes: PalletType[] = ["standard", "euro", "custom"]
+      const visibleCount = palletTypes.filter(pt => {
+        const ptKey = `${currentGoodsType}|${pt}`
+        return !hiddenPalletTypes.has(ptKey)
+      }).length
+      
+      // If only one is visible, don't allow hiding it
+      if (visibleCount <= 1) {
+        setPalletTypeError("At least one pallet type must remain enabled. Customers need at least one option to make bookings.")
+        setTimeout(() => setPalletTypeError(null), 5000)
+        return
+      }
+      
+      newHidden.add(key)
+    } else {
+      newHidden.delete(key)
+    }
+    
+    setPalletTypeError(null)
+    setHiddenPalletTypes(newHidden)
+    
+    // Update pricing entries with enabled state
+    const updatedPricing = pricing.map(entry => {
+      const entryKey = `${normalizeGoodsType(entry.goodsType)}|${entry.palletType}`
+      return {
+        ...entry,
+        enabled: !newHidden.has(entryKey)
+      }
+    })
+    
+    updatePricing(updatedPricing)
+  }
+  
+  // Check if a pallet type is hidden for current goods type
+  const isPalletTypeHidden = (palletType: PalletType): boolean => {
+    const key = `${normalizeGoodsType(selectedGoodsType)}|${palletType}`
+    return hiddenPalletTypes.has(key)
   }
 
   const addHeightRange = (palletType: PalletType, _period: PricingPeriod) => {
@@ -1103,11 +1171,62 @@ export function PalletPricingForm({
       return error
     }
 
+    const isHidden = isPalletTypeHidden(palletType)
+
     return (
-      <Card key={palletType}>
-        <CardHeader>
-          <CardTitle>{palletTypeLabel}</CardTitle>
+      <Card key={palletType} className={isHidden ? "opacity-60 border-dashed border-muted-foreground/30" : ""}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className={isHidden ? "text-muted-foreground line-through" : ""}>
+            {palletTypeLabel}
+          </CardTitle>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => togglePalletTypeVisibility(palletType)}
+                  className={isHidden 
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 dark:bg-emerald-950 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900" 
+                    : "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400 dark:bg-amber-950 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900"
+                  }
+                >
+                  {isHidden ? (
+                    <>
+                      <Eye className="h-4 w-4 mr-1.5" />
+                      Show
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="h-4 w-4 mr-1.5" />
+                      Hide
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                {isHidden ? (
+                  <p>Click to enable this pallet type. Customers will be able to book this type.</p>
+                ) : (
+                  <p className="text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-3.5 w-3.5 inline mr-1" />
+                    If you hide this pallet type, customers will not be able to make bookings for it.
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </CardHeader>
+        
+        {isHidden ? (
+          <div className="px-6 pb-4">
+            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+              <EyeOff className="h-4 w-4 flex-shrink-0" />
+              <span>This pallet type is hidden. Customers cannot book this type. Click &quot;Show&quot; to enable it.</span>
+            </div>
+          </div>
+        ) : (
         <CardContent className="space-y-6">
           {/* Custom Pallet Sizes - Multiple sizes with individual height ranges */}
           {palletType === "custom" && (
@@ -1232,7 +1351,12 @@ export function PalletPricingForm({
                           <Card key={sizeIndex} className="border-2">
                             <CardHeader className="pb-3">
                               <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">Size {sizeIndex + 1}</CardTitle>
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-xs dark:bg-emerald-900 dark:text-emerald-300">
+                                    S{sizeIndex + 1}
+                                  </span>
+                                  <CardTitle className="text-base">Custom Size {sizeIndex + 1}</CardTitle>
+                                </div>
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1347,12 +1471,13 @@ export function PalletPricingForm({
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead className="min-w-[140px]">Min Height</TableHead>
-                                        <TableHead className="min-w-[140px]">Max Height</TableHead>
-                                        <TableHead className="min-w-[50px]">Stackable<br/>Price ($)</TableHead>
-                                        <TableHead className="min-w-[145px]">Unstackable<br/>Calculation</TableHead>
-                                        <TableHead className="min-w-[60px]">Unstackable<br/>Price ($)</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
+                                        <TableHead className="w-[40px] text-center">#</TableHead>
+                                        <TableHead className="min-w-[80px]">Min Height</TableHead>
+                                        <TableHead className="min-w-[80px]">Max Height</TableHead>
+                                        <TableHead className="min-w-[60px]">Stackable<br/>Price ($)</TableHead>
+                                        <TableHead className="min-w-[170px]">Unstackable<br/>Calculation</TableHead>
+                                        <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
+                                        <TableHead className="w-[40px]"></TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1361,6 +1486,11 @@ export function PalletPricingForm({
                                         const isLastItem = rangeIndex === (size.heightRanges?.length || 0) - 1
                                         return (
                                         <TableRow key={rangeIndex}>
+                                          <TableCell className="text-center">
+                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs dark:bg-blue-900 dark:text-blue-300">
+                                              H{rangeIndex + 1}
+                                            </span>
+                                          </TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
                                               <Input
@@ -1439,35 +1569,50 @@ export function PalletPricingForm({
                                                 )
                                                 return (
                                                   <>
-                                                    <Input
-                                                      type="number"
-                                                      min="0"
-                                                      value={range.heightMaxCm || ""}
-                                                      placeholder={isLastItem ? "∞" : ""}
-                                                      onFocus={(e) => {
-                                                        if (e.target.value === "0") {
-                                                          e.target.select()
+                                                    {isLastItem ? (
+                                                      <TooltipProvider>
+                                                        <Tooltip>
+                                                          <TooltipTrigger asChild>
+                                                            <div className="min-w-[70px] h-9 px-3 flex items-center justify-center bg-muted border border-input rounded-md text-lg font-semibold text-muted-foreground cursor-help">
+                                                              ∞
+                                                            </div>
+                                                          </TooltipTrigger>
+                                                          <TooltipContent side="top" className="max-w-xs">
+                                                            <p className="text-xs">Last range must be infinite. Add a new range if you need more price tiers.</p>
+                                                          </TooltipContent>
+                                                        </Tooltip>
+                                                      </TooltipProvider>
+                                                    ) : (
+                                                      <Input
+                                                        type="number"
+                                                        min="0"
+                                                        value={range.heightMaxCm || ""}
+                                                        placeholder=""
+                                                        onFocus={(e) => {
+                                                          if (e.target.value === "0") {
+                                                            e.target.select()
+                                                          }
+                                                        }}
+                                                        onChange={(e) =>
+                                                          updateHeightRangeInCustomSize(
+                                                            palletType,
+                                                            period,
+                                                            sizeIndex,
+                                                            rangeIndex,
+                                                            "heightMaxCm",
+                                                            e.target.value === "" ? undefined : Number(e.target.value)
+                                                          )
                                                         }
-                                                      }}
-                                                      onChange={(e) =>
-                                                        updateHeightRangeInCustomSize(
-                                                          palletType,
-                                                          period,
-                                                          sizeIndex,
-                                                          rangeIndex,
-                                                          "heightMaxCm",
-                                                          e.target.value === "" ? undefined : Number(e.target.value)
-                                                        )
-                                                      }
-                                                      className={`min-w-[70px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                                                    />
+                                                        className={`min-w-[70px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                                      />
+                                                    )}
                                                     {serverError && (
                                                       <p className="text-xs text-destructive">{serverError}</p>
                                                     )}
                                                   </>
                                                 )
                                               })()}
-                                              {(() => {
+                                              {!isLastItem && (() => {
                                                 const minValue = Number(range.heightMinCm || 0)
                                                 const maxValue = Number(range.heightMaxCm || 0)
                                                 if (
@@ -1536,8 +1681,8 @@ export function PalletPricingForm({
                                                   )
                                                 }
                                               >
-                                                <SelectTrigger className="w-[70px]">
-                                                  <span className="truncate">
+                                                <SelectTrigger className="w-[95px]">
+                                                  <span className="truncate text-xs">
                                                     {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
                                                   </span>
                                                 </SelectTrigger>
@@ -1553,7 +1698,7 @@ export function PalletPricingForm({
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                className="w-[70px]"
+                                                className="w-[60px]"
                                                 value={(range as any).unstackableValue ?? ''}
                                                 onFocus={(e) => {
                                                   if (e.target.value === '0') {
@@ -1636,12 +1781,13 @@ export function PalletPricingForm({
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead className="min-w-[140px]">Min Weight</TableHead>
-                                        <TableHead className="min-w-[140px]">Max Weight</TableHead>
-                                        <TableHead className="min-w-[50px]">Stackable<br/>Price ($)</TableHead>
-                                        <TableHead className="min-w-[145px]">Unstackable<br/>Calculation</TableHead>
-                                        <TableHead className="min-w-[60px]">Unstackable<br/>Price ($)</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
+                                        <TableHead className="w-[40px] text-center">#</TableHead>
+                                        <TableHead className="min-w-[80px]">Min Weight</TableHead>
+                                        <TableHead className="min-w-[80px]">Max Weight</TableHead>
+                                        <TableHead className="min-w-[60px]">Stackable<br/>Price ($)</TableHead>
+                                        <TableHead className="min-w-[170px]">Unstackable<br/>Calculation</TableHead>
+                                        <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
+                                        <TableHead className="w-[40px]"></TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1650,6 +1796,11 @@ export function PalletPricingForm({
                                         const isLastItem = rangeIndex === (palletPricing.weightRanges?.length || 0) - 1
                                         return (
                                         <TableRow key={rangeIndex}>
+                                          <TableCell className="text-center">
+                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-semibold text-xs dark:bg-purple-900 dark:text-purple-300">
+                                              W{rangeIndex + 1}
+                                            </span>
+                                          </TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
                                               <Input
@@ -1722,34 +1873,49 @@ export function PalletPricingForm({
                                                 )
                                                 return (
                                                   <>
-                                                    <Input
-                                                      type="number"
-                                                      min="0"
-                                                      value={range.weightMaxKg || ""}
-                                                      placeholder={isLastItem ? "∞" : ""}
-                                                      onFocus={(e) => {
-                                                        if (e.target.value === "0") {
-                                                          e.target.select()
+                                                    {isLastItem ? (
+                                                      <TooltipProvider>
+                                                        <Tooltip>
+                                                          <TooltipTrigger asChild>
+                                                            <div className="min-w-[70px] h-9 px-3 flex items-center justify-center bg-muted border border-input rounded-md text-lg font-semibold text-muted-foreground cursor-help">
+                                                              ∞
+                                                            </div>
+                                                          </TooltipTrigger>
+                                                          <TooltipContent side="top" className="max-w-xs">
+                                                            <p className="text-xs">Last range must be infinite. Add a new range if you need more price tiers.</p>
+                                                          </TooltipContent>
+                                                        </Tooltip>
+                                                      </TooltipProvider>
+                                                    ) : (
+                                                      <Input
+                                                        type="number"
+                                                        min="0"
+                                                        value={range.weightMaxKg || ""}
+                                                        placeholder=""
+                                                        onFocus={(e) => {
+                                                          if (e.target.value === "0") {
+                                                            e.target.select()
+                                                          }
+                                                        }}
+                                                        onChange={(e) =>
+                                                          updateWeightRange(
+                                                            palletType,
+                                                            period,
+                                                            rangeIndex,
+                                                            "weightMaxKg",
+                                                            e.target.value === "" ? undefined : Number(e.target.value)
+                                                          )
                                                         }
-                                                      }}
-                                                      onChange={(e) =>
-                                                        updateWeightRange(
-                                                          palletType,
-                                                          period,
-                                                          rangeIndex,
-                                                          "weightMaxKg",
-                                                          e.target.value === "" ? undefined : Number(e.target.value)
-                                                        )
-                                                      }
-                                                      className={`min-w-[70px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                                                    />
+                                                        className={`min-w-[70px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                                      />
+                                                    )}
                                                     {serverError && (
                                                       <p className="text-xs text-destructive">{serverError}</p>
                                                     )}
                                                   </>
                                                 )
                                               })()}
-                                              {(() => {
+                                              {!isLastItem && (() => {
                                                 const minValue = Number(range.weightMinKg || 0)
                                                 const maxValue = Number(range.weightMaxKg || 0)
                                                 if (
@@ -1820,8 +1986,8 @@ export function PalletPricingForm({
                                                   )
                                                 }
                                               >
-                                                <SelectTrigger className="w-[70px]">
-                                                  <span className="truncate">
+                                                <SelectTrigger className="w-[95px]">
+                                                  <span className="truncate text-xs">
                                                     {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
                                                   </span>
                                                 </SelectTrigger>
@@ -1837,7 +2003,7 @@ export function PalletPricingForm({
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                className="w-[70px]"
+                                                className="w-[60px]"
                                                 value={(range as any).unstackableValue ?? ''}
                                                 onFocus={(e) => {
                                                   if (e.target.value === '0') {
@@ -1924,12 +2090,13 @@ export function PalletPricingForm({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="min-w-[90px]">Min ({sizeUnitLabel})</TableHead>
-                              <TableHead className="min-w-[90px]">Max ({sizeUnitLabel})</TableHead>
-                              <TableHead className="min-w-[70px]">Stackable<br/>Price ($)</TableHead>
-                              <TableHead className="min-w-[120px]">Unstackable<br/>Calculation</TableHead>
+                              <TableHead className="w-[40px] text-center">#</TableHead>
+                              <TableHead className="min-w-[70px]">Min ({sizeUnitLabel})</TableHead>
+                              <TableHead className="min-w-[70px]">Max ({sizeUnitLabel})</TableHead>
+                              <TableHead className="min-w-[60px]">Stackable<br/>Price ($)</TableHead>
+                              <TableHead className="min-w-[170px]">Unstackable<br/>Calculation</TableHead>
                               <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
-                              <TableHead className="w-[50px]"></TableHead>
+                              <TableHead className="w-[40px]"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1938,6 +2105,11 @@ export function PalletPricingForm({
                               const isLastItem = index === (palletPricing.heightRanges?.length || 0) - 1
                               return (
                               <TableRow key={index}>
+                                <TableCell className="text-center">
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs dark:bg-blue-900 dark:text-blue-300">
+                                    H{index + 1}
+                                  </span>
+                                </TableCell>
                                 <TableCell>
                                   <div className="space-y-1">
                                     <Input
@@ -2014,34 +2186,49 @@ export function PalletPricingForm({
                                       )
                                       return (
                                         <>
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            value={range.heightMaxCm || ''}
-                                            placeholder={isLastItem ? "∞" : ""}
-                                            onFocus={(e) => {
-                                              if (e.target.value === '0') {
-                                                e.target.select()
+                                          {isLastItem ? (
+                                            <TooltipProvider>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <div className="min-w-[80px] h-9 px-3 flex items-center justify-center bg-muted border border-input rounded-md text-lg font-semibold text-muted-foreground cursor-help">
+                                                    ∞
+                                                  </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="max-w-xs">
+                                                  <p className="text-xs">Last range must be infinite. Add a new range if you need more price tiers.</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          ) : (
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={range.heightMaxCm || ''}
+                                              placeholder=""
+                                              onFocus={(e) => {
+                                                if (e.target.value === '0') {
+                                                  e.target.select()
+                                                }
+                                              }}
+                                              onChange={(e) =>
+                                                updateHeightRange(
+                                                  palletType,
+                                                  period,
+                                                  index,
+                                                  "heightMaxCm",
+                                                  e.target.value === "" ? undefined : Number(e.target.value)
+                                                )
                                               }
-                                            }}
-                                            onChange={(e) =>
-                                              updateHeightRange(
-                                                palletType,
-                                                period,
-                                                index,
-                                                "heightMaxCm",
-                                                e.target.value === "" ? undefined : Number(e.target.value)
-                                              )
-                                            }
-                                            className={`min-w-[80px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                                          />
+                                              className={`min-w-[80px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                            />
+                                          )}
                                           {serverError && (
                                             <p className="text-xs text-destructive">{serverError}</p>
                                           )}
                                         </>
                                       )
                                     })()}
-                                    {(() => {
+                                    {!isLastItem && (() => {
                                       const minValue = Number(range.heightMinCm || 0)
                                       const maxValue = Number(range.heightMaxCm || 0)
                                       if (
@@ -2112,8 +2299,8 @@ export function PalletPricingForm({
                                         )
                                       }
                                     >
-                                      <SelectTrigger className="w-[70px]">
-                                        <span className="truncate">
+                                      <SelectTrigger className="w-[95px]">
+                                        <span className="truncate text-xs">
                                           {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
                                         </span>
                                       </SelectTrigger>
@@ -2129,7 +2316,7 @@ export function PalletPricingForm({
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      className="w-[70px]"
+                                      className="w-[60px]"
                                       value={(range as any).unstackableValue ?? ''}
                                       onFocus={(e) => {
                                         if (e.target.value === '0') {
@@ -2209,12 +2396,13 @@ export function PalletPricingForm({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="min-w-[90px]">Min ({weightUnitLabel})</TableHead>
-                            <TableHead className="min-w-[90px]">Max ({weightUnitLabel})</TableHead>
-                            <TableHead className="min-w-[70px]">Stackable<br/>Price ($)</TableHead>
-                            <TableHead className="min-w-[120px]">Unstackable<br/>Calculation</TableHead>
+                            <TableHead className="w-[40px] text-center">#</TableHead>
+                            <TableHead className="min-w-[70px]">Min ({weightUnitLabel})</TableHead>
+                            <TableHead className="min-w-[70px]">Max ({weightUnitLabel})</TableHead>
+                            <TableHead className="min-w-[60px]">Stackable<br/>Price ($)</TableHead>
+                            <TableHead className="min-w-[170px]">Unstackable<br/>Calculation</TableHead>
                             <TableHead className="min-w-[70px]">Unstackable<br/>Price ($)</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead className="w-[40px]"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2223,6 +2411,11 @@ export function PalletPricingForm({
                             const isLastItem = index === (palletPricing.weightRanges?.length || 0) - 1
                             return (
                             <TableRow key={index}>
+                              <TableCell className="text-center">
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-semibold text-xs dark:bg-purple-900 dark:text-purple-300">
+                                  W{index + 1}
+                                </span>
+                              </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
                                   <Input
@@ -2300,35 +2493,50 @@ export function PalletPricingForm({
                                     )
                                     return (
                                       <>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          value={range.weightMaxKg || ""}
-                                          placeholder={isLastItem ? "∞" : ""}
-                                          onFocus={(e) => {
-                                            if (e.target.value === "0") {
-                                              e.target.select()
+                                        {isLastItem ? (
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <div className="min-w-[80px] h-9 px-3 flex items-center justify-center bg-muted border border-input rounded-md text-lg font-semibold text-muted-foreground cursor-help">
+                                                  ∞
+                                                </div>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="max-w-xs">
+                                                <p className="text-xs">Last range must be infinite. Add a new range if you need more price tiers.</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        ) : (
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={range.weightMaxKg || ""}
+                                            placeholder=""
+                                            onFocus={(e) => {
+                                              if (e.target.value === "0") {
+                                                e.target.select()
+                                              }
+                                            }}
+                                            onChange={(e) =>
+                                              updateWeightRange(
+                                                palletType,
+                                                period,
+                                                index,
+                                                "weightMaxKg",
+                                                e.target.value === "" ? undefined : Number(e.target.value)
+                                              )
                                             }
-                                          }}
-                                          onChange={(e) =>
-                                            updateWeightRange(
-                                              palletType,
-                                              period,
-                                              index,
-                                              "weightMaxKg",
-                                              e.target.value === "" ? undefined : Number(e.target.value)
-                                            )
-                                          }
-                                          className={`min-w-[80px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                                        />
+                                            className={`min-w-[80px] ${serverError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                          />
+                                        )}
                                         {serverError && (
                                           <p className="text-xs text-destructive">{serverError}</p>
                                         )}
                                       </>
                                     )
                                   })()}
-                                  {(() => {
+                                  {!isLastItem && (() => {
                                     const minValue = Number(range.weightMinKg || 0)
                                     const maxValue = Number(range.weightMaxKg || 0)
                                     if (
@@ -2399,8 +2607,8 @@ export function PalletPricingForm({
                                       )
                                     }
                                   >
-                                    <SelectTrigger className="w-[70px]">
-                                      <span className="truncate">
+                                    <SelectTrigger className="w-[95px]">
+                                      <span className="truncate text-xs">
                                         {adjustmentOptions.find(o => o.value === ((range as any).unstackableMethod ?? "rate"))?.shortLabel}
                                       </span>
                                     </SelectTrigger>
@@ -2416,7 +2624,7 @@ export function PalletPricingForm({
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    className="w-[70px]"
+                                    className="w-[60px]"
                                     value={(range as any).unstackableValue ?? ''}
                                     onFocus={(e) => {
                                       if (e.target.value === '0') {
@@ -2477,6 +2685,7 @@ export function PalletPricingForm({
             })}
           </Tabs>
         </CardContent>
+        )}
       </Card>
     )
   }
@@ -2509,12 +2718,31 @@ export function PalletPricingForm({
             </SelectContent>
           </Select>
           {goodsTypeOptions.length > 1 && (
-            <Button type="button" variant="outline" size="sm" onClick={applyPricingToAllGoodsTypes}>
-              Apply for all goods types
-            </Button>
+            <div className="space-y-1.5">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={applyPricingToAllGoodsTypes}
+                className="bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400 hover:text-amber-800 dark:bg-amber-950 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900"
+              >
+                Apply for all goods types
+              </Button>
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                This will automatically assign the prices you set to all product types.
+              </p>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Pallet type validation error */}
+      {palletTypeError && (
+        <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>{palletTypeError}</span>
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* Standard and Euro pallets grouped together */}

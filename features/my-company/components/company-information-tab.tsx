@@ -14,7 +14,8 @@ import { useUIStore } from "@/stores/ui.store"
 
 interface Company {
   id: string
-  name: string | null
+  short_name: string | null
+  trading_name: string | null
   logo_url: string | null
   vat: string | null
   address: string | null
@@ -31,7 +32,8 @@ export function CompanyInformationTab() {
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [formData, setFormData] = useState({
-    name: "",
+    tradingName: "",
+    shortName: "",
     vat: "",
     address: "",
     postalCode: "",
@@ -64,7 +66,7 @@ export function CompanyInformationTab() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name, logo_url, vat, address, postal_code, city, country')
+        .select('id, short_name, trading_name, logo_url, vat, address, postal_code, city, country')
         .eq('id', companyId)
         .maybeSingle()
 
@@ -77,7 +79,8 @@ export function CompanyInformationTab() {
   useEffect(() => {
     if (company) {
       setFormData({
-        name: company.name || "",
+        tradingName: company.trading_name || "",
+        shortName: company.short_name || "",
         vat: company.vat || "",
         address: company.address || "",
         postalCode: company.postal_code || "",
@@ -124,7 +127,8 @@ export function CompanyInformationTab() {
     
     try {
       await updateMutation.mutateAsync({
-        name: formData.name || undefined,
+        trading_name: formData.tradingName || undefined,
+        short_name: formData.shortName || undefined,
         vat: formData.vat || undefined,
         address: formData.address || undefined,
         postal_code: formData.postalCode || undefined,
@@ -232,14 +236,29 @@ export function CompanyInformationTab() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="company-name">Company Name</Label>
+              <Label htmlFor="trading-name">Trading Name (Legal Name)</Label>
               <Input
-                id="company-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter your company name"
+                id="trading-name"
+                value={formData.tradingName}
+                onChange={(e) => setFormData({ ...formData, tradingName: e.target.value })}
+                placeholder="Full legal company name (e.g., Acme Corporation Inc.)"
+              />
+              <p className="text-xs text-muted-foreground">
+                The official registered name of your company
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="short-name">Short Name (Display Name) <span className="text-destructive">*</span></Label>
+              <Input
+                id="short-name"
+                value={formData.shortName}
+                onChange={(e) => setFormData({ ...formData, shortName: e.target.value })}
+                placeholder="Short display name (e.g., Acme Corp)"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                This name will be displayed throughout the platform
+              </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">

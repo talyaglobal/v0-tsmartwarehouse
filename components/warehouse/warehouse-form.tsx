@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ArrowLeft, ArrowRight, Save, CheckCircle2, MapPin } from "lucide-react"
+import { Loader2, ArrowLeft, ArrowRight, Save, CheckCircle2, MapPin, FileSpreadsheet, Tag, RefreshCw } from "lucide-react"
+import * as XLSX from "xlsx"
 import { api } from "@/lib/api/client"
 import { useUIStore } from "@/stores/ui.store"
 import Link from "next/link"
@@ -24,6 +25,7 @@ import { TemperatureSelect } from "@/components/warehouse/temperature-select"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { GOODS_TYPES } from "@/lib/constants/warehouse-types"
+import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
 
 const STORAGE_TYPES = [
   { value: "bulk-space", label: "Bulk Space" },
@@ -81,6 +83,17 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
   const [state, setState] = useState("")
   const [warehousePhotos, setWarehousePhotos] = useState<string[]>([])
   const [showMapPicker, setShowMapPicker] = useState(false)
+  
+  // Store original warehouse info for display in edit mode
+  const [originalWarehouseInfo, setOriginalWarehouseInfo] = useState<{
+    address: string
+    city: string
+    state: string
+    name?: string
+  } | null>(null)
+  
+  // Store the dynamically generated warehouse name
+  const [generatedName, setGeneratedName] = useState<string>("")
 
   const formatNumberInput = (value: string): string => {
     const numericValue = value.replace(/\D/g, '')
@@ -221,6 +234,7 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
       goodsType?: string
       palletType: 'euro' | 'standard' | 'custom'
       pricingPeriod: 'day' | 'week' | 'month'
+      enabled?: boolean
       customDimensions?: { length: number; width: number; height: number; unit?: 'cm' | 'in' }
       customSizes?: Array<{
         lengthMin: number
@@ -246,6 +260,16 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
   const handlePricingChange = useCallback((pricing: any[]) => {
     setFormData((prev) => ({ ...prev, palletPricing: pricing }))
   }, [])
+
+  // Auto-generate warehouse name when location or goods types change
+  useEffect(() => {
+    // Only generate if we have the minimum required data
+    if (formData.city) {
+      const warehouseType = formData.warehouseType.length > 0 ? formData.warehouseType[0] : 'general'
+      const newName = generateWarehouseName(formData.city, warehouseType, state)
+      setGeneratedName(newName)
+    }
+  }, [formData.city, formData.warehouseType, state])
 
   // Load warehouse data for edit mode
   useEffect(() => {
@@ -355,11 +379,27 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
           })
           setWarehousePhotos(warehouse.photos || [])
           
+          // Extract state from city if it contains comma
+          let extractedState = warehouse.state || ""
           if (warehouse.city && warehouse.city.includes(',')) {
             const parts = warehouse.city.split(',')
             if (parts.length > 1) {
-              setState(parts[parts.length - 1].trim())
+              extractedState = parts[parts.length - 1].trim()
+              setState(extractedState)
             }
+          }
+          
+          // Store original warehouse info for header display
+          setOriginalWarehouseInfo({
+            address: warehouse.address || "",
+            city: warehouse.city?.split(',')[0]?.trim() || warehouse.city || "",
+            state: extractedState,
+            name: warehouse.name || "",
+          })
+          
+          // Set initial generated name from the loaded warehouse
+          if (warehouse.name) {
+            setGeneratedName(warehouse.name)
           }
         }
       } catch (error) {
@@ -824,6 +864,196 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
     }
   }
 
+  // Export pricing summary to Excel
+  const exportPricingSummary = useCallback(() => {
+    const workbook = XLSX.utils.book_new()
+    
+    // Get goods types from warehouse types
+    const goodsTypes = formData.warehouseType.length > 0 
+      ? formData.warehouseType 
+      : ["general"]
+    
+    const palletTypes: Array<'standard' | 'euro' | 'custom'> = ['standard', 'euro', 'custom']
+    const periods: Array<'day' | 'week' | 'month'> = ['day', 'week', 'month']
+    
+    // Get goods type label
+    const getGoodsTypeLabel = (value: string) => {
+      const found = GOODS_TYPES.find(g => g.value === value)
+      return found ? found.label : value
+    }
+    
+    // Create a sheet for each goods type
+    goodsTypes.forEach((goodsType) => {
+      const sheetData: any[][] = []
+      const goodsTypeLabel = getGoodsTypeLabel(goodsType)
+      
+      // Add warehouse info header
+      sheetData.push([`Pricing Summary - ${goodsTypeLabel}`])
+      sheetData.push([`Generated: ${new Date().toLocaleDateString()}`])
+      if (originalWarehouseInfo) {
+        sheetData.push([`Warehouse: ${originalWarehouseInfo.address}, ${originalWarehouseInfo.city}${originalWarehouseInfo.state ? `, ${originalWarehouseInfo.state}` : ''}`])
+      }
+      sheetData.push([])
+      
+      // Add Space Pricing if selected
+      if (formData.rentMethods.includes("sq_ft")) {
+        const areaRentalPricing = formData.pricing.find(p => p.pricingType === 'area-rental')
+        sheetData.push(["SPACE STORAGE PRICING"])
+        sheetData.push(["Base Price ($/sq ft/month)", areaRentalPricing?.basePrice || "Not set"])
+        if (formData.minSqFt || formData.maxSqFt) {
+          sheetData.push(["Min Sq Ft", formData.minSqFt || "No minimum"])
+          sheetData.push(["Max Sq Ft", formData.maxSqFt || "No maximum"])
+        }
+        sheetData.push([])
+      }
+      
+      // Add Pallet Pricing if selected
+      if (formData.rentMethods.includes("pallet")) {
+        sheetData.push(["PALLET STORAGE PRICING"])
+        sheetData.push([])
+        
+        // Process each pallet type
+        palletTypes.forEach((palletType) => {
+          const palletTypeLabel = palletType.charAt(0).toUpperCase() + palletType.slice(1) + " Pallet"
+          sheetData.push([palletTypeLabel.toUpperCase()])
+          
+          periods.forEach((period) => {
+            const pricing = formData.palletPricing.find(
+              p => (p.goodsType || "general").toLowerCase() === goodsType.toLowerCase() &&
+                   p.palletType === palletType &&
+                   p.pricingPeriod === period
+            )
+            
+            if (!pricing) {
+              sheetData.push([`  ${period.charAt(0).toUpperCase() + period.slice(1)}ly: No pricing set`])
+              return
+            }
+            
+            // Check if this pallet type is disabled
+            if (pricing.enabled === false) {
+              sheetData.push([`  ${period.charAt(0).toUpperCase() + period.slice(1)}ly: HIDDEN (Not available for booking)`])
+              return
+            }
+            
+            const periodLabel = period.charAt(0).toUpperCase() + period.slice(1) + "ly Pricing"
+            sheetData.push([`  ${periodLabel}`])
+            
+            // Handle custom pallet sizes
+            if (palletType === 'custom' && pricing.customSizes && pricing.customSizes.length > 0) {
+              pricing.customSizes.forEach((size, sizeIndex) => {
+                sheetData.push([`    Custom Size ${sizeIndex + 1}: ${size.lengthMin}"-${size.lengthMax}" L x ${size.widthMin}"-${size.widthMax}" W`])
+                
+                // Height ranges for custom size
+                if (size.heightRanges && size.heightRanges.length > 0) {
+                  sheetData.push(["      Height Ranges:"])
+                  sheetData.push(["      #", "Min Height (in)", "Max Height (in)", "Price/Unit ($)"])
+                  size.heightRanges.forEach((range, idx) => {
+                    sheetData.push([
+                      `      H${idx + 1}`,
+                      range.heightMinCm,
+                      range.heightMaxCm || "∞",
+                      range.pricePerUnit
+                    ])
+                  })
+                }
+              })
+            } else {
+              // Height ranges for standard/euro
+              if (pricing.heightRanges && pricing.heightRanges.length > 0) {
+                sheetData.push(["    Height Ranges:"])
+                sheetData.push(["    #", "Min Height (in)", "Max Height (in)", "Price/Unit ($)"])
+                pricing.heightRanges.forEach((range, idx) => {
+                  sheetData.push([
+                    `    H${idx + 1}`,
+                    range.heightMinCm,
+                    range.heightMaxCm || "∞",
+                    range.pricePerUnit
+                  ])
+                })
+              }
+            }
+            
+            // Weight ranges
+            if (pricing.weightRanges && pricing.weightRanges.length > 0) {
+              sheetData.push(["    Weight Ranges:"])
+              sheetData.push(["    #", "Min Weight (lbs)", "Max Weight (lbs)", "Price/Pallet ($)"])
+              pricing.weightRanges.forEach((range, idx) => {
+                sheetData.push([
+                  `    W${idx + 1}`,
+                  range.weightMinKg,
+                  range.weightMaxKg || "∞",
+                  range.pricePerPallet
+                ])
+              })
+            }
+            
+            sheetData.push([])
+          })
+          
+          sheetData.push([])
+        })
+        
+        // Add In/Out Fees
+        sheetData.push(["WAREHOUSE IN/OUT FEES"])
+        sheetData.push(["In Fee ($/pallet)", formData.warehouseInFee || "Not set"])
+        sheetData.push(["Out Fee ($/pallet)", formData.warehouseOutFee || "Not set"])
+        sheetData.push([])
+        
+        // Add Overtime Pricing
+        if (formData.overtimePrice) {
+          sheetData.push(["OVERTIME PRICING (per pallet)"])
+          sheetData.push(["After Regular Work Time - In", formData.overtimePrice.afterRegularWorkTime?.in || "Not set"])
+          sheetData.push(["After Regular Work Time - Out", formData.overtimePrice.afterRegularWorkTime?.out || "Not set"])
+          sheetData.push(["Holidays - In", formData.overtimePrice.holidays?.in || "Not set"])
+          sheetData.push(["Holidays - Out", formData.overtimePrice.holidays?.out || "Not set"])
+          sheetData.push([])
+        }
+        
+        // Add Free Storage Rules
+        if (formData.freeStorageRules && formData.freeStorageRules.length > 0) {
+          sheetData.push(["FREE STORAGE RULES"])
+          sheetData.push(["#", "Min Duration", "Max Duration", "Free Amount"])
+          formData.freeStorageRules.forEach((rule, idx) => {
+            sheetData.push([
+              `R${idx + 1}`,
+              `${rule.minDuration} ${rule.durationUnit}(s)`,
+              rule.maxDuration ? `${rule.maxDuration} ${rule.durationUnit}(s)` : "∞",
+              `${rule.freeAmount} ${rule.freeUnit}(s)`
+            ])
+          })
+        }
+      }
+      
+      // Create worksheet
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetData)
+      
+      // Set column widths
+      worksheet['!cols'] = [
+        { wch: 35 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 15 }
+      ]
+      
+      // Add worksheet to workbook (sheet name max 31 chars)
+      const sheetName = goodsTypeLabel.length > 31 ? goodsTypeLabel.substring(0, 31) : goodsTypeLabel
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+    })
+    
+    // Generate filename
+    const warehouseAddress = originalWarehouseInfo?.address?.replace(/[^a-zA-Z0-9]/g, '_')?.substring(0, 30) || 'warehouse'
+    const fileName = `Pricing_Summary_${warehouseAddress}_${new Date().toISOString().split('T')[0]}.xlsx`
+    
+    // Download the file
+    XLSX.writeFile(workbook, fileName)
+    
+    addNotification({
+      type: 'success',
+      message: 'Pricing summary exported successfully!',
+      duration: 3000,
+    })
+  }, [formData, originalWarehouseInfo, addNotification])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -843,7 +1073,7 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">
             {mode === 'edit' ? 'Edit Warehouse' : 'Add New Warehouse'}
           </h1>
@@ -851,7 +1081,103 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
             {mode === 'edit' ? 'Update your warehouse details' : 'Create a new warehouse listing'}
           </p>
         </div>
+        {/* Show current warehouse info and generated name */}
+        {(generatedName || (mode === 'edit' && originalWarehouseInfo)) && (
+          <div className="hidden sm:flex items-center gap-4">
+            {/* Warehouse Name Card */}
+            {generatedName && (
+              <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${
+                mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name
+                  ? 'bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700'
+                  : 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950 dark:border-emerald-700'
+              }`}>
+                <Tag className={`h-5 w-5 flex-shrink-0 ${
+                  mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                }`} />
+                <div className="text-right">
+                  <p className={`font-bold text-sm ${
+                    mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name
+                      ? 'text-amber-700 dark:text-amber-300'
+                      : 'text-emerald-700 dark:text-emerald-300'
+                  }`}>
+                    {generatedName}
+                  </p>
+                  {mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 justify-end">
+                      <RefreshCw className="h-3 w-3" />
+                      was: {originalWarehouseInfo.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Location Card */}
+            {mode === 'edit' && originalWarehouseInfo && (
+              <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border border-primary/20 rounded-lg">
+                <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
+                <div className="text-right">
+                  <p className="font-medium text-sm text-foreground truncate max-w-[250px]">
+                    {originalWarehouseInfo.address}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {originalWarehouseInfo.city}{originalWarehouseInfo.state ? `, ${originalWarehouseInfo.state}` : ''}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      {/* Mobile warehouse info banner */}
+      {(generatedName || (mode === 'edit' && originalWarehouseInfo)) && (
+        <div className="sm:hidden space-y-2 mb-4">
+          {/* Mobile Warehouse Name */}
+          {generatedName && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+              mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name
+                ? 'bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700'
+                : 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950 dark:border-emerald-700'
+            }`}>
+              <Tag className={`h-4 w-4 flex-shrink-0 ${
+                mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-emerald-600 dark:text-emerald-400'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className={`font-bold text-sm ${
+                  mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-emerald-700 dark:text-emerald-300'
+                }`}>
+                  {generatedName}
+                </p>
+                {mode === 'edit' && originalWarehouseInfo?.name && generatedName !== originalWarehouseInfo.name && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    was: {originalWarehouseInfo.name}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {/* Mobile Location */}
+          {mode === 'edit' && originalWarehouseInfo && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-lg">
+              <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-foreground truncate">
+                  {originalWarehouseInfo.address}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {originalWarehouseInfo.city}{originalWarehouseInfo.state ? `, ${originalWarehouseInfo.state}` : ''}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress */}
       <div className="mb-8">
@@ -1767,19 +2093,30 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           ) : (
-            <Button type="button" onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  {mode === 'edit' ? 'Save Changes' : 'Create Warehouse'}
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={exportPricingSummary}
+                className="bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 dark:bg-emerald-950 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900"
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Print Pricing Summary
+              </Button>
+              <Button type="button" onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    {mode === 'edit' ? 'Save Changes' : 'Create Warehouse'}
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </CardFooter>
       </Card>

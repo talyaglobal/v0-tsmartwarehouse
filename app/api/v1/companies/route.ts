@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('companies')
       .select('*')
-      .order('name', { ascending: true })
+      .order('short_name', { ascending: true })
 
     if (error) {
       throw new Error(`Failed to fetch companies: ${error.message}`)
@@ -47,12 +47,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, logo_url } = body
+    const { name, short_name, trading_name, logo_url } = body
+    
+    // Use short_name if provided, otherwise fall back to name
+    const shortNameValue = short_name || name
 
-    if (!name || typeof name !== 'string' || name.trim() === '') {
+    if (!shortNameValue || typeof shortNameValue !== 'string' || shortNameValue.trim() === '') {
       const errorData: ErrorResponse = {
         success: false,
-        error: "Company name is required",
+        error: "Company short name is required",
         statusCode: 400,
       }
       return NextResponse.json(errorData, { status: 400 })
@@ -62,7 +65,8 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('companies')
       .insert({
-        name: name.trim(),
+        short_name: shortNameValue.trim(),
+        trading_name: trading_name?.trim() || shortNameValue.trim(),
         logo_url: logo_url || null,
       })
       .select()

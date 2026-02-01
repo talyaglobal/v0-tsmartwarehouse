@@ -19,7 +19,7 @@ export async function PATCH(
     const { user } = authResult
     const { id } = await params
     const body = await request.json()
-    const { name, logo_url, vat, address, postal_code, city, country } = body
+    const { name, short_name, trading_name, logo_url, vat, address, postal_code, city, country } = body
 
     // Check if user has permission to update this company
     // Root can update any company
@@ -50,24 +50,27 @@ export async function PATCH(
     const supabase = createServerSupabaseClient()
     
     const updates: Record<string, any> = {}
-    if (name !== undefined) {
-      if (typeof name !== 'string' || name.trim() === '') {
+    
+    // Handle short_name (or legacy name field)
+    const shortNameValue = short_name ?? name // Use short_name if provided, otherwise fall back to name
+    if (shortNameValue !== undefined) {
+      if (typeof shortNameValue !== 'string' || shortNameValue.trim() === '') {
         const errorData: ErrorResponse = {
           success: false,
-          error: "Company name cannot be empty",
+          error: "Company short name cannot be empty",
           statusCode: 400,
         }
         return NextResponse.json(errorData, { status: 400 })
       }
       
-      const trimmedName = name.trim()
+      const trimmedShortName = shortNameValue.trim()
       
-      // Check if a company with this name already exists (excluding current company)
+      // Check if a company with this short_name already exists (excluding current company)
       // Use case-insensitive comparison
       const { data: existingCompany, error: checkError } = await supabase
         .from('companies')
-        .select('id, name')
-        .ilike('name', trimmedName)
+        .select('id, short_name')
+        .ilike('short_name', trimmedShortName)
         .neq('id', id)
         .maybeSingle()
       
@@ -78,13 +81,18 @@ export async function PATCH(
       if (existingCompany) {
         const errorData: ErrorResponse = {
           success: false,
-          error: `A company with the name "${trimmedName}" already exists`,
+          error: `A company with the name "${trimmedShortName}" already exists`,
           statusCode: 409, // Conflict
         }
         return NextResponse.json(errorData, { status: 409 })
       }
       
-      updates.name = trimmedName
+      updates.short_name = trimmedShortName
+    }
+    
+    // Handle trading_name
+    if (trading_name !== undefined) {
+      updates.trading_name = trading_name?.trim() || null
     }
     if (logo_url !== undefined) {
       updates.logo_url = logo_url || null

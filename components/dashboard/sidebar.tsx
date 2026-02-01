@@ -219,7 +219,7 @@ export function DashboardSidebar() {
       if (companyId) {
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
-          .select('id, name, logo_url')
+          .select('id, short_name, trading_name, logo_url')
           .eq('id', companyId)
           .maybeSingle()
 
@@ -231,7 +231,8 @@ export function DashboardSidebar() {
       return {
         name: profileData?.name || user.email?.split('@')[0] || 'User',
         membershipTier: (profileData?.membership_tier as MembershipTier) || 'bronze',
-        company: company?.name || null,
+        company: company?.short_name || null,
+        companyTradingName: company?.trading_name || null,
         companyLogo: company?.logo_url || null,
         companyId: companyId,
         role: profileData?.role || 'warehouse_client',
@@ -243,17 +244,17 @@ export function DashboardSidebar() {
     refetchOnWindowFocus: false, // Don't refetch on window focus
   })
 
-  // Check if user is company admin (using profiles.role and company_id)
+  // Check if user is company admin (using profiles.role and company_id, or client team admin)
   const { data: companyAdminStatus } = useQuery({
     queryKey: ['company-admin', user?.id, profile?.companyId],
     queryFn: async () => {
       if (!user) return false
       const supabase = createClient()
       
-      // First get profile to check company_id
+      // First get profile to check company_id and client_type
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('role, company_id')
+        .select('role, company_id, client_type')
         .eq('id', user.id)
         .maybeSingle()
       
@@ -261,17 +262,32 @@ export function DashboardSidebar() {
         return false
       }
       
-      // User must have a company_id and be owner or admin
+      // User must have a company_id
       if (!profileData.company_id) {
         return false
       }
       
       // Check if user is warehouse_admin or warehouse_supervisor
-      if (!['warehouse_admin', 'warehouse_supervisor'].includes(profileData.role)) {
-        return false
+      if (['warehouse_admin', 'warehouse_supervisor'].includes(profileData.role)) {
+        return true
       }
       
-      return true
+      // Check if user is a corporate client with admin role in their team
+      if (profileData.role === 'warehouse_client' && profileData.client_type === 'corporate') {
+        // Check if user is admin in any client team
+        const { data: teamMember } = await supabase
+          .from('client_team_members')
+          .select('role')
+          .eq('member_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle()
+        
+        if (teamMember) {
+          return true
+        }
+      }
+      
+      return false
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -19,4 +19,6 @@ export * from './companies'
 export * from './warehouses'
 export * from './appointments'
 export * from './appointment-types'
+export * from './teams'
+export * from './booking-approvals'
 

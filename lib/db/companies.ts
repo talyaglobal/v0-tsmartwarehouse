@@ -4,11 +4,14 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-export type CompanyType = 'warehouse_company' | 'customer_company'
+export type CompanyType = 'warehouse_company' | 'customer_company' | 'client_company'
 
 export interface Company {
   id: string
-  name: string
+  shortName: string
+  tradingName?: string
+  /** @deprecated Use shortName instead */
+  name?: string
   type: CompanyType
   logoUrl?: string
   createdAt: string
@@ -83,7 +86,8 @@ export async function createCompany(
   const { data, error } = await supabase
     .from('companies')
     .insert({
-      name: company.name,
+      short_name: company.shortName || company.name,
+      trading_name: company.tradingName,
       type: company.type,
       logo_url: company.logoUrl,
     })
@@ -107,7 +111,10 @@ export async function updateCompany(
   const supabase = await createServerSupabaseClient()
 
   const updateData: any = {}
-  if (updates.name !== undefined) updateData.name = updates.name
+  if (updates.shortName !== undefined) updateData.short_name = updates.shortName
+  if (updates.tradingName !== undefined) updateData.trading_name = updates.tradingName
+  // Support legacy name field
+  if (updates.name !== undefined && !updates.shortName) updateData.short_name = updates.name
   if (updates.type !== undefined) updateData.type = updates.type
   if (updates.logoUrl !== undefined) updateData.logo_url = updates.logoUrl
 
@@ -144,7 +151,10 @@ export async function deleteCompany(id: string): Promise<void> {
 function transformCompanyRow(row: any): Company {
   return {
     id: row.id,
-    name: row.name,
+    shortName: row.short_name,
+    tradingName: row.trading_name,
+    // Keep name for backward compatibility
+    name: row.short_name,
     type: row.type,
     logoUrl: row.logo_url,
     createdAt: row.created_at,

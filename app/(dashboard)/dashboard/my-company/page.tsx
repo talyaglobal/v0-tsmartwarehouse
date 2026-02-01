@@ -13,6 +13,9 @@ import { TeamMembersTab, type TeamMembersTabRef } from "@/features/my-company/co
 import { WarehousesTab } from "@/features/my-company/components/warehouses-tab"
 import { CompanyInformationTab } from "@/features/my-company/components/company-information-tab"
 import { AccessLogsTab } from "@/features/my-company/components/access-logs-tab"
+import { ClientTeamMembersTab } from "@/features/my-company/components/client-team-members-tab"
+
+type UserType = 'warehouse' | 'corporate_client' | null
 
 export default function MyCompanyPage() {
   const { user } = useUser()
@@ -53,23 +56,46 @@ export default function MyCompanyPage() {
     router.push(`${pathname}?tab=${value}`, { scroll: false })
   }
 
-  // Check if user is company admin
-  const { data: isCompanyAdmin, isLoading: checkingRole } = useQuery({
+  // Check if user is company admin and determine user type
+  const { data: adminData, isLoading: checkingRole } = useQuery({
     queryKey: ['company-admin-check', user?.id],
     queryFn: async () => {
-      if (!user) return false
+      if (!user) return { isAdmin: false, userType: null as UserType }
       const supabase = createClient()
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role, company_id')
+        .select('role, company_id, client_type')
         .eq('id', user.id)
         .maybeSingle()
       
-      if (!profile || !profile.company_id) return false
-      return ['warehouse_admin', 'warehouse_supervisor'].includes(profile.role)
+      if (!profile || !profile.company_id) return { isAdmin: false, userType: null as UserType }
+      
+      // Warehouse admin/supervisor can access
+      if (['warehouse_admin', 'warehouse_supervisor'].includes(profile.role)) {
+        return { isAdmin: true, userType: 'warehouse' as UserType }
+      }
+      
+      // Corporate client team admin can access
+      if (profile.role === 'warehouse_client' && profile.client_type === 'corporate') {
+        const { data: teamMember } = await supabase
+          .from('client_team_members')
+          .select('role')
+          .eq('member_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle()
+        
+        if (teamMember) {
+          return { isAdmin: true, userType: 'corporate_client' as UserType }
+        }
+      }
+      
+      return { isAdmin: false, userType: null as UserType }
     },
     enabled: !!user,
   })
+
+  const isCompanyAdmin = adminData?.isAdmin
+  const userType = adminData?.userType
 
   if (checkingRole) {
     return (
@@ -94,36 +120,53 @@ export default function MyCompanyPage() {
     )
   }
 
+  // Different description based on user type
+  const pageDescription = userType === 'corporate_client' 
+    ? "Manage your company settings and team members"
+    : "Manage your company settings, team members, and warehouses"
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="My Company"
-        description="Manage your company settings, team members, and warehouses"
+        description={pageDescription}
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
           <TabsTrigger value="team">Team Members</TabsTrigger>
-          <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
+          {userType === 'warehouse' && (
+            <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
+          )}
           <TabsTrigger value="information">Company Information</TabsTrigger>
-          <TabsTrigger value="access-logs">Access Logs</TabsTrigger>
+          {userType === 'warehouse' && (
+            <TabsTrigger value="access-logs">Access Logs</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="team" className="space-y-4">
-          <TeamMembersTab ref={teamMembersTabRef} />
+          {userType === 'corporate_client' ? (
+            <ClientTeamMembersTab />
+          ) : (
+            <TeamMembersTab ref={teamMembersTabRef} />
+          )}
         </TabsContent>
 
-        <TabsContent value="warehouses" className="space-y-4">
-          <WarehousesTab />
-        </TabsContent>
+        {userType === 'warehouse' && (
+          <TabsContent value="warehouses" className="space-y-4">
+            <WarehousesTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="information" className="space-y-4">
           <CompanyInformationTab />
         </TabsContent>
 
-        <TabsContent value="access-logs" className="space-y-4">
-          <AccessLogsTab />
-        </TabsContent>
+        {userType === 'warehouse' && (
+          <TabsContent value="access-logs" className="space-y-4">
+            <AccessLogsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
     // Apply search filter
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,city.ilike.%${search}%`)
+      query = query.or(`short_name.ilike.%${search}%,trading_name.ilike.%${search}%,email.ilike.%${search}%,city.ilike.%${search}%`)
     }
 
     // Apply pagination
@@ -81,7 +81,9 @@ export async function GET(request: Request) {
     // Transform data
     const transformedCompanies = (companies || []).map((company: any) => ({
       id: company.id,
-      name: company.name,
+      short_name: company.short_name,
+      trading_name: company.trading_name,
+      name: company.short_name, // Keep name for backward compatibility
       email: company.email,
       phone: company.phone,
       address: company.address,

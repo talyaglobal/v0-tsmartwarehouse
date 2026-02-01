@@ -3,7 +3,9 @@ import { checkPalletCapacity, checkAreaRentalCapacity, reserveCapacity } from ".
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
 import { getBookings, getBookingById, createBooking, updateBooking } from "@/lib/db/bookings"
 import { getNotificationService } from "@/lib/notifications/service"
-import type { Booking, BookingType, MembershipTier } from "@/types"
+import { canBookOnBehalf } from "@/lib/db/teams"
+import { createApprovalRequest, approveBooking as dbApproveBooking, rejectBooking as dbRejectBooking, getPendingApprovalsForUser } from "@/lib/db/booking-approvals"
+import type { Booking, BookingType, MembershipTier, BookingApproval } from "@/types"
 
 /**
  * Business Logic: Booking Creation with Availability Checking
@@ -433,5 +435,241 @@ export async function getBookingsWithConfirmedTimeSlots(warehouseId: string): Pr
   
   // Filter to only include bookings with confirmed time slots
   return bookings.filter(booking => booking.timeSlotConfirmedAt !== undefined)
+}
+
+// =====================================================
+// On-Behalf Booking Functions (2026-01-29)
+// =====================================================
+
+export interface CreateOnBehalfBookingInput extends CreateBookingInput {
+  bookedById: string      // The team admin creating the booking
+  bookedByName: string    // Name of the team admin
+  requiresApproval: boolean // Whether customer approval is needed
+  requestMessage?: string // Optional message for approval request
+}
+
+export interface CreateOnBehalfBookingResult extends CreateBookingResult {
+  approval?: BookingApproval
+  bookedOnBehalf: boolean
+}
+
+/**
+ * Create a booking on behalf of a team member
+ * Only team admins can create bookings on behalf of team members
+ */
+export async function createBookingOnBehalf(
+  input: CreateOnBehalfBookingInput
+): Promise<CreateOnBehalfBookingResult> {
+  // Step 1: Validate that booker can book on behalf of customer
+  const canBook = await canBookOnBehalf(input.bookedById, input.customerId)
+  if (!canBook) {
+    throw new Error(
+      "You do not have permission to book on behalf of this user. " +
+      "Only team admins can book on behalf of team members."
+    )
+  }
+
+  // Step 2: Create the booking using standard flow
+  const result = await createBookingWithAvailability(input)
+
+  // Step 3: Update booking with on-behalf information
+  const supabase = createServerSupabaseClient()
+  await supabase
+    .from("bookings")
+    .update({
+      booked_by_id: input.bookedById,
+      booked_on_behalf: true,
+      requires_approval: input.requiresApproval,
+      approval_status: input.requiresApproval ? "pending" : null,
+    })
+    .eq("id", result.booking.id)
+
+  // Step 4: If approval is required, create approval request
+  let approval: BookingApproval | undefined
+  if (input.requiresApproval) {
+    approval = await createApprovalRequest(
+      result.booking.id,
+      input.bookedById,
+      input.bookedByName,
+      input.requestMessage
+    )
+
+    // Send notification to customer about pending approval
+    try {
+      const notificationService = getNotificationService()
+      await notificationService.sendNotification({
+        userId: input.customerId,
+        type: "booking",
+        channels: ["email", "push"],
+        title: "Booking Approval Required",
+        message: `${input.bookedByName} has created a booking on your behalf. Please review and approve or reject the booking.`,
+        template: "booking-approval-required",
+        templateData: {
+          bookingId: result.booking.id.slice(0, 8),
+          bookedByName: input.bookedByName,
+          bookingType: input.type,
+          quantity: input.type === "pallet" ? input.palletCount : input.areaSqFt,
+          customerName: input.customerName,
+          requestMessage: input.requestMessage,
+        },
+      })
+    } catch (error) {
+      console.error("Failed to send approval notification:", error)
+    }
+  } else {
+    // No approval needed - send confirmation notification
+    try {
+      const notificationService = getNotificationService()
+      await notificationService.sendNotification({
+        userId: input.customerId,
+        type: "booking",
+        channels: ["email", "push"],
+        title: "Booking Created on Your Behalf",
+        message: `${input.bookedByName} has created a booking on your behalf.`,
+        template: "booking-created-on-behalf",
+        templateData: {
+          bookingId: result.booking.id.slice(0, 8),
+          bookedByName: input.bookedByName,
+          bookingType: input.type,
+          quantity: input.type === "pallet" ? input.palletCount : input.areaSqFt,
+          customerName: input.customerName,
+        },
+      })
+    } catch (error) {
+      console.error("Failed to send on-behalf notification:", error)
+    }
+  }
+
+  return {
+    ...result,
+    approval,
+    bookedOnBehalf: true,
+    message: input.requiresApproval
+      ? "Booking created. Waiting for customer approval."
+      : "Booking created successfully on behalf of team member.",
+  }
+}
+
+/**
+ * Approve a booking that was created on behalf
+ */
+export async function approveOnBehalfBooking(
+  bookingId: string,
+  customerId: string,
+  customerName: string,
+  responseMessage?: string
+): Promise<BookingApproval> {
+  // Get booking to verify customer
+  const booking = await getBookingById(bookingId, false)
+  if (!booking) {
+    throw new Error("Booking not found")
+  }
+
+  if (booking.customerId !== customerId) {
+    throw new Error("You can only approve bookings made on your behalf")
+  }
+
+  if (!booking.bookedOnBehalf || !booking.requiresApproval) {
+    throw new Error("This booking does not require approval")
+  }
+
+  if (booking.approvalStatus !== "pending") {
+    throw new Error(`Booking has already been ${booking.approvalStatus}`)
+  }
+
+  const approval = await dbApproveBooking(
+    bookingId,
+    customerId,
+    customerName,
+    responseMessage
+  )
+
+  // Notify the person who booked
+  try {
+    const notificationService = getNotificationService()
+    await notificationService.sendNotification({
+      userId: booking.bookedById!,
+      type: "booking",
+      channels: ["email", "push"],
+      title: "Booking Approved",
+      message: `${customerName} has approved the booking #${bookingId.slice(0, 8)} you created on their behalf.`,
+      template: "booking-approved",
+      templateData: {
+        bookingId: bookingId.slice(0, 8),
+        customerName,
+        responseMessage,
+      },
+    })
+  } catch (error) {
+    console.error("Failed to send approval notification:", error)
+  }
+
+  return approval
+}
+
+/**
+ * Reject a booking that was created on behalf
+ */
+export async function rejectOnBehalfBooking(
+  bookingId: string,
+  customerId: string,
+  customerName: string,
+  responseMessage?: string
+): Promise<BookingApproval> {
+  // Get booking to verify customer
+  const booking = await getBookingById(bookingId, false)
+  if (!booking) {
+    throw new Error("Booking not found")
+  }
+
+  if (booking.customerId !== customerId) {
+    throw new Error("You can only reject bookings made on your behalf")
+  }
+
+  if (!booking.bookedOnBehalf || !booking.requiresApproval) {
+    throw new Error("This booking does not require approval")
+  }
+
+  if (booking.approvalStatus !== "pending") {
+    throw new Error(`Booking has already been ${booking.approvalStatus}`)
+  }
+
+  const approval = await dbRejectBooking(
+    bookingId,
+    customerId,
+    customerName,
+    responseMessage
+  )
+
+  // Notify the person who booked
+  try {
+    const notificationService = getNotificationService()
+    await notificationService.sendNotification({
+      userId: booking.bookedById!,
+      type: "booking",
+      channels: ["email", "push"],
+      title: "Booking Rejected",
+      message: `${customerName} has rejected the booking #${bookingId.slice(0, 8)} you created on their behalf.`,
+      template: "booking-rejected",
+      templateData: {
+        bookingId: bookingId.slice(0, 8),
+        customerName,
+        responseMessage,
+      },
+    })
+  } catch (error) {
+    console.error("Failed to send rejection notification:", error)
+  }
+
+  return approval
+}
+
+/**
+ * Get pending booking approvals for a user
+ */
+export async function getPendingBookingApprovals(
+  userId: string
+): Promise<BookingApproval[]> {
+  return await getPendingApprovalsForUser(userId)
 }
 

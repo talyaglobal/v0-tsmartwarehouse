@@ -259,20 +259,9 @@ export async function searchWarehouses(
 
       // Apply additional filters
       
-      // Filter by rent method (storage type)
-      if (params.type) {
-        const rentMethodMap: Record<string, string> = {
-          'pallet': 'pallet',
-          'area-rental': 'sq_ft',
-        }
-        const requiredRentMethod = rentMethodMap[params.type]
-        if (requiredRentMethod) {
-          results = results.filter((w) => {
-            const rentMethods = (w as any).rent_methods || []
-            return rentMethods.includes(requiredRentMethod)
-          })
-        }
-      }
+      // Note: We no longer strictly filter by rent_methods
+      // Warehouses are shown based on their capacity (sqft or pallet storage)
+      // The type filter is handled by the capacity filters below
       
       if (params.min_rating) {
         results = results.filter((w) => w.average_rating >= params.min_rating!)
@@ -399,9 +388,9 @@ export async function searchWarehouses(
       const stateSearch = normalizeStateSearch(searchTerm)
       
       if (zipMatch) {
-        // ZIP code search
+        // ZIP code search - use ilike for zip_code to handle formats like "07206" or "07206-1234"
         const zipCode = zipMatch[0]
-        query = query.or(`city.ilike.%${cityName}%,zip_code.eq.${zipCode},address.ilike.%${zipCode}%`)
+        query = query.or(`city.ilike.%${cityName}%,zip_code.ilike.${zipCode}%,address.ilike.%${zipCode}%`)
       } else if (stateSearch.abbr) {
         // State search - search for state abbreviation in city field (e.g., "Fair Lawn, NJ")
         // Also search in address field for full state names
@@ -428,18 +417,10 @@ export async function searchWarehouses(
     // If min_sq_ft/max_sq_ft is set, customer's requested quantity must be within range
     // If not set, warehouse's total_sq_ft must be >= customer's requested quantity
 
-    // Filter by rent method (storage type)
-    if (params.type) {
-      const rentMethodMap: Record<string, string> = {
-        'pallet': 'pallet',
-        'area-rental': 'sq_ft',
-      }
-      const requiredRentMethod = rentMethodMap[params.type]
-      if (requiredRentMethod) {
-        query = query.contains('rent_methods', [requiredRentMethod])
-      }
-    }
-
+    // Note: We no longer strictly filter by rent_methods here
+    // Instead, we check for existence of corresponding pricing
+    // This is done after the query to be more flexible
+    
     // Sorting
     const sortBy = params.sort_by || 'name'
     const sortOrder = params.sort_order || 'asc'
@@ -466,7 +447,6 @@ export async function searchWarehouses(
         .from('warehouse_pricing')
         .select('warehouse_id, pricing_type, base_price, unit')
         .in('warehouse_id', warehouseIds)
-        .eq('status', true)
       pricingData = pricing || []
     }
 
@@ -546,6 +526,7 @@ export async function searchWarehouses(
     // Filter for area-rental (Space Storage) with min/max sqft logic
     // If min_sq_ft/max_sq_ft is set, customer's requested quantity must be within range
     // If not set, warehouse's total_sq_ft must be >= customer's requested quantity
+    let beforeFilterCount = warehouses.length
     if (params.type === 'area-rental' && params.quantity) {
       const requestedSqFt = params.quantity
       warehouses = warehouses.filter((w: any) => {
@@ -563,14 +544,24 @@ export async function searchWarehouses(
         // If no limits set, warehouse capacity must meet customer's requirements
         return totalSqFt >= requestedSqFt
       })
+      
+      // Debug logging
+      if (warehouses.length === 0 && beforeFilterCount > 0) {
+        console.log(`[warehouse-search] Area-rental filter: ${beforeFilterCount} warehouses found, but none meet ${requestedSqFt} sqft requirement`)
+      }
     }
+
+    // Return actual filtered count for pagination accuracy
+    const actualTotal = params.type === 'area-rental' && params.quantity 
+      ? warehouses.length 
+      : (count || 0)
 
     return {
       warehouses,
-      total: count || 0,
+      total: actualTotal,
       page,
       limit,
-      total_pages: Math.ceil((count || 0) / limit),
+      total_pages: Math.ceil(actualTotal / limit),
     }
   } catch (error) {
     console.error('[warehouse-search] Error searching warehouses:', error)

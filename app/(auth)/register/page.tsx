@@ -8,11 +8,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Check, Building2, Eye } from "@/components/icons"
-import { User, EyeOff } from "lucide-react"
+import { User, EyeOff, ArrowRight, Sparkles, Shield, Zap, TrendingUp, Search, MapPin, Users, DollarSign, BarChart3, FileText, Clock } from "lucide-react"
 import { PhoneInput } from 'react-international-phone'
 import 'react-international-phone/style.css'
 import { signUp } from "@/lib/auth/actions"
@@ -20,6 +19,69 @@ import { acceptInvitation } from "@/features/companies/actions"
 import { useUIStore } from "@/stores/ui.store"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+
+const roles = [
+  {
+    id: "owner" as const,
+    title: "Warehouse Owner",
+    shortTitle: "Owner",
+    description: "List and manage warehouse spaces",
+    icon: Building2,
+    gradient: "from-blue-500 to-indigo-600",
+    bgGradient: "from-blue-500/10 to-indigo-600/10",
+    features: [
+      { icon: Zap, text: "Create warehouse listings" },
+      { icon: DollarSign, text: "Set pricing & availability" },
+      { icon: BarChart3, text: "Track bookings & revenue" },
+      { icon: Users, text: "Manage staff operations" },
+    ]
+  },
+  {
+    id: "renter" as const,
+    title: "Warehouse Client",
+    shortTitle: "Client",
+    description: "Find and book warehouse storage",
+    icon: User,
+    gradient: "from-emerald-500 to-teal-600",
+    bgGradient: "from-emerald-500/10 to-teal-600/10",
+    features: [
+      { icon: Search, text: "Search & discover warehouses" },
+      { icon: Zap, text: "Book storage instantly" },
+      { icon: FileText, text: "Manage your bookings" },
+      { icon: Clock, text: "Track usage & invoices" },
+    ]
+  },
+  {
+    id: "reseller" as const,
+    title: "Warehouse Reseller",
+    shortTitle: "Reseller",
+    description: "Acquire customers for the platform",
+    icon: TrendingUp,
+    gradient: "from-purple-500 to-pink-600",
+    bgGradient: "from-purple-500/10 to-pink-600/10",
+    features: [
+      { icon: Users, text: "Manage customer pipeline" },
+      { icon: BarChart3, text: "Track sales metrics" },
+      { icon: FileText, text: "Send proposals & contracts" },
+      { icon: DollarSign, text: "Earn commissions" },
+    ]
+  },
+  {
+    id: "finder" as const,
+    title: "Warehouse Finder",
+    shortTitle: "Finder",
+    description: "Discover and onboard new warehouses",
+    icon: MapPin,
+    gradient: "from-orange-500 to-red-600",
+    bgGradient: "from-orange-500/10 to-red-600/10",
+    features: [
+      { icon: Search, text: "Discover warehouses" },
+      { icon: MapPin, text: "Conduct site visits" },
+      { icon: Users, text: "Manage acquisition pipeline" },
+      { icon: Shield, text: "Request admin approvals" },
+    ]
+  },
+]
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -62,12 +124,14 @@ export default function RegisterPage() {
     acceptTerms: false,
   })
   
-  // Warehouse Renter (Customer) form data
+  // Warehouse Client (Customer) form data
   const [renterFormData, setRenterFormData] = useState({
     email: "",
     phone: "",
     password: "",
     confirmPassword: "",
+    clientType: "individual" as "individual" | "corporate",
+    companyName: "",
     acceptTerms: false,
   })
 
@@ -105,6 +169,14 @@ export default function RegisterPage() {
   const [exactCompanyMatch, setExactCompanyMatch] = useState<{ id: string; name: string } | null>(null)
   const companyInputRef = useRef<HTMLInputElement>(null)
   const companySuggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Client company search state (for corporate clients)
+  const [clientCompanySuggestions, setClientCompanySuggestions] = useState<Array<{ id: string; name: string }>>([])
+  const [showClientCompanySuggestions, setShowClientCompanySuggestions] = useState(false)
+  const [isSearchingClientCompanies, setIsSearchingClientCompanies] = useState(false)
+  const [exactClientCompanyMatch, setExactClientCompanyMatch] = useState<{ id: string; name: string } | null>(null)
+  const clientCompanyInputRef = useRef<HTMLInputElement>(null)
+  const clientCompanySuggestionsRef = useRef<HTMLDivElement>(null)
 
   // Load invitation details if token is present
   useEffect(() => {
@@ -222,11 +294,83 @@ export default function RegisterPage() {
       ) {
         setShowCompanySuggestions(false)
       }
+      // Also handle client company suggestions
+      if (
+        clientCompanySuggestionsRef.current &&
+        !clientCompanySuggestionsRef.current.contains(event.target as Node) &&
+        clientCompanyInputRef.current &&
+        !clientCompanyInputRef.current.contains(event.target as Node)
+      ) {
+        setShowClientCompanySuggestions(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Search client companies (for corporate clients)
+  const searchClientCompanies = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setClientCompanySuggestions([])
+      setShowClientCompanySuggestions(false)
+      setExactClientCompanyMatch(null)
+      return
+    }
+
+    setIsSearchingClientCompanies(true)
+    try {
+      const response = await fetch(`/api/v1/companies/search?q=${encodeURIComponent(query.trim())}&type=client_company`)
+      const data = await response.json()
+      const companies = data.companies || []
+      setClientCompanySuggestions(companies)
+      
+      // Check for exact match
+      const trimmedQuery = query.trim().toLowerCase()
+      const exactMatch = companies.find(
+        (c: { name: string }) => c.name.toLowerCase() === trimmedQuery
+      )
+      setExactClientCompanyMatch(exactMatch || null)
+      
+      setShowClientCompanySuggestions(true)
+    } catch (error) {
+      console.error('Error searching client companies:', error)
+      setClientCompanySuggestions([])
+      setExactClientCompanyMatch(null)
+    } finally {
+      setIsSearchingClientCompanies(false)
+    }
+  }, [])
+
+  // Debounced client company search
+  useEffect(() => {
+    if (renterFormData.clientType !== 'corporate') return
+    
+    const timeoutId = setTimeout(() => {
+      if (renterFormData.companyName) {
+        searchClientCompanies(renterFormData.companyName)
+      } else {
+        setClientCompanySuggestions([])
+        setShowClientCompanySuggestions(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [renterFormData.companyName, renterFormData.clientType, searchClientCompanies])
+
+  // Handle client company selection
+  const handleClientCompanySelect = (company: { id: string; name: string }) => {
+    setRenterFormData((prev) => ({ ...prev, companyName: company.name }))
+    setShowClientCompanySuggestions(false)
+    clientCompanyInputRef.current?.blur()
+  }
+
+  // Handle client company input change
+  const handleClientCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setRenterFormData((prev) => ({ ...prev, companyName: value }))
+    setShowClientCompanySuggestions(true)
+  }
 
   const handleOwnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -308,12 +452,30 @@ export default function RegisterPage() {
       return
     }
 
+    // Validate company name for corporate clients
+    if (renterFormData.clientType === 'corporate') {
+      if (!renterFormData.companyName || renterFormData.companyName.trim().length < 2) {
+        setError("Company name is required for corporate accounts")
+        addNotification({
+          type: 'error',
+          message: "Company name is required for corporate accounts",
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
+    }
+
     const formDataToSubmit = new FormData()
     formDataToSubmit.append('email', renterFormData.email)
     formDataToSubmit.append('password', renterFormData.password)
     formDataToSubmit.append('confirmPassword', renterFormData.confirmPassword)
     if (renterFormData.phone) formDataToSubmit.append('phone', renterFormData.phone)
     formDataToSubmit.append('userType', 'warehouse_client')
+    formDataToSubmit.append('clientType', renterFormData.clientType)
+    if (renterFormData.clientType === 'corporate' && renterFormData.companyName) {
+      formDataToSubmit.append('companyName', renterFormData.companyName.trim())
+    }
 
     const result = await signUp(formDataToSubmit)
     
@@ -565,211 +727,248 @@ export default function RegisterPage() {
     setIsLoading(false)
   }
 
+  const selectedRole = roles.find(r => r.id === activeTab) || roles[0]
+  const activeIndex = roles.findIndex(r => r.id === activeTab)
+
   return (
-    <div className="w-full">
-      {/* Mobile Role Selector */}
-      <div className="lg:hidden mb-4">
-        <div className="space-y-2 mb-4">
-          <h1 className="text-2xl font-bold tracking-tight">Select Your Role</h1>
-          <p className="text-muted-foreground text-xs leading-relaxed">Choose the role that best describes you</p>
+    <div className="w-full max-w-5xl mx-auto">
+      {/* Mobile Role Selector - Horizontal Stepper */}
+      <div className="lg:hidden mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Select Your Role</h2>
+          <span className="text-sm text-muted-foreground">Step {activeIndex + 1} of {roles.length}</span>
         </div>
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => handleTabChange("owner")}
-            className={cn(
-              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
-              activeTab === "owner"
-                ? "border-primary bg-primary/10 shadow-lg"
-                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
-            )}
-          >
-            <div className={cn(
-              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
-              activeTab === "owner" 
-                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
-                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
-            )}>
-              <Building2 className={cn("h-5 w-5 transition-transform duration-200", activeTab === "owner" ? "scale-110" : "group-hover:scale-110")} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className={cn(
-                "font-bold transition-colors duration-200",
-                activeTab === "owner" ? "text-primary text-base" : "text-sm group-hover:text-primary"
-              )}>Warehouse Owner</div>
-              <div className="text-xs text-muted-foreground mt-0.5">List and manage warehouse spaces</div>
-            </div>
-            {activeTab === "owner" && (
-              <div className="flex-shrink-0">
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
-                  <Check className="h-4 w-4 text-primary-foreground" />
-                </div>
-              </div>
-            )}
-          </button>
+        
+        {/* Horizontal stepper for mobile */}
+        <div className="flex items-center gap-1 mb-4 overflow-x-auto pb-2">
+          {roles.map((role, index) => {
+            const isActive = role.id === activeTab
+            const Icon = role.icon
+            return (
+              <button
+                key={role.id}
+                type="button"
+                onClick={() => handleTabChange(role.id)}
+                className={cn(
+                  "flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-200",
+                  isActive
+                    ? `bg-gradient-to-r ${role.gradient} text-white shadow-lg`
+                    : "bg-muted/50 hover:bg-muted text-muted-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="text-xs font-medium whitespace-nowrap">{role.shortTitle}</span>
+              </button>
+            )
+          })}
+        </div>
 
-          <button
-            type="button"
-            onClick={() => handleTabChange("renter")}
-            className={cn(
-              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
-              activeTab === "renter"
-                ? "border-primary bg-primary/10 shadow-lg"
-                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
-            )}
-          >
+        {/* Selected role info card for mobile */}
+        <div className={cn(
+          "rounded-xl p-4 border-2",
+          `bg-gradient-to-br ${selectedRole.bgGradient} border-transparent`
+        )}>
+          <div className="flex items-start gap-3">
             <div className={cn(
-              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
-              activeTab === "renter" 
-                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
-                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
+              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br",
+              selectedRole.gradient
             )}>
-              <User className={cn("h-5 w-5 transition-transform duration-200", activeTab === "renter" ? "scale-110" : "group-hover:scale-110")} />
+              <selectedRole.icon className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className={cn(
-                "font-bold transition-colors duration-200",
-                activeTab === "renter" ? "text-primary text-base" : "text-sm group-hover:text-primary"
-              )}>Warehouse Renter</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Find and book warehouse storage</div>
+              <h3 className="font-semibold text-sm">{selectedRole.title}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{selectedRole.description}</p>
             </div>
-            {activeTab === "renter" && (
-              <div className="flex-shrink-0">
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
-                  <Check className="h-4 w-4 text-primary-foreground" />
-                </div>
-              </div>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabChange("reseller")}
-            className={cn(
-              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
-              activeTab === "reseller"
-                ? "border-primary bg-primary/10 shadow-lg"
-                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
-            )}
-          >
-            <div className={cn(
-              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
-              activeTab === "reseller" 
-                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
-                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
-            )}>
-              <User className={cn("h-5 w-5 transition-transform duration-200", activeTab === "reseller" ? "scale-110" : "group-hover:scale-110")} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className={cn(
-                "font-bold transition-colors duration-200",
-                activeTab === "reseller" ? "text-primary text-base" : "text-sm group-hover:text-primary"
-              )}>Warehouse Reseller</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Acquire customers for the platform</div>
-            </div>
-            {activeTab === "reseller" && (
-              <div className="flex-shrink-0">
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
-                  <Check className="h-4 w-4 text-primary-foreground" />
-                </div>
-              </div>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabChange("finder")}
-            className={cn(
-              "w-full flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all duration-200 text-left group relative overflow-hidden",
-              activeTab === "finder"
-                ? "border-primary bg-primary/10 shadow-lg"
-                : "border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-md"
-            )}
-          >
-            <div className={cn(
-              "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200",
-              activeTab === "finder" 
-                ? "bg-primary text-primary-foreground shadow-lg scale-105" 
-                : "bg-muted group-hover:bg-primary/10 group-hover:scale-105"
-            )}>
-              <Building2 className={cn("h-5 w-5 transition-transform duration-200", activeTab === "finder" ? "scale-110" : "group-hover:scale-110")} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className={cn(
-                "font-bold transition-colors duration-200",
-                activeTab === "finder" ? "text-primary text-base" : "text-sm group-hover:text-primary"
-              )}>Warehouse Finder</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Discover and onboard new warehouses</div>
-            </div>
-            {activeTab === "finder" && (
-              <div className="flex-shrink-0">
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in fade-in zoom-in duration-200">
-                  <Check className="h-4 w-4 text-primary-foreground" />
-                </div>
-              </div>
-            )}
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* Registration Form */}
-      <div className="w-full max-w-4xl mx-auto">
-        <Card className="border-2 shadow-xl bg-background/50 backdrop-blur-sm">
-          <CardHeader className="space-y-2 pb-4 border-b bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-              Create Your Account
-            </CardTitle>
-            <CardDescription className="text-sm text-muted-foreground">
-              Fill in your details to get started with Warebnb
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="pt-4 space-y-4">
+      {/* Main Content - Desktop Layout */}
+      <div className="lg:grid lg:grid-cols-5 lg:gap-8">
+        {/* Left Side - Role Selection (Desktop) */}
+        <div className="hidden lg:block lg:col-span-2">
+          <div className="sticky top-4 space-y-3">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold mb-1">Choose Your Role</h2>
+              <p className="text-sm text-muted-foreground">Select the option that best describes how you&apos;ll use Warebnb</p>
+            </div>
 
-        {/* Warehouse Owner Form */}
-        {activeTab === "owner" && (
-          <form id="owner-form" onSubmit={handleOwnerSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
-                  <div className="font-semibold mb-1">Error</div>
-                  <div>{error}</div>
+            {/* Role Cards */}
+            <div className="space-y-2">
+              {roles.map((role, index) => {
+                const isActive = role.id === activeTab
+                const Icon = role.icon
+                
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => handleTabChange(role.id)}
+                    className={cn(
+                      "w-full text-left rounded-xl p-4 transition-all duration-300 border-2 group relative overflow-hidden",
+                      isActive
+                        ? `bg-gradient-to-br ${role.bgGradient} border-transparent shadow-lg ring-2 ring-offset-2 ring-offset-background`
+                        : "bg-card hover:bg-accent/50 border-border hover:border-primary/30"
+                    )}
+                    style={{
+                      ['--tw-ring-color' as any]: isActive ? `var(--${role.gradient.split('-')[1]}-500)` : undefined
+                    }}
+                  >
+                    {/* Active indicator line */}
+                    {isActive && (
+                      <div className={cn(
+                        "absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-gradient-to-b",
+                        role.gradient
+                      )} />
+                    )}
+
+                    <div className="flex items-start gap-4">
+                      {/* Step number / Icon */}
+                      <div className={cn(
+                        "relative flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
+                        isActive
+                          ? `bg-gradient-to-br ${role.gradient} text-white shadow-lg`
+                          : "bg-muted group-hover:bg-primary/10"
+                      )}>
+                        <Icon className={cn(
+                          "h-5 w-5 transition-transform duration-300",
+                          isActive ? "scale-110" : "group-hover:scale-110"
+                        )} />
+                        {/* Step number badge */}
+                        <div className={cn(
+                          "absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center transition-all duration-300",
+                          isActive
+                            ? "bg-white text-primary shadow-md"
+                            : "bg-muted-foreground/20 text-muted-foreground"
+                        )}>
+                          {index + 1}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className={cn(
+                            "font-semibold transition-colors duration-200",
+                            isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                          )}>
+                            {role.title}
+                          </h3>
+                          {isActive && (
+                            <div className={cn(
+                              "w-5 h-5 rounded-full flex items-center justify-center bg-gradient-to-br",
+                              role.gradient
+                            )}>
+                              <Check className="h-3 w-3 text-white" />
+                            </div>
+                          )}
+                        </div>
+                        <p className={cn(
+                          "text-sm mt-0.5 transition-colors duration-200",
+                          isActive ? "text-muted-foreground" : "text-muted-foreground/70"
+                        )}>
+                          {role.description}
+                        </p>
+
+                        {/* Features - Only show when active */}
+                        {isActive && (
+                          <div className="mt-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
+                            {role.features.map((feature, featureIndex) => (
+                              <div key={featureIndex} className="flex items-center gap-2 text-sm">
+                                <div className={cn(
+                                  "w-6 h-6 rounded-md flex items-center justify-center bg-gradient-to-br",
+                                  role.gradient,
+                                  "bg-opacity-20"
+                                )}>
+                                  <feature.icon className="h-3.5 w-3.5 text-foreground/80" />
+                                </div>
+                                <span className="text-muted-foreground">{feature.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side - Registration Form */}
+        <div className="lg:col-span-3">
+          <div className="bg-card rounded-2xl border shadow-sm p-6 lg:p-8">
+            {/* Form Header */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br",
+                  selectedRole.gradient
+                )}>
+                  <selectedRole.icon className="h-5 w-5 text-white" />
                 </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2.5">
-                  <Label htmlFor="owner-name" className="text-sm font-semibold flex items-center gap-2">
-                    Full Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="owner-name"
-                    placeholder="John Doe"
-                    value={ownerFormData.name}
-                    onChange={(e) => setOwnerFormData({ ...ownerFormData, name: e.target.value })}
-                    required
-                    disabled={isLoading}
-                    className="h-10 transition-all focus-visible:ring-2 focus-visible:ring-primary/20"
-                  />
-                </div>
-                <div className="space-y-2.5">
-                  <Label htmlFor="owner-email" className="text-sm font-semibold flex items-center gap-2">
-                    Email Address <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="owner-email"
-                    type="email"
-                    placeholder="name@example.com"
-                    value={ownerFormData.email}
-                    onChange={(e) => setOwnerFormData({ ...ownerFormData, email: e.target.value })}
-                    required
-                    autoComplete="email"
-                    disabled={isLoading}
-                    className="h-10 transition-all focus-visible:ring-2 focus-visible:ring-primary/20"
-                  />
+                <div>
+                  <h1 className="text-xl font-bold">Create Your Account</h1>
+                  <p className="text-sm text-muted-foreground">as {selectedRole.title}</p>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner-phone" className="text-sm font-semibold">Phone Number</Label>
-                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+            </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-xs font-bold">!</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Registration Error</p>
+                    <p className="text-sm opacity-90 mt-0.5">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Warehouse Owner Form */}
+            {activeTab === "owner" && (
+              <form id="owner-form" onSubmit={handleOwnerSubmit} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-name" className="text-sm font-medium">
+                      Full Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="owner-name"
+                      placeholder="John Doe"
+                      value={ownerFormData.name}
+                      onChange={(e) => setOwnerFormData({ ...ownerFormData, name: e.target.value })}
+                      required
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-email" className="text-sm font-medium">
+                      Email Address <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="owner-email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={ownerFormData.email}
+                      onChange={(e) => setOwnerFormData({ ...ownerFormData, email: e.target.value })}
+                      required
+                      autoComplete="email"
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="owner-phone" className="text-sm font-medium">
+                    Phone Number <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
                   <PhoneInput
                     defaultCountry="us"
                     value={ownerFormData.phone}
@@ -778,20 +977,18 @@ export default function RegisterPage() {
                     inputProps={{
                       name: 'phone',
                       id: 'owner-phone',
-                      required: false,
-                      autoFocus: false,
-                      autoComplete: 'tel',
-                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                      className: 'h-11 flex-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                     }}
                     countrySelectorStyleProps={{
-                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                      buttonClassName: 'h-11 rounded-l-md border border-r-0 border-input bg-background px-3 hover:bg-accent'
                     }}
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner-companyName" className="text-sm font-semibold">Company Name</Label>
-                <div className="relative">
+
+                <div className="space-y-2">
+                  <Label htmlFor="owner-companyName" className="text-sm font-medium">
+                    Company Name <span className="text-destructive">*</span>
+                  </Label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -800,14 +997,10 @@ export default function RegisterPage() {
                       placeholder="Enter or search for company name"
                       value={ownerFormData.companyName}
                       onChange={handleCompanyNameChange}
-                      onFocus={() => {
-                        if (companySuggestions.length > 0) {
-                          setShowCompanySuggestions(true)
-                        }
-                      }}
+                      onFocus={() => companySuggestions.length > 0 && setShowCompanySuggestions(true)}
                       required
                       disabled={isLoading}
-                      className="pl-9"
+                      className="h-11 pl-10"
                     />
                     {isSearchingCompanies && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -816,146 +1009,255 @@ export default function RegisterPage() {
                   {showCompanySuggestions && companySuggestions.length > 0 && (
                     <div
                       ref={companySuggestionsRef}
-                      className="absolute z-50 w-full mt-1 bg-popover border border-input rounded-md shadow-md max-h-60 overflow-auto"
+                      className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-auto"
                     >
                       {companySuggestions.map((company) => (
                         <button
                           key={company.id}
                           type="button"
                           onClick={() => handleCompanySelect(company)}
-                          className={cn(
-                            "w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center justify-between",
-                            ownerFormData.companyName === company.name && "bg-accent"
-                          )}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent flex items-center gap-2"
                         >
-                          <span className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            {company.name}
-                          </span>
-                          {ownerFormData.companyName === company.name && (
-                            <Check className="h-4 w-4 text-primary" />
-                          )}
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          {company.name}
                         </button>
                       ))}
                     </div>
                   )}
                   {ownerFormData.companyName && ownerFormData.companyName.trim().length >= 2 && (
-                    <div className="mt-1 px-1">
+                    <div className="mt-1.5">
                       {exactCompanyMatch ? (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                          Company "{exactCompanyMatch.name}" already exists. Please select it from the list above.
+                        <p className="text-xs text-amber-600 flex items-center gap-1">
+                          <Shield className="h-3 w-3" />
+                          Company exists. Select from suggestions above.
                         </p>
                       ) : !isSearchingCompanies && companySuggestions.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-emerald-600 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
                           This will create a new company
                         </p>
                       ) : null}
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner-storageType" className="text-sm font-semibold">Storage Interest</Label>
-                <Select
-                  value={ownerFormData.storageType}
-                  onValueChange={(value) => setOwnerFormData((prev) => ({ ...prev, storageType: value }))}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select storage type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pallet">Pallet Storage</SelectItem>
-                    <SelectItem value="area-rental">Space Storage (Level 3)</SelectItem>
-                    <SelectItem value="both">Both Options</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 relative">
-                  <Label htmlFor="owner-password" className="text-sm font-semibold">Password</Label>
-                  <Input
-                    id="owner-password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Create password"
-                    value={ownerFormData.password}
-                    onChange={(e) => setOwnerFormData({ ...ownerFormData, password: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle password" onClick={() => setShowPassword(s => !s)} className="absolute right-3 top-9">
-                    {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-                <div className="space-y-2 relative">
-                  <Label htmlFor="owner-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
-                  <Input
-                    id="owner-confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm password"
-                    value={ownerFormData.confirmPassword}
-                    onChange={(e) => setOwnerFormData({ ...ownerFormData, confirmPassword: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowConfirmPassword(s => !s)} className="absolute right-3 top-9">
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-              </div>
-            <div className="pt-4 border-t">
-              <div className="flex items-start space-x-3 pt-2">
-                <Checkbox
-                  id="owner-terms"
-                  checked={ownerFormData.acceptTerms}
-                  onCheckedChange={(checked) => setOwnerFormData({ ...ownerFormData, acceptTerms: checked as boolean })}
-                  required
-                  disabled={isLoading}
-                  className="mt-1"
-                />
-                <Label htmlFor="owner-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
-                  By creating an account, you agree to our{" "}
-                  <Link href="/terms" className="text-primary hover:underline font-medium">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline font-medium">
-                    Privacy Policy
-                  </Link>
-                </Label>
-              </div>
-            </div>
-          </form>
-        )}
 
-        {/* Warehouse Renter Form */}
-        {activeTab === "renter" && (
-          <form id="renter-form" onSubmit={handleRenterSubmit} className="space-y-4">
-              {error && (
-                <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
-                  <div className="font-semibold mb-1">Error</div>
-                  <div>{error}</div>
+                <div className="space-y-2">
+                  <Label htmlFor="owner-storageType" className="text-sm font-medium">
+                    Storage Interest <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
+                  <Select
+                    value={ownerFormData.storageType}
+                    onValueChange={(value) => setOwnerFormData({ ...ownerFormData, storageType: value })}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Select storage type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pallet">Pallet Storage</SelectItem>
+                      <SelectItem value="area-rental">Space Storage</SelectItem>
+                      <SelectItem value="both">Both Options</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="renter-email" className="text-sm font-semibold">Email Address</Label>
-                <Input
-                  id="renter-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={renterFormData.email}
-                  onChange={(e) => setRenterFormData({ ...renterFormData, email: e.target.value })}
-                  required
-                  autoComplete="email"
-                  disabled={isLoading}
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="renter-phone" className="text-sm font-semibold">Phone Number <span className="text-muted-foreground font-normal">(Optional)</span></Label>
-                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-password" className="text-sm font-medium">
+                      Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="owner-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Create password"
+                        value={ownerFormData.password}
+                        onChange={(e) => setOwnerFormData({ ...ownerFormData, password: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-confirmPassword" className="text-sm font-medium">
+                      Confirm Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="owner-confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Confirm password"
+                        value={ownerFormData.confirmPassword}
+                        onChange={(e) => setOwnerFormData({ ...ownerFormData, confirmPassword: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 pt-2">
+                  <Checkbox
+                    id="owner-terms"
+                    checked={ownerFormData.acceptTerms}
+                    onCheckedChange={(checked) => setOwnerFormData({ ...ownerFormData, acceptTerms: checked as boolean })}
+                    required
+                    disabled={isLoading}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="owner-terms" className="text-sm text-muted-foreground cursor-pointer leading-relaxed">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                    {" "}and{" "}
+                    <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                  </Label>
+                </div>
+              </form>
+            )}
+
+            {/* Warehouse Client Form */}
+            {activeTab === "renter" && (
+              <form id="renter-form" onSubmit={handleRenterSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="renter-clientType" className="text-sm font-medium">Account Type</Label>
+                  <Select
+                    value={renterFormData.clientType}
+                    onValueChange={(value: "individual" | "corporate") => {
+                      setRenterFormData((prev) => ({
+                        ...prev,
+                        clientType: value,
+                        companyName: value === 'individual' ? '' : prev.companyName
+                      }))
+                      if (value === 'individual') {
+                        setClientCompanySuggestions([])
+                        setShowClientCompanySuggestions(false)
+                        setExactClientCompanyMatch(null)
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Select account type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="individual">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          <span>Individual</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="corporate">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          <span>Corporate</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {renterFormData.clientType === 'individual'
+                      ? 'Personal account for individual storage needs'
+                      : 'Business account linked to your company'}
+                  </p>
+                </div>
+
+                {renterFormData.clientType === 'corporate' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="renter-companyName" className="text-sm font-medium">
+                      Company Name <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        ref={clientCompanyInputRef}
+                        id="renter-companyName"
+                        placeholder="Enter or search for company name"
+                        value={renterFormData.companyName}
+                        onChange={handleClientCompanyNameChange}
+                        onFocus={() => clientCompanySuggestions.length > 0 && setShowClientCompanySuggestions(true)}
+                        required
+                        disabled={isLoading}
+                        className="h-11 pl-10"
+                      />
+                      {isSearchingClientCompanies && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    {showClientCompanySuggestions && clientCompanySuggestions.length > 0 && (
+                      <div
+                        ref={clientCompanySuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-auto"
+                      >
+                        {clientCompanySuggestions.map((company) => (
+                          <button
+                            key={company.id}
+                            type="button"
+                            onClick={() => handleClientCompanySelect(company)}
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent flex items-center gap-2"
+                          >
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            {company.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {renterFormData.companyName && renterFormData.companyName.trim().length >= 2 && (
+                      <div className="mt-1.5">
+                        {exactClientCompanyMatch ? (
+                          <p className="text-xs text-emerald-600 flex items-center gap-1">
+                            <Check className="h-3 w-3" />
+                            You will join &quot;{exactClientCompanyMatch.name}&quot;
+                          </p>
+                        ) : !isSearchingClientCompanies && clientCompanySuggestions.length === 0 ? (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            This will create a new company
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="renter-email" className="text-sm font-medium">
+                    Email Address <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="renter-email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={renterFormData.email}
+                    onChange={(e) => setRenterFormData({ ...renterFormData, email: e.target.value })}
+                    required
+                    autoComplete="email"
+                    disabled={isLoading}
+                    className="h-11"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="renter-phone" className="text-sm font-medium">
+                    Phone Number <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
                   <PhoneInput
                     defaultCountry="us"
                     value={renterFormData.phone}
@@ -964,116 +1266,126 @@ export default function RegisterPage() {
                     inputProps={{
                       name: 'phone',
                       id: 'renter-phone',
-                      required: false,
-                      autoFocus: false,
-                      autoComplete: 'tel',
-                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                      className: 'h-11 flex-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                     }}
                     countrySelectorStyleProps={{
-                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                      buttonClassName: 'h-11 rounded-l-md border border-r-0 border-input bg-background px-3 hover:bg-accent'
                     }}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 relative">
-                  <Label htmlFor="renter-password" className="text-sm font-semibold">Password</Label>
-                  <Input
-                    id="renter-password"
-                    type={showRenterPassword ? 'text' : 'password'}
-                    placeholder="Create password"
-                    value={renterFormData.password}
-                    onChange={(e) => setRenterFormData({ ...renterFormData, password: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle password" onClick={() => setShowRenterPassword(s => !s)} className="absolute right-3 top-9">
-                    {showRenterPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-                <div className="space-y-2 relative">
-                  <Label htmlFor="renter-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
-                  <Input
-                    id="renter-confirmPassword"
-                    type={showRenterConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm password"
-                    value={renterFormData.confirmPassword}
-                    onChange={(e) => setRenterFormData({ ...renterFormData, confirmPassword: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowRenterConfirmPassword(s => !s)} className="absolute right-3 top-9">
-                    {showRenterConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-              </div>
-            <div className="pt-4 border-t">
-              <div className="flex items-start space-x-3 pt-2">
-                <Checkbox
-                  id="renter-terms"
-                  checked={renterFormData.acceptTerms}
-                  onCheckedChange={(checked) => setRenterFormData({ ...renterFormData, acceptTerms: checked as boolean })}
-                  required
-                  disabled={isLoading}
-                  className="mt-1"
-                />
-                <Label htmlFor="renter-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
-                  By creating an account, you agree to our{" "}
-                  <Link href="/terms" className="text-primary hover:underline font-medium">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline font-medium">
-                    Privacy Policy
-                  </Link>
-                </Label>
-              </div>
-            </div>
-          </form>
-        )}
 
-        {/* Warehouse Reseller Form */}
-        {activeTab === "reseller" && (
-          <form id="reseller-form" onSubmit={handleResellerSubmit} className="space-y-4">
-              {error && (
-                <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
-                  <div className="font-semibold mb-1">Error</div>
-                  <div>{error}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="renter-password" className="text-sm font-medium">
+                      Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="renter-password"
+                        type={showRenterPassword ? 'text' : 'password'}
+                        placeholder="Create password"
+                        value={renterFormData.password}
+                        onChange={(e) => setRenterFormData({ ...renterFormData, password: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRenterPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showRenterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="renter-confirmPassword" className="text-sm font-medium">
+                      Confirm Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="renter-confirmPassword"
+                        type={showRenterConfirmPassword ? 'text' : 'password'}
+                        placeholder="Confirm password"
+                        value={renterFormData.confirmPassword}
+                        onChange={(e) => setRenterFormData({ ...renterFormData, confirmPassword: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRenterConfirmPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showRenterConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div className="flex items-start gap-3 pt-2">
+                  <Checkbox
+                    id="renter-terms"
+                    checked={renterFormData.acceptTerms}
+                    onCheckedChange={(checked) => setRenterFormData({ ...renterFormData, acceptTerms: checked as boolean })}
+                    required
+                    disabled={isLoading}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="renter-terms" className="text-sm text-muted-foreground cursor-pointer leading-relaxed">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                    {" "}and{" "}
+                    <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                  </Label>
+                </div>
+              </form>
+            )}
+
+            {/* Warehouse Reseller Form */}
+            {activeTab === "reseller" && (
+              <form id="reseller-form" onSubmit={handleResellerSubmit} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reseller-name" className="text-sm font-medium">
+                      Full Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="reseller-name"
+                      placeholder="John Doe"
+                      value={resellerFormData.name}
+                      onChange={(e) => setResellerFormData({ ...resellerFormData, name: e.target.value })}
+                      required
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reseller-email" className="text-sm font-medium">
+                      Email Address <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="reseller-email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={resellerFormData.email}
+                      onChange={(e) => setResellerFormData({ ...resellerFormData, email: e.target.value })}
+                      required
+                      autoComplete="email"
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="reseller-name" className="text-sm font-semibold">Full Name</Label>
-                <Input
-                  id="reseller-name"
-                  placeholder="John Doe"
-                  value={resellerFormData.name}
-                  onChange={(e) => setResellerFormData({ ...resellerFormData, name: e.target.value })}
-                  required
-                  disabled={isLoading}
-                  className="h-11"
-                />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reseller-email" className="text-sm font-semibold">Email Address</Label>
-                <Input
-                  id="reseller-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={resellerFormData.email}
-                  onChange={(e) => setResellerFormData({ ...resellerFormData, email: e.target.value })}
-                  required
-                  autoComplete="email"
-                  disabled={isLoading}
-                  className="h-11"
-                />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reseller-phone" className="text-sm font-semibold">Phone Number <span className="text-muted-foreground font-normal">(Optional)</span></Label>
-                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+                  <Label htmlFor="reseller-phone" className="text-sm font-medium">
+                    Phone Number <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
                   <PhoneInput
                     defaultCountry="us"
                     value={resellerFormData.phone}
@@ -1082,116 +1394,126 @@ export default function RegisterPage() {
                     inputProps={{
                       name: 'phone',
                       id: 'reseller-phone',
-                      required: false,
-                      autoFocus: false,
-                      autoComplete: 'tel',
-                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                      className: 'h-11 flex-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                     }}
                     countrySelectorStyleProps={{
-                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                      buttonClassName: 'h-11 rounded-l-md border border-r-0 border-input bg-background px-3 hover:bg-accent'
                     }}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 relative">
-                  <Label htmlFor="reseller-password" className="text-sm font-semibold">Password</Label>
-                  <Input
-                    id="reseller-password"
-                    type={showResellerPassword ? 'text' : 'password'}
-                    placeholder="Create password"
-                    value={resellerFormData.password}
-                    onChange={(e) => setResellerFormData({ ...resellerFormData, password: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle password" onClick={() => setShowResellerPassword(s => !s)} className="absolute right-3 top-9">
-                    {showResellerPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-                <div className="space-y-2 relative">
-                  <Label htmlFor="reseller-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
-                  <Input
-                    id="reseller-confirmPassword"
-                    type={showResellerConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm password"
-                    value={resellerFormData.confirmPassword}
-                    onChange={(e) => setResellerFormData({ ...resellerFormData, confirmPassword: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowResellerConfirmPassword(s => !s)} className="absolute right-3 top-9">
-                    {showResellerConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-              </div>
-            <div className="pt-4 border-t">
-              <div className="flex items-start space-x-3 pt-2">
-                <Checkbox
-                  id="reseller-terms"
-                  checked={resellerFormData.acceptTerms}
-                  onCheckedChange={(checked) => setResellerFormData({ ...resellerFormData, acceptTerms: checked as boolean })}
-                  required
-                  disabled={isLoading}
-                  className="mt-1"
-                />
-                <Label htmlFor="reseller-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
-                  By creating an account, you agree to our{" "}
-                  <Link href="/terms" className="text-primary hover:underline font-medium">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline font-medium">
-                    Privacy Policy
-                  </Link>
-                </Label>
-              </div>
-            </div>
-          </form>
-        )}
 
-        {/* Warehouse Finder Form */}
-        {activeTab === "finder" && (
-          <form id="finder-form" onSubmit={handleFinderSubmit} className="space-y-4">
-              {error && (
-                <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-lg border-2 border-destructive/20">
-                  <div className="font-semibold mb-1">Error</div>
-                  <div>{error}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reseller-password" className="text-sm font-medium">
+                      Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="reseller-password"
+                        type={showResellerPassword ? 'text' : 'password'}
+                        placeholder="Create password"
+                        value={resellerFormData.password}
+                        onChange={(e) => setResellerFormData({ ...resellerFormData, password: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResellerPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showResellerPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reseller-confirmPassword" className="text-sm font-medium">
+                      Confirm Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="reseller-confirmPassword"
+                        type={showResellerConfirmPassword ? 'text' : 'password'}
+                        placeholder="Confirm password"
+                        value={resellerFormData.confirmPassword}
+                        onChange={(e) => setResellerFormData({ ...resellerFormData, confirmPassword: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResellerConfirmPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showResellerConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div className="flex items-start gap-3 pt-2">
+                  <Checkbox
+                    id="reseller-terms"
+                    checked={resellerFormData.acceptTerms}
+                    onCheckedChange={(checked) => setResellerFormData({ ...resellerFormData, acceptTerms: checked as boolean })}
+                    required
+                    disabled={isLoading}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="reseller-terms" className="text-sm text-muted-foreground cursor-pointer leading-relaxed">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                    {" "}and{" "}
+                    <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                  </Label>
+                </div>
+              </form>
+            )}
+
+            {/* Warehouse Finder Form */}
+            {activeTab === "finder" && (
+              <form id="finder-form" onSubmit={handleFinderSubmit} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="finder-name" className="text-sm font-medium">
+                      Full Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="finder-name"
+                      placeholder="John Doe"
+                      value={finderFormData.name}
+                      onChange={(e) => setFinderFormData({ ...finderFormData, name: e.target.value })}
+                      required
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="finder-email" className="text-sm font-medium">
+                      Email Address <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="finder-email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={finderFormData.email}
+                      onChange={(e) => setFinderFormData({ ...finderFormData, email: e.target.value })}
+                      required
+                      autoComplete="email"
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="finder-name" className="text-sm font-semibold">Full Name</Label>
-                <Input
-                  id="finder-name"
-                  placeholder="John Doe"
-                  value={finderFormData.name}
-                  onChange={(e) => setFinderFormData({ ...finderFormData, name: e.target.value })}
-                  required
-                  disabled={isLoading}
-                  className="h-11"
-                />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="finder-email" className="text-sm font-semibold">Email Address</Label>
-                <Input
-                  id="finder-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={finderFormData.email}
-                  onChange={(e) => setFinderFormData({ ...finderFormData, email: e.target.value })}
-                  required
-                  autoComplete="email"
-                  disabled={isLoading}
-                  className="h-11"
-                />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="finder-phone" className="text-sm font-semibold">Phone Number <span className="text-muted-foreground font-normal">(Optional)</span></Label>
-                <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
+                  <Label htmlFor="finder-phone" className="text-sm font-medium">
+                    Phone Number <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
                   <PhoneInput
                     defaultCountry="us"
                     value={finderFormData.phone}
@@ -1200,104 +1522,126 @@ export default function RegisterPage() {
                     inputProps={{
                       name: 'phone',
                       id: 'finder-phone',
-                      required: false,
-                      autoFocus: false,
-                      autoComplete: 'tel',
-                      className: 'h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+                      className: 'h-11 flex-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                     }}
                     countrySelectorStyleProps={{
-                      buttonClassName: 'h-9 rounded-l-md border border-r-0 border-input bg-transparent px-3 flex items-center justify-center hover:bg-accent transition-colors'
+                      buttonClassName: 'h-11 rounded-l-md border border-r-0 border-input bg-background px-3 hover:bg-accent'
                     }}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 relative">
-                  <Label htmlFor="finder-password" className="text-sm font-semibold">Password</Label>
-                  <Input
-                    id="finder-password"
-                    type={showFinderPassword ? 'text' : 'password'}
-                    placeholder="Create password"
-                    value={finderFormData.password}
-                    onChange={(e) => setFinderFormData({ ...finderFormData, password: e.target.value })}
-                    required
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                  />
-                  <button type="button" aria-label="toggle password" onClick={() => setShowFinderPassword(s => !s)} className="absolute right-3 top-9">
-                    {showFinderPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="finder-password" className="text-sm font-medium">
+                      Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="finder-password"
+                        type={showFinderPassword ? 'text' : 'password'}
+                        placeholder="Create password"
+                        value={finderFormData.password}
+                        onChange={(e) => setFinderFormData({ ...finderFormData, password: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowFinderPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showFinderPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="finder-confirmPassword" className="text-sm font-medium">
+                      Confirm Password <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="finder-confirmPassword"
+                        type={showFinderConfirmPassword ? 'text' : 'password'}
+                        placeholder="Confirm password"
+                        value={finderFormData.confirmPassword}
+                        onChange={(e) => setFinderFormData({ ...finderFormData, confirmPassword: e.target.value })}
+                        required
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowFinderConfirmPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showFinderConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2 relative">
-                  <Label htmlFor="finder-confirmPassword" className="text-sm font-semibold">Confirm Password</Label>
-                  <Input
-                    id="finder-confirmPassword"
-                    type={showFinderConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm password"
-                    value={finderFormData.confirmPassword}
-                    onChange={(e) => setFinderFormData({ ...finderFormData, confirmPassword: e.target.value })}
+
+                <div className="flex items-start gap-3 pt-2">
+                  <Checkbox
+                    id="finder-terms"
+                    checked={finderFormData.acceptTerms}
+                    onCheckedChange={(checked) => setFinderFormData({ ...finderFormData, acceptTerms: checked as boolean })}
                     required
-                    autoComplete="new-password"
                     disabled={isLoading}
+                    className="mt-0.5"
                   />
-                  <button type="button" aria-label="toggle confirm password" onClick={() => setShowFinderConfirmPassword(s => !s)} className="absolute right-3 top-9">
-                    {showFinderConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
+                  <Label htmlFor="finder-terms" className="text-sm text-muted-foreground cursor-pointer leading-relaxed">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                    {" "}and{" "}
+                    <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                  </Label>
                 </div>
-              </div>
-            <div className="pt-4 border-t">
-              <div className="flex items-start space-x-3 pt-2">
-                <Checkbox
-                  id="finder-terms"
-                  checked={finderFormData.acceptTerms}
-                  onCheckedChange={(checked) => setFinderFormData({ ...finderFormData, acceptTerms: checked as boolean })}
-                  required
-                  disabled={isLoading}
-                  className="mt-1"
-                />
-                <Label htmlFor="finder-terms" className="text-sm leading-relaxed cursor-pointer flex-1">
-                  By creating an account, you agree to our{" "}
-                  <Link href="/terms" className="text-primary hover:underline font-medium">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline font-medium">
-                    Privacy Policy
-                  </Link>
-                </Label>
-              </div>
+              </form>
+            )}
+
+            {/* Submit Button */}
+            <div className="mt-6 pt-6 border-t space-y-4">
+              <Button
+                type="submit"
+                form={activeTab === "owner" ? "owner-form" : activeTab === "renter" ? "renter-form" : activeTab === "reseller" ? "reseller-form" : "finder-form"}
+                className={cn(
+                  "w-full h-12 text-base font-semibold bg-gradient-to-r shadow-lg hover:shadow-xl transition-all duration-300",
+                  selectedRole.gradient
+                )}
+                disabled={
+                  isLoading ||
+                  (activeTab === "owner" && !ownerFormData.acceptTerms) ||
+                  (activeTab === "renter" && !renterFormData.acceptTerms) ||
+                  (activeTab === "reseller" && !resellerFormData.acceptTerms) ||
+                  (activeTab === "finder" && !finderFormData.acceptTerms)
+                }
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    Create Account
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
+              </Button>
+
+              <p className="text-sm text-center text-muted-foreground">
+                Already have an account?{" "}
+                <Link href="/login" className="text-primary hover:underline font-semibold">
+                  Sign in
+                </Link>
+              </p>
             </div>
-          </form>
-        )}
-          </CardContent>
-          
-          <CardFooter className="pt-6 border-t flex flex-col gap-4">
-            <Button 
-              type="submit"
-              form={activeTab === "owner" ? "owner-form" : activeTab === "renter" ? "renter-form" : activeTab === "reseller" ? "reseller-form" : "finder-form"}
-              className="w-full h-12 text-base font-semibold" 
-              size="lg" 
-              disabled={isLoading || (activeTab === "owner" && !ownerFormData.acceptTerms) || (activeTab === "renter" && !renterFormData.acceptTerms) || (activeTab === "reseller" && !resellerFormData.acceptTerms) || (activeTab === "finder" && !finderFormData.acceptTerms)}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                "Create Account"
-              )}
-            </Button>
-            <p className="text-sm text-center text-muted-foreground w-full">
-              Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline font-semibold">
-                Sign in
-              </Link>
-            </p>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
-
