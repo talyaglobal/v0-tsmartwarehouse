@@ -126,6 +126,7 @@ export default function RegisterPage() {
   
   // Warehouse Client (Customer) form data
   const [renterFormData, setRenterFormData] = useState({
+    name: "",  // Full name for corporate clients (used for team name)
     email: "",
     phone: "",
     password: "",
@@ -452,8 +453,18 @@ export default function RegisterPage() {
       return
     }
 
-    // Validate company name for corporate clients
+    // Validate name and company name for corporate clients
     if (renterFormData.clientType === 'corporate') {
+      if (!renterFormData.name || renterFormData.name.trim().length < 2) {
+        setError("Full name is required for corporate accounts")
+        addNotification({
+          type: 'error',
+          message: "Full name is required for corporate accounts",
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
       if (!renterFormData.companyName || renterFormData.companyName.trim().length < 2) {
         setError("Company name is required for corporate accounts")
         addNotification({
@@ -473,7 +484,8 @@ export default function RegisterPage() {
     if (renterFormData.phone) formDataToSubmit.append('phone', renterFormData.phone)
     formDataToSubmit.append('userType', 'warehouse_client')
     formDataToSubmit.append('clientType', renterFormData.clientType)
-    if (renterFormData.clientType === 'corporate' && renterFormData.companyName) {
+    if (renterFormData.clientType === 'corporate') {
+      formDataToSubmit.append('name', renterFormData.name.trim())
       formDataToSubmit.append('companyName', renterFormData.companyName.trim())
     }
 
@@ -1180,6 +1192,30 @@ export default function RegisterPage() {
                 </div>
 
                 {renterFormData.clientType === 'corporate' && (
+                  <>
+                  {/* Full Name for Corporate Clients */}
+                  <div className="space-y-2">
+                    <Label htmlFor="renter-name" className="text-sm font-medium">
+                      Full Name <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="renter-name"
+                        placeholder="Your full name"
+                        value={renterFormData.name}
+                        onChange={(e) => setRenterFormData({ ...renterFormData, name: e.target.value })}
+                        required
+                        disabled={isLoading}
+                        className="h-11 pl-10"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Your team will be named &quot;{renterFormData.name || 'Your Name'}&apos;s Team&quot;
+                    </p>
+                  </div>
+
+                  {/* Company Name */}
                   <div className="space-y-2">
                     <Label htmlFor="renter-companyName" className="text-sm font-medium">
                       Company Name <span className="text-destructive">*</span>
@@ -1229,12 +1265,13 @@ export default function RegisterPage() {
                         ) : !isSearchingClientCompanies && clientCompanySuggestions.length === 0 ? (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <Sparkles className="h-3 w-3" />
-                            This will create a new company
+                            This will create a new company (you&apos;ll be the admin)
                           </p>
                         ) : null}
                       </div>
                     )}
                   </div>
+                  </>
                 )}
 
                 <div className="space-y-2">

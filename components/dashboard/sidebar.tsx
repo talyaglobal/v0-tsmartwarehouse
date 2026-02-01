@@ -187,7 +187,7 @@ export function DashboardSidebar() {
     refetchOnWindowFocus: true,
   })
 
-  // Fetch user profile (name, membership tier, company, role, and logo)
+  // Fetch user profile (name, membership tier, company, role, logo, and client_type)
   // Use separate query key to avoid conflicts with settings page
   const { data: profile } = useQuery({
     queryKey: ['sidebar-profile', user?.id],
@@ -195,10 +195,10 @@ export function DashboardSidebar() {
       if (!user) return null
       const supabase = createClient()
 
-      // First get profile data including role
+      // First get profile data including role and client_type
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('name, membership_tier, company_id, role')
+        .select('name, membership_tier, company_id, role, client_type')
         .eq('id', user.id)
         .maybeSingle()
 
@@ -236,6 +236,7 @@ export function DashboardSidebar() {
         companyLogo: company?.logo_url || null,
         companyId: companyId,
         role: profileData?.role || 'warehouse_client',
+        clientType: profileData?.client_type || null,
       }
     },
     enabled: !!user,
@@ -244,37 +245,28 @@ export function DashboardSidebar() {
     refetchOnWindowFocus: false, // Don't refetch on window focus
   })
 
-  // Check if user is company admin (using profiles.role and company_id, or client team admin)
-  const { data: companyAdminStatus } = useQuery({
-    queryKey: ['company-admin', user?.id, profile?.companyId],
+  // Check if user is company admin AND if they are a corporate client
+  const { data: companyStatus } = useQuery({
+    queryKey: ['company-status', user?.id, profile?.companyId, profile?.clientType],
     queryFn: async () => {
-      if (!user) return false
+      if (!user || !profile) return { isAdmin: false, isCorporateClient: false }
       const supabase = createClient()
       
-      // First get profile to check company_id and client_type
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, company_id, client_type')
-        .eq('id', user.id)
-        .maybeSingle()
-      
-      if (profileError || !profileData) {
-        return false
-      }
-      
       // User must have a company_id
-      if (!profileData.company_id) {
-        return false
+      if (!profile.companyId) {
+        return { isAdmin: false, isCorporateClient: false }
       }
+      
+      // Check if user is a corporate client using profile data
+      const isCorporateClient = profile.role === 'warehouse_client' && profile.clientType === 'corporate'
       
       // Check if user is warehouse_admin or warehouse_supervisor
-      if (['warehouse_admin', 'warehouse_supervisor'].includes(profileData.role)) {
-        return true
+      if (['warehouse_admin', 'warehouse_supervisor'].includes(profile.role)) {
+        return { isAdmin: true, isCorporateClient: false }
       }
       
       // Check if user is a corporate client with admin role in their team
-      if (profileData.role === 'warehouse_client' && profileData.client_type === 'corporate') {
-        // Check if user is admin in any client team
+      if (isCorporateClient) {
         const { data: teamMember } = await supabase
           .from('client_team_members')
           .select('role')
@@ -282,20 +274,21 @@ export function DashboardSidebar() {
           .eq('role', 'admin')
           .maybeSingle()
         
-        if (teamMember) {
-          return true
-        }
+        return { isAdmin: !!teamMember, isCorporateClient: true }
       }
       
-      return false
+      return { isAdmin: false, isCorporateClient: false }
     },
-    enabled: !!user,
+    enabled: !!user && !!profile,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
+  const [isCorporateClient, setIsCorporateClient] = useState(false)
+
   useEffect(() => {
-    setIsCompanyAdmin(companyAdminStatus || false)
-  }, [companyAdminStatus])
+    setIsCompanyAdmin(companyStatus?.isAdmin || false)
+    setIsCorporateClient(companyStatus?.isCorporateClient || false)
+  }, [companyStatus])
 
   // Reset logo error when profile changes
   useEffect(() => {
@@ -499,16 +492,30 @@ export function DashboardSidebar() {
           })()}
         </nav>
 
-        {/* My Company Section - Only for Company Admin */}
+        {/* My Company / My Organization Section */}
         {(() => {
           // Determine if My Company should be shown based on role
           let userRole = profile?.role || 'warehouse_client'
           if (profile?.role === 'root' && selectedTestRole) {
             userRole = selectedTestRole
           }
-          const showMyCompany = isCompanyAdmin || ['warehouse_admin', 'warehouse_supervisor'].includes(userRole)
+          
+          // Check if corporate client directly from profile (fallback)
+          const isCorporateFromProfile = profile?.role === 'warehouse_client' && 
+                                          profile?.clientType === 'corporate' && 
+                                          !!profile?.companyId
+          
+          // Show for warehouse admins/supervisors OR for ALL corporate clients
+          const showMyCompany = isCompanyAdmin || 
+                                ['warehouse_admin', 'warehouse_supervisor'].includes(userRole) || 
+                                isCorporateClient || 
+                                isCorporateFromProfile
 
           if (!showMyCompany) return null
+
+          // Different label for corporate clients vs warehouse owners
+          const isCorporate = isCorporateClient || isCorporateFromProfile
+          const sectionLabel = isCorporate ? "My Organization" : "My Company"
 
           const myCompanyContent = (
             <Link href="/dashboard/my-company">
@@ -523,7 +530,7 @@ export function DashboardSidebar() {
                 )}
               >
                 <Building2 className="h-4 w-4 flex-shrink-0" />
-                {!isCollapsed && <span>My Company</span>}
+                {!isCollapsed && <span>{sectionLabel}</span>}
               </Button>
             </Link>
           )
@@ -536,7 +543,7 @@ export function DashboardSidebar() {
                     {myCompanyContent}
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    My Company
+                    {sectionLabel}
                   </TooltipContent>
                 </Tooltip>
               ) : (

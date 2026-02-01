@@ -60,7 +60,7 @@ export default function MyCompanyPage() {
   const { data: adminData, isLoading: checkingRole } = useQuery({
     queryKey: ['company-admin-check', user?.id],
     queryFn: async () => {
-      if (!user) return { isAdmin: false, userType: null as UserType }
+      if (!user) return { isAdmin: false, userType: null as UserType, hasAccess: false }
       const supabase = createClient()
       const { data: profile } = await supabase
         .from('profiles')
@@ -68,15 +68,16 @@ export default function MyCompanyPage() {
         .eq('id', user.id)
         .maybeSingle()
       
-      if (!profile || !profile.company_id) return { isAdmin: false, userType: null as UserType }
+      if (!profile || !profile.company_id) return { isAdmin: false, userType: null as UserType, hasAccess: false }
       
-      // Warehouse admin/supervisor can access
+      // Warehouse admin/supervisor can access (as admin)
       if (['warehouse_admin', 'warehouse_supervisor'].includes(profile.role)) {
-        return { isAdmin: true, userType: 'warehouse' as UserType }
+        return { isAdmin: true, userType: 'warehouse' as UserType, hasAccess: true }
       }
       
-      // Corporate client team admin can access
+      // All corporate clients can access this page
       if (profile.role === 'warehouse_client' && profile.client_type === 'corporate') {
+        // Check if user is team admin
         const { data: teamMember } = await supabase
           .from('client_team_members')
           .select('role')
@@ -84,18 +85,22 @@ export default function MyCompanyPage() {
           .eq('role', 'admin')
           .maybeSingle()
         
-        if (teamMember) {
-          return { isAdmin: true, userType: 'corporate_client' as UserType }
+        // All corporate clients have access, but only team admins can edit
+        return { 
+          isAdmin: !!teamMember, 
+          userType: 'corporate_client' as UserType, 
+          hasAccess: true 
         }
       }
       
-      return { isAdmin: false, userType: null as UserType }
+      return { isAdmin: false, userType: null as UserType, hasAccess: false }
     },
     enabled: !!user,
   })
 
   const isCompanyAdmin = adminData?.isAdmin
   const userType = adminData?.userType
+  const hasAccess = adminData?.hasAccess
 
   if (checkingRole) {
     return (
@@ -105,14 +110,14 @@ export default function MyCompanyPage() {
     )
   }
 
-  if (!isCompanyAdmin) {
+  if (!hasAccess) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              Only Company Administrators can access this page.
+              You need to be part of a company to access this page.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -120,15 +125,18 @@ export default function MyCompanyPage() {
     )
   }
 
-  // Different description based on user type
+  // Different title and description based on user type
+  const pageTitle = userType === 'corporate_client' ? "My Organization" : "My Company"
   const pageDescription = userType === 'corporate_client' 
-    ? "Manage your company settings and team members"
+    ? isCompanyAdmin 
+      ? "Manage your organization settings and team members"
+      : "View your organization and team information"
     : "Manage your company settings, team members, and warehouses"
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="My Company"
+        title={pageTitle}
         description={pageDescription}
       />
 

@@ -349,8 +349,9 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           console.log('Individual warehouse client profile created:', insertedProfile?.id)
           return { error: undefined }
         } else {
-          // Corporate client - needs company
+          // Corporate client - needs company and name
           const clientCompanyName = validation.data.companyName
+          const clientUserName = validation.data.name
           
           if (!clientCompanyName || !clientCompanyName.trim()) {
             try {
@@ -365,7 +366,21 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
             }
           }
 
+          if (!clientUserName || !clientUserName.trim()) {
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            } catch (deleteError) {
+              console.error('Failed to delete user:', deleteError)
+            }
+            return {
+              error: {
+                message: 'Full name is required for corporate accounts.',
+              },
+            }
+          }
+
           const trimmedClientCompanyName = clientCompanyName.trim()
+          const trimmedClientUserName = clientUserName.trim()
           
           // Check if client company exists (exact match, case-insensitive)
           const { data: existingClientCompanies } = await supabaseAdmin
@@ -389,17 +404,33 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
             teamRole = 'member'
             console.log('Joining existing client company as member:', existingClientCompany.short_name)
             
-            // Find existing team for this company
-            const { data: existingTeams } = await supabaseAdmin
+            // Find the DEFAULT team for this company (is_default = true)
+            const { data: defaultTeam } = await supabaseAdmin
               .from('client_teams')
               .select('id, name')
               .eq('company_id', clientCompanyId)
+              .eq('is_default', true)
               .eq('status', true)
-              .limit(1)
+              .single()
             
-            if (existingTeams && existingTeams.length > 0) {
-              teamId = existingTeams[0].id
-              console.log('Found existing team:', existingTeams[0].name)
+            if (defaultTeam) {
+              teamId = defaultTeam.id
+              console.log('Found default team:', defaultTeam.name)
+            } else {
+              // Fallback: find any team for this company
+              const { data: anyTeam } = await supabaseAdmin
+                .from('client_teams')
+                .select('id, name')
+                .eq('company_id', clientCompanyId)
+                .eq('status', true)
+                .order('created_at', { ascending: true })
+                .limit(1)
+                .single()
+              
+              if (anyTeam) {
+                teamId = anyTeam.id
+                console.log('Found fallback team:', anyTeam.name)
+              }
             }
           } else {
             // No exact match - create new client company, user becomes ADMIN
@@ -433,13 +464,13 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
             console.log('Created new client company:', newClientCompany.short_name, '- User will be admin')
           }
 
-          // Create profile with company_id first (we'll update default_team_id after creating/joining team)
+          // Create profile with company_id and name
           const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
             .from('profiles')
             .upsert({
               id: data.user.id,
               email: validation.data.email,
-              name: null,
+              name: trimmedClientUserName, // Now storing the name for corporate clients
               role: defaultRole,
               phone: validation.data.phone || null,
               company_id: clientCompanyId,
@@ -465,19 +496,18 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           }
 
           // Create or join team
-          if (isNewCompany || !teamId) {
-            // Create a default team for the company
-            const teamName = isNewCompany ? 'Default Team' : 'General'
+          if (isNewCompany) {
+            // Create a default team for the company named "{Full Name}'s Team"
+            const teamName = `${trimmedClientUserName}'s Team`
             const { data: newTeam, error: teamCreateError } = await supabaseAdmin
               .from('client_teams')
               .insert({
                 company_id: clientCompanyId,
                 name: teamName,
-                description: isNewCompany 
-                  ? `Default team for ${trimmedClientCompanyName}` 
-                  : `General team for new members`,
+                description: `Default team for ${trimmedClientCompanyName}`,
                 created_by: data.user.id,
                 status: true,
+                is_default: true, // This is the default team - cannot be deleted
               })
               .select()
               .single()
@@ -487,7 +517,30 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
               // Don't fail registration, just log the error
             } else {
               teamId = newTeam.id
-              console.log('Created new team:', newTeam.name, 'for company')
+              console.log('Created default team:', newTeam.name, 'for company')
+            }
+          } else if (!teamId) {
+            // Company exists but no team found - this shouldn't happen normally
+            // Create a general team for the user
+            const teamName = `${trimmedClientUserName}'s Team`
+            const { data: newTeam, error: teamCreateError } = await supabaseAdmin
+              .from('client_teams')
+              .insert({
+                company_id: clientCompanyId,
+                name: teamName,
+                description: `Team for ${trimmedClientUserName}`,
+                created_by: data.user.id,
+                status: true,
+                is_default: false, // Not the default team since company already exists
+              })
+              .select()
+              .single()
+
+            if (teamCreateError) {
+              console.error('Team creation error:', teamCreateError)
+            } else {
+              teamId = newTeam.id
+              console.log('Created new team for existing company:', newTeam.name)
             }
           }
 

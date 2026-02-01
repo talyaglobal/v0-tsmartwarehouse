@@ -93,21 +93,39 @@ export function ClientTeamMembersTab() {
     setEditForm((prev) => ({ ...prev, phone: value }))
   }, [])
 
-  // Get user's company ID
-  const { data: companyId, isLoading: isLoadingCompanyId } = useQuery({
-    queryKey: ['user-company-id', user?.id],
+  // Get user's company ID and admin status
+  const { data: companyData, isLoading: isLoadingCompanyData } = useQuery({
+    queryKey: ['user-company-data', user?.id],
     queryFn: async () => {
-      if (!user) return null
+      if (!user) return { companyId: null, isAdmin: false }
       const supabase = createClient()
       const { data: profile } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('id', user.id)
         .maybeSingle()
-      return profile?.company_id || null
+      
+      if (!profile?.company_id) return { companyId: null, isAdmin: false }
+      
+      // Check if user is team admin
+      const { data: teamMember } = await supabase
+        .from('client_team_members')
+        .select('role')
+        .eq('member_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle()
+      
+      return { 
+        companyId: profile.company_id, 
+        isAdmin: !!teamMember 
+      }
     },
     enabled: !!user,
   })
+
+  const companyId = companyData?.companyId || null
+  const isAdmin = companyData?.isAdmin || false
+  const isLoadingCompanyId = isLoadingCompanyData
 
   // Fetch client team members (users with this company_id and client_type='corporate')
   const { data: members = [], isLoading: membersLoading } = useQuery<ClientTeamMember[]>({
@@ -405,6 +423,7 @@ export function ClientTeamMembersTab() {
                 Manage your company team members and their permissions
               </CardDescription>
             </div>
+            {isAdmin && (
             <div className="flex gap-2">
               {/* Add Member Directly */}
               <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
@@ -585,6 +604,7 @@ export function ClientTeamMembersTab() {
                 </DialogContent>
               </Dialog>
             </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -600,13 +620,13 @@ export function ClientTeamMembersTab() {
                     <TableHead>Role</TableHead>
                     <TableHead>Permissions</TableHead>
                     <TableHead>Joined</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    {isAdmin && <TableHead className="w-[50px]"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {members.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={isAdmin ? 6 : 5} className="text-center text-muted-foreground">
                         No team members yet
                       </TableCell>
                     </TableRow>
@@ -647,51 +667,53 @@ export function ClientTeamMembersTab() {
                         <TableCell>
                           {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : '-'}
                         </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedMember(member)
-                                  setEditForm({
-                                    name: member.profile?.name || "",
-                                    email: member.profile?.email || "",
-                                    phone: member.profile?.phone || "",
-                                    role: member.role,
-                                    avatarUrl: member.profile?.avatar_url || "",
-                                    password: "",
-                                    canCreateBookings: member.can_create_bookings,
-                                    canViewAllBookings: member.can_view_all_bookings,
-                                    canManageTeam: member.can_manage_team,
-                                  })
-                                  setShowEditPassword(false)
-                                  setEditDialogOpen(true)
-                                }}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              {member.user_id !== user?.id && (
+                        {isAdmin && (
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  className="text-destructive"
                                   onClick={() => {
-                                    if (confirm(`Remove ${member.profile?.name || member.profile?.email} from the team?`)) {
-                                      deleteMemberMutation.mutate(member.id)
-                                    }
+                                    setSelectedMember(member)
+                                    setEditForm({
+                                      name: member.profile?.name || "",
+                                      email: member.profile?.email || "",
+                                      phone: member.profile?.phone || "",
+                                      role: member.role,
+                                      avatarUrl: member.profile?.avatar_url || "",
+                                      password: "",
+                                      canCreateBookings: member.can_create_bookings,
+                                      canViewAllBookings: member.can_view_all_bookings,
+                                      canManageTeam: member.can_manage_team,
+                                    })
+                                    setShowEditPassword(false)
+                                    setEditDialogOpen(true)
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Remove
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
                                 </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                                {member.user_id !== user?.id && (
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Remove ${member.profile?.name || member.profile?.email} from the team?`)) {
+                                        deleteMemberMutation.mutate(member.id)
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remove
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -710,7 +732,7 @@ export function ClientTeamMembersTab() {
                       <TableHead>Role</TableHead>
                       <TableHead>Invited</TableHead>
                       <TableHead>Expires</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
+                      {isAdmin && <TableHead className="w-[50px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -720,24 +742,26 @@ export function ClientTeamMembersTab() {
                         <TableCell>{getRoleBadge(invitation.role)}</TableCell>
                         <TableCell>{new Date(invitation.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>{new Date(invitation.expires_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => deleteInvitationMutation.mutate(invitation.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Cancel Invitation
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => deleteInvitationMutation.mutate(invitation.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Cancel Invitation
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
