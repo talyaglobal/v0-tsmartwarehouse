@@ -239,10 +239,11 @@ export async function POST(
         return NextResponse.json({ error: 'Cannot add your own company' }, { status: 400 })
       }
 
+      const otherCompanyId = corporateCompanyId.trim()
       const { data: otherTeams } = await adminClient
         .from('client_teams')
         .select('id')
-        .eq('company_id', corporateCompanyId.trim())
+        .eq('company_id', otherCompanyId)
         .eq('status', true)
 
       if (!otherTeams?.length) {
@@ -262,7 +263,33 @@ export async function POST(
         return NextResponse.json({ error: 'No admin found for that company' }, { status: 404 })
       }
 
-      return addExistingUserToTeam(adminMember.member_id)
+      const response = await addExistingUserToTeam(adminMember.member_id)
+      if (response.status !== 200) return response
+
+      const { data: otherDefaultTeam } = await adminClient
+        .from('client_teams')
+        .select('id')
+        .eq('company_id', otherCompanyId)
+        .eq('status', true)
+        .eq('is_default', true)
+        .maybeSingle()
+
+      const teamToAddTo = otherDefaultTeam?.id ?? otherTeams[0]?.id
+      if (teamToAddTo) {
+        const { error: reciprocalErr } = await adminClient
+          .from('client_team_members')
+          .insert({
+            team_id: teamToAddTo,
+            member_id: user.id,
+            role: 'member',
+            invited_by: adminMember.member_id,
+          })
+        if (reciprocalErr && reciprocalErr.code !== '23505') {
+          console.error('Reciprocal add to partner team:', reciprocalErr)
+        }
+      }
+
+      return response
     }
 
     if (hasCorporateCompany) {

@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus, Eye, EyeOff, User, Mail, Users, Plus } from "@/components/icons"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus, Eye, EyeOff, User, Mail, Users, Plus, RefreshCw } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
@@ -25,6 +26,7 @@ interface ClientTeam {
   description: string | null
   is_default: boolean
   member_count: number
+  has_admin_member?: boolean
   created_at?: string
 }
 
@@ -75,11 +77,19 @@ export function ClientTeamMembersTab() {
   const [addExistingDialogOpen, setAddExistingDialogOpen] = useState(false)
   const [createTeamDialogOpen, setCreateTeamDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [changeTeamDialogOpen, setChangeTeamDialogOpen] = useState(false)
+  const [changeTeamMember, setChangeTeamMember] = useState<ClientTeamMember | null>(null)
+  const [changeTeamSelectedId, setChangeTeamSelectedId] = useState("")
   const [selectedMember, setSelectedMember] = useState<ClientTeamMember | null>(null)
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showEditPassword, setShowEditPassword] = useState(false)
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [editTeamDialogOpen, setEditTeamDialogOpen] = useState(false)
+  const [editTeamId, setEditTeamId] = useState("")
+  const [editTeamName, setEditTeamName] = useState("")
+  const [editTeamDescription, setEditTeamDescription] = useState("")
+  const [deleteTeamId, setDeleteTeamId] = useState<string | null>(null)
   const [createTeamForm, setCreateTeamForm] = useState({ name: "", description: "" })
   const [addExistingForm, setAddExistingForm] = useState({
     corporateCompanyId: "" as string,
@@ -317,6 +327,47 @@ export function ClientTeamMembersTab() {
     },
   })
 
+  // Update team (rename) mutation
+  const updateTeamMutation = useMutation({
+    mutationFn: async ({ teamId, name, description }: { teamId: string; name: string; description: string }) => {
+      if (!companyId) throw new Error("No company ID")
+      const result = await api.patch(`/api/v1/client-teams/${companyId}/${teamId}`, { name, description }, { showToast: false })
+      if (!result.success) throw new Error(result.error || "Failed to update team")
+      return result.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-teams", companyId] })
+      setEditTeamDialogOpen(false)
+      setEditTeamId("")
+      setEditTeamName("")
+      setEditTeamDescription("")
+      addNotification({ type: "success", message: "Team updated", duration: 5000 })
+    },
+    onError: (error: Error) => {
+      addNotification({ type: "error", message: error.message || "Failed to update team", duration: 5000 })
+    },
+  })
+
+  // Delete team mutation
+  const deleteTeamMutation = useMutation({
+    mutationFn: async (teamId: string) => {
+      if (!companyId) throw new Error("No company ID")
+      const result = await api.delete(`/api/v1/client-teams/${companyId}/${teamId}`, { showToast: false })
+      if (!result.success) throw new Error(result.error || "Failed to delete team")
+      return result.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-teams", companyId] })
+      queryClient.invalidateQueries({ queryKey: ["client-team-members", companyId] })
+      setDeleteTeamId(null)
+      setSelectedTeamId(null)
+      addNotification({ type: "success", message: "Team deleted", duration: 5000 })
+    },
+    onError: (error: Error) => {
+      addNotification({ type: "error", message: error.message || "Failed to delete team", duration: 5000 })
+    },
+  })
+
   // Create team mutation
   const createTeamMutation = useMutation({
     mutationFn: async ({ name, description }: { name: string; description: string }) => {
@@ -363,6 +414,26 @@ export function ClientTeamMembersTab() {
         message: error.message || 'Failed to update member',
         duration: 5000,
       })
+    },
+  })
+
+  // Change team (for partner members) mutation
+  const changeTeamMutation = useMutation({
+    mutationFn: async ({ memberId, teamId }: { memberId: string; teamId: string }) => {
+      if (!companyId) throw new Error("No company ID")
+      const result = await api.patch(`/api/v1/client-teams/${companyId}/members/${memberId}`, { teamId }, { showToast: false })
+      if (!result.success) throw new Error(result.error || "Failed to move member")
+      return result.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-team-members", companyId] })
+      queryClient.invalidateQueries({ queryKey: ["client-teams", companyId] })
+      setChangeTeamDialogOpen(false)
+      setChangeTeamMember(null)
+      addNotification({ type: "success", message: "Member moved to team", duration: 5000 })
+    },
+    onError: (error: Error) => {
+      addNotification({ type: "error", message: error.message || "Failed to move member", duration: 5000 })
     },
   })
 
@@ -526,10 +597,79 @@ export function ClientTeamMembersTab() {
             <p className="text-sm text-muted-foreground">No teams yet. Create a team to add members.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
+              <Badge
+                variant={selectedTeamId === null ? "default" : "outline"}
+                className="cursor-pointer text-sm py-1.5 px-3 transition-colors hover:opacity-90"
+                onClick={() => setSelectedTeamId(null)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedTeamId(null) } }}
+              >
+                All Teams ({members.length})
+              </Badge>
               {teams.map((t) => (
-                <Badge key={t.id} variant={t.is_default ? "default" : "secondary"} className="text-sm py-1.5 px-3">
-                  {t.name} ({t.member_count})
-                </Badge>
+                <div key={t.id} className="flex items-center gap-0.5">
+                  <Badge
+                    variant={selectedTeamId === t.id ? "default" : "outline"}
+                    className="cursor-pointer text-sm py-1.5 px-3 transition-colors hover:opacity-90"
+                    onClick={() => setSelectedTeamId(t.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedTeamId(t.id) } }}
+                  >
+                    {t.name} ({t.member_count})
+                  </Badge>
+                  {isAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditTeamId(t.id)
+                            setEditTeamName(t.name)
+                            setEditTeamDescription(t.description ?? "")
+                            setEditTeamDialogOpen(true)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Rename
+                        </DropdownMenuItem>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex w-full">
+                                <DropdownMenuItem
+                                  disabled={t.is_default || !!t.has_admin_member}
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => !t.is_default && !t.has_admin_member && setDeleteTeamId(t.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete team
+                                </DropdownMenuItem>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-[220px]">
+                              {t.is_default
+                                ? "Varsayılan takım silinemez."
+                                : t.has_admin_member
+                                  ? "Bu takımda admin kullanıcı var. Önce bu kullanıcıları başka takıma taşıyın."
+                                  : "Takımı sil"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -546,6 +686,11 @@ export function ClientTeamMembersTab() {
               </CardTitle>
               <CardDescription>
                 Manage your company team members and their permissions
+                {!isAdmin && (
+                  <span className="block mt-1 text-muted-foreground">
+                    Add Member and Invite Member are available only to team admins.
+                  </span>
+                )}
               </CardDescription>
             </div>
             {isAdmin && (
@@ -612,28 +757,13 @@ export function ClientTeamMembersTab() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="existing-role">Role *</Label>
-                      <Select
-                        value={addExistingForm.role}
-                        onValueChange={(v: "admin" | "member") => setAddExistingForm((p) => ({ ...p, role: v }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="ghost" onClick={() => setAddExistingDialogOpen(false)}>Cancel</Button>
                     <Button
                       onClick={() => addExistingMemberMutation.mutate({
                         corporateCompanyId: addExistingForm.corporateCompanyId,
-                        role: addExistingForm.role,
+                        role: "member",
                         teamId: addExistingForm.teamId || defaultTeamId,
                       })}
                       disabled={!addExistingForm.corporateCompanyId || !(addExistingForm.teamId || defaultTeamId) || addExistingMemberMutation.isPending}
@@ -926,22 +1056,34 @@ export function ClientTeamMembersTab() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   onClick={() => {
-                                    setSelectedMember(member)
-                                    setEditForm({
-                                      name: member.profile?.name || "",
-                                      email: member.profile?.email || "",
-                                      phone: member.profile?.phone || "",
-                                      role: member.role,
-                                      avatarUrl: member.profile?.avatar_url || "",
-                                      password: "",
-                                    })
-                                    setShowEditPassword(false)
-                                    setEditDialogOpen(true)
+                                    setChangeTeamMember(member)
+                                    setChangeTeamSelectedId(member.teams?.[0]?.id ?? defaultTeamId ?? "")
+                                    setChangeTeamDialogOpen(true)
                                   }}
                                 >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Move to another team
                                 </DropdownMenuItem>
+                                {!member.company_name && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedMember(member)
+                                      setEditForm({
+                                        name: member.profile?.name || "",
+                                        email: member.profile?.email || "",
+                                        phone: member.profile?.phone || "",
+                                        role: member.role,
+                                        avatarUrl: member.profile?.avatar_url || "",
+                                        password: "",
+                                      })
+                                      setShowEditPassword(false)
+                                      setEditDialogOpen(true)
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
                                 {member.user_id !== user?.id && (
                                   <DropdownMenuItem
                                     className="text-destructive"
@@ -1016,6 +1158,71 @@ export function ClientTeamMembersTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Team (Rename) Dialog */}
+      <Dialog open={editTeamDialogOpen} onOpenChange={(open) => { setEditTeamDialogOpen(open); if (!open) { setEditTeamId(""); setEditTeamName(""); setEditTeamDescription(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Takımı düzenle</DialogTitle>
+            <DialogDescription>
+              Takım adı ve açıklamasını güncelleyin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-team-name">Takım adı *</Label>
+              <Input
+                id="edit-team-name"
+                placeholder="Örn: Lojistik, Satış"
+                value={editTeamName}
+                onChange={(e) => setEditTeamName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-team-desc">Açıklama (isteğe bağlı)</Label>
+              <Input
+                id="edit-team-desc"
+                placeholder="Kısa açıklama"
+                value={editTeamDescription}
+                onChange={(e) => setEditTeamDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditTeamDialogOpen(false)}>İptal</Button>
+            <Button
+              onClick={() => editTeamId && updateTeamMutation.mutate({ teamId: editTeamId, name: editTeamName.trim(), description: editTeamDescription })}
+              disabled={!editTeamName.trim() || updateTeamMutation.isPending}
+            >
+              {updateTeamMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Kaydet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Team Confirmation Dialog */}
+      <Dialog open={!!deleteTeamId} onOpenChange={(open) => { if (!open) setDeleteTeamId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Takımı sil</DialogTitle>
+            <DialogDescription>
+              &quot;{teams.find((t) => t.id === deleteTeamId)?.name}&quot; takımını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTeamId(null)}>İptal</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTeamId && deleteTeamMutation.mutate(deleteTeamId)}
+              disabled={deleteTeamMutation.isPending}
+            >
+              {deleteTeamMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Sil
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Member Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -1146,6 +1353,60 @@ export function ClientTeamMembersTab() {
                 Save Changes
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Team Dialog (partner members only) */}
+      <Dialog open={changeTeamDialogOpen} onOpenChange={(open) => { setChangeTeamDialogOpen(open); if (!open) setChangeTeamMember(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change team</DialogTitle>
+            <DialogDescription>
+              Move this partner to another team. They will be removed from their current team(s) and added to the selected team.
+            </DialogDescription>
+          </DialogHeader>
+          {changeTeamMember && (
+            <div className="space-y-4 py-4">
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-sm font-medium">{changeTeamMember.profile?.name || changeTeamMember.profile?.email || "Unknown"}</p>
+                <p className="text-xs text-muted-foreground">{changeTeamMember.company_name}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Team</Label>
+                <Select
+                  value={changeTeamSelectedId || defaultTeamId}
+                  onValueChange={setChangeTeamSelectedId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}{t.is_default ? " (default)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeTeamDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!changeTeamMember || !(changeTeamSelectedId || defaultTeamId)) return
+                changeTeamMutation.mutate({
+                  memberId: changeTeamMember.id,
+                  teamId: changeTeamSelectedId || defaultTeamId,
+                })
+              }}
+              disabled={!changeTeamMember || !(changeTeamSelectedId || defaultTeamId) || changeTeamMutation.isPending}
+            >
+              {changeTeamMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Move to team
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

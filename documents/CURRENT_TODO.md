@@ -8,6 +8,12 @@
 
 ## 📋 Session / Recent Fixes
 
+### 2026-02-02: My Organization – team rename & delete (admin only, admin-in-team guard)
+- **Teams section** (My Organization → Team Members): Admin can use the dropdown on each team badge for **Rename** and **Delete team**.
+- **Rename**: Opens "Takımı düzenle" dialog (name + description); submits via `PATCH /api/v1/client-teams/[companyId]/[teamId]`.
+- **Delete team**: Disabled when the team is the default or has any admin member (`has_admin_member` from API). Tooltip explains: "Varsayılan takım silinemez." / "Bu takımda admin kullanıcı var. Önce bu kullanıcıları başka takıma taşıyın." When allowed, click opens confirmation dialog "Takımı sil" and calls `DELETE /api/v1/client-teams/[companyId]/[teamId]`.
+- **API**: Already enforced – default team and teams with admin members cannot be deleted; users must be moved first.
+
 ### 2026-02-02: Booking requests – company admin edit/delete, English status labels
 - **`/dashboard/bookings/requests`**: Company admin (and requester/customer) can **edit** and **delete** existing booking requests.
 - **API**: `PATCH /api/v1/booking-requests/[id]` and `DELETE /api/v1/booking-requests/[id]` with `canManageRequest()` (requester, customer, or company admin via `profiles.company_id`). GET response includes `can_edit` and `can_delete` per request.

@@ -17,7 +17,7 @@ export async function PATCH(
 
     const { companyId, memberId } = await params
     const body = await request.json()
-    const { name, phone, role, password } = body
+    const { name, phone, role, password, teamId: newTeamId } = body
 
     const isAdmin = await isCompanyAdmin(user.id, companyId)
     if (!isAdmin) {
@@ -47,6 +47,32 @@ export async function PATCH(
 
     if (fetchError || !membership) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    if (newTeamId && typeof newTeamId === 'string') {
+      const validTeam = teamIds.includes(newTeamId)
+      if (!validTeam) {
+        return NextResponse.json({ error: 'Invalid team' }, { status: 400 })
+      }
+      for (const tid of teamIds) {
+        await adminClient
+          .from('client_team_members')
+          .delete()
+          .eq('team_id', tid)
+          .eq('member_id', memberId)
+      }
+      const { error: insertErr } = await adminClient
+        .from('client_team_members')
+        .insert({
+          team_id: newTeamId,
+          member_id: memberId,
+          role: 'member',
+          invited_by: user.id,
+        })
+      if (insertErr) {
+        return NextResponse.json({ error: insertErr.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, message: 'Member moved to team successfully' })
     }
 
     if (name !== undefined || phone !== undefined) {

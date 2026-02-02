@@ -57,12 +57,21 @@ export async function GET(
       countByTeam[r.team_id] = (countByTeam[r.team_id] ?? 0) + 1
     })
 
+    const { data: adminRows } = await adminClient
+      .from('client_team_members')
+      .select('team_id')
+      .in('team_id', teamIds)
+      .eq('role', 'admin')
+
+    const teamIdsWithAdmin = new Set((adminRows ?? []).map((r: { team_id: string }) => r.team_id))
+
     const list = (teams ?? []).map((t) => ({
       id: t.id,
       name: t.name,
       description: t.description ?? null,
       is_default: t.is_default ?? false,
       member_count: countByTeam[t.id] ?? 0,
+      has_admin_member: teamIdsWithAdmin.has(t.id),
       created_at: t.created_at,
     }))
 
