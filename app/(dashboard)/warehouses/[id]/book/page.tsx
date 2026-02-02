@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
 import { createBookingRequest } from '@/features/bookings/actions'
 import { api } from '@/lib/api/client'
+import { getBookingOnBehalfContext, clearBookingOnBehalfContext } from '@/lib/booking-context'
 import type { Warehouse } from '@/types'
 import { formatNumber } from '@/lib/utils/format'
+import { Users } from 'lucide-react'
 
 export default function BookWarehousePage() {
   const params = useParams()
@@ -26,10 +28,15 @@ export default function BookWarehousePage() {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [onBehalfContext, setOnBehalfContext] = useState<ReturnType<typeof getBookingOnBehalfContext>>(null)
 
   useEffect(() => {
     fetchWarehouse()
   }, [warehouseId])
+
+  useEffect(() => {
+    setOnBehalfContext(getBookingOnBehalfContext())
+  }, [])
 
   async function fetchWarehouse() {
     try {
@@ -51,6 +58,33 @@ export default function BookWarehousePage() {
     setSubmitting(true)
 
     try {
+      if (onBehalfContext) {
+        const result = await api.post<{ booking: { id: string }; approval?: unknown; bookedOnBehalf: boolean }>(
+          '/api/v1/bookings/on-behalf',
+          {
+            customerId: onBehalfContext.customerId,
+            warehouseId,
+            type: bookingType,
+            palletCount: bookingType === 'pallet' ? palletCount : undefined,
+            areaSqFt: bookingType === 'area-rental' ? areaSqFt : undefined,
+            startDate,
+            endDate: endDate || undefined,
+            notes: notes || undefined,
+            requiresApproval: onBehalfContext.requiresApproval,
+            requestMessage: onBehalfContext.requestMessage,
+          },
+          { showToast: true }
+        )
+        clearBookingOnBehalfContext()
+        setOnBehalfContext(null)
+        if (result.success && result.data?.booking?.id) {
+          router.push(`/dashboard/bookings/${result.data.booking.id}`)
+          return
+        }
+        alert(result.error || 'Failed to create booking on behalf')
+        return
+      }
+
       const result = await createBookingRequest({
         warehouseId,
         type: bookingType,
@@ -84,6 +118,13 @@ export default function BookWarehousePage() {
   return (
     <div className="space-y-6">
       <PageHeader title={`Book ${warehouse.name}`} />
+      {onBehalfContext && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-sm">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">Booking on behalf of</span>
+          <span className="font-medium">{onBehalfContext.customerName || onBehalfContext.customerEmail || 'Team member'}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-2">
         <Card>

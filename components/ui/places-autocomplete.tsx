@@ -152,7 +152,23 @@ export function PlacesAutocomplete({
           ""
 
         if (formatted) {
-          onChange(formatted, place)
+          let placeToPass: any = place
+          const components = place?.addressComponents ?? place?.address_components
+          const hasComponents = Array.isArray(components) && components.length > 0
+          if (!hasComponents && window.google?.maps?.Geocoder) {
+            try {
+              const results = await new Promise<any[]>((resolve, reject) => {
+                new window.google.maps.Geocoder().geocode({ address: formatted }, (r: any, status: string) => {
+                  if (status === 'OK') resolve(r || [])
+                  else reject(new Error(status))
+                })
+              })
+              if (results?.[0]) placeToPass = results[0]
+            } catch (e) {
+              console.warn("[PlacesAutocomplete] Geocode fallback failed:", e)
+            }
+          }
+          onChange(formatted, placeToPass)
         }
 
         if (place?.location && onLocationChange) {
@@ -190,21 +206,36 @@ export function PlacesAutocomplete({
       autocompleteRef.current = autocomplete
 
       // Listen for place selection
-      autocomplete.addListener('place_changed', () => {
+      autocomplete.addListener('place_changed', async () => {
         setIsLoading(true)
         const place = autocomplete.getPlace()
+        const formatted = place.formatted_address
 
-        if (place.formatted_address) {
-          onChange(place.formatted_address, place)
-
-          // Extract location if available
-          if (place.geometry?.location && onLocationChange) {
-            const location = {
-              lat: place.geometry.location.lat(),
-              lng: place.geometry.location.lng(),
+        if (formatted) {
+          let placeToPass: any = place
+          const components = place.address_components ?? place.addressComponents
+          const hasComponents = Array.isArray(components) && components.length > 0
+          if (!hasComponents && window.google?.maps?.Geocoder) {
+            try {
+              const results = await new Promise<any[]>((resolve, reject) => {
+                new window.google.maps.Geocoder().geocode({ address: formatted }, (r: any, status: string) => {
+                  if (status === 'OK') resolve(r || [])
+                  else reject(new Error(status))
+                })
+              })
+              if (results?.[0]) placeToPass = results[0]
+            } catch (e) {
+              console.warn("[PlacesAutocomplete] Geocode fallback failed:", e)
             }
-            onLocationChange(location)
           }
+          onChange(formatted, placeToPass)
+        }
+
+        if (place.geometry?.location && onLocationChange) {
+          onLocationChange({
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          })
         }
 
         setIsLoading(false)

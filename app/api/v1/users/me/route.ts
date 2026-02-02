@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const supabase = createServerSupabaseClient()
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, first_name, last_name, role, company_id, membership_tier, credit_balance, avatar_url')
+      .select('id, email, name, role, company_id, membership_tier, credit_balance, avatar_url')
       .eq('id', user.id)
       .single()
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const userData = {
       id: user.id,
       email: profile?.email || authUser?.email || '',
-      name: profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || authUser?.email?.split('@')[0] || 'User',
+      name: profile?.name || authUser?.email?.split('@')[0] || 'User',
       role: profile?.role || 'warehouse_client',
       companyId: profile?.company_id || null,
       membershipTier: profile?.membership_tier || 'bronze',

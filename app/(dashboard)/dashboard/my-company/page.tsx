@@ -75,9 +75,8 @@ export default function MyCompanyPage() {
         return { isAdmin: true, userType: 'warehouse' as UserType, hasAccess: true }
       }
       
-      // All corporate clients can access this page
+      // Corporate clients: team admin can edit, all can view
       if (profile.role === 'warehouse_client' && profile.client_type === 'corporate') {
-        // Check if user is team admin
         const { data: teamMember } = await supabase
           .from('client_team_members')
           .select('role')
@@ -85,12 +84,16 @@ export default function MyCompanyPage() {
           .eq('role', 'admin')
           .maybeSingle()
         
-        // All corporate clients have access, but only team admins can edit
         return { 
           isAdmin: !!teamMember, 
           userType: 'corporate_client' as UserType, 
           hasAccess: true 
         }
+      }
+      
+      // Warehouse client with company_id (e.g. individual with company): allow access, show "My Company"
+      if (profile.role === 'warehouse_client') {
+        return { isAdmin: false, userType: null as UserType, hasAccess: true }
       }
       
       return { isAdmin: false, userType: null as UserType, hasAccess: false }

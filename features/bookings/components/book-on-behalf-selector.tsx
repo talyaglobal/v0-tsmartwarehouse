@@ -35,15 +35,24 @@ export function BookOnBehalfSelector({ onSelect, disabled }: BookOnBehalfSelecto
   const [requiresApproval, setRequiresApproval] = useState(true)
   const [requestMessage, setRequestMessage] = useState("")
 
-  // Fetch team members available for booking
-  const { data: members = [], isLoading } = useQuery<TeamMemberWithTeam[]>({
+  // Fetch team members and whether current user is team admin (admin can pre-approve; member must require approval)
+  const { data: bookingMembersData, isLoading } = useQuery<{ members: TeamMemberWithTeam[]; isTeamAdmin: boolean }>({
     queryKey: ["booking-members"],
     queryFn: async () => {
-      const result = await api.get<TeamMemberWithTeam[]>("/api/v1/teams/booking-members", { showToast: false })
-      return result.success ? (result.data || []) : []
+      const result = await api.get<{ members?: TeamMemberWithTeam[]; isTeamAdmin?: boolean } | TeamMemberWithTeam[]>("/api/v1/teams/booking-members", { showToast: false })
+      if (!result.success) return { members: [], isTeamAdmin: false }
+      const data = result.data
+      if (Array.isArray(data)) return { members: data, isTeamAdmin: true }
+      return {
+        members: data?.members ?? [],
+        isTeamAdmin: data?.isTeamAdmin ?? false,
+      }
     },
     enabled: bookOnBehalf,
   })
+
+  const members = bookingMembersData?.members ?? []
+  const isTeamAdmin = bookingMembersData?.isTeamAdmin ?? false
 
   // Group members by team
   const membersByTeam = members.reduce((acc, member) => {
@@ -74,13 +83,13 @@ export function BookOnBehalfSelector({ onSelect, disabled }: BookOnBehalfSelecto
   const handleMemberSelect = (memberId: string) => {
     const member = members.find((m) => m.memberId === memberId)
     setSelectedMemberId(memberId)
-    
+    const needsApproval = isTeamAdmin ? requiresApproval : true
     if (member) {
       onSelect({
         customerId: member.memberId,
         customerName: member.name || member.email || null,
         customerEmail: member.email || null,
-        requiresApproval,
+        requiresApproval: needsApproval,
         requestMessage: requestMessage || undefined,
       })
     }
@@ -88,7 +97,7 @@ export function BookOnBehalfSelector({ onSelect, disabled }: BookOnBehalfSelecto
 
   const handleApprovalChange = (needsApproval: boolean) => {
     setRequiresApproval(needsApproval)
-    
+    if (!isTeamAdmin) return
     if (selectedMember) {
       onSelect({
         customerId: selectedMember.memberId,
@@ -102,13 +111,13 @@ export function BookOnBehalfSelector({ onSelect, disabled }: BookOnBehalfSelecto
 
   const handleMessageChange = (message: string) => {
     setRequestMessage(message)
-    
+    const effectiveRequiresApproval = isTeamAdmin ? requiresApproval : true
     if (selectedMember) {
       onSelect({
         customerId: selectedMember.memberId,
         customerName: selectedMember.name || selectedMember.email || null,
         customerEmail: selectedMember.email || null,
-        requiresApproval,
+        requiresApproval: effectiveRequiresApproval,
         requestMessage: message || undefined,
       })
     }
@@ -150,7 +159,7 @@ export function BookOnBehalfSelector({ onSelect, disabled }: BookOnBehalfSelecto
             <div className="text-center py-4 text-muted-foreground text-sm">
               <UserPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No team members available</p>
-              <p className="text-xs mt-1">You need to be a team admin to book on behalf of members</p>
+              <p className="text-xs mt-1">You can book on behalf of members in your team</p>
             </div>
           ) : (
             <>
@@ -207,33 +216,42 @@ export function BookOnBehalfSelector({ onSelect, disabled }: BookOnBehalfSelecto
                 </div>
               )}
 
-              {/* Approval Options */}
+              {/* Approval Options: only team admins can choose pre-approved vs require approval; members always require approval */}
               {selectedMember && (
                 <div className="space-y-4 pt-2">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center gap-2">
-                        {requiresApproval ? (
-                          <Bell className="h-4 w-4 text-amber-500" />
-                        ) : (
-                          <BellOff className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        Require Approval
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {requiresApproval
-                          ? "Team member must approve before booking is confirmed"
-                          : "Booking will be created immediately without approval"}
-                      </p>
+                  {isTeamAdmin ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="flex items-center gap-2">
+                            {requiresApproval ? (
+                              <Bell className="h-4 w-4 text-amber-500" />
+                            ) : (
+                              <BellOff className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            Require Approval
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {requiresApproval
+                              ? "Team member must approve before booking is confirmed"
+                              : "Booking will be created immediately (pre-approved)"}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={requiresApproval}
+                          onCheckedChange={handleApprovalChange}
+                          disabled={disabled}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-md bg-muted/60 p-3 text-sm text-muted-foreground">
+                      <Bell className="h-4 w-4 inline mr-2 text-amber-500" />
+                      Client must approve this booking before it is confirmed.
                     </div>
-                    <Switch
-                      checked={requiresApproval}
-                      onCheckedChange={handleApprovalChange}
-                      disabled={disabled}
-                    />
-                  </div>
+                  )}
 
-                  {requiresApproval && (
+                  {(requiresApproval || !isTeamAdmin) && (
                     <div className="space-y-2">
                       <Label>Message (optional)</Label>
                       <Textarea

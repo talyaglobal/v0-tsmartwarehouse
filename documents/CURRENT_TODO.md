@@ -1,8 +1,44 @@
 # TSmart Warehouse - Current TODO List
 
-**Date**: January 10, 2026  
+**Date**: February 2, 2026  
 **Sprint**: 15 (Jan 10-24, 2026)  
 **Focus**: Polish & Complete Remaining Features
+
+---
+
+## 📋 Session / Recent Fixes
+
+### 2026-02-02: Booking requests – company admin edit/delete, English status labels
+- **`/dashboard/bookings/requests`**: Company admin (and requester/customer) can **edit** and **delete** existing booking requests.
+- **API**: `PATCH /api/v1/booking-requests/[id]` and `DELETE /api/v1/booking-requests/[id]` with `canManageRequest()` (requester, customer, or company admin via `profiles.company_id`). GET response includes `can_edit` and `can_delete` per request.
+- **UI**: Edit dialog (all request fields + Requires approval / Pre-approved), delete confirmation AlertDialog. Buttons shown only when `can_edit` / `can_delete` are true.
+- **Status labels**: Request status badges now show English labels: Pending, Quoted, Approved, Rejected (via `statusLabel` map) instead of raw DB values.
+
+### 2026-02-02: Booking entry modal & book-on-behalf flow
+- **Entry modal** on `/dashboard/bookings/new`: On load, a modal asks "Who is this booking for?" with two options: **For myself** (book for own company) and **For another client** (book on behalf of a team member; approval may be required).
+- **New booking page**:
+  - After choice, if "For another client" the **BookOnBehalfSelector** is shown (team member picker + approval switch for admins; members always require approval).
+  - Search form submit: if "for another client" and a member is selected, **booking-on-behalf context** is stored in `sessionStorage` and user is redirected to `/find-warehouses?...`.
+- **Booking context** (`lib/booking-context.ts`): `getBookingOnBehalfContext`, `setBookingOnBehalfContext`, `clearBookingOnBehalfContext` for persisting on-behalf choice across the flow.
+- **Warehouse book flows** now consume context:
+  - **Marketplace warehouse detail** (`components/marketplace/warehouse-detail-view.tsx`): On confirm booking, if context exists, calls `POST /api/v1/bookings/on-behalf` with same params + context, then clears context and redirects to booking detail. Banner "Booking on behalf of {name}" shown when context is set.
+  - **Dashboard book page** (`app/(dashboard)/warehouses/[id]/book/page.tsx`): Same logic on submit; banner "Booking on behalf of {name}" when context is set.
+- **Result**: User can choose "for self" or "for another client" once on New Booking; if "another client", they select a team member (and admins can choose pre-approved vs require approval); search redirects to find-warehouses; when they complete a booking, it is created on behalf of the selected client and context is cleared.
+
+---
+
+### 2026-02-02: Warehouse client "My Company" visibility
+- **Issue**: Warehouse client kullanıcı company'ye sahip olsa bile (company_id varsa) dashboard sidebar'da "My Company" görünmüyordu; sadece corporate client'lar için gösteriliyordu.
+- **Fix**:
+  1. **Sidebar** (`components/dashboard/sidebar.tsx`): `warehouseClientHasCompany` eklendi – `userRole === 'warehouse_client' && !!profile?.companyId` durumunda "My Company" linki gösteriliyor.
+  2. **My Company sayfası** (`app/(dashboard)/dashboard/my-company/page.tsx`): `warehouse_client` + `company_id` olan tüm kullanıcılar sayfaya erişebiliyor; sadece corporate değil, company_id olan her warehouse client erişim alıyor. Başlık "My Company" olarak kalıyor (corporate için "My Organization").
+- **Sonuç**: Company’si olan her warehouse client dashboard’da "My Company" görüyor ve sayfaya girebiliyor.
+
+---
+
+### 2026-02-02: Corporate register – company autocomplete, select vs create, admin/team admin fix
+- **Company name**: Klavyeden yazarken `status = true` client_company'ler listeleniyor. Tam eşleşme varsa listeden seçim zorunlu; yoksa yeni company oluşturuluyor.
+- **Form**: `selectedCompanyId` + submit'te `companyId`. Backend: corporate akışı trigger'dan bağımsız; yeni company = admin + team admin; profil upsert ile company_id/client_type yazılıyor; dashboard'da My Company görünüyor.
 
 ---
 

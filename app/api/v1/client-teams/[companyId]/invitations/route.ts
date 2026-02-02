@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/auth/api-middleware'
+import { isCompanyAdmin, getUserCompanyId } from '@/lib/auth/company-admin'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { nanoid } from 'nanoid'
 
 // POST - Create an invitation for a new team member
@@ -8,12 +10,11 @@ export async function POST(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
+    const { user } = authResult
 
     const { companyId } = await params
     const body = await request.json()
@@ -23,63 +24,50 @@ export async function POST(
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    // Verify the requesting user is an admin of this company's client team
-    const { data: memberCheck } = await supabase
-      .from('client_team_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .eq('role', 'admin')
-      .maybeSingle()
-
-    if (!memberCheck) {
+    const isAdmin = await isCompanyAdmin(user.id, companyId)
+    if (!isAdmin) {
       return NextResponse.json({ error: 'Only team admins can send invitations' }, { status: 403 })
     }
 
-    // Check if email is already a member
-    const { data: existingProfile } = await supabase
+    const adminClient = createAdminClient()
+
+    const { data: existingProfile } = await adminClient
       .from('profiles')
       .select('id')
       .eq('email', email)
       .maybeSingle()
 
     if (existingProfile) {
-      const { data: existingMember } = await supabase
-        .from('client_team_members')
+      const { data: companyTeams } = await adminClient
+        .from('client_teams')
         .select('id')
-        .eq('user_id', existingProfile.id)
         .eq('company_id', companyId)
-        .maybeSingle()
-
-      if (existingMember) {
-        return NextResponse.json({ error: 'This email is already a team member' }, { status: 400 })
+        .eq('status', true)
+      const teamIds = companyTeams?.map((t) => t.id) ?? []
+      if (teamIds.length > 0) {
+        const { data: existingMember } = await adminClient
+          .from('client_team_members')
+          .select('team_id')
+          .eq('member_id', existingProfile.id)
+          .in('team_id', teamIds)
+          .limit(1)
+          .maybeSingle()
+        if (existingMember) {
+          return NextResponse.json({ error: 'This email is already a team member' }, { status: 400 })
+        }
       }
     }
 
-    // Check for existing pending invitation
-    const { data: existingInvitation } = await supabase
-      .from('client_team_invitations')
-      .select('id')
-      .eq('email', email)
-      .eq('company_id', companyId)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle()
-
-    if (existingInvitation) {
-      return NextResponse.json({ error: 'An invitation is already pending for this email' }, { status: 400 })
-    }
-
-    // Create the invitation
-    const token = nanoid(32)
     const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiry
+    expiresAt.setDate(expiresAt.getDate() + 7)
+    const token = nanoid(32)
 
-    const { data: invitation, error: insertError } = await supabase
+    const { data: invitation, error: insertError } = await adminClient
       .from('client_team_invitations')
       .insert({
         company_id: companyId,
         email,
-        role: role || 'member',
+        role: role === 'admin' ? 'admin' : 'member',
         token,
         invited_by: user.id,
         expires_at: expiresAt.toISOString(),
@@ -92,14 +80,10 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 })
     }
 
-    // TODO: Send invitation email
-    // For now, we'll just return success
-    // In production, you'd send an email with the invitation link
-
     return NextResponse.json({
       success: true,
       message: 'Invitation created',
-      emailSent: false, // Set to true when email sending is implemented
+      emailSent: false,
       invitation,
     })
   } catch (error) {
@@ -110,32 +94,25 @@ export async function POST(
 
 // GET - List pending invitations
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
+    const { user } = authResult
 
     const { companyId } = await params
 
-    // Verify the requesting user is a member of this company's client team
-    const { data: memberCheck } = await supabase
-      .from('client_team_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .maybeSingle()
-
-    if (!memberCheck) {
+    const userCompanyId = await getUserCompanyId(user.id)
+    if (userCompanyId !== companyId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    const { data: invitations, error } = await supabase
+    const adminClient = createAdminClient()
+    const { data: invitations, error } = await adminClient
       .from('client_team_invitations')
       .select('*')
       .eq('company_id', companyId)

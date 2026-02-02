@@ -351,6 +351,9 @@
 
 ## ✅ Completed Tasks
 
+### Recent Fixes (Feb 2026)
+- ✅ **My Company unauthorized fix**: Şirket oluşturan kurumsal müşteri (corporate client) team member eklerken ve şirket bilgilerini düzenlerken 403 Unauthorized hatası alıyordu. Sebep: `lib/auth/company-admin.ts` içindeki `isCompanyAdmin` sadece `warehouse_owner` / `warehouse_admin` / `warehouse_supervisor` rollerini kontrol ediyordu; kurumsal müşteri `warehouse_client` + `client_team_members.role = 'admin'` ile şirket admini sayılmıyordu. Çözüm: `isCompanyAdmin` ve `getUserAdminCompanies` güncellendi; artık `client_team_members` tablosunda `role = 'admin'` olan kullanıcılar ilgili şirket için company admin kabul ediliyor (PATCH company, GET/POST members API’leri çalışıyor).
+
 ### Database & Infrastructure
 - ✅ Initial database schema created
 - ✅ Supabase integration complete

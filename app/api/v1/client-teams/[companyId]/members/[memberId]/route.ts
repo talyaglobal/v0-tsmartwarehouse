@@ -1,95 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/auth/api-middleware'
+import { isCompanyAdmin } from '@/lib/auth/company-admin'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// PATCH - Update a client team member
+// PATCH - Update a client team member (memberId = profile id)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string; memberId: string }> }
 ) {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
+    const { user } = authResult
 
     const { companyId, memberId } = await params
     const body = await request.json()
-    const { name, phone, role, password, canCreateBookings, canViewAllBookings, canManageTeam } = body
+    const { name, phone, role, password } = body
 
-    // Verify the requesting user is an admin of this company's client team
-    const { data: memberCheck } = await supabase
-      .from('client_team_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .eq('role', 'admin')
-      .maybeSingle()
-
-    if (!memberCheck) {
+    const isAdmin = await isCompanyAdmin(user.id, companyId)
+    if (!isAdmin) {
       return NextResponse.json({ error: 'Only team admins can update members' }, { status: 403 })
-    }
-
-    // Get the member being updated
-    const { data: targetMember, error: fetchError } = await supabase
-      .from('client_team_members')
-      .select('user_id, role')
-      .eq('id', memberId)
-      .eq('company_id', companyId)
-      .maybeSingle()
-
-    if (fetchError || !targetMember) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
     const adminClient = createAdminClient()
 
-    // Update profile if name or phone provided
-    if (name !== undefined || phone !== undefined) {
-      const profileUpdates: Record<string, any> = {}
-      if (name !== undefined) profileUpdates.name = name
-      if (phone !== undefined) profileUpdates.phone = phone
+    const { data: companyTeams } = await adminClient
+      .from('client_teams')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('status', true)
 
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .update(profileUpdates)
-        .eq('id', targetMember.user_id)
-
-      if (profileError) {
-        console.error('Error updating profile:', profileError)
-      }
+    if (!companyTeams?.length) {
+      return NextResponse.json({ error: 'Company or team not found' }, { status: 404 })
     }
 
-    // Update password if provided
-    if (password) {
-      const { error: passwordError } = await adminClient.auth.admin.updateUserById(
-        targetMember.user_id,
-        { password }
-      )
+    const teamIds = companyTeams.map((t) => t.id)
+    const { data: membership, error: fetchError } = await adminClient
+      .from('client_team_members')
+      .select('team_id, role')
+      .eq('member_id', memberId)
+      .in('team_id', teamIds)
+      .limit(1)
+      .maybeSingle()
 
+    if (fetchError || !membership) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    if (name !== undefined || phone !== undefined) {
+      const profileUpdates: Record<string, unknown> = {}
+      if (name !== undefined) profileUpdates.name = name
+      if (phone !== undefined) profileUpdates.phone = phone
+      await adminClient
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', memberId)
+    }
+
+    if (password) {
+      const { error: passwordError } = await adminClient.auth.admin.updateUserById(memberId, { password })
       if (passwordError) {
         return NextResponse.json({ error: 'Failed to update password' }, { status: 500 })
       }
     }
 
-    // Update team member record
-    const teamUpdates: Record<string, any> = {}
-    if (role !== undefined) teamUpdates.role = role
-    if (canCreateBookings !== undefined) teamUpdates.can_create_bookings = canCreateBookings
-    if (canViewAllBookings !== undefined) teamUpdates.can_view_all_bookings = canViewAllBookings
-    if (canManageTeam !== undefined) teamUpdates.can_manage_team = canManageTeam
-
-    if (Object.keys(teamUpdates).length > 0) {
-      const { error: teamError } = await supabase
+    if (role !== undefined && (role === 'admin' || role === 'member')) {
+      const { error: teamError } = await adminClient
         .from('client_team_members')
-        .update(teamUpdates)
-        .eq('id', memberId)
+        .update({ role })
+        .eq('team_id', membership.team_id)
+        .eq('member_id', memberId)
 
       if (teamError) {
-        console.error('Error updating team member:', teamError)
-        return NextResponse.json({ error: 'Failed to update member' }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to update member role' }, { status: 500 })
       }
     }
 
@@ -100,68 +85,64 @@ export async function PATCH(
   }
 }
 
-// DELETE - Remove a member from the client team
+// DELETE - Remove a member from the client team (memberId = profile id)
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ companyId: string; memberId: string }> }
 ) {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
+    const { user } = authResult
 
     const { companyId, memberId } = await params
 
-    // Verify the requesting user is an admin of this company's client team
-    const { data: memberCheck } = await supabase
-      .from('client_team_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .eq('role', 'admin')
-      .maybeSingle()
-
-    if (!memberCheck) {
-      return NextResponse.json({ error: 'Only team admins can remove members' }, { status: 403 })
-    }
-
-    // Get the member being removed
-    const { data: targetMember } = await supabase
-      .from('client_team_members')
-      .select('user_id')
-      .eq('id', memberId)
-      .eq('company_id', companyId)
-      .maybeSingle()
-
-    if (!targetMember) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
-    }
-
-    // Prevent removing yourself
-    if (targetMember.user_id === user.id) {
+    if (memberId === user.id) {
       return NextResponse.json({ error: 'You cannot remove yourself from the team' }, { status: 400 })
     }
 
-    // Remove from client_team_members
-    const { error: deleteError } = await supabase
-      .from('client_team_members')
-      .delete()
-      .eq('id', memberId)
-
-    if (deleteError) {
-      console.error('Error removing member:', deleteError)
-      return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 })
+    const isAdmin = await isCompanyAdmin(user.id, companyId)
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Only team admins can remove members' }, { status: 403 })
     }
 
-    // Optionally, clear the company_id from their profile
     const adminClient = createAdminClient()
+
+    const { data: companyTeams } = await adminClient
+      .from('client_teams')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('status', true)
+
+    if (!companyTeams?.length) {
+      return NextResponse.json({ error: 'Company or team not found' }, { status: 404 })
+    }
+
+    const teamIds = companyTeams.map((t) => t.id)
+    const { data: memberships } = await adminClient
+      .from('client_team_members')
+      .select('team_id')
+      .eq('member_id', memberId)
+      .in('team_id', teamIds)
+
+    if (!memberships?.length) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    for (const m of memberships) {
+      await adminClient
+        .from('client_team_members')
+        .delete()
+        .eq('team_id', m.team_id)
+        .eq('member_id', memberId)
+    }
+
     await adminClient
       .from('profiles')
       .update({ company_id: null, client_type: 'individual' })
-      .eq('id', targetMember.user_id)
+      .eq('id', memberId)
 
     return NextResponse.json({ success: true, message: 'Member removed successfully' })
   } catch (error) {

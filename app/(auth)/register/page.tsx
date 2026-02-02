@@ -133,6 +133,7 @@ export default function RegisterPage() {
     confirmPassword: "",
     clientType: "individual" as "individual" | "corporate",
     companyName: "",
+    selectedCompanyId: null as string | null, // When user picks from list
     acceptTerms: false,
   })
 
@@ -321,23 +322,32 @@ export default function RegisterPage() {
 
     setIsSearchingClientCompanies(true)
     try {
-      const response = await fetch(`/api/v1/companies/search?q=${encodeURIComponent(query.trim())}&type=client_company`)
+      const url = `/api/v1/companies/search?q=${encodeURIComponent(query.trim())}&type=client_company`
+      const response = await fetch(url)
       const data = await response.json()
-      const companies = data.companies || []
+
+      if (!response.ok) {
+        console.error('Company search API error:', response.status, data)
+        setClientCompanySuggestions([])
+        setExactClientCompanyMatch(null)
+        setShowClientCompanySuggestions(true)
+        return
+      }
+
+      const companies = Array.isArray(data.companies) ? data.companies : []
       setClientCompanySuggestions(companies)
-      
-      // Check for exact match
-      const trimmedQuery = query.trim().toLowerCase()
+
+      const trimmedLower = query.trim().toLowerCase()
       const exactMatch = companies.find(
-        (c: { name: string }) => c.name.toLowerCase() === trimmedQuery
+        (c: { name?: string }) => (c.name || '').toLowerCase() === trimmedLower
       )
       setExactClientCompanyMatch(exactMatch || null)
-      
       setShowClientCompanySuggestions(true)
     } catch (error) {
       console.error('Error searching client companies:', error)
       setClientCompanySuggestions([])
       setExactClientCompanyMatch(null)
+      setShowClientCompanySuggestions(true)
     } finally {
       setIsSearchingClientCompanies(false)
     }
@@ -359,17 +369,25 @@ export default function RegisterPage() {
     return () => clearTimeout(timeoutId)
   }, [renterFormData.companyName, renterFormData.clientType, searchClientCompanies])
 
-  // Handle client company selection
+  // Handle client company selection (user must select when company exists)
   const handleClientCompanySelect = (company: { id: string; name: string }) => {
-    setRenterFormData((prev) => ({ ...prev, companyName: company.name }))
+    setRenterFormData((prev) => ({
+      ...prev,
+      companyName: company.name,
+      selectedCompanyId: company.id,
+    }))
     setShowClientCompanySuggestions(false)
     clientCompanyInputRef.current?.blur()
   }
 
-  // Handle client company input change
+  // Handle client company input change (typing clears selection = new company)
   const handleClientCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    setRenterFormData((prev) => ({ ...prev, companyName: value }))
+    setRenterFormData((prev) => ({
+      ...prev,
+      companyName: value,
+      selectedCompanyId: null,
+    }))
     setShowClientCompanySuggestions(true)
   }
 
@@ -453,7 +471,7 @@ export default function RegisterPage() {
       return
     }
 
-    // Validate name and company name for corporate clients
+    // Validate name and company for corporate clients
     if (renterFormData.clientType === 'corporate') {
       if (!renterFormData.name || renterFormData.name.trim().length < 2) {
         setError("Full name is required for corporate accounts")
@@ -475,6 +493,17 @@ export default function RegisterPage() {
         setIsLoading(false)
         return
       }
+      // If there is an exact match in the system, user must select it (cannot type-only)
+      if (exactClientCompanyMatch && renterFormData.selectedCompanyId !== exactClientCompanyMatch.id) {
+        setError("This company already exists. Please select it from the list below.")
+        addNotification({
+          type: 'error',
+          message: "Please select the company from the list.",
+          duration: 5000,
+        })
+        setIsLoading(false)
+        return
+      }
     }
 
     const formDataToSubmit = new FormData()
@@ -487,6 +516,9 @@ export default function RegisterPage() {
     if (renterFormData.clientType === 'corporate') {
       formDataToSubmit.append('name', renterFormData.name.trim())
       formDataToSubmit.append('companyName', renterFormData.companyName.trim())
+      if (renterFormData.selectedCompanyId) {
+        formDataToSubmit.append('companyId', renterFormData.selectedCompanyId)
+      }
     }
 
     const result = await signUp(formDataToSubmit)
@@ -1156,7 +1188,8 @@ export default function RegisterPage() {
                       setRenterFormData((prev) => ({
                         ...prev,
                         clientType: value,
-                        companyName: value === 'individual' ? '' : prev.companyName
+                        companyName: value === 'individual' ? '' : prev.companyName,
+                        selectedCompanyId: value === 'individual' ? null : prev.selectedCompanyId
                       }))
                       if (value === 'individual') {
                         setClientCompanySuggestions([])
@@ -1215,20 +1248,23 @@ export default function RegisterPage() {
                     </p>
                   </div>
 
-                  {/* Company Name */}
-                  <div className="space-y-2">
+                  {/* Company Name - overflow-visible so dropdown is not clipped */}
+                  <div className="space-y-2 relative overflow-visible">
                     <Label htmlFor="renter-companyName" className="text-sm font-medium">
                       Company Name <span className="text-destructive">*</span>
                     </Label>
                     <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
                       <Input
                         ref={clientCompanyInputRef}
                         id="renter-companyName"
                         placeholder="Enter or search for company name"
                         value={renterFormData.companyName}
                         onChange={handleClientCompanyNameChange}
-                        onFocus={() => clientCompanySuggestions.length > 0 && setShowClientCompanySuggestions(true)}
+                        onFocus={() => {
+                          if (clientCompanySuggestions.length > 0) setShowClientCompanySuggestions(true)
+                          else if (renterFormData.companyName.trim().length >= 2) searchClientCompanies(renterFormData.companyName)
+                        }}
                         required
                         disabled={isLoading}
                         className="h-11 pl-10"
@@ -1236,25 +1272,25 @@ export default function RegisterPage() {
                       {isSearchingClientCompanies && (
                         <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                       )}
+                      {showClientCompanySuggestions && clientCompanySuggestions.length > 0 && (
+                        <div
+                          ref={clientCompanySuggestionsRef}
+                          className="absolute left-0 right-0 top-full z-[100] mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-auto"
+                        >
+                          {clientCompanySuggestions.map((company) => (
+                            <button
+                              key={company.id}
+                              type="button"
+                              onClick={() => handleClientCompanySelect(company)}
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent flex items-center gap-2"
+                            >
+                              <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">{company.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {showClientCompanySuggestions && clientCompanySuggestions.length > 0 && (
-                      <div
-                        ref={clientCompanySuggestionsRef}
-                        className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-auto"
-                      >
-                        {clientCompanySuggestions.map((company) => (
-                          <button
-                            key={company.id}
-                            type="button"
-                            onClick={() => handleClientCompanySelect(company)}
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent flex items-center gap-2"
-                          >
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            {company.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                     {renterFormData.companyName && renterFormData.companyName.trim().length >= 2 && (
                       <div className="mt-1.5">
                         {exactClientCompanyMatch ? (

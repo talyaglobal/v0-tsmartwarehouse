@@ -130,6 +130,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const name = formData.get('name') as string | null
     const phone = formData.get('phone') as string | null
     const companyName = formData.get('companyName') as string | null
+    const companyId = formData.get('companyId') as string | null
     const storageType = formData.get('storageType') as string | null
     const userType = formData.get('userType') as 'owner' | 'warehouse_client' | 'warehouse_broker' | 'warehouse_finder' | null
     const clientType = formData.get('clientType') as 'individual' | 'corporate' | null
@@ -261,6 +262,226 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     // Wait a moment for the trigger to create the profile
     await new Promise(resolve => setTimeout(resolve, 1000))
 
+    // Corporate client: always run company + profile + team (works even if trigger already created profile)
+    if (isCustomer && (validation.data.clientType || 'individual') === 'corporate') {
+      const clientCompanyName = validation.data.companyName?.trim()
+      const clientUserName = validation.data.name?.trim()
+      const providedCompanyId = companyId?.trim() || null
+
+      if (!clientCompanyName || clientCompanyName.length < 2) {
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+        } catch (deleteError) {
+          console.error('Failed to delete user:', deleteError)
+        }
+        return {
+          error: { message: 'Company name is required for corporate accounts.' },
+        }
+      }
+      if (!clientUserName || clientUserName.length < 2) {
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+        } catch (deleteError) {
+          console.error('Failed to delete user:', deleteError)
+        }
+        return {
+          error: { message: 'Full name is required for corporate accounts.' },
+        }
+      }
+
+      let clientCompanyId: string
+      let isNewCompany = false
+      let teamId: string | null = null
+      let teamRole: 'admin' | 'member' = 'member'
+
+      if (providedCompanyId) {
+        // User selected existing company – join as member (only active companies)
+        const { data: existingCompany, error: fetchErr } = await supabaseAdmin
+          .from('companies')
+          .select('id, short_name')
+          .eq('id', providedCompanyId)
+          .eq('type', 'client_company')
+          .eq('status', true)
+          .maybeSingle()
+
+        if (fetchErr || !existingCompany) {
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+          } catch (deleteError) {
+            console.error('Failed to delete user:', deleteError)
+          }
+          return {
+            error: { message: 'Selected company not found or invalid. Please try again.' },
+          }
+        }
+        clientCompanyId = existingCompany.id
+        teamRole = 'member'
+        console.log('Joining existing client company as member:', existingCompany.short_name)
+
+        const { data: defaultTeam } = await supabaseAdmin
+          .from('client_teams')
+          .select('id, name')
+          .eq('company_id', clientCompanyId)
+          .eq('is_default', true)
+          .eq('status', true)
+          .single()
+
+        if (defaultTeam) {
+          teamId = defaultTeam.id
+        } else {
+          const { data: anyTeam } = await supabaseAdmin
+            .from('client_teams')
+            .select('id, name')
+            .eq('company_id', clientCompanyId)
+            .eq('status', true)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          if (anyTeam) teamId = anyTeam.id
+        }
+      } else {
+        // No companyId – find by name or create new (user becomes admin)
+        const { data: existingClientCompanies } = await supabaseAdmin
+          .from('companies')
+          .select('id, short_name')
+          .eq('type', 'client_company')
+          .eq('status', true)
+          .limit(100)
+
+        const existingClientCompany = existingClientCompanies?.find(
+          (c) => c.short_name?.toLowerCase() === clientCompanyName.toLowerCase()
+        ) || null
+
+        if (existingClientCompany) {
+          clientCompanyId = existingClientCompany.id
+          teamRole = 'member'
+          console.log('Joining existing client company as member:', existingClientCompany.short_name)
+
+          const { data: defaultTeam } = await supabaseAdmin
+            .from('client_teams')
+            .select('id, name')
+            .eq('company_id', clientCompanyId)
+            .eq('is_default', true)
+            .eq('status', true)
+            .single()
+          if (defaultTeam) teamId = defaultTeam.id
+          else {
+            const { data: anyTeam } = await supabaseAdmin
+              .from('client_teams')
+              .select('id, name')
+              .eq('company_id', clientCompanyId)
+              .eq('status', true)
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle()
+            if (anyTeam) teamId = anyTeam.id
+          }
+        } else {
+          isNewCompany = true
+          teamRole = 'admin'
+          const { data: newClientCompany, error: clientCompanyCreateError } = await supabaseAdmin
+            .from('companies')
+            .insert({
+              short_name: clientCompanyName,
+              trading_name: clientCompanyName,
+              type: 'client_company',
+            })
+            .select()
+            .single()
+
+          if (clientCompanyCreateError) {
+            try {
+              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+            } catch (deleteError) {
+              console.error('Failed to delete user after company creation error:', deleteError)
+            }
+            return {
+              error: {
+                message: `Failed to create company: ${clientCompanyCreateError.message}. Please try again.`,
+              },
+            }
+          }
+          clientCompanyId = newClientCompany.id
+          console.log('Created new client company:', newClientCompany.short_name, '- User will be company admin and team admin')
+        }
+      }
+
+      // Upsert profile with company_id and client_type (overwrites trigger-created profile if any)
+      const { error: profileCreateError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: data.user.id,
+          email: validation.data.email,
+          name: clientUserName,
+          role: defaultRole,
+          phone: validation.data.phone || null,
+          company_id: clientCompanyId,
+          client_type: 'corporate',
+        }, {
+          onConflict: 'id',
+        })
+
+      if (profileCreateError) {
+        console.error('Profile create/update error:', profileCreateError)
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+        } catch (deleteError) {
+          console.error('Failed to cleanup after profile error:', deleteError)
+        }
+        return {
+          error: {
+            message: `Account creation failed: ${profileCreateError.message}. Please try again.`,
+          },
+        }
+      }
+
+      if (isNewCompany) {
+        const teamName = `${clientUserName}'s Team`
+        const { data: newTeam, error: teamCreateError } = await supabaseAdmin
+          .from('client_teams')
+          .insert({
+            company_id: clientCompanyId,
+            name: teamName,
+            description: `Default team for ${clientCompanyName}`,
+            created_by: data.user.id,
+            status: true,
+            is_default: true,
+          })
+          .select()
+          .single()
+
+        if (!teamCreateError && newTeam) {
+          teamId = newTeam.id
+          console.log('Created default team:', newTeam.name, 'for company')
+        }
+      }
+
+      if (teamId) {
+        const { error: memberError } = await supabaseAdmin
+          .from('client_team_members')
+          .insert({
+            team_id: teamId,
+            member_id: data.user.id,
+            role: teamRole,
+            invited_by: isNewCompany ? data.user.id : null,
+          })
+
+        if (memberError) {
+          console.error('Team member add error:', memberError)
+        } else {
+          console.log(`Added user to team as ${teamRole}`)
+        }
+
+        await supabaseAdmin
+          .from('profiles')
+          .update({ default_team_id: teamId })
+          .eq('id', data.user.id)
+      }
+
+      console.log('Corporate warehouse client profile created/updated, company_id:', clientCompanyId)
+      return { error: undefined }
+    }
+
     // Verify profile was created by trigger, if not create it manually
     const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
@@ -348,234 +569,8 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
           }
           console.log('Individual warehouse client profile created:', insertedProfile?.id)
           return { error: undefined }
-        } else {
-          // Corporate client - needs company and name
-          const clientCompanyName = validation.data.companyName
-          const clientUserName = validation.data.name
-          
-          if (!clientCompanyName || !clientCompanyName.trim()) {
-            try {
-              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-            } catch (deleteError) {
-              console.error('Failed to delete user:', deleteError)
-            }
-            return {
-              error: {
-                message: 'Company name is required for corporate accounts.',
-              },
-            }
-          }
-
-          if (!clientUserName || !clientUserName.trim()) {
-            try {
-              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-            } catch (deleteError) {
-              console.error('Failed to delete user:', deleteError)
-            }
-            return {
-              error: {
-                message: 'Full name is required for corporate accounts.',
-              },
-            }
-          }
-
-          const trimmedClientCompanyName = clientCompanyName.trim()
-          const trimmedClientUserName = clientUserName.trim()
-          
-          // Check if client company exists (exact match, case-insensitive)
-          const { data: existingClientCompanies } = await supabaseAdmin
-            .from('companies')
-            .select('id, short_name')
-            .eq('type', 'client_company')
-            .limit(100)
-          
-          const existingClientCompany = existingClientCompanies?.find(
-            (c) => c.short_name?.toLowerCase() === trimmedClientCompanyName.toLowerCase()
-          ) || null
-          
-          let clientCompanyId: string
-          let isNewCompany = false
-          let teamId: string | null = null
-          let teamRole: 'admin' | 'member' = 'member'
-
-          if (existingClientCompany) {
-            // Exact match found - join existing company as MEMBER
-            clientCompanyId = existingClientCompany.id
-            teamRole = 'member'
-            console.log('Joining existing client company as member:', existingClientCompany.short_name)
-            
-            // Find the DEFAULT team for this company (is_default = true)
-            const { data: defaultTeam } = await supabaseAdmin
-              .from('client_teams')
-              .select('id, name')
-              .eq('company_id', clientCompanyId)
-              .eq('is_default', true)
-              .eq('status', true)
-              .single()
-            
-            if (defaultTeam) {
-              teamId = defaultTeam.id
-              console.log('Found default team:', defaultTeam.name)
-            } else {
-              // Fallback: find any team for this company
-              const { data: anyTeam } = await supabaseAdmin
-                .from('client_teams')
-                .select('id, name')
-                .eq('company_id', clientCompanyId)
-                .eq('status', true)
-                .order('created_at', { ascending: true })
-                .limit(1)
-                .single()
-              
-              if (anyTeam) {
-                teamId = anyTeam.id
-                console.log('Found fallback team:', anyTeam.name)
-              }
-            }
-          } else {
-            // No exact match - create new client company, user becomes ADMIN
-            isNewCompany = true
-            teamRole = 'admin'
-            
-            const { data: newClientCompany, error: clientCompanyCreateError } = await supabaseAdmin
-              .from('companies')
-              .insert({
-                short_name: trimmedClientCompanyName,
-                trading_name: trimmedClientCompanyName,
-                type: 'client_company',
-              })
-              .select()
-              .single()
-
-            if (clientCompanyCreateError) {
-              console.error('Client company creation error:', clientCompanyCreateError)
-              try {
-                await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-              } catch (deleteError) {
-                console.error('Failed to delete user after company creation error:', deleteError)
-              }
-              return {
-                error: {
-                  message: `Failed to create company: ${clientCompanyCreateError.message}. Please try again.`,
-                },
-              }
-            }
-            clientCompanyId = newClientCompany.id
-            console.log('Created new client company:', newClientCompany.short_name, '- User will be admin')
-          }
-
-          // Create profile with company_id and name
-          const { data: insertedProfile, error: profileCreateError } = await supabaseAdmin
-            .from('profiles')
-            .upsert({
-              id: data.user.id,
-              email: validation.data.email,
-              name: trimmedClientUserName, // Now storing the name for corporate clients
-              role: defaultRole,
-              phone: validation.data.phone || null,
-              company_id: clientCompanyId,
-              client_type: 'corporate',
-            }, {
-              onConflict: 'id'
-            })
-            .select()
-            .single()
-
-          if (profileCreateError) {
-            console.error('Profile creation error:', profileCreateError)
-            try {
-              await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-            } catch (deleteError) {
-              console.error('Failed to cleanup after profile creation error:', deleteError)
-            }
-            return {
-              error: {
-                message: `Account creation failed: ${profileCreateError.message}. Please try again.`,
-              },
-            }
-          }
-
-          // Create or join team
-          if (isNewCompany) {
-            // Create a default team for the company named "{Full Name}'s Team"
-            const teamName = `${trimmedClientUserName}'s Team`
-            const { data: newTeam, error: teamCreateError } = await supabaseAdmin
-              .from('client_teams')
-              .insert({
-                company_id: clientCompanyId,
-                name: teamName,
-                description: `Default team for ${trimmedClientCompanyName}`,
-                created_by: data.user.id,
-                status: true,
-                is_default: true, // This is the default team - cannot be deleted
-              })
-              .select()
-              .single()
-
-            if (teamCreateError) {
-              console.error('Team creation error:', teamCreateError)
-              // Don't fail registration, just log the error
-            } else {
-              teamId = newTeam.id
-              console.log('Created default team:', newTeam.name, 'for company')
-            }
-          } else if (!teamId) {
-            // Company exists but no team found - this shouldn't happen normally
-            // Create a general team for the user
-            const teamName = `${trimmedClientUserName}'s Team`
-            const { data: newTeam, error: teamCreateError } = await supabaseAdmin
-              .from('client_teams')
-              .insert({
-                company_id: clientCompanyId,
-                name: teamName,
-                description: `Team for ${trimmedClientUserName}`,
-                created_by: data.user.id,
-                status: true,
-                is_default: false, // Not the default team since company already exists
-              })
-              .select()
-              .single()
-
-            if (teamCreateError) {
-              console.error('Team creation error:', teamCreateError)
-            } else {
-              teamId = newTeam.id
-              console.log('Created new team for existing company:', newTeam.name)
-            }
-          }
-
-          // Add user to team with appropriate role
-          if (teamId) {
-            const { error: memberError } = await supabaseAdmin
-              .from('client_team_members')
-              .insert({
-                team_id: teamId,
-                member_id: data.user.id,
-                role: teamRole,
-                invited_by: isNewCompany ? data.user.id : null, // Self-invited if created company
-              })
-
-            if (memberError) {
-              console.error('Team member add error:', memberError)
-              // Don't fail registration, just log the error
-            } else {
-              console.log(`Added user to team as ${teamRole}`)
-            }
-
-            // Update profile with default_team_id
-            const { error: updateError } = await supabaseAdmin
-              .from('profiles')
-              .update({ default_team_id: teamId })
-              .eq('id', data.user.id)
-
-            if (updateError) {
-              console.error('Failed to set default team:', updateError)
-              // Don't fail registration
-            }
-          }
-          console.log('Corporate warehouse client profile created:', insertedProfile?.id)
-          return { error: undefined }
         }
+        // Corporate client is handled above (before profile check); no else needed
       }
 
       // For warehouse owners, continue with company creation logic

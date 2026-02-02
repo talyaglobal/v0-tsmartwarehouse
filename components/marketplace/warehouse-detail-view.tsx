@@ -22,7 +22,8 @@ import {
   Video,
   DollarSign,
   Info,
-  Lock
+  Lock,
+  Users
 } from "lucide-react"
 import { PhotoGallery } from "./photo-gallery"
 import { RatingStars } from "./rating-stars"
@@ -30,6 +31,8 @@ import { BookingSummary } from "./booking-summary"
 import { BookingTimeSlotModal } from "./booking-time-slot-modal"
 import { createBookingRequest } from "@/features/bookings/actions"
 import { useUser } from "@/lib/hooks/use-user"
+import { getBookingOnBehalfContext, clearBookingOnBehalfContext } from "@/lib/booking-context"
+import { api } from "@/lib/api/client"
 import type { PalletBookingDetails, WarehouseSearchResult, Review, ReviewSummary } from "@/types/marketplace"
 import { formatNumber } from "@/lib/utils/format"
 
@@ -215,6 +218,7 @@ export function WarehouseDetailView({
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showBookingModal, setShowBookingModal] = useState(false)
+  const [onBehalfContext, setOnBehalfContext] = useState<ReturnType<typeof getBookingOnBehalfContext>>(null)
   const [showVideoModal, setShowVideoModal] = useState(false)
   const [externalRating, setExternalRating] = useState<number | null>(
     warehouse.external_rating ?? null
@@ -223,6 +227,10 @@ export function WarehouseDetailView({
     warehouse.external_reviews_count || 0
   )
   const hasVideos = (warehouse.videos && warehouse.videos.length > 0) || warehouse.video_url
+
+  useEffect(() => {
+    setOnBehalfContext(getBookingOnBehalfContext())
+  }, [])
 
   // Fetch favorite status on mount
   useEffect(() => {
@@ -572,6 +580,34 @@ export function WarehouseDetailView({
       const palletQuantity = palletDetails
         ? palletDetails.pallets.reduce((sum, pallet) => sum + (pallet.quantity || 0), 0)
         : quantity
+      const notes = `Requested drop-off date: ${selectedDate} at ${selectedTime}`
+
+      const onBehalfContext = getBookingOnBehalfContext()
+      if (onBehalfContext) {
+        const result = await api.post<{ booking: { id: string }; approval?: unknown; bookedOnBehalf: boolean }>(
+          "/api/v1/bookings/on-behalf",
+          {
+            customerId: onBehalfContext.customerId,
+            warehouseId: warehouse.id,
+            type,
+            palletCount: type === "pallet" ? palletQuantity : undefined,
+            areaSqFt: type === "area-rental" ? quantity : undefined,
+            startDate,
+            endDate,
+            notes,
+            requiresApproval: onBehalfContext.requiresApproval,
+            requestMessage: onBehalfContext.requestMessage,
+          },
+          { showToast: true }
+        )
+        clearBookingOnBehalfContext()
+        if (result.success && result.data?.booking?.id) {
+          router.push(`/dashboard/bookings/${result.data.booking.id}`)
+          return
+        }
+        alert(result.error || "Failed to create booking on behalf")
+        return
+      }
 
       const result = await createBookingRequest({
         warehouseId: warehouse.id,
@@ -580,7 +616,7 @@ export function WarehouseDetailView({
         areaSqFt: type === "area-rental" ? quantity : undefined,
         startDate,
         endDate,
-        notes: `Requested drop-off date: ${selectedDate} at ${selectedTime}`,
+        notes,
         metadata: {
           requestedDropInTime: `${selectedDate}T${selectedTime}:00`,
           requestedDropInDate: selectedDate,
@@ -621,6 +657,14 @@ export function WarehouseDetailView({
           Back to Search
         </Button>
       </Link>
+
+      {onBehalfContext && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-sm">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">Booking on behalf of</span>
+          <span className="font-medium">{onBehalfContext.customerName || onBehalfContext.customerEmail || "Team member"}</span>
+        </div>
+      )}
 
       {/* Mobile Booking Summary - Shows at top on mobile */}
       <div className="lg:hidden">

@@ -1,29 +1,54 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
- * Check if user is a warehouse admin or warehouse owner (using profiles.role)
- * Supports both old and new role names for backward compatibility
+ * Check if user is a company admin:
+ * - Warehouse side: warehouse_owner, warehouse_admin, warehouse_supervisor (profiles.role)
+ * - Corporate client side: warehouse_client with client_team_members.role = 'admin' for a team of this company
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
   const supabase = createServerSupabaseClient()
-  
+
+  // 1) Warehouse admin/owner/supervisor for this company
   let query = supabase
     .from('profiles')
     .select('role, company_id')
     .eq('id', userId)
     .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
-  
+
   if (companyId) {
     query = query.eq('company_id', companyId)
   }
-  
-  const { data, error } = await query.maybeSingle()
-  
-  if (error || !data) {
-    return false
+
+  const { data: profile, error: profileError } = await query.maybeSingle()
+
+  if (!profileError && profile) {
+    return true
   }
-  
-  return true
+
+  // 2) Corporate client: team admin for this company (client_team_members.role = 'admin' on a team with company_id)
+  if (companyId) {
+    const { data: companyTeams, error: teamsError } = await supabase
+      .from('client_teams')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('status', true)
+
+    if (!teamsError && companyTeams && companyTeams.length > 0) {
+      const teamIds = companyTeams.map((t) => t.id)
+      const { data: adminMembership, error: memberError } = await supabase
+        .from('client_team_members')
+        .select('team_id')
+        .eq('member_id', userId)
+        .eq('role', 'admin')
+        .in('team_id', teamIds)
+        .limit(1)
+        .maybeSingle()
+
+      if (!memberError && adminMembership) return true
+    }
+  }
+
+  return false
 }
 
 /**
@@ -71,23 +96,43 @@ export async function getUserCompanyRole(userId: string, companyId: string): Pro
 }
 
 /**
- * Get all company IDs where user is admin or owner (using profiles.role)
- * Supports both old and new role names for backward compatibility
+ * Get all company IDs where user is admin or owner:
+ * - Warehouse side: profiles.role in warehouse_owner/admin/supervisor
+ * - Corporate client side: client_team_members.role = 'admin' for a team of that company
  */
 export async function getUserAdminCompanies(userId: string): Promise<string[]> {
   const supabase = createServerSupabaseClient()
-  
+  const companyIds = new Set<string>()
+
+  // 1) Warehouse admin companies
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select('company_id')
     .eq('id', userId)
     .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
     .not('company_id', 'is', null)
-  
-  if (error || !profiles) {
-    return []
+
+  if (!error && profiles) {
+    profiles.forEach((p) => p.company_id && companyIds.add(p.company_id))
   }
-  
-  return profiles.map(p => p.company_id).filter((id): id is string => id !== null)
+
+  // 2) Corporate client: companies where user is team admin
+  const { data: adminMemberships } = await supabase
+    .from('client_team_members')
+    .select('team_id')
+    .eq('member_id', userId)
+    .eq('role', 'admin')
+
+  if (adminMemberships && adminMemberships.length > 0) {
+    const teamIds = adminMemberships.map((m) => m.team_id)
+    const { data: teams } = await supabase
+      .from('client_teams')
+      .select('company_id')
+      .in('id', teamIds)
+      .eq('status', true)
+    if (teams) teams.forEach((t) => t.company_id && companyIds.add(t.company_id))
+  }
+
+  return Array.from(companyIds)
 }
 

@@ -505,11 +505,15 @@ export function DashboardSidebar() {
                                           profile?.clientType === 'corporate' && 
                                           !!profile?.companyId
           
-          // Show for warehouse admins/supervisors OR for ALL corporate clients
+          // Warehouse client with company_id should always see My Company (corporate or not)
+          const warehouseClientHasCompany = userRole === 'warehouse_client' && !!profile?.companyId
+          
+          // Show for warehouse admins/supervisors OR corporate clients OR any warehouse_client with company
           const showMyCompany = isCompanyAdmin || 
                                 ['warehouse_admin', 'warehouse_supervisor'].includes(userRole) || 
                                 isCorporateClient || 
-                                isCorporateFromProfile
+                                isCorporateFromProfile ||
+                                warehouseClientHasCompany
 
           if (!showMyCompany) return null
 

@@ -3,7 +3,7 @@ import { checkPalletCapacity, checkAreaRentalCapacity, reserveCapacity } from ".
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
 import { getBookings, getBookingById, createBooking, updateBooking } from "@/lib/db/bookings"
 import { getNotificationService } from "@/lib/notifications/service"
-import { canBookOnBehalf } from "@/lib/db/teams"
+import { canBookOnBehalf, isTeamAdminForBooking } from "@/lib/db/teams"
 import { createApprovalRequest, approveBooking as dbApproveBooking, rejectBooking as dbRejectBooking, getPendingApprovalsForUser } from "@/lib/db/booking-approvals"
 import type { Booking, BookingType, MembershipTier, BookingApproval } from "@/types"
 
@@ -460,33 +460,37 @@ export interface CreateOnBehalfBookingResult extends CreateBookingResult {
 export async function createBookingOnBehalf(
   input: CreateOnBehalfBookingInput
 ): Promise<CreateOnBehalfBookingResult> {
-  // Step 1: Validate that booker can book on behalf of customer
+  // Step 1: Validate that booker can book on behalf of customer (same team)
   const canBook = await canBookOnBehalf(input.bookedById, input.customerId)
   if (!canBook) {
     throw new Error(
       "You do not have permission to book on behalf of this user. " +
-      "Only team admins can book on behalf of team members."
+      "You can only book on behalf of members in your team."
     )
   }
 
-  // Step 2: Create the booking using standard flow
+  // Step 2: Members must require approval; only team admins can create pre-approved bookings
+  const isAdmin = await isTeamAdminForBooking(input.bookedById, input.customerId)
+  const requiresApproval = isAdmin ? input.requiresApproval : true
+
+  // Step 3: Create the booking using standard flow
   const result = await createBookingWithAvailability(input)
 
-  // Step 3: Update booking with on-behalf information
+  // Step 4: Update booking with on-behalf information
   const supabase = createServerSupabaseClient()
   await supabase
     .from("bookings")
     .update({
       booked_by_id: input.bookedById,
       booked_on_behalf: true,
-      requires_approval: input.requiresApproval,
-      approval_status: input.requiresApproval ? "pending" : null,
+      requires_approval: requiresApproval,
+      approval_status: requiresApproval ? "pending" : null,
     })
     .eq("id", result.booking.id)
 
-  // Step 4: If approval is required, create approval request
+  // Step 5: If approval is required, create approval request
   let approval: BookingApproval | undefined
-  if (input.requiresApproval) {
+  if (requiresApproval) {
     approval = await createApprovalRequest(
       result.booking.id,
       input.bookedById,
@@ -544,7 +548,7 @@ export async function createBookingOnBehalf(
     ...result,
     approval,
     bookedOnBehalf: true,
-    message: input.requiresApproval
+    message: requiresApproval
       ? "Booking created. Waiting for customer approval."
       : "Booking created successfully on behalf of team member.",
   }

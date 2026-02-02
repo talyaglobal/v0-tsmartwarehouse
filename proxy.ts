@@ -10,7 +10,7 @@ export async function proxy(request: NextRequest) {
   
   if (betaProtectionEnabled) {
     // Public paths that don't require beta password
-    const betaPublicPaths = ["/beta-login", "/api/beta-auth", "/api/v1/public", "/_next", "/favicon.ico"]
+    const betaPublicPaths = ["/beta-login", "/api/beta-auth", "/api/v1/public", "/api/v1/companies/search", "/_next", "/favicon.ico"]
     const isBetaPublicPath = betaPublicPaths.some(path => pathname.startsWith(path))
     
     // Also allow static assets

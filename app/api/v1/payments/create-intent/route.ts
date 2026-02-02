@@ -80,18 +80,16 @@ export async function POST(request: NextRequest) {
       if (user) {
         userId = user.id
 
-        // Get user's full name from profile
+        // Get user's name from profile
         const supabase = await createServerSupabaseClient()
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, first_name, last_name')
+          .select('name')
           .eq('id', user.id)
           .single()
 
-        if (profile?.full_name) {
-          customerName = profile.full_name
-        } else if (profile?.first_name || profile?.last_name) {
-          customerName = [profile.first_name, profile.last_name].filter(Boolean).join(' ')
+        if (profile?.name) {
+          customerName = profile.name
         } else {
           // Fallback to email username
           customerName = user.email?.split('@')[0] || 'Customer'

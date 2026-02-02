@@ -369,25 +369,37 @@ export async function getUserTeams(userId: string): Promise<ClientTeam[]> {
 
 /**
  * Get team members that user can book on behalf of
- * Only returns members if user is a team admin
+ * Uses: 1) teams where user is in client_team_members, or 2) if none, teams for user's company_id (so company admins see members).
  */
 export async function getTeamMembersForBooking(userId: string): Promise<Array<TeamMember & { teamId: string; teamName: string }>> {
   const supabase = await createServerSupabaseClient()
 
-  // First, get all teams where user is an admin
-  const { data: adminTeams, error: adminError } = await supabase
+  let teamIds: string[] = []
+
+  const { data: userTeams, error: teamError } = await supabase
     .from('client_team_members')
     .select('team_id')
     .eq('member_id', userId)
-    .eq('role', 'admin')
 
-  if (adminError || !adminTeams || adminTeams.length === 0) {
+  if (!teamError && userTeams && userTeams.length > 0) {
+    teamIds = userTeams.map((t: any) => t.team_id)
+  } else {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single()
+    const companyId = profile?.company_id
+    if (companyId) {
+      const companyTeams = await getTeamsByCompany(companyId)
+      teamIds = companyTeams.map((t) => t.id)
+    }
+  }
+
+  if (teamIds.length === 0) {
     return []
   }
 
-  const teamIds = adminTeams.map((t: any) => t.team_id)
-
-  // Get all members from those teams (excluding the admin themselves)
   const { data, error } = await supabase
     .from('client_team_members')
     .select(`
@@ -413,12 +425,11 @@ export async function getTeamMembersForBooking(userId: string): Promise<Array<Te
 }
 
 /**
- * Check if user can book on behalf of another user
+ * Check if user can book on behalf of another user (same team)
  */
 export async function canBookOnBehalf(bookerId: string, customerId: string): Promise<boolean> {
   const supabase = await createServerSupabaseClient()
 
-  // Use the database function
   const { data, error } = await supabase.rpc('can_book_on_behalf', {
     p_booker_id: bookerId,
     p_customer_id: customerId,
@@ -430,6 +441,33 @@ export async function canBookOnBehalf(bookerId: string, customerId: string): Pro
   }
 
   return data === true
+}
+
+/**
+ * Check if booker is a team admin for a team that contains the customer.
+ * Only team admins can create pre-approved (no approval required) on-behalf bookings.
+ */
+export async function isTeamAdminForBooking(bookerId: string, customerId: string): Promise<boolean> {
+  const supabase = await createServerSupabaseClient()
+
+  const { data: adminTeams } = await supabase
+    .from('client_team_members')
+    .select('team_id')
+    .eq('member_id', bookerId)
+    .eq('role', 'admin')
+
+  if (!adminTeams?.length) return false
+
+  const teamIds = adminTeams.map((t: any) => t.team_id)
+  const { data: customerInTeam } = await supabase
+    .from('client_team_members')
+    .select('team_id')
+    .eq('member_id', customerId)
+    .in('team_id', teamIds)
+    .limit(1)
+    .maybeSingle()
+
+  return !!customerInTeam
 }
 
 // =====================================================

@@ -7,10 +7,48 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Save, Upload, X } from "@/components/icons"
+import { MapPin } from "lucide-react"
+import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
+import { MapLocationPicker } from "@/components/ui/map-location-picker"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { useUIStore } from "@/stores/ui.store"
+
+/** Normalize a single address component from classic (long_name) or new API (longText) format */
+function getLongName(component: any): string {
+  if (component.long_name) return component.long_name
+  if (component.longText?.text) return component.longText.text
+  return ""
+}
+
+/** Parse Google address_components into address, postal_code, city, country. Supports both classic (long_name/short_name) and new API (longText/shortText) formats. */
+function parseAddressComponents(components: { long_name?: string; short_name?: string; longText?: { text: string }; shortText?: { text: string }; types?: string[] }[] | undefined, formattedAddress?: string): { address: string; postalCode: string; city: string; country: string } {
+  let streetNumber = ""
+  let route = ""
+  let city = ""
+  let postalCode = ""
+  let country = ""
+
+  if (components && Array.isArray(components)) {
+    components.forEach((component: any) => {
+      const types = component.types || []
+      const longName = getLongName(component)
+      if (types.includes("street_number")) streetNumber = longName
+      else if (types.includes("route")) route = longName
+      else if (types.includes("locality")) city = longName
+      else if (types.includes("postal_town") && !city) city = longName
+      else if (types.includes("sublocality_level_1") && !city) city = longName
+      else if (types.includes("administrative_area_level_3") && !city) city = longName
+      else if (types.includes("postal_code")) postalCode = longName
+      else if (types.includes("country")) country = longName
+    })
+  }
+
+  const address = streetNumber && route ? `${streetNumber} ${route}` : (formattedAddress?.split(",")[0]?.trim() || "")
+
+  return { address, postalCode, city, country }
+}
 
 interface Company {
   id: string
@@ -31,6 +69,7 @@ export function CompanyInformationTab() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(false)
   const [formData, setFormData] = useState({
     tradingName: "",
     shortName: "",
@@ -260,16 +299,52 @@ export function CompanyInformationTab() {
                 This name will be displayed throughout the platform
               </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="vat">VAT Number</Label>
-                <Input
-                  id="vat"
-                  value={formData.vat}
-                  onChange={(e) => setFormData({ ...formData, vat: e.target.value })}
-                  placeholder="VAT/Tax ID"
-                />
+            <div className="space-y-2">
+              <Label htmlFor="vat">VAT Number</Label>
+              <Input
+                id="vat"
+                value={formData.vat}
+                onChange={(e) => setFormData({ ...formData, vat: e.target.value })}
+                placeholder="VAT/Tax ID"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="address">Address</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMapPicker(true)}
+                  className="flex items-center gap-1"
+                >
+                  <MapPin className="h-4 w-4" /> Pick on Map
+                </Button>
               </div>
+              <PlacesAutocomplete
+                value={formData.address}
+                onChange={(val, place) => {
+                  if (place) {
+                    const components = place.address_components || place.addressComponents
+                    const parsed = parseAddressComponents(components, place.formatted_address || val)
+                    setFormData({
+                      ...formData,
+                      address: parsed.address || val,
+                      postalCode: parsed.postalCode,
+                      city: parsed.city,
+                      country: parsed.country,
+                    })
+                  } else {
+                    setFormData({ ...formData, address: val })
+                  }
+                }}
+                placeholder="Enter address or search with Google Maps"
+              />
+              <p className="text-xs text-muted-foreground">
+                Start typing to get suggestions; postal code, city and country will auto-fill when you select an address
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="postal-code">Postal Code</Label>
                 <Input
@@ -279,17 +354,6 @@ export function CompanyInformationTab() {
                   placeholder="Postal Code"
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Street address"
-              />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -309,6 +373,20 @@ export function CompanyInformationTab() {
                 />
               </div>
             </div>
+            <MapLocationPicker
+              open={showMapPicker}
+              onOpenChange={setShowMapPicker}
+              onLocationSelect={(location) => {
+                const parsed = parseAddressComponents(location.addressComponents, location.address)
+                setFormData({
+                  ...formData,
+                  address: parsed.address || location.address || formData.address,
+                  postalCode: parsed.postalCode || formData.postalCode,
+                  city: parsed.city || formData.city,
+                  country: parsed.country || formData.country,
+                })
+              }}
+            />
             <div className="space-y-2">
               <Label htmlFor="logo">Company Logo</Label>
               <div className="flex items-center gap-4">

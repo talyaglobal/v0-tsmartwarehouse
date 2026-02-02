@@ -69,8 +69,22 @@ export async function createTeamWithValidation(
     throw new Error('You can only create teams for your own company')
   }
 
-  // Check for duplicate team name
   const existingTeams = await getTeamsByCompany(input.companyId)
+
+  // Only team admins can create new teams (or first team for company)
+  if (existingTeams.length > 0) {
+    let userIsAdmin = false
+    for (const t of existingTeams) {
+      if (await isTeamAdmin(t.id, input.createdBy)) {
+        userIsAdmin = true
+        break
+      }
+    }
+    if (!userIsAdmin) {
+      throw new Error('Only team admins can create new teams')
+    }
+  }
+
   if (existingTeams.some(t => t.name.toLowerCase() === input.name.toLowerCase())) {
     throw new Error('A team with this name already exists in your company')
   }
