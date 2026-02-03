@@ -28,6 +28,15 @@ export default function LegalLayout({
           <div className="container mx-auto px-4">
             <div className="flex flex-col items-center gap-4 text-sm text-muted-foreground">
               <div className="flex gap-6">
+                <Link href="/how-to-use" className="hover:text-foreground">
+                  How to Use
+                </Link>
+                <Link href="/terms" className="hover:text-foreground">
+                  Terms of Service
+                </Link>
+                <Link href="/privacy" className="hover:text-foreground">
+                  Privacy Policy
+                </Link>
                 <Link href="/admin" className="hover:text-foreground">
                   Admin
                 </Link>

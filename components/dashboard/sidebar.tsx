@@ -20,6 +20,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  FileText,
 } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -556,6 +557,35 @@ export function DashboardSidebar() {
             </div>
           )
         })()}
+
+        {/* How to Use - visible to all */}
+        <div className={cn("border-t", isCollapsed ? "p-2" : "p-4")}>
+          {isCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/how-to-use"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <FileText className="h-4 w-4 flex-shrink-0" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">How to Use</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link
+              href="/how-to-use"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span>How to Use</span>
+            </Link>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   )

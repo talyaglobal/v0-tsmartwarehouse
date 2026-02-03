@@ -8,6 +8,13 @@
 
 ## 📋 Session / Recent Fixes
 
+### 2026-02-02: How to Use page (English, all user types)
+- **Page**: `/how-to-use` – public page under `(legal)` layout with header “Back to Home” and footer links.
+- **Content (English)**: Overview of Warebnb; Getting Started (register, login, dashboard); **By User Type**: System Admin (root), Warehouse Owner (warehouse_admin), Warehouse Manager (warehouse_supervisor), Customer (warehouse_client – individual & corporate), Warehouse Staff, Warehouse Finder, Reseller/Broker, End Delivery Party, Local Transport, International Transport; Common Flows (booking, team management, warehouse operations); links to Terms, Privacy, Home.
+- **Landing page footer**: “How to Use” link added under Company section (with How It Works, Features, Contact).
+- **Dashboard sidebar**: “How to Use” link at bottom for all logged-in users; opens in new tab; tooltip when sidebar collapsed.
+- **Legal layout footer**: How to Use, Terms, Privacy, Admin links added for consistency on legal/how-to-use pages.
+
 ### 2026-02-02: My Organization – team rename & delete (admin only, admin-in-team guard)
 - **Teams section** (My Organization → Team Members): Admin can use the dropdown on each team badge for **Rename** and **Delete team**.
 - **Rename**: Opens "Takımı düzenle" dialog (name + description); submits via `PATCH /api/v1/client-teams/[companyId]/[teamId]`.

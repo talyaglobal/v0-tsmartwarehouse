@@ -617,6 +617,11 @@ export default function HomePage() {
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2">
                 <li>
+                  <Link href="/how-to-use" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    How to Use
+                  </Link>
+                </li>
+                <li>
                   <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     How It Works
                   </a>
