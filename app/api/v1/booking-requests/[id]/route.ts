@@ -66,6 +66,35 @@ export async function PATCH(
     if (body.notes != null) updates.notes = body.notes?.trim() || null
     if (body.requiresApproval != null) updates.requires_approval = body.requiresApproval !== false
 
+    if (body.customerId != null && body.customerId !== row.customer_id) {
+      const newCustomerId = String(body.customerId).trim()
+      if (!newCustomerId) {
+        return NextResponse.json(
+          { success: false, error: "Invalid customer", statusCode: 400 },
+          { status: 400 }
+        )
+      }
+      const { data: currentCustomerProfile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("id", row.customer_id)
+        .single()
+      const { data: newCustomerProfile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("id", newCustomerId)
+        .single()
+      const currentCompanyId = currentCustomerProfile?.company_id
+      const newCompanyId = newCustomerProfile?.company_id
+      if (!currentCompanyId || !newCompanyId || currentCompanyId !== newCompanyId) {
+        return NextResponse.json(
+          { success: false, error: "Customer must be from the same company", statusCode: 400 },
+          { status: 400 }
+        )
+      }
+      updates.customer_id = newCustomerId
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ success: true, data: row })
     }

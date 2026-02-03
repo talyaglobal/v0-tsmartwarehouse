@@ -1,10 +1,19 @@
-Place the 9 How to Use screenshots here with these exact filenames:
-01-homepage.png       - Homepage hero and search
-02-search-results.png - Find warehouses search results and filters
-03-warehouse-detail.png - Warehouse detail page and booking summary
-04-my-organization.png - My Organization teams and team members
-05-booking-for-modal.png - "Who is this booking for?" modal
-06-booking-request-details.png - Booking request details form
-07-booking-requests.png - Booking Requests list
-08-booking-details.png - Booking Details page
-09-complete-booking.png - Complete Your Booking step 2 (date & time)
+HOW TO USE EKRAN GÖRÜNTÜLERİ
+=============================
+Görsellerin sitede görünmesi için bu klasöre (public/how-to-use/) aşağıdaki
+isimlerle 9 adet PNG ekran görüntüsü kopyalamanız gerekir. İsimler tam olarak
+aynı olmalıdır.
+
+Neden görünmüyor? Next.js sadece "public" klasörü altındaki dosyaları sunar.
+Dosyalar bu klasörde yoksa sayfa placeholder gösterir.
+
+Dosya isimleri (aynen yazın):
+01-homepage.png       - Anasayfa, arama çubuğu
+02-search-results.png - Depo arama sonuçları ve filtreler
+03-warehouse-detail.png - Depo detay ve rezervasyon özeti
+04-my-organization.png - My Organization takımlar ve üyeler
+05-booking-for-modal.png - "Bu rezervasyon kimin için?" modal
+06-booking-request-details.png - Rezervasyon talep detay formu
+07-booking-requests.png - Rezervasyon talepleri listesi
+08-booking-details.png - Rezervasyon detay sayfası
+09-complete-booking.png - Rezervasyonu tamamla (tarih/saat adımı)

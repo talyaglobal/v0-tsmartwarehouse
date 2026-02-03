@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +18,10 @@ import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
 import { BookingRequestsList } from "@/features/bookings/components/booking-requests-list"
+import {
+  BookingEntryModal,
+  type BookingEntryResult,
+} from "@/features/bookings/components/booking-entry-modal"
 import { useRouter, useSearchParams } from "next/navigation"
 import { RootTestDataIndicator } from "@/components/ui/root-test-data-badge"
 import { getRootUserIds, isTestDataSync } from "@/lib/utils/test-data"
@@ -29,6 +33,8 @@ export default function BookingsPage() {
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null)
   const [selectedBookingForTimeSlot, setSelectedBookingForTimeSlot] = useState<Booking | null>(null)
   const [selectedBookingForAccept, setSelectedBookingForAccept] = useState<Booking | null>(null)
+  const [newBookingModalOpen, setNewBookingModalOpen] = useState(false)
+  const [submittingNewRequest, setSubmittingNewRequest] = useState(false)
   const { user, isLoading: userLoading } = useUser()
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -204,6 +210,43 @@ export default function BookingsPage() {
     statusMutation.mutate({ bookingId, newStatus: 'cancelled' })
   }
 
+  const handleNewBookingComplete = useCallback(
+    async (res: BookingEntryResult) => {
+      setNewBookingModalOpen(false)
+
+      if (res.bookingType === "request" && res.requestForm) {
+        setSubmittingNewRequest(true)
+        try {
+          const customerId = res.bookingFor === "another" ? res.requestCustomerId : undefined
+          const response = await api.post<{ request: { id: string } }>(
+            "/api/v1/booking-requests",
+            {
+              customerId,
+              averagePalletDays: res.requestForm.averagePalletDays,
+              requestedFloor: res.requestForm.requestedFloor || undefined,
+              ownerOfProduct: res.requestForm.ownerOfProduct || undefined,
+              skuCount: res.requestForm.skuCount,
+              isSingleType: res.requestForm.isSingleType,
+              notes: res.requestForm.specialMessage?.trim() || undefined,
+              requiresApproval: res.requestForm.requiresApproval,
+            },
+            { showToast: true }
+          )
+          if (response.success) {
+            setActiveTab("requests")
+            router.replace("/dashboard/bookings?tab=requests", { scroll: false })
+            queryClient.invalidateQueries({ queryKey: ["booking-requests"] })
+          }
+        } finally {
+          setSubmittingNewRequest(false)
+        }
+      } else if (res.bookingType === "instant") {
+        router.push("/dashboard/bookings/new?instant=1")
+      }
+    },
+    [queryClient, router]
+  )
+
   if (bookingsLoading || userLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -260,12 +303,14 @@ export default function BookingsPage() {
         description={isCustomer ? "View and manage your bookings" : "Manage bookings to your company warehouses"}
       >
         {isCustomer && (
-          <Link href="/dashboard/bookings/new">
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Booking
-            </Button>
-          </Link>
+          <Button
+            className="gap-2"
+            onClick={() => setNewBookingModalOpen(true)}
+            disabled={submittingNewRequest}
+          >
+            <Plus className="h-4 w-4" />
+            New Booking
+          </Button>
         )}
       </PageHeader>
 
@@ -534,6 +579,13 @@ export default function BookingsPage() {
           }}
         />
       )}
+
+      {/* New Booking Modal – opens on same page, no URL change */}
+      <BookingEntryModal
+        open={newBookingModalOpen}
+        onComplete={handleNewBookingComplete}
+        onClose={() => setNewBookingModalOpen(false)}
+      />
     </div>
   )
 }

@@ -19,7 +19,7 @@
   5. `created_by` ve `updated_by` üzerinde sorgu için index’ler eklendi.
 - **Not**: Zaten `created_by` veya `updated_by` olan tablolar (örn. client_teams, floor_plans) sütun eklemede atlanıyor; trigger’lar yine ekleniyor. Uygulamak için: `supabase link` ile proje bağlandıktan sonra `supabase db push` (veya remote’da migration’ları çalıştır).
 
-### 2026-02-02: How to Use page (English, all user types)
+### 2026-02-02: How to Use – How It Works removed, screenshots and explanations added
 - **Page**: `/how-to-use` – public page under `(legal)` layout with header “Back to Home” and footer links.
 - **Content (English)**: Overview of Warebnb; Getting Started (register, login, dashboard); **By User Type**: System Admin (root), Warehouse Owner (warehouse_admin), Warehouse Manager (warehouse_supervisor), Customer (warehouse_client – individual & corporate), Warehouse Staff, Warehouse Finder, Reseller/Broker, End Delivery Party, Local Transport, International Transport; Common Flows (booking, team management, warehouse operations); links to Terms, Privacy, Home.
 - **Landing page footer**: “How to Use” link added under Company section (with How It Works, Features, Contact).

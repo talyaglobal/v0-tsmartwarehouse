@@ -6,17 +6,14 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { BookingRequestDetailsForm } from "@/features/bookings/components/booking-request-details-form"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +57,7 @@ export function BookingRequestsList() {
   const { addNotification } = useUIStore()
   const [editId, setEditId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({
+    customerId: "" as string | null,
     averagePalletDays: 0,
     requestedFloor: "",
     ownerOfProduct: "",
@@ -80,6 +78,27 @@ export function BookingRequestsList() {
       return { requests: (res.data?.requests ?? []) as BookingRequestRow[] }
     },
   })
+
+  const { data: bookingMembersData, isLoading: isLoadingMembers } = useQuery({
+    queryKey: ["booking-members", editId ?? "", editForm.customerId ?? ""],
+    queryFn: async () => {
+      const forCustomerId = editForm.customerId
+        ? `?forCustomerId=${encodeURIComponent(editForm.customerId)}`
+        : ""
+      const res = await api.get<{ members?: { memberId: string; name?: string; email?: string; teamName?: string; companyName?: string | null }[]; isTeamAdmin?: boolean }>(
+        `/api/v1/teams/booking-members${forCustomerId}`,
+        { showToast: false }
+      )
+      if (!res.success) return { members: [], isTeamAdmin: false }
+      const data = res.data
+      const members = Array.isArray(data) ? [] : (data?.members ?? [])
+      const isTeamAdmin = !Array.isArray(data) && (data?.isTeamAdmin === true)
+      return { members, isTeamAdmin }
+    },
+    enabled: !!editId && !!editForm.customerId,
+  })
+  const members = bookingMembersData?.members ?? []
+  const isTeamAdmin = bookingMembersData?.isTeamAdmin ?? false
 
   const requests = data?.requests ?? []
 
@@ -118,6 +137,7 @@ export function BookingRequestsList() {
 
   const openEdit = (r: BookingRequestRow) => {
     setEditForm({
+      customerId: r.customer_id ?? null,
       averagePalletDays: r.average_pallet_days,
       requestedFloor: r.requested_floor ?? "",
       ownerOfProduct: r.owner_of_product ?? "",
@@ -132,18 +152,19 @@ export function BookingRequestsList() {
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editId) return
-    patchMutation.mutate({
-      id: editId,
-      body: {
-        averagePalletDays: editForm.averagePalletDays,
-        requestedFloor: editForm.requestedFloor || undefined,
-        ownerOfProduct: editForm.ownerOfProduct || undefined,
-        skuCount: editForm.skuCount,
-        isSingleType: editForm.isSingleType,
-        notes: editForm.notes.trim() || undefined,
-        requiresApproval: editForm.requiresApproval,
-      },
-    })
+    const body: Record<string, unknown> = {
+      averagePalletDays: editForm.averagePalletDays,
+      requestedFloor: editForm.requestedFloor || undefined,
+      ownerOfProduct: editForm.ownerOfProduct || undefined,
+      skuCount: editForm.skuCount,
+      isSingleType: editForm.isSingleType,
+      notes: editForm.notes.trim() || undefined,
+      requiresApproval: editForm.requiresApproval,
+    }
+    if (members.length > 0 && editForm.customerId != null && editForm.customerId !== "") {
+      body.customerId = editForm.customerId
+    }
+    patchMutation.mutate({ id: editId, body })
   }
 
   const handleDeleteConfirm = () => {
@@ -232,114 +253,29 @@ export function BookingRequestsList() {
       ))}
 
       <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit booking request</DialogTitle>
-            <DialogDescription>Update the request details.</DialogDescription>
+        <DialogContent className="flex min-w-0 max-h-[90vh] flex-col overflow-hidden sm:max-w-md">
+          <DialogHeader className="min-w-0 shrink-0">
+            <DialogTitle className="break-words pr-6">Edit booking request</DialogTitle>
+            <DialogDescription className="max-w-full break-words whitespace-normal text-wrap">
+              Fill in the details of your storage request. Single-type products may qualify for a discount (set by warehouse admin).
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-averagePalletDays">Average days per pallet</Label>
-              <Input
-                id="edit-averagePalletDays"
-                type="number"
-                min={1}
-                value={editForm.averagePalletDays}
-                onChange={(e) =>
-                  setEditForm((p) => ({ ...p, averagePalletDays: parseInt(e.target.value, 10) || 0 }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-requestedFloor">Requested floor</Label>
-              <Input
-                id="edit-requestedFloor"
-                value={editForm.requestedFloor}
-                onChange={(e) => setEditForm((p) => ({ ...p, requestedFloor: e.target.value }))}
-                placeholder="e.g. Ground, 1, 2"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-ownerOfProduct">Owner of product</Label>
-              <Input
-                id="edit-ownerOfProduct"
-                value={editForm.ownerOfProduct}
-                onChange={(e) => setEditForm((p) => ({ ...p, ownerOfProduct: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-skuCount">SKU count</Label>
-              <Input
-                id="edit-skuCount"
-                type="number"
-                min={1}
-                value={editForm.skuCount}
-                onChange={(e) =>
-                  setEditForm((p) => ({ ...p, skuCount: parseInt(e.target.value, 10) || 0 }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Special message (optional)</Label>
-              <Textarea
-                id="edit-notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
-                rows={3}
-                className="min-h-[80px] resize-y"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Single product type?</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={editForm.isSingleType ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setEditForm((p) => ({ ...p, isSingleType: true }))}
-                >
-                  Yes
-                </Button>
-                <Button
-                  type="button"
-                  variant={!editForm.isSingleType ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setEditForm((p) => ({ ...p, isSingleType: false }))}
-                >
-                  No
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Requires approval?</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={editForm.requiresApproval === false ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setEditForm((p) => ({ ...p, requiresApproval: false }))}
-                >
-                  Pre-approved
-                </Button>
-                <Button
-                  type="button"
-                  variant={editForm.requiresApproval !== false ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setEditForm((p) => ({ ...p, requiresApproval: true }))}
-                >
-                  Requires approval
-                </Button>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setEditId(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={patchMutation.isPending}>
-                {patchMutation.isPending ? "Saving…" : "Save"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <BookingRequestDetailsForm
+              form={editForm}
+              setForm={setEditForm}
+              members={members}
+              isLoadingMembers={isLoadingMembers}
+              isTeamAdmin={isTeamAdmin}
+              showClientSelect={!!editForm.customerId || members.length > 0}
+              onSubmit={handleEditSubmit}
+              submitLabel="Save"
+              onCancel={() => setEditId(null)}
+              cancelLabel="Cancel"
+              isSubmitting={patchMutation.isPending}
+              emptyListMessage="No other team members for this client's company. You can keep the current selection."
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -1,13 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
-import { getUserCompanyId } from "@/lib/auth/company-admin"
+import { getUserCompanyId, isCompanyAdmin } from "@/lib/auth/company-admin"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
 
 /**
  * GET /api/v1/teams/booking-members
  * Get team members that the current user can book on behalf of (same company's teams).
+ * Query param: forCustomerId – when editing a booking request, pass the request's customer_id
+ * to get members from that customer's company (all same-company members; no partner-only filter).
+ * When forCustomerId is absent (create flow), only "partner" members are returned (profile.company_id !== team company).
  * Uses admin client so RLS does not hide any members. Returns { members, isTeamAdmin }.
  */
 export async function GET(request: NextRequest) {
@@ -18,16 +21,47 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = authResult.user.id
-    const companyId = await getUserCompanyId(userId)
-
-    if (!companyId) {
-      return NextResponse.json({
-        success: true,
-        data: { members: [], isTeamAdmin: false },
-      })
-    }
+    const { searchParams } = new URL(request.url)
+    const forCustomerId = searchParams.get("forCustomerId")?.trim() || null
 
     const admin = createAdminClient()
+
+    let companyId: string | null
+    let excludeMemberId: string | null = userId
+
+    if (forCustomerId) {
+      const { data: customerProfile, error: profileError } = await admin
+        .from("profiles")
+        .select("company_id")
+        .eq("id", forCustomerId)
+        .single()
+
+      if (profileError || !customerProfile?.company_id) {
+        return NextResponse.json({
+          success: true,
+          data: { members: [], isTeamAdmin: false },
+        })
+      }
+
+      companyId = customerProfile.company_id
+      const allowed =
+        userId === forCustomerId || (await isCompanyAdmin(userId, companyId))
+      if (!allowed) {
+        return NextResponse.json({
+          success: true,
+          data: { members: [], isTeamAdmin: false },
+        })
+      }
+      excludeMemberId = null
+    } else {
+      companyId = await getUserCompanyId(userId)
+      if (!companyId) {
+        return NextResponse.json({
+          success: true,
+          data: { members: [], isTeamAdmin: false },
+        })
+      }
+    }
 
     const { data: teams, error: teamsError } = await admin
       .from("client_teams")
@@ -36,6 +70,32 @@ export async function GET(request: NextRequest) {
       .eq("status", true)
 
     if (teamsError || !teams?.length) {
+      if (forCustomerId) {
+        const { data: customerProfile } = await admin
+          .from("profiles")
+          .select("id, name, email")
+          .eq("id", forCustomerId)
+          .single()
+        if (customerProfile) {
+          return NextResponse.json({
+            success: true,
+            data: {
+              members: [
+                {
+                  memberId: customerProfile.id,
+                  name: customerProfile.name ?? null,
+                  email: customerProfile.email ?? null,
+                  avatar: null,
+                  teamId: "",
+                  teamName: "",
+                  companyName: null,
+                },
+              ],
+              isTeamAdmin: false,
+            },
+          })
+        }
+      }
       return NextResponse.json({
         success: true,
         data: { members: [], isTeamAdmin: false },
@@ -45,11 +105,14 @@ export async function GET(request: NextRequest) {
     const teamIds = teams.map((t) => t.id)
     const teamNameById = Object.fromEntries(teams.map((t) => [t.id, t.name || ""]))
 
-    const { data: membersRows, error: membersError } = await admin
+    let membersQuery = admin
       .from("client_team_members")
       .select("member_id, team_id, role")
       .in("team_id", teamIds)
-      .neq("member_id", userId)
+    if (excludeMemberId) {
+      membersQuery = membersQuery.neq("member_id", excludeMemberId)
+    }
+    const { data: membersRows, error: membersError } = await membersQuery
 
     if (membersError) {
       const errorData: ErrorResponse = {
@@ -60,7 +123,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(errorData, { status: 500 })
     }
 
-    const memberIds = [...new Set((membersRows || []).map((r: { member_id: string }) => r.member_id))]
+    let memberIds = [...new Set((membersRows || []).map((r: { member_id: string }) => r.member_id))]
+
+    if (memberIds.length === 0 && forCustomerId) {
+      const { data: customerProfile } = await admin
+        .from("profiles")
+        .select("id, name, email")
+        .eq("id", forCustomerId)
+        .single()
+      if (customerProfile) {
+        const { data: adminRole } = await admin
+          .from("client_team_members")
+          .select("role")
+          .eq("member_id", userId)
+          .in("team_id", teamIds)
+          .eq("role", "admin")
+          .limit(1)
+          .maybeSingle()
+        return NextResponse.json({
+          success: true,
+          data: {
+            members: [
+              {
+                memberId: customerProfile.id,
+                name: customerProfile.name ?? null,
+                email: customerProfile.email ?? null,
+                avatar: null,
+                teamId: "",
+                teamName: "",
+                companyName: null,
+              },
+            ],
+            isTeamAdmin: !!adminRole,
+          },
+        })
+      }
+    }
+
     if (memberIds.length === 0) {
       let isTeamAdminUser = false
       const { data: myRole } = await admin
@@ -129,7 +228,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
     const isTeamAdminUser = !!adminRole
 
-    const members = memberIds.map((id) => {
+    const allMembers = memberIds.map((id) => {
       const p = profileById[id] || {}
       const { teamId, teamName } = memberToTeam[id] || { teamId: "", teamName: "" }
       const memberCompanyId = p.company_id
@@ -144,6 +243,10 @@ export async function GET(request: NextRequest) {
         companyName: companyName ?? null,
       }
     })
+
+    const members = forCustomerId
+      ? allMembers
+      : allMembers.filter((m) => m.companyName != null)
 
     const responseData: ApiResponse = {
       success: true,

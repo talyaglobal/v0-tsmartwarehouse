@@ -4,13 +4,13 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { User, Users, FileText, Zap, ChevronLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api/client"
+import {
+  BookingRequestDetailsForm,
+  type BookingRequestFormState,
+} from "./booking-request-details-form"
 
 export type BookingEntryChoice = "self" | "another"
 export type BookingTypeChoice = "request" | "instant"
@@ -34,6 +34,17 @@ export interface BookingEntryResult {
   requestCustomerId?: string
 }
 
+const defaultFormState: BookingRequestFormState = {
+  customerId: null,
+  averagePalletDays: 7,
+  requestedFloor: "",
+  ownerOfProduct: "",
+  skuCount: 1,
+  isSingleType: true,
+  notes: "",
+  requiresApproval: true,
+}
+
 interface BookingEntryModalProps {
   open: boolean
   onComplete: (result: BookingEntryResult) => void
@@ -51,21 +62,15 @@ export function BookingEntryModal({ open, onComplete, onClose }: BookingEntryMod
   const [step, setStep] = useState<number>(0)
   const [bookingFor, setBookingFor] = useState<BookingEntryChoice | null>(null)
   const [bookingType, setBookingType] = useState<BookingTypeChoice | null>(null)
-  const [requestForm, setRequestForm] = useState<BookingRequestFormData>({
-    averagePalletDays: 7,
-    requestedFloor: "",
-    ownerOfProduct: "",
-    skuCount: 1,
-    isSingleType: true,
-    specialMessage: "",
-    requiresApproval: true,
-  })
-  const [requestCustomerId, setRequestCustomerId] = useState<string | null>(null)
+  const [form, setForm] = useState<BookingRequestFormState>(defaultFormState)
 
   const { data: bookingMembersData, isLoading: isLoadingMembers } = useQuery({
     queryKey: ["booking-members"],
     queryFn: async () => {
-      const res = await api.get<{ members?: { memberId: string; name?: string; email?: string; teamName?: string }[]; isTeamAdmin?: boolean }>("/api/v1/teams/booking-members", { showToast: false })
+      const res = await api.get<{ members?: { memberId: string; name?: string; email?: string; teamName?: string; companyName?: string | null }[]; isTeamAdmin?: boolean }>(
+        "/api/v1/teams/booking-members",
+        { showToast: false }
+      )
       if (!res.success) return { members: [], isTeamAdmin: false }
       const data = res.data
       const members = Array.isArray(data) ? [] : (data?.members ?? [])
@@ -94,6 +99,7 @@ export function BookingEntryModal({ open, onComplete, onClose }: BookingEntryMod
       return
     }
     setStep(2)
+    setForm(defaultFormState)
   }
 
   const handleBack = () => {
@@ -108,12 +114,20 @@ export function BookingEntryModal({ open, onComplete, onClose }: BookingEntryMod
 
   const handleRequestSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (bookingFor === "another" && !requestCustomerId) return
+    if (bookingFor === "another" && !form.customerId) return
     onComplete({
       bookingFor: bookingFor!,
       bookingType: "request",
-      requestForm: { ...requestForm },
-      requestCustomerId: bookingFor === "another" ? requestCustomerId ?? undefined : undefined,
+      requestForm: {
+        averagePalletDays: form.averagePalletDays,
+        requestedFloor: form.requestedFloor,
+        ownerOfProduct: form.ownerOfProduct,
+        skuCount: form.skuCount,
+        isSingleType: form.isSingleType,
+        specialMessage: form.notes,
+        requiresApproval: form.requiresApproval,
+      },
+      requestCustomerId: bookingFor === "another" ? form.customerId ?? undefined : undefined,
     })
   }
 
@@ -224,157 +238,20 @@ export function BookingEntryModal({ open, onComplete, onClose }: BookingEntryMod
           </div>
         )}
 
-        {/* Step 2: Request form */}
+        {/* Step 2: Request form (shared component) */}
         {step === 2 && showFormStep && (
-          <form onSubmit={handleRequestSubmit} className="space-y-4 py-2">
-            {bookingFor === "another" && (
-              <div className="space-y-2">
-                <Label>Request on behalf of (select a client from your team)</Label>
-                {isLoadingMembers ? (
-                  <p className="text-sm text-muted-foreground py-2">Loading team members…</p>
-                ) : members.length === 0 ? (
-                  <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3">
-                    No other clients in your team. Add team members in My Company to book on their behalf.
-                  </p>
-                ) : (
-                  <Select
-                    value={requestCustomerId ?? ""}
-                    onValueChange={(v) => setRequestCustomerId(v || null)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a client from your team" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {members.map((m: { memberId: string; name?: string; email?: string; teamName?: string; companyName?: string | null }) => (
-                        <SelectItem key={m.memberId} value={m.memberId}>
-                          {m.name || m.email || "Team member"}
-                          {m.teamName ? ` (${m.teamName})` : ""}
-                          {m.companyName ? ` · ${m.companyName}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
-            {bookingFor === "another" && isTeamAdmin && (
-              <div className="space-y-2 rounded-lg border p-4">
-                <Label>Approval for this request (on behalf of client)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Pre-approved: request is confirmed without client approval. Requires approval: client must approve before confirmation.
-                </p>
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    type="button"
-                    variant={requestForm.requiresApproval === false ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setRequestForm((p) => ({ ...p, requiresApproval: false }))}
-                  >
-                    Pre-approved
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={requestForm.requiresApproval !== false ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setRequestForm((p) => ({ ...p, requiresApproval: true }))}
-                  >
-                    Requires approval
-                  </Button>
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="averagePalletDays">Average days per pallet (storage duration)</Label>
-              <Input
-                id="averagePalletDays"
-                type="number"
-                min={1}
-                value={requestForm.averagePalletDays}
-                onChange={(e) =>
-                  setRequestForm((p) => ({ ...p, averagePalletDays: parseInt(e.target.value, 10) || 0 }))
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="requestedFloor">Requested floor</Label>
-              <Input
-                id="requestedFloor"
-                type="text"
-                placeholder="e.g. Ground, 1, 2"
-                value={requestForm.requestedFloor}
-                onChange={(e) => setRequestForm((p) => ({ ...p, requestedFloor: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ownerOfProduct">Owner of product</Label>
-              <Input
-                id="ownerOfProduct"
-                type="text"
-                placeholder="Company or contact name"
-                value={requestForm.ownerOfProduct}
-                onChange={(e) => setRequestForm((p) => ({ ...p, ownerOfProduct: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="skuCount">How many SKU / products</Label>
-              <Input
-                id="skuCount"
-                type="number"
-                min={1}
-                value={requestForm.skuCount}
-                onChange={(e) =>
-                  setRequestForm((p) => ({ ...p, skuCount: parseInt(e.target.value, 10) || 0 }))
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="specialMessage">Special message (optional)</Label>
-              <Textarea
-                id="specialMessage"
-                placeholder="Any special instructions or notes for the warehouse…"
-                value={requestForm.specialMessage ?? ""}
-                onChange={(e) => setRequestForm((p) => ({ ...p, specialMessage: e.target.value }))}
-                rows={3}
-                className="min-h-[80px] resize-y"
-              />
-            </div>
-            <div className="space-y-2 rounded-lg border p-4">
-              <Label>Single product type?</Label>
-              <p className="text-xs text-muted-foreground">
-                Single type may qualify for discount (e.g. 20% – set by warehouse admin)
-              </p>
-              <div className="flex gap-2 pt-1">
-                <Button
-                  type="button"
-                  variant={requestForm.isSingleType ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setRequestForm((p) => ({ ...p, isSingleType: true }))}
-                >
-                  Yes
-                </Button>
-                <Button
-                  type="button"
-                  variant={!requestForm.isSingleType ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setRequestForm((p) => ({ ...p, isSingleType: false }))}
-                >
-                  No
-                </Button>
-              </div>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button type="button" variant="ghost" onClick={handleBack} className="gap-1">
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </Button>
-              <Button type="submit" className="flex-1">
-                Submit request
-              </Button>
-            </div>
-          </form>
+          <BookingRequestDetailsForm
+            form={form}
+            setForm={setForm}
+            members={members}
+            isLoadingMembers={isLoadingMembers}
+            isTeamAdmin={isTeamAdmin}
+            showClientSelect={bookingFor === "another"}
+            onSubmit={handleRequestSubmit}
+            submitLabel="Submit request"
+            onCancel={handleBack}
+            cancelLabel="Back"
+          />
         )}
 
         {/* Back button for step 1 */}
