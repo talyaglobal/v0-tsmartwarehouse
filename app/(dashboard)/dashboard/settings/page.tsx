@@ -177,7 +177,7 @@ export default function SettingsPage() {
       if (!canChangeEmail && profileData.role === 'warehouse_client' && companyId) {
         const { data: companyTeams } = await supabase.from('client_teams').select('id').eq('company_id', companyId).eq('status', true)
         if (companyTeams?.length) {
-          const teamIds = companyTeams.map((t) => t.id)
+          const teamIds = companyTeams.map((t: { id: string }) => t.id)
           const { data: adminMember } = await supabase
             .from('client_team_members')
             .select('team_id')

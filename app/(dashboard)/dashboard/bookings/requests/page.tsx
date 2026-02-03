@@ -1,8 +1,6 @@
 "use client"
 
-import Link from "next/link"
 import { PageHeader } from "@/components/ui/page-header"
-import { Button } from "@/components/ui/button"
 import { BookingRequestsList } from "@/features/bookings/components/booking-requests-list"
 
 export default function BookingRequestsPage() {

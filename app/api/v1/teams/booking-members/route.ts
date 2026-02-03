@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
       companyId = customerProfile.company_id
       const allowed =
-        userId === forCustomerId || (await isCompanyAdmin(userId, companyId))
+        userId === forCustomerId || (await isCompanyAdmin(userId, companyId ?? undefined))
       if (!allowed) {
         return NextResponse.json({
           success: true,
