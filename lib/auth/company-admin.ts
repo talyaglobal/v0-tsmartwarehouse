@@ -2,18 +2,31 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
  * Check if user is a company admin:
+ * - Platform admin: admin, super_admin, root (profiles.role) with matching company_id
  * - Warehouse side: warehouse_owner, warehouse_admin, warehouse_supervisor (profiles.role)
  * - Corporate client side: warehouse_client with client_team_members.role = 'admin' for a team of this company
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
   const supabase = createServerSupabaseClient()
 
-  // 1) Warehouse admin/owner/supervisor for this company
+  // 0) Platform admin (admin/super_admin/root) with matching company – can update their company
+  if (companyId) {
+    const { data: platformProfile } = await supabase
+      .from('profiles')
+      .select('role, company_id')
+      .eq('id', userId)
+      .eq('company_id', companyId)
+      .in('role', ['admin', 'super_admin', 'root'])
+      .maybeSingle()
+    if (platformProfile) return true
+  }
+
+  // 1) Warehouse admin/owner/supervisor for this company (include legacy: owner, company_admin)
   let query = supabase
     .from('profiles')
     .select('role, company_id')
     .eq('id', userId)
-    .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
+    .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor', 'owner', 'company_admin'])
 
   if (companyId) {
     query = query.eq('company_id', companyId)
@@ -45,6 +58,24 @@ export async function isCompanyAdmin(userId: string, companyId?: string): Promis
         .maybeSingle()
 
       if (!memberError && adminMembership) return true
+    }
+  }
+
+  // 3) Fallback: user has this company_id and role is any known admin-like value (covers legacy/alternate DB values)
+  if (companyId) {
+    const ADMIN_LIKE_ROLES = [
+      'admin', 'super_admin', 'root',
+      'warehouse_owner', 'warehouse_admin', 'warehouse_supervisor',
+      'owner', 'company_admin',
+    ]
+    const { data: fallbackProfile } = await supabase
+      .from('profiles')
+      .select('role, company_id')
+      .eq('id', userId)
+      .eq('company_id', companyId)
+      .maybeSingle()
+    if (fallbackProfile && fallbackProfile.role && ADMIN_LIKE_ROLES.includes(fallbackProfile.role)) {
+      return true
     }
   }
 
@@ -104,12 +135,12 @@ export async function getUserAdminCompanies(userId: string): Promise<string[]> {
   const supabase = createServerSupabaseClient()
   const companyIds = new Set<string>()
 
-  // 1) Warehouse admin companies
+  // 1) Warehouse admin companies (include legacy: owner, company_admin)
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select('company_id')
     .eq('id', userId)
-    .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
+    .in('role', ['warehouse_owner', 'warehouse_admin', 'warehouse_supervisor', 'owner', 'company_admin'])
     .not('company_id', 'is', null)
 
   if (!error && profiles) {

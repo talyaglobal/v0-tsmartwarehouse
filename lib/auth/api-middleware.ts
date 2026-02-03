@@ -55,8 +55,8 @@ export async function getAuthUser(request: NextRequest) {
         .maybeSingle()
       
       if (profile?.role) {
-        // Map legacy roles to new roles
-        if (profile.role === 'super_admin') userRole = 'root'
+        // Map legacy roles to new roles (admin = platform admin, same as root for API)
+        if (profile.role === 'super_admin' || profile.role === 'admin') userRole = 'root'
         else if (profile.role === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
         else if (profile.role === 'warehouse_client') userRole = 'warehouse_client'
         else if (profile.role === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
@@ -67,7 +67,7 @@ export async function getAuthUser(request: NextRequest) {
       } else {
         // Fallback to user_metadata if profile doesn't exist
         const metadataRole = user.user_metadata?.role as string
-        if (metadataRole === 'super_admin') userRole = 'root'
+        if (metadataRole === 'super_admin' || metadataRole === 'admin') userRole = 'root'
         else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
         else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
         else if (metadataRole === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
@@ -80,7 +80,7 @@ export async function getAuthUser(request: NextRequest) {
       console.error('Error fetching profile role:', error)
       // Fallback to user_metadata
       const metadataRole = user.user_metadata?.role as string
-      if (metadataRole === 'super_admin') userRole = 'root'
+      if (metadataRole === 'super_admin' || metadataRole === 'admin') userRole = 'root'
       else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
       else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
       else if (metadataRole === 'worker') userRole = 'warehouse_staff'
