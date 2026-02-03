@@ -1287,6 +1287,21 @@ export function ClientTeamMembersTab() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  placeholder="member@company.com"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  disabled={updateMemberMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Company admins can change team member email. Changes apply to login and profile.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="edit-phone">Phone</Label>
                 <div className="[&_.react-international-phone-input-container]:flex [&_.react-international-phone-input-container]:items-center [&_.react-international-phone-input-container]:gap-2 [&_.react-international-phone-input-container]:w-full">
                   <PhoneInput
@@ -1337,8 +1352,26 @@ export function ClientTeamMembersTab() {
             </Button>
             {!selectedMember?.company_name && (
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (!selectedMember) return
+                  const emailChanged =
+                    editForm.email?.trim() &&
+                    editForm.email !== selectedMember.profile?.email
+                  if (emailChanged) {
+                    const emailResult = await api.patch<{ email: string }>(
+                      "/api/v1/profile/email",
+                      { email: editForm.email.trim(), userId: selectedMember.id },
+                      { showToast: false }
+                    )
+                    if (!emailResult.success) {
+                      addNotification({
+                        type: "error",
+                        message: emailResult.error ?? "Failed to update email",
+                        duration: 5000,
+                      })
+                      return
+                    }
+                  }
                   updateMemberMutation.mutate({
                     memberId: selectedMember.id,
                     name: editForm.name,

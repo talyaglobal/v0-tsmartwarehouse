@@ -57,7 +57,7 @@ export default function SettingsPage() {
       // Try to fetch with avatar_url first
       const { data: dataWithAvatar, error: errorWithAvatar } = await supabase
         .from('profiles')
-        .select('name, phone, company_id, email, avatar_url')
+        .select('name, phone, company_id, email, avatar_url, role')
         .eq('id', user.id)
         .maybeSingle()
       
@@ -95,7 +95,7 @@ export default function SettingsPage() {
           // Try without avatar_url
           const { data: dataWithoutAvatar, error: errorWithoutAvatar } = await supabase
             .from('profiles')
-            .select('name, phone, company_id, email, avatar_url')
+            .select('name, phone, company_id, email, avatar_url, role')
             .eq('id', user.id)
             .maybeSingle()
           
@@ -103,7 +103,7 @@ export default function SettingsPage() {
             // If still error, try with only basic fields
             const { data: dataBasic, error: errorBasic } = await supabase
               .from('profiles')
-              .select('name, phone, company_id, email')
+              .select('name, phone, company_id, email, role')
               .eq('id', user.id)
               .maybeSingle()
             
@@ -170,13 +170,32 @@ export default function SettingsPage() {
       } else if (profileData.role === 'warehouse_client') {
         companyRole = 'warehouse_client'
       }
+
+      // canChangeEmail: root, admin, company admins (warehouse + corporate team admin) can change own email
+      const platformOrWarehouseAdminRoles = ['root', 'admin', 'super_admin', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_owner', 'owner', 'company_admin']
+      let canChangeEmail = platformOrWarehouseAdminRoles.includes(profileData.role)
+      if (!canChangeEmail && profileData.role === 'warehouse_client' && companyId) {
+        const { data: companyTeams } = await supabase.from('client_teams').select('id').eq('company_id', companyId).eq('status', true)
+        if (companyTeams?.length) {
+          const teamIds = companyTeams.map((t) => t.id)
+          const { data: adminMember } = await supabase
+            .from('client_team_members')
+            .select('team_id')
+            .eq('member_id', user.id)
+            .eq('role', 'admin')
+            .in('team_id', teamIds)
+            .limit(1)
+            .maybeSingle()
+          canChangeEmail = !!adminMember
+        }
+      }
       
       const result = {
         ...profileData,
         company_id: companyId || profileData.company_id,
         companies: company,
         companyRole,
-        canChangeEmail: companyRole === 'warehouse_admin', // Only warehouse admins can change email
+        canChangeEmail,
       }
       
       return result

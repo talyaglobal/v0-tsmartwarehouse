@@ -79,17 +79,27 @@ export default function HomePage() {
           <nav className="hidden lg:flex items-center gap-1">
             {[
               { href: "#services", label: "Services" },
-              { href: "#how-it-works", label: "How It Works" },
+              { href: "/how-to-use", label: "How to Use" },
               { href: "#features", label: "Features" },
               { href: "#contact", label: "Contact" },
             ].map((item) => (
-              <a 
-                key={item.href}
-                href={item.href} 
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent"
-              >
-                {item.label}
-              </a>
+              item.href.startsWith("/") ? (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent"
+                >
+                  {item.label}
+                </a>
+              )
             ))}
           </nav>
           
@@ -367,71 +377,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section id="how-it-works" className="py-24 relative overflow-hidden">
-          <div className="absolute top-0 left-1/2 w-[800px] h-[400px] bg-gradient-to-b from-amber-500/5 to-transparent rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-          
-          <div className="container mx-auto px-4 relative">
-            <div className="text-center mb-16">
-              <Badge variant="outline" className="mb-4">Simple Process</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Get started in minutes with our streamlined booking process
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {[
-                {
-                  step: 1,
-                  title: "Search & Compare",
-                  description: "Browse warehouses by location, size, and amenities. Compare prices from multiple verified owners.",
-                  icon: Globe,
-                  gradient: "from-amber-400 to-amber-500",
-                },
-                {
-                  step: 2,
-                  title: "Book Instantly",
-                  description: "Select your dates, choose your space type, and book securely online. No hidden fees.",
-                  icon: Zap,
-                  gradient: "from-amber-500 to-yellow-500",
-                },
-                {
-                  step: 3,
-                  title: "Start Storing",
-                  description: "Deliver your goods at the scheduled time. Manage everything from your dashboard.",
-                  icon: Package,
-                  gradient: "from-yellow-500 to-orange-500",
-                },
-              ].map((item, index) => (
-                <div key={index} className="relative group">
-                  {/* Connector line */}
-                  {index < 2 && (
-                    <div className="hidden md:block absolute top-16 left-1/2 w-full h-0.5 bg-gradient-to-r from-border via-amber-500/30 to-border" />
-                  )}
-                  
-                  <div className="relative bg-card rounded-2xl border p-8 hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-500/5 transition-all duration-500 group-hover:-translate-y-2">
-                    {/* Step number */}
-                    <div className={cn(
-                      "w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br shadow-lg",
-                      item.gradient
-                    )}>
-                      <item.icon className="h-7 w-7 text-white" />
-                    </div>
-                    
-                    <div className="absolute top-6 right-6 text-6xl font-bold text-muted/10">
-                      {item.step}
-                    </div>
-                    
-                    <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* Features Section */}
         <section id="features" className="py-24 bg-muted/30">
           <div className="container mx-auto px-4">
@@ -620,11 +565,6 @@ export default function HomePage() {
                   <Link href="/how-to-use" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     How to Use
                   </Link>
-                </li>
-                <li>
-                  <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    How It Works
-                  </a>
                 </li>
                 <li>
                   <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

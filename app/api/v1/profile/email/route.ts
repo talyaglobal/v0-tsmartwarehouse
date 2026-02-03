@@ -1,12 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
+import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ApiResponse } from "@/types/api"
 
 /**
  * PATCH /api/v1/profile/email
- * Update user email (admin/owner only, no email confirmation required)
+ * Update user email (admin / company admin only; no email confirmation required).
+ * - Root (platform admin): can change own or any user's email.
+ * - Company admin: can change own email or same-company users' emails.
+ * Body: { email, userId? }. If userId is omitted, updates the caller's email.
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -17,7 +21,8 @@ export async function PATCH(request: NextRequest) {
     const { user } = authResult
 
     const body = await request.json()
-    const { email } = body
+    const { email, userId: bodyUserId } = body
+    const targetId = typeof bodyUserId === 'string' && bodyUserId.trim() ? bodyUserId.trim() : user.id
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       const errorData: ErrorResponse = {
@@ -28,29 +33,61 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Check if user is owner (only owners can change email)
     const supabase = createServerSupabaseClient()
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
 
-    if (!profile || profile.role !== 'company_owner') {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: "Forbidden: Only warehouse owners can change email addresses.",
-        statusCode: 403,
+    // Resolve permission: root can do anything; company admin can change own or same-company user
+    const isRoot = user.role === 'root'
+    const callerCompanyId = await getUserCompanyId(user.id)
+
+    if (!isRoot) {
+      const targetProfile = await supabase
+        .from('profiles')
+        .select('id, company_id')
+        .eq('id', targetId)
+        .maybeSingle()
+
+      if (!targetProfile.data?.id) {
+        const errorData: ErrorResponse = {
+          success: false,
+          error: "User not found",
+          statusCode: 404,
+        }
+        return NextResponse.json(errorData, { status: 404 })
       }
-      return NextResponse.json(errorData, { status: 403 })
+
+      const targetCompanyId = targetProfile.data.company_id ?? null
+      const isOwnEmail = targetId === user.id
+
+      if (isOwnEmail) {
+        const canChangeOwn = await isCompanyAdmin(user.id, callerCompanyId ?? undefined)
+        if (!canChangeOwn) {
+          const errorData: ErrorResponse = {
+            success: false,
+            error: "Forbidden: Only admins and company admins can change email addresses.",
+            statusCode: 403,
+          }
+          return NextResponse.json(errorData, { status: 403 })
+        }
+      } else {
+        const sameCompany = targetCompanyId !== null && targetCompanyId === callerCompanyId
+        const isAdminForTarget = sameCompany && await isCompanyAdmin(user.id, targetCompanyId)
+        if (!isAdminForTarget) {
+          const errorData: ErrorResponse = {
+            success: false,
+            error: "Forbidden: You can only change email for users in your company.",
+            statusCode: 403,
+          }
+          return NextResponse.json(errorData, { status: 403 })
+        }
+      }
     }
 
-    // Check if email is already in use
+    // Check if email is already in use by another user
     const { data: existingUser } = await supabase
       .from('profiles')
       .select('id')
       .eq('email', email.toLowerCase().trim())
-      .neq('id', user.id)
+      .neq('id', targetId)
       .maybeSingle()
 
     if (existingUser) {
@@ -62,11 +99,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Update email using admin API (no confirmation required)
-    // We need to use service role key for admin operations
-    const { createClient } = await import('@supabase/supabase-js')
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    
     if (!serviceRoleKey) {
       const errorData: ErrorResponse = {
         success: false,
@@ -76,6 +109,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(errorData, { status: 500 })
     }
 
+    const { createClient } = await import('@supabase/supabase-js')
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceRoleKey,
@@ -87,12 +121,11 @@ export async function PATCH(request: NextRequest) {
       }
     )
 
-    // Update user email in auth (no confirmation required)
     const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      user.id,
+      targetId,
       {
         email: email.toLowerCase().trim(),
-        email_confirm: true, // Auto-confirm email
+        email_confirm: true,
       }
     )
 
@@ -100,17 +133,15 @@ export async function PATCH(request: NextRequest) {
       throw new Error(`Failed to update email: ${updateError.message}`)
     }
 
-    // Update email in profiles table
     const { data: updatedProfile, error: profileError } = await supabase
       .from('profiles')
       .update({ email: email.toLowerCase().trim() })
-      .eq('id', user.id)
+      .eq('id', targetId)
       .select()
       .single()
 
     if (profileError) {
       console.error('Error updating profile email:', profileError)
-      // Don't fail if profile update fails, auth update succeeded
     }
 
     const responseData: ApiResponse = {

@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle, DollarSign } from "@/components/icons"
@@ -16,7 +17,8 @@ import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
-import { useRouter } from "next/navigation"
+import { BookingRequestsList } from "@/features/bookings/components/booking-requests-list"
+import { useRouter, useSearchParams } from "next/navigation"
 import { RootTestDataIndicator } from "@/components/ui/root-test-data-badge"
 import { getRootUserIds, isTestDataSync } from "@/lib/utils/test-data"
 
@@ -30,7 +32,16 @@ export default function BookingsPage() {
   const { user, isLoading: userLoading } = useUser()
   const queryClient = useQueryClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams?.get("tab")
+  const [activeTab, setActiveTab] = useState<string>(tabParam === "requests" ? "requests" : "bookings")
   const [rootUserIds, setRootUserIds] = useState<string[]>([])
+
+  // Sync tab with URL
+  useEffect(() => {
+    if (tabParam === "requests") setActiveTab("requests")
+    else if (tabParam === "bookings" || !tabParam) setActiveTab("bookings")
+  }, [tabParam])
 
   // Fetch root user IDs for test data detection
   useEffect(() => {
@@ -258,6 +269,13 @@ export default function BookingsPage() {
         )}
       </PageHeader>
 
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); router.replace(`/dashboard/bookings${v === "requests" ? "?tab=requests" : ""}`, { scroll: false }) }} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="bookings">Bookings</TabsTrigger>
+          <TabsTrigger value="requests">Booking Requests</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="bookings" className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>{isCustomer ? "My Bookings" : "Company Warehouse Bookings"}</CardTitle>
@@ -482,6 +500,12 @@ export default function BookingsPage() {
           </Table>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="requests" className="space-y-4">
+          <BookingRequestsList />
+        </TabsContent>
+      </Tabs>
 
       {/* Time Slot Selection Modal */}
       {selectedBookingForTimeSlot && (
