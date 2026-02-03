@@ -3,7 +3,6 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin } from "@/lib/auth/company-admin"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
-import type { ApiResponse, ErrorResponse } from "@/types/api"
 
 async function canManageRequest(
   userId: string,

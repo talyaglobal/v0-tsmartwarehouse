@@ -17,7 +17,7 @@ type RouteContext = {
  * Get specific agreement version
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   context: RouteContext
 ) {
   try {
@@ -148,7 +148,7 @@ export async function PATCH(
  * Note: This is a soft delete - sets is_active to false
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   context: RouteContext
 ) {
   try {
@@ -179,7 +179,7 @@ export async function DELETE(
     }
 
     // Soft delete by setting is_active to false
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('agreement_versions')
       .update({ is_active: false })
       .eq('id', params.id)

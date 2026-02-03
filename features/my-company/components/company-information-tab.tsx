@@ -62,7 +62,12 @@ interface Company {
   country: string | null
 }
 
-export function CompanyInformationTab() {
+interface CompanyInformationTabProps {
+  /** When false (e.g. team member with "Member" role), inputs are disabled and Save Changes is hidden */
+  canEdit?: boolean
+}
+
+export function CompanyInformationTab({ canEdit = true }: CompanyInformationTabProps) {
   const { user } = useUser()
   const queryClient = useQueryClient()
   const { addNotification } = useUIStore()
@@ -281,6 +286,7 @@ export function CompanyInformationTab() {
                 value={formData.tradingName}
                 onChange={(e) => setFormData({ ...formData, tradingName: e.target.value })}
                 placeholder="Full legal company name (e.g., Acme Corporation Inc.)"
+                disabled={!canEdit}
               />
               <p className="text-xs text-muted-foreground">
                 The official registered name of your company
@@ -294,6 +300,7 @@ export function CompanyInformationTab() {
                 onChange={(e) => setFormData({ ...formData, shortName: e.target.value })}
                 placeholder="Short display name (e.g., Acme Corp)"
                 required
+                disabled={!canEdit}
               />
               <p className="text-xs text-muted-foreground">
                 This name will be displayed throughout the platform
@@ -306,20 +313,23 @@ export function CompanyInformationTab() {
                 value={formData.vat}
                 onChange={(e) => setFormData({ ...formData, vat: e.target.value })}
                 placeholder="VAT/Tax ID"
+                disabled={!canEdit}
               />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="address">Address</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowMapPicker(true)}
-                  className="flex items-center gap-1"
-                >
-                  <MapPin className="h-4 w-4" /> Pick on Map
-                </Button>
+                {canEdit && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMapPicker(true)}
+                    className="flex items-center gap-1"
+                  >
+                    <MapPin className="h-4 w-4" /> Pick on Map
+                  </Button>
+                )}
               </div>
               <PlacesAutocomplete
                 value={formData.address}
@@ -339,6 +349,7 @@ export function CompanyInformationTab() {
                   }
                 }}
                 placeholder="Enter address or search with Google Maps"
+                disabled={!canEdit}
               />
               <p className="text-xs text-muted-foreground">
                 Start typing to get suggestions; postal code, city and country will auto-fill when you select an address
@@ -352,6 +363,7 @@ export function CompanyInformationTab() {
                   value={formData.postalCode}
                   onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
                   placeholder="Postal Code"
+                  disabled={!canEdit}
                 />
               </div>
               <div className="space-y-2">
@@ -361,6 +373,7 @@ export function CompanyInformationTab() {
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   placeholder="City"
+                  disabled={!canEdit}
                 />
               </div>
               <div className="space-y-2">
@@ -370,6 +383,7 @@ export function CompanyInformationTab() {
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                   placeholder="Country"
+                  disabled={!canEdit}
                 />
               </div>
             </div>
@@ -400,66 +414,72 @@ export function CompanyInformationTab() {
                         e.currentTarget.style.display = 'none'
                       }}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                      onClick={() => setFormData({ ...formData, logoUrl: "" })}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                        onClick={() => setFormData({ ...formData, logoUrl: "" })}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
-                <div className="flex-1">
-                  <Input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png"
-                    onChange={handleLogoUpload}
-                    disabled={isUploadingLogo}
-                    className="hidden"
-                    id="logo-upload"
-                  />
-                  <Label htmlFor="logo-upload" className="cursor-pointer">
-                    <Button
-                      type="button"
-                      variant="outline"
+                {canEdit && (
+                  <div className="flex-1">
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={handleLogoUpload}
                       disabled={isUploadingLogo}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {isUploadingLogo ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload Logo
-                        </>
-                      )}
-                    </Button>
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    JPEG or PNG, max 2MB
-                  </p>
-                </div>
+                      className="hidden"
+                      id="logo-upload"
+                    />
+                    <Label htmlFor="logo-upload" className="cursor-pointer">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isUploadingLogo}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {isUploadingLogo ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload Logo
+                          </>
+                        )}
+                      </Button>
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      JPEG or PNG, max 2MB
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-            <Button type="submit" disabled={isSaving || updateMutation.isPending}>
-              {isSaving || updateMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
+            {canEdit && (
+              <Button type="submit" disabled={isSaving || updateMutation.isPending}>
+                {isSaving || updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>

@@ -6,6 +6,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
+/** Normalize agreement_version from join (can be single object or array) */
+function getAgreementType(agreement: { agreement_version?: unknown }): string | undefined {
+  const v = agreement.agreement_version;
+  if (!v) return undefined;
+  const row = Array.isArray(v) ? v[0] : v;
+  return (row as { agreement_type?: string })?.agreement_type;
+}
+
 /**
  * GET /api/agreements/stats
  * Get agreement acceptance statistics (admin only)
@@ -74,7 +82,7 @@ export async function GET(request: NextRequest) {
     const byType: Record<string, any> = {};
     if (userAgreements) {
       for (const agreement of userAgreements) {
-        const type = agreement.agreement_version?.agreement_type;
+        const type = getAgreementType(agreement);
         if (type) {
           if (!byType[type]) {
             byType[type] = {

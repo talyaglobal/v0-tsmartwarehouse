@@ -170,7 +170,7 @@ export default function MyCompanyPage() {
         )}
 
         <TabsContent value="information" className="space-y-4">
-          <CompanyInformationTab />
+          <CompanyInformationTab canEdit={isCompanyAdmin} />
         </TabsContent>
 
         {userType === 'warehouse' && (

@@ -8,6 +8,17 @@
 
 ## 📋 Session / Recent Fixes
 
+### 2026-02-03: created_by ve updated_by – tüm public tablolara
+- **Amaç**: Kimin kayıt eklediğini ve kimin son güncellediğini takip etmek.
+- **Migration**: `supabase/migrations/20260203100000_add_created_by_updated_by_to_tables.sql`
+- **Yapılanlar**:
+  1. Tüm `public` şemasındaki tablolara `created_by` ve `updated_by` sütunları eklendi (yoksa). Referans: `auth.users(id)` ON DELETE SET NULL.
+  2. `set_created_by_column()`: INSERT sırasında `created_by` null ise `auth.uid()` atanıyor.
+  3. `set_updated_by_column()`: UPDATE sırasında `updated_by` her zaman `auth.uid()` yapılıyor.
+  4. Her iki sütun için BEFORE INSERT / BEFORE UPDATE trigger’ları tüm ilgili tablolara uygulandı.
+  5. `created_by` ve `updated_by` üzerinde sorgu için index’ler eklendi.
+- **Not**: Zaten `created_by` veya `updated_by` olan tablolar (örn. client_teams, floor_plans) sütun eklemede atlanıyor; trigger’lar yine ekleniyor. Uygulamak için: `supabase link` ile proje bağlandıktan sonra `supabase db push` (veya remote’da migration’ları çalıştır).
+
 ### 2026-02-02: How to Use page (English, all user types)
 - **Page**: `/how-to-use` – public page under `(legal)` layout with header “Back to Home” and footer links.
 - **Content (English)**: Overview of Warebnb; Getting Started (register, login, dashboard); **By User Type**: System Admin (root), Warehouse Owner (warehouse_admin), Warehouse Manager (warehouse_supervisor), Customer (warehouse_client – individual & corporate), Warehouse Staff, Warehouse Finder, Reseller/Broker, End Delivery Party, Local Transport, International Transport; Common Flows (booking, team management, warehouse operations); links to Terms, Privacy, Home.

@@ -7,6 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { AgreementType } from '@/features/agreements/types';
 
+/** Shape returned by get_latest_agreement_version RPC */
+interface AgreementVersionRow {
+  id: string;
+  version?: number;
+  is_major_version?: boolean;
+}
+
 /**
  * POST /api/agreements/check
  * Check if user has accepted required agreements
@@ -38,12 +45,13 @@ export async function POST(request: NextRequest) {
 
     for (const agreementType of agreementTypes) {
       // Get latest version of this agreement
-      const { data: latestVersion } = await supabase
+      const { data: latestVersionData } = await supabase
         .rpc('get_latest_agreement_version', {
           p_agreement_type: agreementType,
           p_language: 'en',
         })
         .single();
+      const latestVersion = latestVersionData as AgreementVersionRow | null;
 
       if (!latestVersion) {
         results[agreementType] = {
@@ -115,12 +123,13 @@ export async function POST(request: NextRequest) {
 
       for (const agreementType of warehouseAgreementTypes) {
         if (!agreementTypes.includes(agreementType)) {
-          const { data: latestVersion } = await supabase
+          const { data: latestVersionData } = await supabase
             .rpc('get_latest_agreement_version', {
               p_agreement_type: agreementType,
               p_language: 'en',
             })
             .single();
+          const latestVersion = latestVersionData as AgreementVersionRow | null;
 
           if (latestVersion) {
             const { data: warehouseAgreement } = await supabase
@@ -150,12 +159,13 @@ export async function POST(request: NextRequest) {
 
       for (const agreementType of bookingAgreementTypes) {
         if (!agreementTypes.includes(agreementType)) {
-          const { data: latestVersion } = await supabase
+          const { data: latestVersionData } = await supabase
             .rpc('get_latest_agreement_version', {
               p_agreement_type: agreementType,
               p_language: 'en',
             })
             .single();
+          const latestVersion = latestVersionData as AgreementVersionRow | null;
 
           if (latestVersion) {
             const { data: bookingAgreement } = await supabase
