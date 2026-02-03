@@ -80,13 +80,10 @@ export function BookingRequestsList() {
   })
 
   const { data: bookingMembersData, isLoading: isLoadingMembers } = useQuery({
-    queryKey: ["booking-members", editId ?? "", editForm.customerId ?? ""],
+    queryKey: ["booking-members", "edit", editId ?? ""],
     queryFn: async () => {
-      const forCustomerId = editForm.customerId
-        ? `?forCustomerId=${encodeURIComponent(editForm.customerId)}`
-        : ""
       const res = await api.get<{ members?: { memberId: string; name?: string; email?: string; teamName?: string; companyName?: string | null }[]; isTeamAdmin?: boolean }>(
-        `/api/v1/teams/booking-members${forCustomerId}`,
+        "/api/v1/teams/booking-members",
         { showToast: false }
       )
       if (!res.success) return { members: [], isTeamAdmin: false }
@@ -95,7 +92,7 @@ export function BookingRequestsList() {
       const isTeamAdmin = !Array.isArray(data) && (data?.isTeamAdmin === true)
       return { members, isTeamAdmin }
     },
-    enabled: !!editId && !!editForm.customerId,
+    enabled: !!editId,
   })
   const members = bookingMembersData?.members ?? []
   const isTeamAdmin = bookingMembersData?.isTeamAdmin ?? false

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { isCompanyAdmin } from "@/lib/auth/company-admin"
+import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { handleApiError } from "@/lib/utils/logger"
 
@@ -18,6 +18,29 @@ async function canManageRequest(
   const customerCompanyId = profile?.company_id
   if (!customerCompanyId) return false
   return isCompanyAdmin(userId, customerCompanyId)
+}
+
+/** Check if newCustomerId is a member the editor can book on behalf of (editor's company teams). */
+async function canAssignCustomer(editorId: string, newCustomerId: string): Promise<boolean> {
+  if (editorId === newCustomerId) return true
+  const editorCompanyId = await getUserCompanyId(editorId)
+  if (!editorCompanyId) return false
+  const supabase = await createServerSupabaseClient()
+  const { data: teams } = await supabase
+    .from("client_teams")
+    .select("id")
+    .eq("company_id", editorCompanyId)
+    .eq("status", true)
+  if (!teams?.length) return false
+  const teamIds = teams.map((t) => t.id)
+  const { data: member } = await supabase
+    .from("client_team_members")
+    .select("member_id")
+    .eq("member_id", newCustomerId)
+    .in("team_id", teamIds)
+    .limit(1)
+    .maybeSingle()
+  return !!member
 }
 
 /**
@@ -74,21 +97,10 @@ export async function PATCH(
           { status: 400 }
         )
       }
-      const { data: currentCustomerProfile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", row.customer_id)
-        .single()
-      const { data: newCustomerProfile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", newCustomerId)
-        .single()
-      const currentCompanyId = currentCustomerProfile?.company_id
-      const newCompanyId = newCustomerProfile?.company_id
-      if (!currentCompanyId || !newCompanyId || currentCompanyId !== newCompanyId) {
+      const allowedAssign = await canAssignCustomer(authResult.user.id, newCustomerId)
+      if (!allowedAssign) {
         return NextResponse.json(
-          { success: false, error: "Customer must be from the same company", statusCode: 400 },
+          { success: false, error: "You can only assign a client from your team (e.g. partner company members)", statusCode: 400 },
           { status: 400 }
         )
       }
