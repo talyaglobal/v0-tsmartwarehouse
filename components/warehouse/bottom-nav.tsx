@@ -3,14 +3,17 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, ClipboardList, ScanLine, Package, User, Calendar } from "@/components/icons"
+import { Home, ClipboardList, ScanLine, Package, User, Calendar, MessageSquare } from "@/components/icons"
 
 const navItems = [
   { name: "Home", href: "/warehouse", icon: Home },
   { name: "Tasks", href: "/warehouse/tasks", icon: ClipboardList },
   { name: "Appointments", href: "/warehouse/appointments", icon: Calendar },
+  { name: "Chats", href: "/warehouse/chats", icon: MessageSquare },
   { name: "Scan", href: "/warehouse/scan", icon: ScanLine },
   { name: "Inventory", href: "/warehouse/inventory", icon: Package },
+  { name: "Check-in", href: "/warehouse/check-in", icon: Package },
+  { name: "Check-out", href: "/warehouse/check-out", icon: Package },
   { name: "Profile", href: "/warehouse/profile", icon: User },
 ]
 

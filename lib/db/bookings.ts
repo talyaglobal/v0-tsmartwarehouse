@@ -166,6 +166,8 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
       start_date,
       end_date,
       total_amount,
+      deposit_amount,
+      deposit_paid_at,
       notes,
       scheduled_dropoff_datetime,
       time_slot_set_by,
@@ -290,6 +292,8 @@ export async function updateBooking(
   if (updates.startDate !== undefined) updateRow.start_date = updates.startDate
   if (updates.endDate !== undefined) updateRow.end_date = updates.endDate ?? null
   if (updates.totalAmount !== undefined) updateRow.total_amount = updates.totalAmount
+  if ((updates as any).depositAmount !== undefined) updateRow.deposit_amount = (updates as any).depositAmount
+  if ((updates as any).depositPaidAt !== undefined) updateRow.deposit_paid_at = (updates as any).depositPaidAt ?? null
   if (updates.notes !== undefined) updateRow.notes = updates.notes ?? null
   if (updates.scheduledDropoffDatetime !== undefined) updateRow.scheduled_dropoff_datetime = updates.scheduledDropoffDatetime ?? null
   if (updates.timeSlotSetBy !== undefined) updateRow.time_slot_set_by = updates.timeSlotSetBy ?? null
@@ -359,6 +363,8 @@ function transformBookingRow(row: any): Booking & { warehouse_name?: string; war
     startDate: row.start_date,
     endDate: row.end_date ?? undefined,
     totalAmount: parseFloat(row.total_amount),
+    depositAmount: row.deposit_amount != null ? parseFloat(row.deposit_amount) : undefined,
+    depositPaidAt: (row as any).deposit_paid_at ?? undefined,
     notes: row.notes ?? undefined,
     scheduledDropoffDatetime: row.scheduled_dropoff_datetime ?? undefined,
     timeSlotSetBy: row.time_slot_set_by ?? undefined,

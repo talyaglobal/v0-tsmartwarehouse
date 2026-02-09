@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle, DollarSign } from "@/components/icons"
+import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle, DollarSign, MessageSquare } from "@/components/icons"
 import { formatCurrency, formatDate, getBookingTypeLabel, formatNumber } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
@@ -42,6 +42,7 @@ export default function BookingsPage() {
   const tabParam = searchParams?.get("tab")
   const [activeTab, setActiveTab] = useState<string>(tabParam === "requests" ? "requests" : "bookings")
   const [rootUserIds, setRootUserIds] = useState<string[]>([])
+  const [chatStartingForBookingId, setChatStartingForBookingId] = useState<string | null>(null)
 
   // Sync tab with URL
   useEffect(() => {
@@ -229,6 +230,8 @@ export default function BookingsPage() {
               isSingleType: res.requestForm.isSingleType,
               notes: res.requestForm.specialMessage?.trim() || undefined,
               requiresApproval: res.requestForm.requiresApproval,
+              poInfo: res.requestForm.poInfo?.trim() || undefined,
+              isLabellingRequired: res.requestForm.isLabellingRequired,
             },
             { showToast: true }
           )
@@ -451,6 +454,39 @@ export default function BookingsPage() {
                       </Link>
                       {isCustomer ? (
                         <>
+                          {/* Chat with warehouse staff: show when awaiting_time_slot or (pending + proposed time) */}
+                          {(booking.status === 'awaiting_time_slot' || (booking.status === 'pending' && !!booking.proposedStartDate && !!booking.proposedStartTime)) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Chat with warehouse staff"
+                              disabled={chatStartingForBookingId === booking.id}
+                              onClick={async () => {
+                                setChatStartingForBookingId(booking.id)
+                                try {
+                                  const result = await api.post<{ conversationId: string }>('/api/v1/conversations/start-for-booking', { bookingId: booking.id })
+                                  if (result.success && result.data?.conversationId) {
+                                    router.push(`/dashboard/chats?conversation=${result.data.conversationId}`)
+                                  } else {
+                                    api.showToast?.('Failed to start chat', 'error')
+                                  }
+                                } catch {
+                                  api.showToast?.('Failed to start chat', 'error')
+                                } finally {
+                                  setChatStartingForBookingId(null)
+                                }
+                              }}
+                            >
+                              {chatStartingForBookingId === booking.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <MessageSquare className="h-4 w-4 mr-1" />
+                                  Chat
+                                </>
+                              )}
+                            </Button>
+                          )}
                           {/* Time Slot Actions for awaiting_time_slot or pending status with proposed time */}
                           {(booking.status === 'awaiting_time_slot' || booking.status === 'pending') && booking.proposedStartDate && booking.proposedStartTime && (
                             <>

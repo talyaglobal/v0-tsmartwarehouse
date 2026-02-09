@@ -212,6 +212,11 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
     workingDays: [] as string[],
     warehouseInFee: "",
     warehouseOutFee: "",
+    lateArrivalGraceValue: "",
+    lateArrivalGraceUnit: "minutes" as "minutes" | "hours" | "days",
+    lateArrivalPenaltyAmount: "",
+    lateArrivalPenaltyType: "" as "" | "flat" | "per_hour" | "per_day",
+    paymentTermsDays: "",
     overtimePrice: {
       afterRegularWorkTime: {
         in: "",
@@ -342,6 +347,11 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
             workingDays: warehouse.workingDays || [],
             warehouseInFee: warehouse.warehouseInFee != null ? warehouse.warehouseInFee.toString() : "",
             warehouseOutFee: warehouse.warehouseOutFee != null ? warehouse.warehouseOutFee.toString() : "",
+            lateArrivalGraceValue: warehouse.lateArrivalGraceMinutes != null ? warehouse.lateArrivalGraceMinutes.toString() : "",
+            lateArrivalGraceUnit: "minutes" as const,
+            lateArrivalPenaltyAmount: warehouse.lateArrivalPenaltyAmount != null ? warehouse.lateArrivalPenaltyAmount.toString() : "",
+            lateArrivalPenaltyType: (warehouse.lateArrivalPenaltyType as "" | "flat" | "per_hour" | "per_day") || "",
+            paymentTermsDays: warehouse.paymentTermsDays != null ? warehouse.paymentTermsDays.toString() : "",
             overtimePrice: warehouse.overtimePrice && typeof warehouse.overtimePrice === 'object'
               ? {
                   afterRegularWorkTime: {
@@ -782,6 +792,24 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
         workingDays: formData.workingDays,
         warehouseInFee: formData.warehouseInFee ? parseFloat(formData.warehouseInFee) : undefined,
         warehouseOutFee: formData.warehouseOutFee ? parseFloat(formData.warehouseOutFee) : undefined,
+        lateArrivalGraceMinutes: (() => {
+          const v = formData.lateArrivalGraceValue.trim()
+          if (!v) return undefined
+          const num = parseFloat(v)
+          if (isNaN(num) || num < 0) return undefined
+          if (formData.lateArrivalGraceUnit === "hours") return Math.round(num * 60)
+          if (formData.lateArrivalGraceUnit === "days") return Math.round(num * 24 * 60)
+          return Math.round(num)
+        })(),
+        lateArrivalPenaltyAmount: formData.lateArrivalPenaltyAmount.trim()
+          ? parseFloat(formData.lateArrivalPenaltyAmount)
+          : undefined,
+        lateArrivalPenaltyType: formData.lateArrivalPenaltyType
+          ? (formData.lateArrivalPenaltyType as "flat" | "per_hour" | "per_day")
+          : undefined,
+        paymentTermsDays: formData.paymentTermsDays.trim()
+          ? (() => { const n = parseInt(formData.paymentTermsDays, 10); return isNaN(n) || n < 0 ? undefined : n })()
+          : undefined,
         overtimePrice: {
           afterRegularWorkTime: {
             in: formData.overtimePrice.afterRegularWorkTime.in ? parseFloat(formData.overtimePrice.afterRegularWorkTime.in) : undefined,
@@ -1592,9 +1620,9 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                         setFormData({ ...formData, productDepartureTimeSlots: slots })
                       }
                     />
-                  </div>
-                </div>
               </div>
+            </div>
+            </div>
 
               {/* Working Days */}
               <div className="space-y-2">
@@ -1687,6 +1715,111 @@ export function WarehouseForm({ mode, warehouseId, initialStep = 1 }: WarehouseF
                   ))}
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Payment terms (financial due) - always in Pricing step */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Payment Terms (days)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Number of days from invoice date until payment is due. Leave empty for no warehouse-specific terms.
+                </p>
+                <div className="max-w-[200px]">
+                  <Input
+                    id="paymentTermsDays"
+                    type="number"
+                    min={0}
+                    max={365}
+                    placeholder="e.g. 30"
+                    value={formData.paymentTermsDays}
+                    onChange={(e) =>
+                      setFormData({ ...formData, paymentTermsDays: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Days (0–365)</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Late arrival penalty - always in Pricing step */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Late Arrival Penalty</Label>
+                <p className="text-sm text-muted-foreground">
+                  Applied when the appointment time is exceeded (e.g. appointment 8:30, arrival 9:30). Set allowed grace period and penalty amount.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lateGraceValue">Allowed grace period</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="lateGraceValue"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={formData.lateArrivalGraceValue}
+                        onChange={(e) =>
+                          setFormData({ ...formData, lateArrivalGraceValue: e.target.value })
+                        }
+                      />
+                      <Select
+                        value={formData.lateArrivalGraceUnit}
+                        onValueChange={(val: "minutes" | "hours" | "days") =>
+                          setFormData({ ...formData, lateArrivalGraceUnit: val })
+                        }
+                      >
+                        <SelectTrigger className="w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="minutes">Minutes</SelectItem>
+                          <SelectItem value="hours">Hours</SelectItem>
+                          <SelectItem value="days">Days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="latePenaltyAmount">Penalty amount</Label>
+                    <Input
+                      id="latePenaltyAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.lateArrivalPenaltyAmount}
+                      onChange={(e) =>
+                        setFormData({ ...formData, lateArrivalPenaltyAmount: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="latePenaltyType">Penalty unit</Label>
+                    <Select
+                      value={formData.lateArrivalPenaltyType === "" ? "__none__" : formData.lateArrivalPenaltyType}
+                      onValueChange={(val) =>
+                        setFormData({
+                          ...formData,
+                          lateArrivalPenaltyType: val === "__none__" ? "" : (val as "flat" | "per_hour" | "per_day"),
+                        })
+                      }
+                    >
+                      <SelectTrigger id="latePenaltyType">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No penalty</SelectItem>
+                        <SelectItem value="flat">One-time</SelectItem>
+                        <SelectItem value="per_hour">Per hour</SelectItem>
+                        <SelectItem value="per_day">Per day</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
 
               {/* Handling Fees - Only show if Pallet Storage is selected */}
               {formData.rentMethods.includes("pallet") && (

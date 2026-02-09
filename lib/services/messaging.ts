@@ -1,11 +1,12 @@
 /**
  * Messaging Service
- * 
+ *
  * Handles conversations and messages management
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { Conversation, Message } from '@/types/marketplace'
+import { createNotification } from '@/lib/db/notifications'
 
 /**
  * Get conversations for a user
@@ -213,7 +214,8 @@ export async function getOrCreateConversation(
 }
 
 /**
- * Send a message
+ * Send a message.
+ * receiver_id is derived from conversation: guest receives when host/staff sends, host receives when guest sends.
  */
 export async function sendMessage(
   conversationId: string,
@@ -225,13 +227,25 @@ export async function sendMessage(
 ): Promise<Message> {
   const supabase = createServerSupabaseClient()
 
+  const { data: conv, error: convError } = await supabase
+    .from('conversations')
+    .select('host_id, guest_id')
+    .eq('id', conversationId)
+    .single()
+
+  if (convError || !conv) {
+    throw new Error('Conversation not found')
+  }
+
+  const receiverId = conv.guest_id === senderId ? conv.host_id : conv.guest_id
+
   try {
     const { data: message, error } = await supabase
       .from('warehouse_messages')
       .insert({
         conversation_id: conversationId,
         sender_id: senderId,
-        receiver_id: senderId, // Will be updated by trigger
+        receiver_id: receiverId,
         content,
         message_type: messageType,
         attachments: attachments || [],
@@ -343,6 +357,256 @@ export async function getUnreadCount(userId: string): Promise<number> {
   } catch (error) {
     console.error('[messaging] Error getting unread count:', error)
     return 0
+  }
+}
+
+/**
+ * Resolve a representative host user_id for a warehouse (for conversation host_id).
+ * Priority: (1) warehouse_staff with role manager, (2) any warehouse_staff, (3) company admin for owner_company_id.
+ */
+export async function resolveHostForWarehouse(warehouseId: string): Promise<string | null> {
+  const supabase = createServerSupabaseClient()
+
+  const { data: warehouse } = await supabase
+    .from('warehouses')
+    .select('owner_company_id')
+    .eq('id', warehouseId)
+    .single()
+
+  if (!warehouse?.owner_company_id) {
+    return null
+  }
+
+  const { data: managerStaff } = await supabase
+    .from('warehouse_staff')
+    .select('user_id')
+    .eq('warehouse_id', warehouseId)
+    .eq('status', true)
+    .eq('role', 'manager')
+    .limit(1)
+    .maybeSingle()
+
+  if (managerStaff?.user_id) {
+    return managerStaff.user_id
+  }
+
+  const { data: anyStaff } = await supabase
+    .from('warehouse_staff')
+    .select('user_id')
+    .eq('warehouse_id', warehouseId)
+    .eq('status', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (anyStaff?.user_id) {
+    return anyStaff.user_id
+  }
+
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('company_id', warehouse.owner_company_id)
+    .in('role', ['root', 'warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
+    .limit(1)
+    .maybeSingle()
+
+  return adminProfile?.id ?? null
+}
+
+/**
+ * Get conversations for a warehouse-side user (staff or company admin).
+ * Returns conversations where warehouse_id is in the user's assigned/owned warehouses.
+ */
+export async function getConversationsForWarehouseUser(userId: string): Promise<Conversation[]> {
+  const supabase = createServerSupabaseClient()
+
+  const warehouseIds: string[] = []
+
+  const { data: staffRows } = await supabase
+    .from('warehouse_staff')
+    .select('warehouse_id')
+    .eq('user_id', userId)
+    .eq('status', true)
+
+  if (staffRows?.length) {
+    warehouseIds.push(...staffRows.map((r: { warehouse_id: string }) => r.warehouse_id))
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profile?.company_id) {
+    const { data: companyWarehouses } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('owner_company_id', profile.company_id)
+
+    if (companyWarehouses?.length) {
+      companyWarehouses.forEach((w: { id: string }) => {
+        if (!warehouseIds.includes(w.id)) warehouseIds.push(w.id)
+      })
+    }
+  }
+
+  if (warehouseIds.length === 0) {
+    return []
+  }
+
+  const { data: conversations, error } = await supabase
+    .from('conversations')
+    .select(
+      `
+      *,
+      warehouses(id, name),
+      profiles!conversations_host_id_fkey(id, name),
+      profiles!conversations_guest_id_fkey(id, name)
+    `
+    )
+    .in('warehouse_id', warehouseIds)
+    .eq('status', true)
+    .order('last_message_at', { ascending: false })
+
+  if (error) {
+    console.error('[messaging] Error fetching warehouse conversations:', error)
+    return []
+  }
+
+  return (conversations || []).map((conv: any) => ({
+    id: conv.id,
+    booking_id: conv.booking_id,
+    warehouse_id: conv.warehouse_id,
+    warehouse_name: conv.warehouses?.name || '',
+    host_id: conv.host_id,
+    host_name: conv.profiles?.name || '',
+    guest_id: conv.guest_id,
+    guest_name: conv.profiles?.name || '',
+    subject: conv.subject,
+    status: conv.conversation_status,
+    last_message_at: conv.last_message_at,
+    last_message_preview: conv.last_message_preview,
+    unread_count: conv.host_unread_count ?? 0,
+    created_at: conv.created_at,
+    updated_at: conv.updated_at,
+  }))
+}
+
+/**
+ * Check if a user can access a conversation (is guest, host, or warehouse staff/admin for that warehouse).
+ */
+export async function canUserAccessConversation(
+  conversationId: string,
+  userId: string
+): Promise<boolean> {
+  const supabase = createServerSupabaseClient()
+
+  const { data: conv, error } = await supabase
+    .from('conversations')
+    .select('host_id, guest_id, warehouse_id')
+    .eq('id', conversationId)
+    .single()
+
+  if (error || !conv) {
+    return false
+  }
+
+  if (conv.host_id === userId || conv.guest_id === userId) {
+    return true
+  }
+
+  const { data: staff } = await supabase
+    .from('warehouse_staff')
+    .select('user_id')
+    .eq('warehouse_id', conv.warehouse_id)
+    .eq('user_id', userId)
+    .eq('status', true)
+    .maybeSingle()
+
+  if (staff?.user_id) {
+    return true
+  }
+
+  const { data: warehouse } = await supabase
+    .from('warehouses')
+    .select('owner_company_id')
+    .eq('id', conv.warehouse_id)
+    .single()
+
+  if (!warehouse?.owner_company_id) {
+    return false
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .eq('company_id', warehouse.owner_company_id)
+    .in('role', ['root', 'warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
+    .maybeSingle()
+
+  return !!profile?.id
+}
+
+/**
+ * Notify all warehouse-side users (staff + company admins) that a client started a chat for a booking.
+ */
+export async function notifyWarehouseSideForNewChat(
+  conversationId: string,
+  bookingId: string,
+  warehouseId: string
+): Promise<void> {
+  const supabase = createServerSupabaseClient()
+  const notified = new Set<string>()
+
+  const { data: warehouse } = await supabase
+    .from('warehouses')
+    .select('name, owner_company_id')
+    .eq('id', warehouseId)
+    .single()
+
+  if (!warehouse) return
+
+  const { data: staffRows } = await supabase
+    .from('warehouse_staff')
+    .select('user_id')
+    .eq('warehouse_id', warehouseId)
+    .eq('status', true)
+
+  if (staffRows?.length) {
+    staffRows.forEach((r: { user_id: string }) => notified.add(r.user_id))
+  }
+
+  if (warehouse.owner_company_id) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('company_id', warehouse.owner_company_id)
+      .in('role', ['root', 'warehouse_owner', 'warehouse_admin', 'warehouse_supervisor'])
+
+    if (profiles?.length) {
+      profiles.forEach((p: { id: string }) => notified.add(p.id))
+    }
+  }
+
+  const title = 'New chat started'
+  const message = `A client started a chat for booking ${bookingId}. Open Chats to reply.`
+  const metadata = { conversationId, bookingId, warehouseId }
+
+  for (const userId of notified) {
+    try {
+      await createNotification({
+        userId,
+        type: 'booking',
+        channel: 'push',
+        title,
+        message,
+        metadata,
+      })
+    } catch (err) {
+      console.error('[messaging] Failed to notify user', userId, err)
+    }
   }
 }
 

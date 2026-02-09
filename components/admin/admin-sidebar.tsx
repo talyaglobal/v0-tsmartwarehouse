@@ -66,6 +66,16 @@ const navSections: NavSection[] = [
     defaultOpen: true,
   },
   {
+    title: "Billing",
+    items: [
+      { name: "Orders", href: "/admin/orders", icon: ClipboardList },
+      { name: "Estimates", href: "/admin/estimates", icon: FileText },
+      { name: "Invoices", href: "/admin/invoices", icon: DollarSign },
+      { name: "Cash Collection", href: "/admin/cash-collection", icon: TrendingUp },
+    ],
+    defaultOpen: true,
+  },
+  {
     title: "Management",
     items: [
       { name: "All Users", href: "/admin/users", icon: Users },

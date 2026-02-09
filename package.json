@@ -67,6 +67,7 @@
     "react-international-phone": "^4.6.1",
     "react-is": "^19.0.0",
     "recharts": "^3.6.0",
+    "resend": "^6.9.1",
     "stripe": "^14.21.0",
     "tailwind-merge": "^2.5.5",
     "three": "^0.182.0",

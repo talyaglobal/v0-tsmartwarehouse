@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
+import { isCompanyAdmin, getUserCompanyId, getUserAdminCompanies } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ListResponse, ApiResponse } from "@/types/api"
 import { createWarehouse, getWarehouses } from "@/lib/db/warehouses"
@@ -155,6 +155,12 @@ const createWarehouseSchema = z.object({
   // Warehouse fees
   warehouseInFee: z.number().nonnegative().optional(),
   warehouseOutFee: z.number().nonnegative().optional(),
+  // Gecikme cezası: X süre (dakika) gecikmeden sonra Y tutar
+  lateArrivalGraceMinutes: z.number().int().nonnegative().optional().nullable(),
+  lateArrivalPenaltyAmount: z.number().nonnegative().optional().nullable(),
+  lateArrivalPenaltyType: z.enum(["flat", "per_hour", "per_day"]).optional().nullable(),
+  /** Finansal vade: ödeme süresi (gün). Her depo kendi vadesini belirler. */
+  paymentTermsDays: z.number().int().min(0).max(365).optional().nullable(),
   // Transportation
   ports: z.array(z.object({
     name: z.string().min(1, "Port name is required"),
@@ -194,11 +200,36 @@ export async function GET(request: NextRequest) {
 
     // Check permissions
     if (user.role !== 'root') {
-      const userCompanyId = await getUserCompanyId(user.id)
+      let userCompanyId = await getUserCompanyId(user.id)
+      // Fallback: warehouse_admin may have company from admin role but null company_id in profile
       if (!userCompanyId) {
+        const adminCompanies = await getUserAdminCompanies(user.id)
+        userCompanyId = adminCompanies.length > 0 ? adminCompanies[0] : null
+      }
+      // Fallback: show warehouses where user is assigned as staff (warehouse_staff table)
+      if (!userCompanyId) {
+        const supabase = createServerSupabaseClient()
+        const { data: staffRows } = await supabase
+          .from("warehouse_staff")
+          .select("warehouse_id")
+          .eq("user_id", user.id)
+          .eq("status", true)
+        if (staffRows && staffRows.length > 0) {
+          const warehouseIds = staffRows.map((r: { warehouse_id: string }) => r.warehouse_id)
+          const allWarehouses = await getWarehouses()
+          const assigned = allWarehouses.filter((w: { id: string }) =>
+            warehouseIds.includes((w as { id: string }).id)
+          )
+          const responseData: ListResponse<any> = {
+            success: true,
+            data: assigned,
+            total: assigned.length,
+          }
+          return NextResponse.json(responseData)
+        }
         const errorData: ErrorResponse = {
           success: false,
-          error: "User must belong to a company",
+          error: "User must belong to a company or be assigned to a warehouse to view warehouses. Please contact support or complete your profile (My Company).",
           statusCode: 403,
         }
         return NextResponse.json(errorData, { status: 403 })
@@ -216,7 +247,24 @@ export async function GET(request: NextRequest) {
 
       // Use user's company ID if no companyId specified
       const targetCompanyId = companyId || userCompanyId
-      const warehouses = await getWarehouses({ ownerCompanyId: targetCompanyId })
+      let warehouses = await getWarehouses({ ownerCompanyId: targetCompanyId })
+      // Also include warehouses where user is assigned as staff (in case profile company differs)
+        const supabaseForStaff = createServerSupabaseClient()
+      const { data: staffRows } = await supabaseForStaff
+        .from("warehouse_staff")
+        .select("warehouse_id")
+        .eq("user_id", user.id)
+        .eq("status", true)
+      if (staffRows && staffRows.length > 0) {
+        const companyWarehouseIds = new Set(warehouses.map((w: { id: string }) => (w as { id: string }).id))
+        const allWarehouses = await getWarehouses()
+        const assignedOnly = allWarehouses.filter(
+          (w: { id: string }) =>
+            staffRows.some((r: { warehouse_id: string }) => r.warehouse_id === (w as { id: string }).id) &&
+            !companyWarehouseIds.has((w as { id: string }).id)
+        )
+        warehouses = [...warehouses, ...assignedOnly]
+      }
 
       const responseData: ListResponse<any> = {
         success: true,
@@ -360,6 +408,10 @@ export async function POST(request: NextRequest) {
       workingDays: validated.workingDays,
       warehouseInFee: validated.warehouseInFee,
       warehouseOutFee: validated.warehouseOutFee,
+      lateArrivalGraceMinutes: validated.lateArrivalGraceMinutes ?? undefined,
+      lateArrivalPenaltyAmount: validated.lateArrivalPenaltyAmount ?? undefined,
+      lateArrivalPenaltyType: validated.lateArrivalPenaltyType ?? undefined,
+      paymentTermsDays: validated.paymentTermsDays ?? undefined,
       overtimePrice: validated.overtimePrice, // New field
       freeStorageRules: validated.freeStorageRules || [],
     })

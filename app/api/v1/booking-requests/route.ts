@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
       isSingleType,
       notes,
       requiresApproval,
+      poInfo,
+      isLabellingRequired,
     } = body
 
     const userId = authResult.user.id
@@ -64,6 +66,8 @@ export async function POST(request: NextRequest) {
         is_single_type: Boolean(isSingleType),
         notes: notes?.trim() || null,
         requires_approval: requiresApproval !== false,
+        po_info: poInfo != null ? String(poInfo).trim() || null : null,
+        is_labelling_required: Boolean(isLabellingRequired),
       })
       .select("id, status, created_at")
       .single()

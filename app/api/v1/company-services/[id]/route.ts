@@ -11,6 +11,8 @@ const companyServiceUpdateSchema = z.object({
   serviceDescription: z.string().optional(),
   pricingType: z.enum(['one_time', 'per_pallet', 'per_sqft', 'per_day', 'per_month']).optional(),
   basePrice: z.number().min(0).optional(),
+  minPrice: z.number().min(0).optional().nullable(),
+  allowCustomPrice: z.boolean().optional(),
   isActive: z.boolean().optional()
 })
 
@@ -146,11 +148,13 @@ export async function PATCH(
     const validatedData = companyServiceUpdateSchema.parse(body)
 
     // Build update object
-    const updates: any = {}
+    const updates: Record<string, unknown> = {}
     if (validatedData.serviceName !== undefined) updates.service_name = validatedData.serviceName
     if (validatedData.serviceDescription !== undefined) updates.service_description = validatedData.serviceDescription
     if (validatedData.pricingType !== undefined) updates.pricing_type = validatedData.pricingType
     if (validatedData.basePrice !== undefined) updates.base_price = validatedData.basePrice
+    if (validatedData.minPrice !== undefined) updates.min_price = validatedData.minPrice
+    if (validatedData.allowCustomPrice !== undefined) updates.allow_custom_price = validatedData.allowCustomPrice
     if (validatedData.isActive !== undefined) updates.is_active = validatedData.isActive
 
     // Update company service

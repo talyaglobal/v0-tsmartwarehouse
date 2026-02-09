@@ -40,6 +40,8 @@ export interface BookingRequestRow {
   status: string
   notes: string | null
   requires_approval: boolean
+  po_info: string | null
+  is_labelling_required: boolean
   created_at: string
   can_edit?: boolean
   can_delete?: boolean
@@ -65,6 +67,8 @@ export function BookingRequestsList() {
     isSingleType: true,
     notes: "",
     requiresApproval: true,
+    poInfo: "",
+    isLabellingRequired: false,
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
@@ -142,6 +146,8 @@ export function BookingRequestsList() {
       isSingleType: r.is_single_type,
       notes: r.notes ?? "",
       requiresApproval: r.requires_approval ?? true,
+      poInfo: r.po_info ?? "",
+      isLabellingRequired: r.is_labelling_required ?? false,
     })
     setEditId(r.id)
   }
@@ -157,6 +163,8 @@ export function BookingRequestsList() {
       isSingleType: editForm.isSingleType,
       notes: editForm.notes.trim() || undefined,
       requiresApproval: editForm.requiresApproval,
+      poInfo: editForm.poInfo.trim() || undefined,
+      isLabellingRequired: editForm.isLabellingRequired,
     }
     if (members.length > 0 && editForm.customerId != null && editForm.customerId !== "") {
       body.customerId = editForm.customerId
@@ -219,6 +227,12 @@ export function BookingRequestsList() {
               )}
               {r.notes && (
                 <p className="text-sm text-muted-foreground">Note: {r.notes}</p>
+              )}
+              {r.po_info && (
+                <p className="text-sm text-muted-foreground">PO: {r.po_info}</p>
+              )}
+              {r.is_labelling_required && (
+                <Badge variant="outline" className="text-xs">Labelling required</Badge>
               )}
               <p className="text-xs text-muted-foreground">
                 {new Date(r.created_at).toLocaleDateString()}

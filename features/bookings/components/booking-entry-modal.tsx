@@ -24,6 +24,10 @@ export interface BookingRequestFormData {
   specialMessage?: string
   /** When booking for another client: company admin can choose pre-approved (false) or requires approval (true) */
   requiresApproval?: boolean
+  /** PO (Purchase Order) reference - optional string */
+  poInfo?: string
+  /** Whether labelling is required for this request */
+  isLabellingRequired?: boolean
 }
 
 export interface BookingEntryResult {
@@ -43,6 +47,8 @@ const defaultFormState: BookingRequestFormState = {
   isSingleType: true,
   notes: "",
   requiresApproval: true,
+  poInfo: "",
+  isLabellingRequired: false,
 }
 
 interface BookingEntryModalProps {
@@ -126,6 +132,8 @@ export function BookingEntryModal({ open, onComplete, onClose }: BookingEntryMod
         isSingleType: form.isSingleType,
         specialMessage: form.notes,
         requiresApproval: form.requiresApproval,
+        poInfo: form.poInfo || undefined,
+        isLabellingRequired: form.isLabellingRequired,
       },
       requestCustomerId: bookingFor === "another" ? form.customerId ?? undefined : undefined,
     })

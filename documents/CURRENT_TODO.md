@@ -8,6 +8,70 @@
 
 ## 📋 Session / Recent Fixes
 
+### 2026-02-06: Booking flow – 10% deposit, pallet check-in/check-out, QR logs (plan implementation)
+- **Amaç**: Rezervasyon → depo bildirimi → onay/tarih teklifi → kabul → **%10 depozito** → check-in (min 3 foto, palet başına QR, her okutma log) → check-out talebi → oranlı kalan ödeme → ödeme sonrası check-out (min 3 foto).
+- **Migration**: `supabase/migrations/20260206150000_booking_deposit_pallet_checkout_qr_logs.sql`
+  - `bookings`: `deposit_amount`, `deposit_paid_at`.
+  - `pallet_checkout_requests`: booking_id, warehouse_id, customer_id, pallet_count, amount, status (pending_payment | paid | completed), paid_at, metadata (pallet_ids).
+  - `pallet_checkin_photos`: inventory_item_id, photo_type (sealed | opened_emptying | empty), storage_path, uploaded_by.
+  - `pallet_checkout_photos`: pallet_checkout_request_id, photo_type (before_exit | loading | empty_area), storage_path, uploaded_by.
+  - `pallet_operation_logs`: inventory_item_id, booking_id, warehouse_id, operation (check_in | check_out | move | scan_view), performed_by, performed_at, metadata.
+  - `payments`: optional booking_id, checkout_request_id, payment_type (invoice | deposit | checkout_remaining). RLS ve index’ler.
+- **Bildirim**: `lib/notifications/event-processor.ts` – `booking.requested` için alıcı listesine warehouse_staff (ilgili depoya atanmış) ve aynı company_id’deki profiller eklendi.
+- **Depozito**: `app/payment/page.tsx` – sadece `bookingId` ile gelindiğinde %10 depozito flow; `POST /api/v1/bookings/[id]/create-deposit-intent`; Stripe webhook’ta deposit → `deposit_paid_at`, status confirmed.
+- **Checkout request**: `POST/GET /api/v1/bookings/[id]/checkout-requests` – kalan tutar = (toplam − depozito) × (N/toplam_palet) × (gün oranı); Stripe PaymentIntent (payment_type: checkout_remaining); webhook’ta `pallet_checkout_requests.status = paid`.
+- **Check-in**: `POST /api/v1/inventory/check-in` – 3 foto (sealed, opened_emptying, empty), palet başına QR payload, inventory_items + pallet_checkin_photos + pallet_operation_logs. `lib/utils/qr-payload.ts` encode/decode. Warehouse UI: `/warehouse/check-in` – warehouse/booking seçimi, pallet count, 3 foto upload, sonuçta pallet_id + qr_code listesi.
+- **QR log**: `GET /api/v1/inventory/search?code=...&operation=...` – palet bulunduktan sonra authenticated ise `pallet_operation_logs` insert (operation: check_in | check_out | move | scan_view).
+- **Check-out**: `POST /api/v1/inventory/check-out` – body: checkout_request_id, photos (before_exit, loading, empty_area); request status = paid zorunlu; 3 foto → pallet_checkout_photos; ilgili pallet’ler shipped; pallet_operation_logs (check_out); request status = completed. `GET /api/v1/warehouse-staff/checkout-requests?warehouseId=...&status=paid` – depot staff için paid request listesi. Warehouse UI: `/warehouse/check-out` – warehouse seç, paid request seç, 3 foto yükle, Complete check-out.
+- **Nav**: Warehouse bottom nav’a Check-in ve Check-out linkleri eklendi. Check-in sayfası booking listesi için `GET /api/v1/warehouse-staff/bookings?warehouseId=...&status=confirmed` kullanıyor.
+
+### 2026-02-06: Client – Warehouse Staff Chat (plan implementation)
+- **Amaç**: Müşteri booking’den “Chat with warehouse staff” ile konuşma başlatabilsin; warehouse staff ve admin bildirim alsın; her iki taraf aynı thread’de yazışabilsin.
+- **Migration**: `supabase/migrations/20260206140000_conversations_warehouse_staff_rls.sql`
+  - `conversations`: Warehouse staff’ın atandığı depolara ait konuşmaları görebilmesi için yeni SELECT policy (`warehouse_id IN (SELECT warehouse_id FROM warehouse_staff WHERE user_id = auth.uid() AND status = true)`).
+  - `warehouse_messages`: Warehouse staff’ın bu konuşmalardaki mesajları görmesi için yeni SELECT policy (konuşma warehouse’ı staff’a ait).
+- **Backend** (`lib/services/messaging.ts`):
+  - `resolveHostForWarehouse(warehouseId)`: Host user_id çözümleme (manager staff → herhangi staff → company admin).
+  - `getConversationsForWarehouseUser(userId)`: Warehouse tarafı kullanıcı için konuşma listesi (warehouse_staff + company warehouses).
+  - `notifyWarehouseSideForNewChat(conversationId, bookingId, warehouseId)`: Tüm warehouse staff + company admin’lere in-app bildirim.
+  - `canUserAccessConversation(conversationId, userId)`: Yetki kontrolü (guest, host veya warehouse staff/admin).
+  - `sendMessage`: `receiver_id` artık conversation’dan host_id/guest_id ile doğru set ediliyor (guest gönderirse receiver = host, host/staff gönderirse receiver = guest).
+- **API**:
+  - `POST /api/v1/conversations/start-for-booking`: Body `{ bookingId }`; istek sahibi booking’in customer’ı olmalı; host çözümlenir, konuşma oluşturulur/getirilir, warehouse tarafına bildirim; response `{ conversationId, ... }`.
+  - `GET /api/v1/conversations`: Client + warehouse için birleşik liste (getUserConversations + getConversationsForWarehouseUser merge).
+  - `GET /api/v1/conversations/[id]/messages`: Yetki kontrolü sonrası mesajlar.
+  - `POST /api/v1/conversations/[id]/messages`: Body `{ content }`; yetki kontrolü; sendMessage (receiver_id serviste doğru).
+  - `PATCH /api/v1/conversations/[id]/read`: markMessagesAsRead.
+- **Client UI**:
+  - Bookings sayfasında (müşteri için) “Chat” butonu: `awaiting_time_slot` veya (`pending` + proposed time) olduğunda; tıklanınca POST start-for-booking, sonra `/dashboard/chats?conversation=<id>` yönlendirmesi.
+  - `/dashboard/chats`: Konuşma listesi + seçilince mesaj thread’i, gönderim, okundu işaretleme; back → /dashboard/bookings.
+- **Warehouse UI**:
+  - `/warehouse/chats`: Konuşma listesi (warehouse’a göre filtrelenmiş) + mesaj thread’i + yanıt; back → /warehouse.
+  - Bottom nav’a “Chats” linki eklendi (`MessageSquare` ikonu).
+
+### 2026-02-06: Billing flow – Orders → Estimate → Invoice → Cash collection
+- **Amaç**: Admin dashboard’da fatura öncesi teklif (estimate), estimate’ten fatura oluşturma (şablon + Resend ile PDF e-posta), recurring (aylık) estimate, fatura sonrası tahsilat ekranı; servis tiplerinde min fiyat ve özel fiyat.
+- **Migration**: `supabase/migrations/20260206100000_estimates_invoice_templates_cash_collection.sql`
+  - `estimates` tablosu: estimate_number, service_order_id, booking_id, customer_id, items, subtotal, tax, total, due_date, valid_until, is_recurring, recurring_interval (monthly/quarterly), estimate_status (draft, sent, accepted, rejected, expired, converted).
+  - `invoice_templates` tablosu: name, html_content, company_id, is_system; varsayılan sistem şablonu eklendi.
+  - `invoices` tablosuna `estimate_id` FK eklendi.
+  - `company_services` tablosuna `min_price` (numeric, optional) ve `allow_custom_price` (boolean, default true) eklendi.
+- **Admin sidebar**: Yeni “Billing” bölümü: **Orders** → **Estimates** → **Invoices** → **Cash Collection** (sırayla).
+- **Admin sayfaları**:
+  - `/admin/orders`: Tüm siparişler listesi; Estimate linki ile estimate sayfasına yönlendirme.
+  - `/admin/estimates`: Teklif listesi; satırda sağ tık / Actions menüsü → **Create invoice** → şablon seç, “Send PDF by email (Resend)” ve alıcı e-posta; fatura oluşturulur ve isteğe bağlı Resend ile HTML e-posta gönderilir.
+  - `/admin/cash-collection`: Faturalar listesi, pending/paid özeti, View ile detay.
+- **API**:
+  - `GET/POST /api/v1/estimates`, `GET/PATCH /api/v1/estimates/[id]`, `POST /api/v1/estimates/[id]/create-invoice` (body: templateId?, sendEmail?, toEmail?).
+  - `GET /api/v1/invoice-templates`.
+  - `POST /api/v1/estimates/recurring`: Recurring (aylık) estimate’ler için ay sonunda yeni estimate oluşturur; cron ile çağrılabilir.
+- **Resend**: `lib/email/resend-invoice.ts` – fatura HTML’i ile e-posta gönderimi. `RESEND_API_KEY` ve `RESEND_FROM_EMAIL` env.
+- **Services (Company Services)**:
+  - Servis şablonunda **Min price** (opsiyonel) ve **Allow custom price** (re-price) alanları eklendi.
+  - Dashboard → Services → Company Services tab’da Min Price ve Custom (Yes/No) sütunları; formda min price ve “Allow custom price” switch.
+  - Sipariş/estimate akışında özel fiyat girilirken min_price kontrolü yapılabilir (UI’da ilgili alanlar hazır).
+- **Akış**: Sipariş var → Estimate oluştur (veya doğrudan estimate) → Estimate üzerinden Create invoice (şablon + e-posta) → Fatura kesilir → Cash collection sayfasında takip.
+
 ### 2026-02-03: created_by ve updated_by – tüm public tablolara
 - **Amaç**: Kimin kayıt eklediğini ve kimin son güncellediğini takip etmek.
 - **Migration**: `supabase/migrations/20260203100000_add_created_by_updated_by_to_tables.sql`

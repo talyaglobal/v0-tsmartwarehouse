@@ -311,6 +311,14 @@ export interface Warehouse {
   workingDays?: string[] // Array of working days (e.g., Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
   warehouseInFee?: number // Warehouse in fee (per unit)
   warehouseOutFee?: number // Warehouse out fee (per unit)
+  /** İzin verilen gecikme (dakika). Aşılırsa ceza uygulanır. */
+  lateArrivalGraceMinutes?: number | null
+  /** Ceza tutarı. */
+  lateArrivalPenaltyAmount?: number | null
+  /** flat = tek seferlik, per_hour = saat başı, per_day = gün başı */
+  lateArrivalPenaltyType?: 'flat' | 'per_hour' | 'per_day' | null
+  /** Finansal vade: fatura tarihinden itibaren ödeme süresi (gün). Her depo kendi vadesini belirler. */
+  paymentTermsDays?: number | null
   overtimePrice?: {
     afterRegularWorkTime?: {
       in?: number // Price per pallet for in operations after regular work time
@@ -393,6 +401,9 @@ export interface Booking {
   proposedStartTime?: string
   dateChangeRequestedAt?: string
   dateChangeRequestedBy?: string
+  // Deposit (10% paid at time slot accept)
+  depositAmount?: number
+  depositPaidAt?: string
   // On-behalf booking fields (2026-01-29)
   bookedById?: string           // User who created the booking (may differ from customerId)
   bookedByName?: string         // Name of the user who booked
@@ -424,6 +435,32 @@ export interface PricingConfig {
   }[]
 }
 
+// Estimate Types (Orders -> Estimate -> Invoice -> Cash Collection)
+export type EstimateStatus = "draft" | "sent" | "accepted" | "rejected" | "expired" | "converted"
+
+export interface Estimate {
+  id: string
+  estimateNumber: string
+  serviceOrderId?: string
+  bookingId?: string
+  customerId: string
+  customerName: string
+  customerEmail?: string
+  status: EstimateStatus
+  items: InvoiceItem[]
+  subtotal: number
+  tax: number
+  total: number
+  dueDate?: string
+  validUntil?: string
+  isRecurring: boolean
+  recurringInterval?: "monthly" | "quarterly"
+  estimateDate: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
 // Invoice Types
 export type InvoiceStatus = "draft" | "pending" | "paid" | "overdue" | "cancelled"
 
@@ -431,6 +468,7 @@ export interface Invoice {
   id: string
   bookingId?: string
   serviceOrderId?: string
+  estimateId?: string
   customerId: string
   customerName: string
   status: InvoiceStatus

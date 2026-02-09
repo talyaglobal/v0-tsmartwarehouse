@@ -53,6 +53,40 @@ export async function createPaymentIntent(params: {
 }
 
 /**
+ * Create a payment intent for booking deposit (10%) - no invoice
+ */
+export async function createDepositPaymentIntent(params: {
+  amount: number
+  currency?: string
+  customerId: string
+  bookingId: string
+  customerEmail?: string
+}): Promise<Stripe.PaymentIntent> {
+  if (!stripe) {
+    throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.")
+  }
+
+  const { amount, currency = "usd", customerId, bookingId, customerEmail } = params
+  const amountInCents = Math.round(amount * 100)
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amountInCents,
+    currency,
+    customer: customerId,
+    metadata: {
+      booking_id: bookingId,
+      payment_type: "deposit",
+      ...(customerEmail && { customer_email: customerEmail }),
+    },
+    automatic_payment_methods: {
+      enabled: true,
+    },
+  })
+
+  return paymentIntent
+}
+
+/**
  * Retrieve a payment intent
  */
 export async function getPaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {

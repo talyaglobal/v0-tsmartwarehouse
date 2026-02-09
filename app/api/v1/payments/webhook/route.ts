@@ -11,19 +11,35 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ""
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const supabase = await createServerSupabaseClient()
+  const paymentType = paymentIntent.metadata?.payment_type
+  const isDeposit = paymentType === "deposit"
+  const isCheckoutRemaining = paymentType === "checkout_remaining"
+  const bookingIdFromMeta = paymentIntent.metadata?.booking_id
+  const checkoutRequestId = paymentIntent.metadata?.checkout_request_id as string | undefined
 
-  // First try to find booking by payment_intent_id
-  let booking = null
-  const { data: bookingByIntent, error: fetchError } = await supabase
-    .from("bookings")
-    .select("*")
-    .eq("payment_intent_id", paymentIntent.id)
-    .maybeSingle()
+  let booking: { id: string; total_amount?: number; deposit_amount?: number } | null = null
 
-  if (!fetchError && bookingByIntent) {
-    booking = bookingByIntent
-  } else {
-    // If not found by payment_intent_id, try to find via invoice
+  if (isDeposit && bookingIdFromMeta) {
+    const { data: b } = await supabase
+      .from("bookings")
+      .select("id, total_amount, deposit_amount")
+      .eq("id", bookingIdFromMeta)
+      .maybeSingle()
+    booking = b
+  }
+
+  if (!booking) {
+    const { data: bookingByIntent } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("payment_intent_id", paymentIntent.id)
+      .maybeSingle()
+    if (bookingByIntent) {
+      booking = bookingByIntent
+    }
+  }
+
+  if (!booking) {
     const { data: payment } = await supabase
       .from("payments")
       .select("invoice_id")
@@ -43,7 +59,6 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
           .select("*")
           .eq("id", invoice.booking_id)
           .maybeSingle()
-
         if (bookingByInvoice) {
           booking = bookingByInvoice
         }
@@ -56,25 +71,47 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return
   }
 
-  // Update booking status to confirmed
+  if (isCheckoutRemaining && checkoutRequestId) {
+    try {
+      const { markCheckoutRequestPaid } = await import("@/lib/db/checkout-requests")
+      await markCheckoutRequestPaid(checkoutRequestId)
+    } catch (e) {
+      console.error("Failed to mark checkout request paid:", e)
+    }
+    return
+  }
+
+  const amountPaidCents = paymentIntent.amount
+  const amountPaidDollars = amountPaidCents / 100
+  const totalAmount = Number(booking.total_amount) || 0
+  const amountDue = isDeposit ? Math.max(0, totalAmount - amountPaidDollars) : 0
+
+  const updatePayload: Record<string, unknown> = isDeposit
+    ? {
+        deposit_paid_at: new Date().toISOString(),
+        booking_status: "confirmed",
+        payment_status: "completed",
+        amount_paid: amountPaidDollars,
+        amount_due: amountDue,
+        paid_at: new Date().toISOString(),
+      }
+    : {
+        booking_status: "confirmed",
+        payment_status: "completed",
+        amount_paid: amountPaidDollars,
+        amount_due: 0,
+        paid_at: new Date().toISOString(),
+      }
+
   const { error: updateError } = await supabase
     .from("bookings")
-    .update({
-      booking_status: "confirmed",
-      payment_status: "completed",
-      amount_paid: paymentIntent.amount / 100,
-      amount_due: 0,
-      paid_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", booking.id)
 
   if (updateError) {
     console.error("Failed to update booking:", updateError)
     return
   }
-
-  // TODO: Send confirmation email to customer
-
 }
 
 async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentIntent) {

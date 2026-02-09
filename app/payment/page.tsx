@@ -20,119 +20,87 @@ export default function PaymentPage() {
   const bookingId = searchParams.get("bookingId")
 
   useEffect(() => {
-    // If bookingId is provided, create payment intent from booking
+    // If bookingId is provided, create deposit payment intent (10% of total)
     if (bookingId && !clientSecret) {
-      const createPaymentFromBooking = async () => {
+      const createDepositIntent = async () => {
         try {
           setLoading(true)
-          // First, get the booking
           const bookingResponse = await fetch(`/api/v1/bookings/${bookingId}`, {
-            credentials: 'include',
+            credentials: "include",
           })
           const bookingData = await bookingResponse.json()
-          
+
           if (!bookingData.success || !bookingData.data) {
             router.push("/dashboard/bookings")
             return
           }
 
-          // Get invoice for this booking
-          const invoiceResponse = await fetch(`/api/v1/invoices?bookingId=${bookingId}`, {
-            credentials: 'include',
-          })
-          const invoiceData = await invoiceResponse.json()
-
-          let invoiceId: string | null = null
-          if (invoiceData.success && invoiceData.data && invoiceData.data.length > 0) {
-            invoiceId = invoiceData.data[0].id
+          const booking = bookingData.data
+          if (booking.status !== "payment_pending") {
+            setErrorMessage("This booking is not awaiting deposit payment.")
+            setLoading(false)
+            return
           }
-
-          // If no invoice exists, create one first
-          if (!invoiceId) {
-            try {
-              const generateInvoiceResponse = await fetch("/api/v1/invoices/generate-from-booking", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: 'include',
-                body: JSON.stringify({
-                  bookingId: bookingId,
-                }),
-              })
-              const generateInvoiceData = await generateInvoiceResponse.json()
-              
-              if (generateInvoiceData.success && generateInvoiceData.data) {
-                invoiceId = generateInvoiceData.data.id
-              } else {
-                console.error("Failed to generate invoice:", generateInvoiceData.error)
-                // Still try to proceed with payment using booking amount
-              }
-            } catch (error) {
-              console.error("Failed to generate invoice:", error)
-              // Continue with payment attempt using booking amount
-            }
-          }
-
-          // If we still don't have an invoiceId, we cannot proceed
-          if (!invoiceId) {
-            console.error("Invoice is required for payment")
-            setErrorMessage("Unable to create invoice for this booking. Please contact support.")
+          if (booking.depositPaidAt) {
+            setErrorMessage("Deposit already paid for this booking.")
             setLoading(false)
             return
           }
 
-          // Create payment intent via processInvoicePayment
-          const paymentResponse = await fetch("/api/v1/payments", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: 'include',
-            body: JSON.stringify({
-              invoiceId: invoiceId,
-              paymentMethod: "card",
-            }),
-          })
-          const paymentData = await paymentResponse.json()
-          
-          if (paymentData.success && paymentData.clientSecret) {
-            // Redirect with clientSecret
-            router.push(`/payment?intent=${paymentData.clientSecret}&bookingId=${bookingId}`)
+          const depositResponse = await fetch(
+            `/api/v1/bookings/${bookingId}/create-deposit-intent`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+            }
+          )
+          const depositData = await depositResponse.json()
+
+          if (depositData.success && depositData.clientSecret) {
+            router.push(
+              `/payment?intent=${encodeURIComponent(depositData.clientSecret)}&bookingId=${bookingId}`
+            )
           } else {
-            console.error("Failed to create payment:", paymentData.error)
-            setErrorMessage(paymentData.error || "Failed to create payment. Please try again.")
+            setErrorMessage(
+              depositData.error || "Failed to create deposit payment. Please try again."
+            )
             setLoading(false)
           }
         } catch (error) {
-          console.error("Failed to create payment from booking:", error)
-          setErrorMessage(error instanceof Error ? error.message : "Failed to create payment. Please try again.")
+          console.error("Failed to create deposit intent:", error)
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Failed to create payment. Please try again."
+          )
           setLoading(false)
         }
       }
 
-      createPaymentFromBooking()
+      createDepositIntent()
       return
     }
 
-    // If clientSecret is provided, retrieve payment intent and booking amount
+    // If clientSecret is provided, show deposit amount (10% of booking total)
     if (clientSecret && bookingId) {
       const retrieveIntent = async () => {
         try {
           setLoading(true)
-          
-          // Get booking to show the correct amount
           const bookingResponse = await fetch(`/api/v1/bookings/${bookingId}`, {
-            credentials: 'include',
+            credentials: "include",
           })
           const bookingData = await bookingResponse.json()
-          
+
           if (bookingData.success && bookingData.data) {
-            // Use booking total amount (in dollars, convert to cents for display)
-            const bookingAmount = bookingData.data.totalAmount || 0
-            setAmount(Math.round(bookingAmount * 100)) // Convert to cents for consistency
+            const total = bookingData.data.totalAmount || 0
+            const depositAmount = total * 0.1
+            setAmount(Math.round(depositAmount * 100))
           } else {
-            // Fallback: get amount from payment intent
             const response = await fetch("/api/v1/payments/retrieve-intent", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              credentials: 'include',
+              credentials: "include",
               body: JSON.stringify({ clientSecret }),
             })
             const data = await response.json()
@@ -263,7 +231,7 @@ export default function PaymentPage() {
                 <CardTitle>Payment Details</CardTitle>
                 {amount && (
                   <CardDescription>
-                    Total Amount: <span className="font-semibold text-foreground">{formatCurrency(amount / 100)}</span>
+                    Deposit (10%): <span className="font-semibold text-foreground">{formatCurrency(amount / 100)}</span>
                   </CardDescription>
                 )}
               </CardHeader>

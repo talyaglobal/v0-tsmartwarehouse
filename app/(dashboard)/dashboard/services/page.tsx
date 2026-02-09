@@ -16,6 +16,8 @@ interface CompanyService {
   service_description?: string
   pricing_type: 'one_time' | 'per_pallet' | 'per_sqft' | 'per_day' | 'per_month'
   base_price: number
+  min_price?: number | null
+  allow_custom_price?: boolean
   is_active: boolean
   created_at: string
   updated_at: string

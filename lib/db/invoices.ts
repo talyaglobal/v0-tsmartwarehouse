@@ -53,7 +53,7 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
   // Note: invoice_status is the business status, status is for soft delete
   let query = supabase
     .from('invoices')
-    .select('id, booking_id, service_order_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+    .select('id, booking_id, service_order_id, estimate_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
 
   if (customerId) {
     query = query.eq('customer_id', customerId)
@@ -122,7 +122,7 @@ export async function getInvoiceById(id: string, useCache: boolean = true): Prom
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, booking_id, service_order_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
+    .select('id, booking_id, service_order_id, estimate_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
     .eq('id', id)
     .eq('status', true) // Soft delete filter
     .single()
@@ -147,7 +147,7 @@ export async function getInvoiceById(id: string, useCache: boolean = true): Prom
 export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>): Promise<Invoice> {
   const supabase = createServerSupabaseClient()
   
-  const invoiceRow = {
+  const invoiceRow: Record<string, unknown> = {
     booking_id: invoice.bookingId || null,
     service_order_id: invoice.serviceOrderId || null,
     customer_id: invoice.customerId,
@@ -160,6 +160,9 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>):
     total: invoice.total,
     due_date: invoice.dueDate,
     paid_date: invoice.paidDate ?? null,
+  }
+  if ('estimateId' in invoice && invoice.estimateId) {
+    invoiceRow.estimate_id = invoice.estimateId
   }
 
   const { data, error } = await supabase
@@ -217,6 +220,7 @@ function transformInvoiceRow(row: any): Invoice {
     id: row.id,
     bookingId: row.booking_id || undefined,
     serviceOrderId: row.service_order_id || undefined,
+    estimateId: row.estimate_id || undefined,
     customerId: row.customer_id,
     customerName: row.customer_name,
     status: (row.invoice_status || row.status) as InvoiceStatus, // invoice_status is business status, fallback to status for backward compatibility

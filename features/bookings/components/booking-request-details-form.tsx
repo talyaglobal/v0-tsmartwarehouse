@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export interface BookingRequestFormState {
   customerId: string | null
@@ -21,6 +22,8 @@ export interface BookingRequestFormState {
   isSingleType: boolean
   notes: string
   requiresApproval: boolean
+  poInfo: string
+  isLabellingRequired: boolean
 }
 
 export interface BookingRequestDetailsFormMember {
@@ -168,6 +171,28 @@ export function BookingRequestDetailsForm({
           value={form.ownerOfProduct}
           onChange={(e) => setForm((p) => ({ ...p, ownerOfProduct: e.target.value }))}
         />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="poInfo">PO (Purchase Order)</Label>
+        <Input
+          id="poInfo"
+          type="text"
+          placeholder="PO number or reference (optional)"
+          value={form.poInfo}
+          onChange={(e) => setForm((p) => ({ ...p, poInfo: e.target.value }))}
+        />
+      </div>
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="isLabellingRequired"
+          checked={form.isLabellingRequired}
+          onCheckedChange={(checked) =>
+            setForm((p) => ({ ...p, isLabellingRequired: checked === true }))
+          }
+        />
+        <Label htmlFor="isLabellingRequired" className="font-normal cursor-pointer">
+          Labelling required
+        </Label>
       </div>
       <div className="space-y-2">
         <Label htmlFor="skuCount">How many SKU / products</Label>

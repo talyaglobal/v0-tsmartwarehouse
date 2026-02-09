@@ -31,6 +31,8 @@ interface CompanyService {
   service_description?: string
   pricing_type: 'one_time' | 'per_pallet' | 'per_sqft' | 'per_day' | 'per_month'
   base_price: number
+  min_price?: number | null
+  allow_custom_price?: boolean
   is_active: boolean
 }
 
@@ -51,6 +53,8 @@ export function CompanyServiceDialog({
   const [serviceDescription, setServiceDescription] = useState('')
   const [pricingType, setPricingType] = useState<'one_time' | 'per_pallet' | 'per_sqft' | 'per_day' | 'per_month'>('one_time')
   const [basePrice, setBasePrice] = useState('')
+  const [minPrice, setMinPrice] = useState('')
+  const [allowCustomPrice, setAllowCustomPrice] = useState(true)
   const [isActive, setIsActive] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
@@ -61,12 +65,16 @@ export function CompanyServiceDialog({
       setServiceDescription(service.service_description || '')
       setPricingType(service.pricing_type)
       setBasePrice(service.base_price.toString())
+      setMinPrice(service.min_price != null ? service.min_price.toString() : '')
+      setAllowCustomPrice(service.allow_custom_price !== false)
       setIsActive(service.is_active)
     } else {
       setServiceName('')
       setServiceDescription('')
       setPricingType('one_time')
       setBasePrice('')
+      setMinPrice('')
+      setAllowCustomPrice(true)
       setIsActive(true)
     }
   }, [service, open])
@@ -92,6 +100,23 @@ export function CompanyServiceDialog({
       })
       return
     }
+    const min = minPrice.trim() ? parseFloat(minPrice) : null
+    if (minPrice.trim() && (isNaN(min!) || min! < 0)) {
+      toast({
+        title: 'Error',
+        description: 'Min price must be a non-negative number',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (min != null && min > price) {
+      toast({
+        title: 'Error',
+        description: 'Min price cannot exceed base price',
+        variant: 'destructive',
+      })
+      return
+    }
 
     try {
       setIsSubmitting(true)
@@ -101,6 +126,8 @@ export function CompanyServiceDialog({
         serviceDescription: serviceDescription.trim() || undefined,
         pricingType,
         basePrice: price,
+        minPrice: min ?? undefined,
+        allowCustomPrice,
         isActive,
       }
 
@@ -192,6 +219,32 @@ export function CompanyServiceDialog({
               placeholder="0.00"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="minPrice">Min Price (optional)</Label>
+            <Input
+              id="minPrice"
+              type="number"
+              step="0.01"
+              min="0"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              placeholder="Leave empty for no minimum"
+            />
+            <p className="text-xs text-muted-foreground">
+              When custom price is allowed, unit price cannot be below this.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label htmlFor="allowCustomPrice">Allow custom price</Label>
+            <Switch
+              id="allowCustomPrice"
+              checked={allowCustomPrice}
+              onCheckedChange={setAllowCustomPrice}
+            />
+            <span className="text-xs text-muted-foreground">Re-price per order (≥ min price)</span>
           </div>
 
           <div className="flex items-center justify-between">

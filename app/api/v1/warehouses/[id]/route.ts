@@ -154,6 +154,10 @@ const updateWarehouseSchema = z.object({
   workingDays: z.array(z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])).optional(),
   warehouseInFee: z.number().nonnegative().optional(),
   warehouseOutFee: z.number().nonnegative().optional(),
+  lateArrivalGraceMinutes: z.number().int().nonnegative().optional().nullable(),
+  lateArrivalPenaltyAmount: z.number().nonnegative().optional().nullable(),
+  lateArrivalPenaltyType: z.enum(["flat", "per_hour", "per_day"]).optional().nullable(),
+  paymentTermsDays: z.number().int().min(0).max(365).optional().nullable(),
   ports: z.array(z.object({
     name: z.string().min(1, "Port name is required"),
     container40DC: z.number().nonnegative().optional(),
@@ -435,6 +439,10 @@ export async function PUT(
     if (validated.workingDays !== undefined) updateData.workingDays = validated.workingDays
     if (validated.warehouseInFee !== undefined) updateData.warehouseInFee = validated.warehouseInFee
     if (validated.warehouseOutFee !== undefined) updateData.warehouseOutFee = validated.warehouseOutFee
+    if (validated.lateArrivalGraceMinutes !== undefined) updateData.lateArrivalGraceMinutes = validated.lateArrivalGraceMinutes
+    if (validated.lateArrivalPenaltyAmount !== undefined) updateData.lateArrivalPenaltyAmount = validated.lateArrivalPenaltyAmount
+    if (validated.lateArrivalPenaltyType !== undefined) updateData.lateArrivalPenaltyType = validated.lateArrivalPenaltyType
+    if (validated.paymentTermsDays !== undefined) updateData.paymentTermsDays = validated.paymentTermsDays
     if (validated.overtimePrice !== undefined) {
       // If overtimePrice is provided, check if it has any values
       if (validated.overtimePrice && 

@@ -177,9 +177,52 @@ async function determineRecipients(
 
   switch (payload.eventType) {
     case 'booking.requested': {
-      // Notify warehouse owner
+      const seen = new Set<string>()
+      // Notify warehouse owner / company
       if ('warehouseOwnerId' in payload && payload.warehouseOwnerId) {
-        recipients.push({ userId: payload.warehouseOwnerId })
+        const ownerId = payload.warehouseOwnerId as string
+        if (!seen.has(ownerId)) {
+          recipients.push({ userId: ownerId })
+          seen.add(ownerId)
+        }
+      }
+      // Notify warehouse staff assigned to this warehouse
+      if ('warehouseId' in payload && payload.warehouseId) {
+        const { data: staffRows } = await supabase
+          .from('warehouse_staff')
+          .select('user_id')
+          .eq('warehouse_id', payload.warehouseId)
+          .eq('status', true)
+        if (staffRows?.length) {
+          for (const row of staffRows) {
+            const uid = row.user_id as string
+            if (!seen.has(uid)) {
+              recipients.push({ userId: uid })
+              seen.add(uid)
+            }
+          }
+        }
+        // Company admins for this warehouse's owner_company_id
+        const { data: warehouse } = await supabase
+          .from('warehouses')
+          .select('owner_company_id')
+          .eq('id', payload.warehouseId)
+          .single()
+        if (warehouse?.owner_company_id) {
+          const { data: companyUsers } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('company_id', warehouse.owner_company_id)
+          if (companyUsers?.length) {
+            for (const p of companyUsers) {
+              const uid = p.id as string
+              if (!seen.has(uid)) {
+                recipients.push({ userId: uid })
+                seen.add(uid)
+              }
+            }
+          }
+        }
       }
       break
     }

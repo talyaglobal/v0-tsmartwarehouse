@@ -46,7 +46,7 @@ export default function WarehousesPage() {
       setLoading(true)
       const result = await api.get<Warehouse[]>("/api/v1/warehouses", { showToast: false })
       if (result.success) {
-        const warehouseData = result.data || []
+        const warehouseData = Array.isArray(result.data) ? result.data : (result as any).data ?? []
 
         // Convert photo paths to full URLs if they're stored in Supabase Storage
         const supabase = createClient()
@@ -100,9 +100,21 @@ export default function WarehousesPage() {
           indexes[w.id] = 0
         })
         setCurrentPhotoIndexes(indexes)
+      } else {
+        setWarehouses([])
+        const errMsg = result?.error || (result as any)?.message || "Could not load warehouses."
+        if (errMsg && typeof errMsg === "string") {
+          const { useUIStore } = await import("@/stores/ui.store")
+          useUIStore.getState().addNotification({
+            type: "error",
+            message: errMsg.length > 280 ? errMsg.slice(0, 280) + "…" : errMsg,
+            duration: 10000,
+          })
+        }
       }
     } catch (error) {
       console.error("Failed to fetch warehouses:", error)
+      setWarehouses([])
     } finally {
       setLoading(false)
     }

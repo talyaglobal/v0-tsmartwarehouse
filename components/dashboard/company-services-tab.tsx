@@ -26,6 +26,8 @@ interface CompanyService {
   service_description?: string
   pricing_type: 'one_time' | 'per_pallet' | 'per_sqft' | 'per_day' | 'per_month'
   base_price: number
+  min_price?: number | null
+  allow_custom_price?: boolean
   is_active: boolean
   created_at: string
   updated_at: string
@@ -130,6 +132,8 @@ export function CompanyServicesTab({
                 <TableHead>Description</TableHead>
                 <TableHead>Pricing Type</TableHead>
                 <TableHead className="text-right">Base Price</TableHead>
+                <TableHead className="text-right">Min Price</TableHead>
+                <TableHead>Custom</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -153,6 +157,14 @@ export function CompanyServicesTab({
                       <DollarSign className="h-4 w-4" />
                       {service.base_price.toFixed(2)}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {service.min_price != null ? service.min_price.toFixed(2) : '–'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {service.allow_custom_price !== false ? 'Yes' : 'No'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={service.is_active ? 'default' : 'secondary'}>

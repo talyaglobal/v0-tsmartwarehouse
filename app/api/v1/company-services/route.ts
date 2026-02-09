@@ -11,6 +11,8 @@ const companyServiceSchema = z.object({
   serviceDescription: z.string().optional(),
   pricingType: z.enum(['one_time', 'per_pallet', 'per_sqft', 'per_day', 'per_month']),
   basePrice: z.number().min(0, "Price must be positive"),
+  minPrice: z.number().min(0).optional().nullable(),
+  allowCustomPrice: z.boolean().optional().default(true),
   isActive: z.boolean().optional().default(true)
 })
 
@@ -117,16 +119,19 @@ export async function POST(request: NextRequest) {
     const validatedData = companyServiceSchema.parse(body)
 
     // Create company service
+    const insertRow: Record<string, unknown> = {
+      company_id: profile.company_id,
+      service_name: validatedData.serviceName,
+      service_description: validatedData.serviceDescription,
+      pricing_type: validatedData.pricingType,
+      base_price: validatedData.basePrice,
+      allow_custom_price: validatedData.allowCustomPrice ?? true,
+      is_active: validatedData.isActive
+    }
+    if (validatedData.minPrice != null) insertRow.min_price = validatedData.minPrice
     const { data: service, error } = await supabase
       .from('company_services')
-      .insert({
-        company_id: profile.company_id,
-        service_name: validatedData.serviceName,
-        service_description: validatedData.serviceDescription,
-        pricing_type: validatedData.pricingType,
-        base_price: validatedData.basePrice,
-        is_active: validatedData.isActive
-      })
+      .insert(insertRow)
       .select()
       .single()
 

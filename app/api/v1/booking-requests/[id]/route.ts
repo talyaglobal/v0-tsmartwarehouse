@@ -88,6 +88,8 @@ export async function PATCH(
     if (body.isSingleType != null) updates.is_single_type = Boolean(body.isSingleType)
     if (body.notes != null) updates.notes = body.notes?.trim() || null
     if (body.requiresApproval != null) updates.requires_approval = body.requiresApproval !== false
+    if (body.poInfo !== undefined) updates.po_info = body.poInfo != null ? String(body.poInfo).trim() || null : null
+    if (body.isLabellingRequired != null) updates.is_labelling_required = Boolean(body.isLabellingRequired)
 
     if (body.customerId != null && body.customerId !== row.customer_id) {
       const newCustomerId = String(body.customerId).trim()

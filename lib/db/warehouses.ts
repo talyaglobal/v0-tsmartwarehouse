@@ -23,7 +23,7 @@ export async function getWarehouses(
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
-    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, goods_type, storage_type, temperature_types, photos, videos, description, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, access_info, product_acceptance_time_slots, product_departure_time_slots, overtime_price, working_days, warehouse_in_fee, warehouse_out_fee, ports, free_storage_rules, created_at, updated_at')
+    .select('id, name, address, city, zip_code, total_sq_ft, total_pallet_storage, available_sq_ft, available_pallet_storage, latitude, longitude, owner_company_id, goods_type, storage_type, temperature_types, photos, videos, description, amenities, operating_hours, status, custom_status, min_pallet, max_pallet, min_sq_ft, max_sq_ft, rent_methods, security, access_info, product_acceptance_time_slots, product_departure_time_slots, overtime_price, working_days, warehouse_in_fee, warehouse_out_fee, late_arrival_grace_minutes, late_arrival_penalty_amount, late_arrival_penalty_type, payment_terms_days, ports, free_storage_rules, created_at, updated_at')
     .eq('status', true) // Soft delete filter
 
   if (filters?.ownerCompanyId) {
@@ -92,6 +92,10 @@ export async function getWarehouseById(id: string): Promise<Warehouse | null> {
       working_days,
       warehouse_in_fee,
       warehouse_out_fee,
+      late_arrival_grace_minutes,
+      late_arrival_penalty_amount,
+      late_arrival_penalty_type,
+      payment_terms_days,
       overtime_price,
       free_storage_rules,
       ports,
@@ -231,6 +235,10 @@ export async function createWarehouse(
       working_days: (warehouse as any).workingDays,
       warehouse_in_fee: (warehouse as any).warehouseInFee,
       warehouse_out_fee: (warehouse as any).warehouseOutFee,
+      late_arrival_grace_minutes: (warehouse as any).lateArrivalGraceMinutes ?? null,
+      late_arrival_penalty_amount: (warehouse as any).lateArrivalPenaltyAmount ?? null,
+      late_arrival_penalty_type: (warehouse as any).lateArrivalPenaltyType ?? null,
+      payment_terms_days: (warehouse as any).paymentTermsDays ?? null,
       overtime_price: overtimePriceValue, // New field - JSONB format (Supabase automatically converts objects to JSONB)
       ports: (warehouse as any).ports || [],
       free_storage_rules: (warehouse as any).freeStorageRules || [],
@@ -320,6 +328,10 @@ export async function updateWarehouse(
   if ((updates as any).workingDays !== undefined) updateData.working_days = (updates as any).workingDays
   if ((updates as any).warehouseInFee !== undefined) updateData.warehouse_in_fee = (updates as any).warehouseInFee
   if ((updates as any).warehouseOutFee !== undefined) updateData.warehouse_out_fee = (updates as any).warehouseOutFee
+  if ((updates as any).lateArrivalGraceMinutes !== undefined) updateData.late_arrival_grace_minutes = (updates as any).lateArrivalGraceMinutes
+  if ((updates as any).lateArrivalPenaltyAmount !== undefined) updateData.late_arrival_penalty_amount = (updates as any).lateArrivalPenaltyAmount
+  if ((updates as any).lateArrivalPenaltyType !== undefined) updateData.late_arrival_penalty_type = (updates as any).lateArrivalPenaltyType
+  if ((updates as any).paymentTermsDays !== undefined) updateData.payment_terms_days = (updates as any).paymentTermsDays
   if ((updates as any).overtimePrice !== undefined) {
     const overtimePrice = (updates as any).overtimePrice
     console.log('[UPDATE DB] OvertimePrice received:', JSON.stringify(overtimePrice, null, 2))
@@ -569,6 +581,10 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
     // Additional fields
     warehouseInFee: row.warehouse_in_fee != null && row.warehouse_in_fee !== '' ? parseFloat(row.warehouse_in_fee.toString()) : undefined,
     warehouseOutFee: row.warehouse_out_fee != null && row.warehouse_out_fee !== '' ? parseFloat(row.warehouse_out_fee.toString()) : undefined,
+    lateArrivalGraceMinutes: row.late_arrival_grace_minutes != null ? row.late_arrival_grace_minutes : undefined,
+    lateArrivalPenaltyAmount: row.late_arrival_penalty_amount != null ? parseFloat(row.late_arrival_penalty_amount.toString()) : undefined,
+    lateArrivalPenaltyType: row.late_arrival_penalty_type || undefined,
+    paymentTermsDays: row.payment_terms_days != null ? row.payment_terms_days : undefined,
     ports: row.ports || [],
     palletPricing: palletPricing.length > 0 ? palletPricing : undefined, // Add pallet pricing to warehouse object
   } as any

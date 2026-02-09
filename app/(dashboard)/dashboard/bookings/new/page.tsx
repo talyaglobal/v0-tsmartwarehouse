@@ -46,6 +46,8 @@ export default function NewBookingPage() {
               isSingleType: res.requestForm.isSingleType,
               notes: res.requestForm.specialMessage?.trim() || undefined,
               requiresApproval: res.requestForm.requiresApproval,
+              poInfo: res.requestForm.poInfo?.trim() || undefined,
+              isLabellingRequired: res.requestForm.isLabellingRequired,
             },
             { showToast: true }
           )
