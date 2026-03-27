@@ -2,19 +2,25 @@
  * Idempotency Key Management for Stripe Operations
  *
  * Ensures exactly-once payment processing even with network retries.
+ * Keys are deterministic: same inputs always produce the same key, making
+ * them safe to reuse on retry without creating a second Stripe PaymentIntent.
  * Critical for financial consistency.
  */
 
 import crypto from "crypto";
 
 /**
- * Generate idempotency key for Stripe operations
+ * Generate a deterministic idempotency key for Stripe operations.
  *
- * Format: {operation}-{bookingId}-{timestamp}-{hash}
+ * The key is derived solely from stable inputs (operation, bookingId, metadata)
+ * without any timestamp, so retrying the same operation produces the same key.
+ * Stripe will return the original PaymentIntent rather than creating a duplicate.
+ *
+ * Format: {operation}-{bookingId}-{sha256(operation+bookingId+metadata)[0:16]}
  *
  * @param operation - Operation type: deposit, checkout, refund
  * @param bookingId - Booking ID
- * @param metadata - Additional context for hash uniqueness
+ * @param metadata - Additional context for hash uniqueness (must be stable across retries)
  * @returns Idempotency key (max 255 chars for Stripe)
  */
 export function generateIdempotencyKey(
@@ -22,18 +28,17 @@ export function generateIdempotencyKey(
   bookingId: string,
   metadata?: Record<string, any>
 ): string {
-  const timestamp = Date.now();
+  // Serialize metadata with sorted keys so key order doesn't change the hash
+  const metaStr = metadata ? JSON.stringify(metadata, Object.keys(metadata).sort()) : "";
 
-  // Create hash from metadata for additional uniqueness
-  const metaStr = metadata ? JSON.stringify(metadata) : "";
   const hash = crypto
     .createHash("sha256")
-    .update(`${operation}-${bookingId}-${timestamp}-${metaStr}`)
+    .update(`${operation}-${bookingId}-${metaStr}`)
     .digest("hex")
-    .substring(0, 8);
+    .substring(0, 16);
 
-  // Format: operation-bookingId-timestamp-hash
-  const key = `${operation}-${bookingId}-${timestamp}-${hash}`;
+  // Format: operation-bookingId-hash
+  const key = `${operation}-${bookingId}-${hash}`;
 
   // Stripe limit: 255 characters
   if (key.length > 255) {

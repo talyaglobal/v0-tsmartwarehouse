@@ -1,96 +1,12 @@
-import { createServerClient } from '@supabase/ssr'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-
 /**
- * Create a Supabase client for server-side operations (API routes, Server Components)
- * This client uses service role key for admin operations
+ * Server-side database client — backed by KolayBase.
+ *
+ * All named exports match the previous Supabase signatures so every
+ * API route and server component continues to work without changes.
  */
-export function createServerSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
-  }
-
-  // For API routes, use service role key for admin operations
-  // For authenticated user operations, use the anon key with user session
-  if (supabaseServiceKey) {
-    return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  }
-
-  // Fallback to anon key if service role key is not available
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseAnonKey) {
-    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
-  }
-
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
-}
-
-/**
- * Create a Supabase client for server-side operations (alias for compatibility)
- */
-export function createClient() {
-  return createServerSupabaseClient()
-}
-
-/**
- * Create a Supabase client for authenticated user operations
- * Uses cookies to get user session
- */
-export async function createAuthenticatedSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables')
-  }
-
-  // Dynamically import cookies to avoid issues when this file is imported in client components
-  const { cookies } = await import('next/headers')
-
-  // During build time, cookies() may not be available
-  // Return a client that will fail gracefully
-  let cookieStore
-  try {
-    cookieStore = await cookies()
-  } catch (error) {
-    // During build, create a client without cookies
-    // This will allow the build to complete, but auth will fail at runtime
-    return createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return []
-        },
-        setAll() {
-          // No-op during build
-        },
-      },
-    })
-  }
-
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        } catch {
-          // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-        }
-      },
-    },
-  })
-}
+export {
+  createServerClient as createServerSupabaseClient,
+  createServerClient as createClient,
+  createAuthenticatedServerClient as createAuthenticatedSupabaseClient,
+} from "@/lib/kolaybase/server";

@@ -159,6 +159,44 @@ export async function createRefund(params: {
 }
 
 /**
+ * Refund a deposit by PaymentIntent ID.
+ * Retrieves the latest charge from the PaymentIntent and creates a refund against it.
+ * Returns null if the PaymentIntent has no associated charge (payment never captured).
+ */
+export async function refundPaymentIntent(params: {
+  paymentIntentId: string;
+  amount?: number; // dollars — omit for full refund
+  reason?: Stripe.RefundCreateParams.Reason;
+  idempotencyKey?: string;
+  metadata?: Record<string, string>;
+}): Promise<Stripe.Refund | null> {
+  if (!stripe) {
+    throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+  }
+  const { paymentIntentId, amount, reason, idempotencyKey, metadata = {} } = params;
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+    expand: ["latest_charge"],
+  });
+
+  const charge = paymentIntent.latest_charge as Stripe.Charge | null;
+  if (!charge) {
+    return null; // Payment was never captured — nothing to refund
+  }
+
+  const refundParams: Stripe.RefundCreateParams = {
+    charge: charge.id,
+    metadata,
+    ...(reason && { reason }),
+    ...(amount !== undefined && { amount: Math.round(amount * 100) }),
+  };
+
+  return await stripe.refunds.create(refundParams, {
+    ...(idempotencyKey && { idempotencyKey }),
+  });
+}
+
+/**
  * Retrieve a refund
  */
 export async function getRefund(refundId: string): Promise<Stripe.Refund> {

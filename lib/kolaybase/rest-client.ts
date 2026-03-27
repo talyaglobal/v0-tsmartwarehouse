@@ -31,15 +31,24 @@ export class KolaybaseQueryBuilder<T = any> {
   private orderFields: string[] = [];
   private limitValue?: number;
   private offsetValue?: number;
+  private countOption?: "exact" | "planned" | "estimated";
+  private upsertOnConflict?: string;
+  private upsertIgnoreDuplicates?: boolean;
   private method: "GET" | "POST" | "PATCH" | "DELETE" = "GET";
   private body?: any;
+  // Set by KolaybaseClient when a server-side token is available
+  _tokenOverride?: string;
 
   constructor(table: string) {
     this.table = table;
   }
 
-  select(fields: string = "*") {
+  select(
+    fields: string = "*",
+    options?: { count?: "exact" | "planned" | "estimated"; head?: boolean }
+  ) {
     this.selectFields = fields;
+    if (options?.count) this.countOption = options.count;
     return this;
   }
 
@@ -99,9 +108,34 @@ export class KolaybaseQueryBuilder<T = any> {
     return this;
   }
 
-  order(field: string, options?: { ascending?: boolean }) {
+  order(field: string, options?: { ascending?: boolean; nullsFirst?: boolean }) {
     const direction = options?.ascending === false ? "desc" : "asc";
-    this.orderFields.push(`${field}.${direction}`);
+    const nulls =
+      options?.nullsFirst === true
+        ? ".nullsfirst"
+        : options?.nullsFirst === false
+          ? ".nullslast"
+          : "";
+    this.orderFields.push(`${field}.${direction}${nulls}`);
+    return this;
+  }
+
+  or(filters: string) {
+    this.filters.push(`or=(${filters})`);
+    return this;
+  }
+
+  contains(column: string, value: any) {
+    const encoded = Array.isArray(value)
+      ? `{${value.map((v) => encodeURIComponent(v)).join(",")}}`
+      : encodeURIComponent(JSON.stringify(value));
+    this.filters.push(`${column}=cs.${encoded}`);
+    return this;
+  }
+
+  overlaps(column: string, value: any[]) {
+    const encoded = `{${value.map((v) => encodeURIComponent(v)).join(",")}}`;
+    this.filters.push(`${column}=ov.${encoded}`);
     return this;
   }
 
@@ -119,6 +153,28 @@ export class KolaybaseQueryBuilder<T = any> {
   insert(data: any) {
     this.method = "POST";
     this.body = data;
+    return this;
+  }
+
+  /**
+   * Upsert (INSERT ... ON CONFLICT DO UPDATE/NOTHING)
+   * onConflict: comma-separated columns that form the unique key
+   * ignoreDuplicates: if true → ON CONFLICT DO NOTHING (returns count=0 for duplicates)
+   * count: 'exact' | 'planned' | 'estimated' — returned in result.count
+   */
+  upsert(
+    data: any,
+    options?: {
+      onConflict?: string;
+      ignoreDuplicates?: boolean;
+      count?: "exact" | "planned" | "estimated";
+    }
+  ) {
+    this.method = "POST";
+    this.body = data;
+    this.upsertOnConflict = options?.onConflict;
+    this.upsertIgnoreDuplicates = options?.ignoreDuplicates ?? false;
+    this.countOption = options?.count;
     return this;
   }
 
@@ -166,13 +222,25 @@ export class KolaybaseQueryBuilder<T = any> {
 
   async execute(): Promise<{ data: T | T[] | null; error: any; count?: number }> {
     const url = this.buildUrl();
-    const token = getAuthToken();
+    const token = this._tokenOverride ?? getAuthToken();
 
     try {
       const headers: Record<string, string> = {
         apikey: ANON_KEY,
         "Content-Type": "application/json",
+        // Request count header when count option is set
+        ...(this.countOption && { Prefer: `count=${this.countOption}` }),
       };
+
+      // Upsert resolution header
+      if (this.upsertOnConflict !== undefined) {
+        const resolution = this.upsertIgnoreDuplicates
+          ? "resolution=ignore-duplicates"
+          : "resolution=merge-duplicates";
+        const onConflict = this.upsertOnConflict ? `,on_conflict=${this.upsertOnConflict}` : "";
+        headers["Prefer"] =
+          `${resolution}${onConflict}${this.countOption ? `,count=${this.countOption}` : ""}`;
+      }
 
       if (token && token !== ANON_KEY) {
         headers.Authorization = `Bearer ${token}`;
@@ -259,18 +327,23 @@ export class KolaybaseQueryBuilder<T = any> {
     };
   }
 
-  // Promise compatibility
+  // Promise compatibility — awaiting the builder resolves to { data, error, count }
   async then<TResult1 = any, TResult2 = never>(
     onfulfilled?:
-      | ((value: { data: T | T[] | null; error: any }) => TResult1 | PromiseLike<TResult1>)
+      | ((value: {
+          data: T | T[] | null;
+          error: any;
+          count: number | null;
+        }) => TResult1 | PromiseLike<TResult1>)
       | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+    _onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     const result = await this.execute();
+    const shaped = { data: result.data, error: result.error, count: result.count ?? null };
     if (onfulfilled) {
-      return onfulfilled(result);
+      return onfulfilled(shaped);
     }
-    return result as any;
+    return shaped as any;
   }
 }
 
@@ -324,6 +397,14 @@ export class KolaybaseRPC<T = any> {
     }
   }
 
+  async single(): Promise<{ data: T | null; error: any }> {
+    return this.execute();
+  }
+
+  async maybeSingle(): Promise<{ data: T | null; error: any }> {
+    return this.execute();
+  }
+
   async then<TResult1 = any>(
     onfulfilled?:
       | ((value: { data: T | null; error: any }) => TResult1 | PromiseLike<TResult1>)
@@ -338,7 +419,8 @@ export class KolaybaseRPC<T = any> {
 }
 
 /**
- * Kolaybase Client (Supabase-compatible interface)
+ * Inner Kolaybase REST client used by the outer KolaybaseClient in client.ts.
+ * Token overrides are applied by the outer client, not here.
  */
 export class KolaybaseClient {
   auth: any;

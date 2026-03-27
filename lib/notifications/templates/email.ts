@@ -2,16 +2,16 @@
  * Email Templates for Notifications
  */
 
-import { getSiteUrl } from '@/lib/utils/site-url'
+import { getSiteUrl } from "@/lib/utils/site-url";
 
 export interface EmailTemplateData {
-  [key: string]: any
+  [key: string]: any;
 }
 
 export interface EmailTemplate {
-  subject: string | ((data: EmailTemplateData) => string)
-  html: (data: EmailTemplateData) => string
-  text?: (data: EmailTemplateData) => string
+  subject: string | ((data: EmailTemplateData) => string);
+  html: (data: EmailTemplateData) => string;
+  text?: (data: EmailTemplateData) => string;
 }
 
 const baseEmailStyles = `
@@ -24,9 +24,14 @@ const baseEmailStyles = `
     .button { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 10px 0; }
     .button:hover { background: #0056b3; }
   </style>
-`
+`;
 
-function baseEmailTemplate(title: string, content: string, actionUrl?: string, actionText?: string): string {
+function baseEmailTemplate(
+  title: string,
+  content: string,
+  actionUrl?: string,
+  actionText?: string
+): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -52,7 +57,7 @@ function baseEmailTemplate(title: string, content: string, actionUrl?: string, a
   </div>
 </body>
 </html>
-  `.trim()
+  `.trim();
 }
 
 export const emailTemplates: Record<string, EmailTemplate> = {
@@ -71,9 +76,9 @@ export const emailTemplates: Record<string, EmailTemplate> = {
           ${data.expectedDate ? `<li><strong>Expected Date:</strong> ${data.expectedDate}</li>` : ""}
         </ul>
         <p>You can view your booking details in your dashboard.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
-      return baseEmailTemplate("Booking Confirmed", content, actionUrl, "View Booking")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`;
+      return baseEmailTemplate("Booking Confirmed", content, actionUrl, "View Booking");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -91,7 +96,7 @@ Booking Details:
 ${data.expectedDate ? `- Expected Date: ${data.expectedDate}` : ""}
 
 View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`}
-      `.trim()
+      `.trim();
     },
   },
 
@@ -108,9 +113,9 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
           <li><strong>Scheduled Date:</strong> ${data.scheduledDate || "N/A"}</li>
         </ul>
         <p>Please ensure you're prepared for your scheduled booking.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
-      return baseEmailTemplate("Booking Reminder", content, actionUrl, "View Booking")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`;
+      return baseEmailTemplate("Booking Reminder", content, actionUrl, "View Booking");
     },
   },
 
@@ -128,9 +133,9 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
           <li><strong>Status:</strong> ${data.status || "Pending"}</li>
         </ul>
         <p>Please review and pay your invoice before the due date.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`
-      return baseEmailTemplate("New Invoice", content, actionUrl, "View Invoice")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`;
+      return baseEmailTemplate("New Invoice", content, actionUrl, "View Invoice");
     },
   },
 
@@ -148,9 +153,9 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
           ${data.daysUntilDue ? `<li><strong>Days Until Due:</strong> ${data.daysUntilDue}</li>` : ""}
         </ul>
         <p>Please make payment before the due date to avoid any late fees.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`
-      return baseEmailTemplate("Invoice Due Reminder", content, actionUrl, "Pay Invoice")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`;
+      return baseEmailTemplate("Invoice Due Reminder", content, actionUrl, "Pay Invoice");
     },
   },
 
@@ -168,9 +173,9 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
           ${data.dueDate ? `<li><strong>Due Date:</strong> ${data.dueDate}</li>` : ""}
         </ul>
         <p>Please review and complete the task as soon as possible.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/worker/tasks`
-      return baseEmailTemplate("Task Assigned", content, actionUrl, "View Task")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/worker/tasks`;
+      return baseEmailTemplate("Task Assigned", content, actionUrl, "View Task");
     },
   },
 
@@ -189,21 +194,21 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
           ${data.reportedBy ? `<li><strong>Reported By:</strong> ${data.reportedBy}</li>` : ""}
         </ul>
         <p>Please review and take appropriate action.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/admin/incidents`
-      return baseEmailTemplate("Incident Reported", content, actionUrl, "View Incident")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/admin/incidents`;
+      return baseEmailTemplate("Incident Reported", content, actionUrl, "View Incident");
     },
   },
 
-  "system": {
+  system: {
     subject: (data: EmailTemplateData) => data.title || "System Notification",
     html: (data: EmailTemplateData) => {
       const content = `
         <p>Dear ${data.userName || "User"},</p>
         <p>${data.message || "You have a new system notification."}</p>
         ${data.details ? `<p><strong>Details:</strong></p><p>${data.details}</p>` : ""}
-      `
-      return baseEmailTemplate(data.title || "System Notification", content)
+      `;
+      return baseEmailTemplate(data.title || "System Notification", content);
     },
   },
 
@@ -224,9 +229,9 @@ View your booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/d
           ${data.endDate ? `<li><strong>End Date:</strong> ${data.endDate}</li>` : ""}
         </ul>
         <p>Please review the request and provide a price proposal.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/warehouse-owner/bookings`
-      return baseEmailTemplate("New Booking Request", content, actionUrl, "Review Request")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/warehouse-owner/bookings`;
+      return baseEmailTemplate("New Booking Request", content, actionUrl, "Review Request");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -248,7 +253,7 @@ ${data.endDate ? `- End Date: ${data.endDate}` : ""}
 Please review the request and provide a price proposal.
 
 View request: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/warehouse-owner/bookings`}
-      `.trim()
+      `.trim();
     },
   },
 
@@ -266,9 +271,9 @@ View request: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/wareho
           ${data.terms ? `<li><strong>Terms:</strong> ${data.terms}</li>` : ""}
         </ul>
         <p>Please review and accept or reject the proposal.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
-      return baseEmailTemplate("Price Proposal Received", content, actionUrl, "Review Proposal")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`;
+      return baseEmailTemplate("Price Proposal Received", content, actionUrl, "Review Proposal");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -287,7 +292,7 @@ ${data.terms ? `- Terms: ${data.terms}` : ""}
 Please review and accept or reject the proposal.
 
 View proposal: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`}
-      `.trim()
+      `.trim();
     },
   },
 
@@ -308,9 +313,9 @@ View proposal: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashb
           <li><strong>Total Amount:</strong> $${data.totalAmount || "0.00"}</li>
         </ul>
         <p>Your booking is now active. You can manage it from your dashboard.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
-      return baseEmailTemplate("Booking Approved", content, actionUrl, "View Booking")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`;
+      return baseEmailTemplate("Booking Approved", content, actionUrl, "View Booking");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -332,7 +337,7 @@ ${data.endDate ? `- End Date: ${data.endDate}` : ""}
 Your booking is now active. You can manage it from your dashboard.
 
 View booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`}
-      `.trim()
+      `.trim();
     },
   },
 
@@ -350,9 +355,9 @@ View booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashbo
         </ul>
         ${data.reason ? `<p><strong>Reason for rejection:</strong> ${data.reason}</p>` : ""}
         <p>If you have any questions, please contact support.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`
-      return baseEmailTemplate("Booking Request Rejected", content, actionUrl, "View Booking")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings`;
+      return baseEmailTemplate("Booking Request Rejected", content, actionUrl, "View Booking");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -372,7 +377,7 @@ ${data.reason ? `Reason for rejection: ${data.reason}` : ""}
 If you have any questions, please contact support.
 
 View booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings`}
-      `.trim()
+      `.trim();
     },
   },
 
@@ -390,9 +395,9 @@ View booking: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashbo
           ${data.daysOverdue ? `<li><strong>Days Overdue:</strong> ${data.daysOverdue}</li>` : ""}
         </ul>
         <p>Please make payment as soon as possible to avoid any additional fees or service interruptions.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`
-      return baseEmailTemplate("Invoice Overdue", content, actionUrl, "Pay Invoice")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/invoices`;
+      return baseEmailTemplate("Invoice Overdue", content, actionUrl, "Pay Invoice");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -411,12 +416,13 @@ ${data.daysOverdue ? `- Days Overdue: ${data.daysOverdue}` : ""}
 Please make payment as soon as possible to avoid any additional fees or service interruptions.
 
 Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/invoices`}
-      `.trim()
+      `.trim();
     },
   },
 
   "team-invitation": {
-    subject: (data: EmailTemplateData) => `You've been invited to join ${data.companyName || "a company"} on Warebnb`,
+    subject: (data: EmailTemplateData) =>
+      `You've been invited to join ${data.companyName || "a company"} on Warebnb`,
     html: (data: EmailTemplateData) => {
       const content = `
         <p>Dear ${data.invitedName || "User"},</p>
@@ -429,9 +435,9 @@ Pay invoice: ${data.dashboardUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboa
           <li><strong>Expires:</strong> ${data.expiresAt || "7 days"}</li>
         </ul>
         <p>Click the button below to accept this invitation and join the team.</p>
-      `
-      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
-      return baseEmailTemplate("Team Invitation", content, actionUrl, "Accept Invitation")
+      `;
+      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`;
+      return baseEmailTemplate("Team Invitation", content, actionUrl, "Accept Invitation");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -448,22 +454,24 @@ Invitation Details:
 - Expires: ${data.expiresAt || "7 days"}
 
 Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation/${data.token}`}
-      `.trim()
+      `.trim();
     },
   },
 
   "welcome-invitation": {
     subject: (data: EmailTemplateData) => `Welcome to ${data.companyName || "Warebnb"}!`,
     html: (data: EmailTemplateData) => {
-      const passwordSection = data.password ? `
+      const passwordSection = data.password
+        ? `
         <p><strong>Your Login Credentials:</strong></p>
         <ul>
           <li><strong>Email:</strong> ${data.email || "Your email address"}</li>
           <li><strong>Password:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${data.password}</code></li>
         </ul>
         <p><strong>Important:</strong> Please save this password. You can change it after logging in.</p>
-      ` : ''
-      
+      `
+        : "";
+
       const content = `
         <p>Dear ${data.fullName || data.invitedName || "User"},</p>
         <p>Welcome to <strong>${data.companyName || "Warebnb"}</strong>! You've been invited to join our team.</p>
@@ -476,19 +484,26 @@ Accept invitation: ${data.acceptUrl || `${process.env.NEXT_PUBLIC_SITE_URL}/acce
         </ul>
         ${passwordSection}
         <p>Click the button below to accept the invitation and automatically log in to your account.</p>
-      `
-      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`
-      return baseEmailTemplate("Welcome to Warebnb", content, actionUrl, "Accept Invitation & Login")
+      `;
+      const actionUrl = data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`;
+      return baseEmailTemplate(
+        "Welcome to Warebnb",
+        content,
+        actionUrl,
+        "Accept Invitation & Login"
+      );
     },
     text: (data: EmailTemplateData) => {
-      const passwordSection = data.password ? `
+      const passwordSection = data.password
+        ? `
 Your Login Credentials:
 - Email: ${data.email || "Your email address"}
 - Password: ${data.password}
 
 Important: Please save this password. You can change it after logging in.
-      ` : ''
-      
+      `
+        : "";
+
       return `
 Welcome to ${data.companyName || "Warebnb"}!
 
@@ -507,8 +522,115 @@ ${passwordSection}
 Click the link below to accept the invitation and automatically log in to your account.
 
 Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data.token}`}
-      `.trim()
+      `.trim();
     },
+  },
+
+  // ─── Payment Notification Templates ────────────────────────────────────────
+
+  "payment-deposit-success": {
+    subject: (data: EmailTemplateData) =>
+      `Deposit Received — Booking #${data.bookingId || "N/A"} Confirmed`,
+    html: (data: EmailTemplateData) => {
+      const content = `
+        <p>Dear ${data.customerName || "Customer"},</p>
+        <p>We have received your deposit payment. Your booking is now <strong>confirmed</strong>.</p>
+        <p><strong>Payment Details:</strong></p>
+        <ul>
+          <li><strong>Booking ID:</strong> ${data.bookingId || "N/A"}</li>
+          <li><strong>Deposit Amount:</strong> $${data.depositAmount || "0.00"}</li>
+          <li><strong>Remaining Balance:</strong> $${data.remainingAmount || "0.00"} (due at checkout)</li>
+          ${data.warehouseName ? `<li><strong>Warehouse:</strong> ${data.warehouseName}</li>` : ""}
+          ${data.startDate ? `<li><strong>Start Date:</strong> ${data.startDate}</li>` : ""}
+        </ul>
+        <p>The remaining balance will be charged when your pallets are checked out.</p>
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/dashboard/bookings/${data.bookingId}`;
+      return baseEmailTemplate("Deposit Payment Confirmed", content, actionUrl, "View Booking");
+    },
+    text: (data: EmailTemplateData) =>
+      `Deposit received for Booking #${data.bookingId}. Amount: $${data.depositAmount}. Your booking is confirmed.`,
+  },
+
+  "payment-deposit-failed": {
+    subject: (data: EmailTemplateData) =>
+      `Action Required: Deposit Payment Failed — Booking #${data.bookingId || "N/A"}`,
+    html: (data: EmailTemplateData) => {
+      const content = `
+        <p>Dear ${data.customerName || "Customer"},</p>
+        <p>Unfortunately, your deposit payment for booking <strong>#${data.bookingId || "N/A"}</strong> has failed.</p>
+        ${data.errorMessage ? `<p><strong>Reason:</strong> ${data.errorMessage}</p>` : ""}
+        <p>Please retry your payment to confirm your booking. Your reservation is currently on hold.</p>
+        <p><strong>Booking Details:</strong></p>
+        <ul>
+          <li><strong>Booking ID:</strong> ${data.bookingId || "N/A"}</li>
+          <li><strong>Deposit Amount:</strong> $${data.depositAmount || "0.00"}</li>
+          ${data.warehouseName ? `<li><strong>Warehouse:</strong> ${data.warehouseName}</li>` : ""}
+        </ul>
+      `;
+      const actionUrl = data.retryUrl || `${getSiteUrl()}/dashboard/bookings/${data.bookingId}`;
+      return baseEmailTemplate("Deposit Payment Failed", content, actionUrl, "Retry Payment");
+    },
+    text: (data: EmailTemplateData) =>
+      `Your deposit payment for Booking #${data.bookingId} failed. Please retry to confirm your booking.`,
+  },
+
+  "payment-cancellation-refund": {
+    subject: (data: EmailTemplateData) =>
+      data.refundAmount > 0
+        ? `Booking Cancelled & Refund Initiated — #${data.bookingId || "N/A"}`
+        : `Booking Cancelled — #${data.bookingId || "N/A"}`,
+    html: (data: EmailTemplateData) => {
+      const hasRefund = Number(data.refundAmount) > 0;
+      const content = `
+        <p>Dear ${data.customerName || "Customer"},</p>
+        <p>Your booking <strong>#${data.bookingId || "N/A"}</strong> has been cancelled.</p>
+        ${
+          hasRefund
+            ? `<p><strong>Refund Details:</strong></p>
+             <ul>
+               <li><strong>Refund Amount:</strong> $${data.refundAmount}</li>
+               <li><strong>Refund Policy:</strong> ${data.refundPercent || 0}% of deposit</li>
+               <li><strong>Reason:</strong> ${data.refundReason || "Cancellation policy applied"}</li>
+               <li><strong>Processing Time:</strong> 5–10 business days</li>
+             </ul>`
+            : `<p>Per our cancellation policy, no refund is applicable for this cancellation.</p>`
+        }
+        ${data.cancellationReason ? `<p><strong>Cancellation reason:</strong> ${data.cancellationReason}</p>` : ""}
+        <p>If you have any questions, please contact our support team.</p>
+      `;
+      return baseEmailTemplate("Booking Cancellation Confirmation", content);
+    },
+    text: (data: EmailTemplateData) => {
+      const hasRefund = Number(data.refundAmount) > 0;
+      return hasRefund
+        ? `Booking #${data.bookingId} cancelled. Refund of $${data.refundAmount} (${data.refundPercent}%) has been initiated.`
+        : `Booking #${data.bookingId} has been cancelled. No refund is applicable per our cancellation policy.`;
+    },
+  },
+
+  "booking-expiration-warning": {
+    subject: (data: EmailTemplateData) =>
+      `Urgent: Booking #${data.bookingId || "N/A"} Expires Soon`,
+    html: (data: EmailTemplateData) => {
+      const content = `
+        <p>Dear ${data.customerName || "Customer"},</p>
+        <p><strong>Important:</strong> Your booking <strong>#${data.bookingId || "N/A"}</strong> will expire in <strong>${data.hoursRemaining || "less than 1"} hour(s)</strong> if the deposit is not paid.</p>
+        <p><strong>Booking Details:</strong></p>
+        <ul>
+          <li><strong>Booking ID:</strong> ${data.bookingId || "N/A"}</li>
+          <li><strong>Deposit Amount:</strong> $${data.depositAmount || "0.00"}</li>
+          ${data.warehouseName ? `<li><strong>Warehouse:</strong> ${data.warehouseName}</li>` : ""}
+          ${data.startDate ? `<li><strong>Start Date:</strong> ${data.startDate}</li>` : ""}
+          <li><strong>Expires At:</strong> ${data.expiresAt || "N/A"}</li>
+        </ul>
+        <p>Complete your deposit payment immediately to secure your reservation.</p>
+      `;
+      const actionUrl = data.paymentUrl || `${getSiteUrl()}/dashboard/bookings/${data.bookingId}`;
+      return baseEmailTemplate("Booking Expiration Warning", content, actionUrl, "Pay Deposit Now");
+    },
+    text: (data: EmailTemplateData) =>
+      `Your booking #${data.bookingId} expires in ${data.hoursRemaining || "1"} hour(s). Pay your deposit of $${data.depositAmount} to secure your reservation.`,
   },
 
   "welcome-member": {
@@ -530,9 +652,9 @@ Accept Invitation: ${data.acceptUrl || `${getSiteUrl()}/accept-invitation/${data
         </ul>
         <p>You can now log in to your account using the credentials above.</p>
         <p><strong>Important:</strong> For security reasons, please change your password after your first login.</p>
-      `
-      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/login`
-      return baseEmailTemplate("Welcome to Warebnb!", content, actionUrl, "Login to Dashboard")
+      `;
+      const actionUrl = data.dashboardUrl || `${getSiteUrl()}/login`;
+      return baseEmailTemplate("Welcome to Warebnb!", content, actionUrl, "Login to Dashboard");
     },
     text: (data: EmailTemplateData) => {
       return `
@@ -556,12 +678,11 @@ You can now log in to your account using the credentials above.
 Important: For security reasons, please change your password after your first login.
 
 Login: ${data.dashboardUrl || `${getSiteUrl()}/login`}
-      `.trim()
+      `.trim();
     },
   },
-}
+};
 
 export function getEmailTemplate(templateName: string): EmailTemplate | null {
-  return emailTemplates[templateName] || null
+  return emailTemplates[templateName] || null;
 }
-

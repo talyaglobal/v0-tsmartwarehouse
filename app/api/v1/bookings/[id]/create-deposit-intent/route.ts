@@ -69,16 +69,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    const supabase = await import("@/lib/supabase/server").then((m) =>
+      m.createServerSupabaseClient()
+    );
+
+    // Generate deterministic idempotency key (same inputs → same key on retry)
+    const idempotencyKey = generateIdempotencyKey("deposit", booking.id, {
+      customerId: booking.customerId,
+      amount: depositAmount,
+    });
+
+    // If a PaymentIntent was already created for this booking, reuse it rather
+    // than creating a second one. This handles the case where the client
+    // retries after a network error before the webhook confirms payment.
+    const { data: rawBooking } = await supabase
+      .from("bookings")
+      .select("payment_intent_id")
+      .eq("id", bookingId)
+      .single();
+
+    if (rawBooking?.payment_intent_id) {
+      const { getPaymentIntent } = await import("@/lib/payments/stripe");
+      const existingIntent = await getPaymentIntent(rawBooking.payment_intent_id);
+      // Only reuse if the intent is still actionable (not succeeded / cancelled)
+      if (existingIntent && !["succeeded", "canceled"].includes(existingIntent.status)) {
+        return NextResponse.json({
+          success: true,
+          clientSecret: existingIntent.client_secret,
+          amount: depositAmount,
+          depositPercent: DEPOSIT_PERCENT * 100,
+        });
+      }
+    }
+
     const stripeCustomer = await getOrCreateStripeCustomer({
       email: booking.customerEmail,
       name: booking.customerName || "Customer",
       metadata: { customer_id: booking.customerId },
-    });
-
-    // Generate idempotency key for exactly-once processing
-    const idempotencyKey = generateIdempotencyKey("deposit", booking.id, {
-      customerId: booking.customerId,
-      amount: depositAmount,
     });
 
     const paymentIntent = await createDepositPaymentIntent({
@@ -89,9 +116,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       idempotencyKey,
     });
 
-    const supabase = await import("@/lib/supabase/server").then((m) =>
-      m.createServerSupabaseClient()
-    );
     await supabase
       .from("bookings")
       .update({

@@ -1,167 +1,145 @@
-import { createServerClient } from '@supabase/ssr'
-import type { NextRequest } from 'next/server'
-import { NextResponse } from 'next/server'
-import type { UserRole } from '@/types'
+/**
+ * API route authentication middleware — backed by KolayBase.
+ *
+ * Validates the user JWT carried in the request cookies or Authorization
+ * header, resolves the role from the profiles table, and returns the user
+ * object (or a 401 NextResponse on failure).
+ *
+ * All named exports are identical to the previous Supabase version so every
+ * API route continues to work without changes.
+ */
+
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import type { UserRole } from "@/types";
+import { createMiddlewareClient } from "@/lib/kolaybase/server";
 
 /**
- * Get the authenticated user from the request
- * Uses cookies from the request to authenticate
+ * Get the authenticated user from the request.
+ * Reads the KB / Supabase access token from request cookies.
  */
 export async function getAuthUser(request: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Missing Supabase environment variables')
-      return null
-    }
-
-    // Create Supabase client that reads cookies from NextRequest
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          // In API routes, we can't set cookies in the response here
-          // The middleware handles cookie updates
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value)
-          })
-        },
-      },
-    })
+    const client = createMiddlewareClient(request);
 
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser()
+    } = await client.auth.getUser();
 
     if (error || !user) {
-      if (error) {
-        console.error('Error getting user from Supabase:', error.message)
-      }
-      return null
+      if (error) console.error("Error getting user from KolayBase:", error.message);
+      return null;
     }
 
-    // Get role from profiles table for accurate role checking
-    let userRole: UserRole = 'warehouse_client' // Default role
+    // Resolve role from profiles table
+    let userRole: UserRole = "warehouse_client";
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
-      
+      const { data: profile } = await client
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
       if (profile?.role) {
-        // Map legacy roles to new roles (admin = platform admin, same as root for API)
-        if (profile.role === 'super_admin' || profile.role === 'admin') userRole = 'root'
-        else if (profile.role === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
-        else if (profile.role === 'warehouse_client') userRole = 'warehouse_client'
-        else if (profile.role === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
-        else if (profile.role === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker'].includes(profile.role)) {
-          userRole = profile.role as UserRole
+        if (profile.role === "super_admin" || profile.role === "admin") userRole = "root";
+        else if (profile.role === "owner") userRole = "warehouse_admin";
+        else if (profile.role === "warehouse_client") userRole = "warehouse_client";
+        else if (profile.role === "member") userRole = "warehouse_client";
+        else if (profile.role === "worker") userRole = "warehouse_staff";
+        else if (
+          [
+            "root",
+            "warehouse_admin",
+            "warehouse_supervisor",
+            "warehouse_client",
+            "warehouse_staff",
+            "warehouse_finder",
+            "warehouse_broker",
+          ].includes(profile.role)
+        ) {
+          userRole = profile.role as UserRole;
         }
       } else {
-        // Fallback to user_metadata if profile doesn't exist
-        const metadataRole = user.user_metadata?.role as string
-        if (metadataRole === 'super_admin' || metadataRole === 'admin') userRole = 'root'
-        else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
-        else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
-        else if (metadataRole === 'member') userRole = 'warehouse_client' // Map legacy 'member' to 'warehouse_client'
-        else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-        else if (['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_client', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker'].includes(metadataRole)) {
-          userRole = metadataRole as UserRole
+        // Fallback to user_metadata
+        const metadataRole = (user as any).user_metadata?.role as string;
+        if (metadataRole === "super_admin" || metadataRole === "admin") userRole = "root";
+        else if (metadataRole === "owner") userRole = "warehouse_admin";
+        else if (metadataRole === "warehouse_client") userRole = "warehouse_client";
+        else if (metadataRole === "member") userRole = "warehouse_client";
+        else if (metadataRole === "worker") userRole = "warehouse_staff";
+        else if (
+          [
+            "root",
+            "warehouse_admin",
+            "warehouse_supervisor",
+            "warehouse_client",
+            "warehouse_staff",
+            "warehouse_finder",
+            "warehouse_broker",
+          ].includes(metadataRole)
+        ) {
+          userRole = metadataRole as UserRole;
         }
       }
-    } catch (error) {
-      console.error('Error fetching profile role:', error)
-      // Fallback to user_metadata
-      const metadataRole = user.user_metadata?.role as string
-      if (metadataRole === 'super_admin' || metadataRole === 'admin') userRole = 'root'
-      else if (metadataRole === 'owner') userRole = 'warehouse_admin' // Map 'owner' to 'warehouse_admin'
-      else if (metadataRole === 'warehouse_client') userRole = 'warehouse_client'
-      else if (metadataRole === 'worker') userRole = 'warehouse_staff'
-      else if (['root', 'warehouse_admin', 'warehouse_supervisor', 'warehouse_staff', 'warehouse_finder', 'warehouse_broker'].includes(metadataRole)) {
-        userRole = metadataRole as UserRole
-      }
+    } catch (err) {
+      console.error("Error fetching profile role:", err);
     }
 
     return {
       id: user.id,
       email: user.email!,
       role: userRole,
-    }
+    };
   } catch (error) {
-    console.error('Error getting auth user:', error)
-    return null
+    console.error("Error getting auth user:", error);
+    return null;
   }
 }
 
-/**
- * Middleware to require authentication for API routes
- */
+/** Require authentication; return 401 if not authenticated. */
 export async function requireAuth(request: NextRequest) {
-  const user = await getAuthUser(request)
+  const user = await getAuthUser(request);
 
   if (!user) {
     return NextResponse.json(
-      { error: 'Unauthorized', message: 'Authentication required' },
+      { error: "Unauthorized", message: "Authentication required" },
       { status: 401 }
-    )
+    );
   }
 
-  return { user }
+  return { user };
 }
 
-/**
- * Middleware to require specific role(s) for API routes
- */
-export async function requireRole(
-  request: NextRequest,
-  requiredRoles: UserRole | UserRole[]
-) {
-  const authResult = await requireAuth(request)
-  
-  if (authResult instanceof NextResponse) {
-    return authResult // Error response
-  }
+/** Require a specific role; return 403 if the role doesn't match. */
+export async function requireRole(request: NextRequest, requiredRoles: UserRole | UserRole[]) {
+  const authResult = await requireAuth(request);
 
-  const { user } = authResult
-  const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
+  if (authResult instanceof NextResponse) return authResult;
+
+  const { user } = authResult;
+  const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
 
   if (!roles.includes(user.role)) {
     return NextResponse.json(
-      { 
-        error: 'Forbidden', 
-        message: `Requires one of the following roles: ${roles.join(', ')}` 
+      {
+        error: "Forbidden",
+        message: `Requires one of the following roles: ${roles.join(", ")}`,
       },
       { status: 403 }
-    )
+    );
   }
 
-  return { user }
+  return { user };
 }
 
-/**
- * Alias for requireAuth that returns a consistent response format
- * Used by payment routes
- */
+/** Alias for requireAuth returning a consistent result shape. */
 export async function authenticateRequest(request: NextRequest) {
-  const user = await getAuthUser(request)
+  const user = await getAuthUser(request);
 
   if (!user) {
-    return {
-      success: false,
-      error: 'Authentication required',
-    }
+    return { success: false, error: "Authentication required" };
   }
 
-  return {
-    success: true,
-    user,
-  }
+  return { success: true, user };
 }
-

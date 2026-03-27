@@ -18,7 +18,10 @@ interface PaymentRetryCardProps {
  * Displays payment failure information and allows customer to retry payment
  * Used when deposit payment fails or times out
  */
-export function PaymentRetryCard({ booking, onRetrySuccess }: PaymentRetryCardProps) {
+export function PaymentRetryCard({
+  booking,
+  onRetrySuccess: _onRetrySuccess,
+}: PaymentRetryCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -5,7 +5,7 @@
  * Base: /api/rest/v1/auth
  */
 
-const API_BASE = "https://api.kolaybase.com";
+const API_BASE = process.env.NEXT_PUBLIC_KOLAYBASE_URL || "https://api.kolaybase.com";
 const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
 
 const TOKEN_KEY = "kb_access_token";
@@ -395,6 +395,185 @@ export class KolaybaseAuth {
       },
     };
   }
+
+  /**
+   * Set session from tokens (used after OAuth callback / email link sign-in)
+   */
+  async setSession(tokens: {
+    access_token: string;
+    refresh_token: string;
+  }): Promise<{ data: any; error: any }> {
+    try {
+      // Persist the tokens as if we just signed in
+      const expiresAt = Date.now() + 3600 * 1000; // default 1h
+      if (typeof window !== "undefined") {
+        localStorage.setItem(TOKEN_KEY, tokens.access_token);
+        localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+        localStorage.setItem(EXPIRES_KEY, expiresAt.toString());
+      }
+      // Fetch the user for the provided token
+      const response = await fetch(`${API_BASE}/api/rest/v1/auth/user`, {
+        headers: {
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${tokens.access_token}`,
+        },
+      });
+      if (!response.ok) {
+        return { data: null, error: { message: "Invalid session tokens" } };
+      }
+      const user = await response.json();
+      if (typeof window !== "undefined") {
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+      }
+      const session = {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        user,
+        expires_at: expiresAt,
+      };
+      return { data: { session, user }, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
+    }
+  }
+
+  /**
+   * Update the authenticated user's attributes (email, password, metadata)
+   */
+  async updateUser(attrs: {
+    email?: string;
+    password?: string;
+    data?: Record<string, any>;
+  }): Promise<{ data: any; error: any }> {
+    const sessionResult = await this.getSession();
+    const token = sessionResult.data.session?.access_token;
+    if (!token) {
+      return { data: null, error: { message: "Not authenticated" } };
+    }
+    try {
+      const response = await fetch(`${API_BASE}/api/rest/v1/auth/user`, {
+        method: "PATCH",
+        headers: {
+          apikey: ANON_KEY,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(attrs),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        return { data: null, error: { message: err.message || "Update failed" } };
+      }
+      const user = await response.json();
+      return { data: { user }, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
+    }
+  }
+
+  /**
+   * Admin auth operations (service role only).
+   * These hit the admin endpoint and require KOLAYBASE_SERVICE_KEY.
+   */
+  admin = {
+    async getUserById(uid: string): Promise<{ data: any; error: any }> {
+      const serviceKey = process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+      try {
+        const res = await fetch(`${API_BASE}/api/rest/v1/auth/admin/users/${uid}`, {
+          headers: { apikey: ANON_KEY, Authorization: `Bearer ${serviceKey}` },
+        });
+        if (!res.ok) return { data: null, error: { message: "User not found" } };
+        return { data: { user: await res.json() }, error: null };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
+      }
+    },
+    async updateUserById(uid: string, attrs: any): Promise<{ data: any; error: any }> {
+      const serviceKey = process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+      try {
+        const res = await fetch(`${API_BASE}/api/rest/v1/auth/admin/users/${uid}`, {
+          method: "PATCH",
+          headers: {
+            apikey: ANON_KEY,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(attrs),
+        });
+        if (!res.ok) return { data: null, error: { message: "Update failed" } };
+        return { data: { user: await res.json() }, error: null };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
+      }
+    },
+    async deleteUser(uid: string): Promise<{ data: any; error: any }> {
+      const serviceKey = process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+      try {
+        const res = await fetch(`${API_BASE}/api/rest/v1/auth/admin/users/${uid}`, {
+          method: "DELETE",
+          headers: { apikey: ANON_KEY, Authorization: `Bearer ${serviceKey}` },
+        });
+        if (!res.ok) return { data: null, error: { message: "Delete failed" } };
+        return { data: {}, error: null };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
+      }
+    },
+    async listUsers(_options?: any): Promise<{ data: any; error: any }> {
+      const serviceKey = process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+      try {
+        const res = await fetch(`${API_BASE}/api/rest/v1/auth/admin/users`, {
+          headers: { apikey: ANON_KEY, Authorization: `Bearer ${serviceKey}` },
+        });
+        if (!res.ok) return { data: null, error: { message: "Failed to list users" } };
+        return { data: { users: await res.json() }, error: null };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
+      }
+    },
+    async createUser(attrs: any): Promise<{ data: any; error: any }> {
+      const serviceKey = process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+      try {
+        const res = await fetch(`${API_BASE}/api/rest/v1/auth/admin/users`, {
+          method: "POST",
+          headers: {
+            apikey: ANON_KEY,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(attrs),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { data: null, error: { message: err.message || "Create user failed" } };
+        }
+        return { data: { user: await res.json() }, error: null };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
+      }
+    },
+    async generateLink(params: any): Promise<{ data: any; error: any }> {
+      const serviceKey = process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+      try {
+        const res = await fetch(`${API_BASE}/api/rest/v1/auth/admin/generate-link`, {
+          method: "POST",
+          headers: {
+            apikey: ANON_KEY,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(params),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { data: null, error: { message: err.message || "Generate link failed" } };
+        }
+        return { data: await res.json(), error: null };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
+      }
+    },
+  };
 
   private clearTokens() {
     if (typeof window !== "undefined") {

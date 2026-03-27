@@ -1,11 +1,14 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
-import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js"
-import type { Task, Notification } from "@/types"
+import { useEffect, useState, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+// RealtimeChannel type aliased to any since we use KolayBase channel stubs
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type RealtimeChannel = any;
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import type { Task, Notification } from "@/types";
 
-type RealtimeChannelStatus = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR"
+type RealtimeChannelStatus = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR";
 
 /**
  * Generic hook for real-time subscriptions
@@ -15,13 +18,13 @@ export function useRealtimeSubscription<T>(
   filter?: string,
   callback?: (payload: any) => void
 ) {
-  const [data, setData] = useState<T[]>([])
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
+  const [data, setData] = useState<T[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const supabase = createClient()
-    let channel: RealtimeChannel | null = null
+    const supabase = createClient();
+    let channel: RealtimeChannel | null = null;
 
     const setupSubscription = async () => {
       try {
@@ -29,11 +32,11 @@ export function useRealtimeSubscription<T>(
         const { data: initialData, error: fetchError } = await supabase
           .from(table)
           .select("*")
-          .order("created_at", { ascending: false })
+          .order("created_at", { ascending: false });
 
-        if (fetchError) throw fetchError
+        if (fetchError) throw fetchError;
 
-        setData(initialData || [])
+        setData(initialData || []);
 
         // Set up real-time subscription
         channel = supabase
@@ -48,81 +51,77 @@ export function useRealtimeSubscription<T>(
             },
             (payload: RealtimePostgresChangesPayload<any>) => {
               if (callback) {
-                callback(payload)
+                callback(payload);
               }
 
               // Update local state
               if (payload.eventType === "INSERT") {
-                setData((prev) => [payload.new as T, ...prev])
+                setData((prev) => [payload.new as T, ...prev]);
               } else if (payload.eventType === "UPDATE") {
                 setData((prev) =>
-                  prev.map((item: any) =>
-                    item.id === payload.new.id ? (payload.new as T) : item
-                  )
-                )
+                  prev.map((item: any) => (item.id === payload.new.id ? (payload.new as T) : item))
+                );
               } else if (payload.eventType === "DELETE") {
-                setData((prev) =>
-                  prev.filter((item: any) => item.id !== payload.old.id)
-                )
+                setData((prev) => prev.filter((item: any) => item.id !== payload.old.id));
               }
             }
           )
           .subscribe((status: RealtimeChannelStatus) => {
-            setIsConnected(status === "SUBSCRIBED")
+            setIsConnected(status === "SUBSCRIBED");
             if (status === "SUBSCRIBED") {
-              setError(null)
+              setError(null);
             }
-          })
+          });
 
-        setIsConnected(true)
+        setIsConnected(true);
       } catch (err) {
-        setError(err instanceof Error ? err : new Error("Unknown error"))
-        setIsConnected(false)
+        setError(err instanceof Error ? err : new Error("Unknown error"));
+        setIsConnected(false);
       }
-    }
+    };
 
-    setupSubscription()
+    setupSubscription();
 
     return () => {
       if (channel) {
-        supabase.removeChannel(channel)
+        supabase.removeChannel(channel);
       }
-    }
-  }, [table, filter, callback])
+    };
+  }, [table, filter, callback]);
 
-  return { data, isConnected, error }
+  return { data, isConnected, error };
 }
 
 /**
  * Hook for real-time task updates
  */
 export function useRealtimeTasks(userId?: string) {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const supabase = createClient()
-    let channel: RealtimeChannel | null = null
+    const supabase = createClient();
+    let channel: RealtimeChannel | null = null;
 
     const setupSubscription = async () => {
       try {
         // Build query
-        let query = supabase.from("tasks").select("*").order("created_at", { ascending: false })
+        let query = supabase.from("tasks").select("*").order("created_at", { ascending: false });
 
         // Filter by user if provided
         if (userId) {
-          query = query.eq("assigned_to", userId)
+          query = query.eq("assigned_to", userId);
         }
 
-        const { data: initialData, error: fetchError } = await query
+        const { data: initialData, error: fetchError } = await query;
 
-        if (fetchError) throw fetchError
+        if (fetchError) throw fetchError;
 
-        setTasks(initialData || [])
+        setTasks(initialData || []);
 
         // Set up real-time subscription
-        const filter = userId ? `assigned_to=eq.${userId}` : undefined
+        const filter = userId ? `assigned_to=eq.${userId}` : undefined;
 
         channel = supabase
           .channel("tasks_changes")
@@ -136,58 +135,54 @@ export function useRealtimeTasks(userId?: string) {
             },
             (payload: RealtimePostgresChangesPayload<Task>) => {
               if (payload.eventType === "INSERT") {
-                setTasks((prev) => [payload.new as Task, ...prev])
+                setTasks((prev) => [payload.new as Task, ...prev]);
               } else if (payload.eventType === "UPDATE") {
                 setTasks((prev) =>
-                  prev.map((task) =>
-                    task.id === payload.new.id ? (payload.new as Task) : task
-                  )
-                )
+                  prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task))
+                );
               } else if (payload.eventType === "DELETE") {
-                setTasks((prev) =>
-                  prev.filter((task) => task.id !== payload.old.id)
-                )
+                setTasks((prev) => prev.filter((task) => task.id !== payload.old.id));
               }
             }
           )
           .subscribe((status: RealtimeChannelStatus) => {
-            setIsConnected(status === "SUBSCRIBED")
+            setIsConnected(status === "SUBSCRIBED");
             if (status === "SUBSCRIBED") {
-              setError(null)
+              setError(null);
             }
-          })
+          });
 
-        setIsConnected(true)
+        setIsConnected(true);
       } catch (err) {
-        setError(err instanceof Error ? err : new Error("Unknown error"))
-        setIsConnected(false)
+        setError(err instanceof Error ? err : new Error("Unknown error"));
+        setIsConnected(false);
       }
-    }
+    };
 
-    setupSubscription()
+    setupSubscription();
 
     return () => {
       if (channel) {
-        supabase.removeChannel(channel)
+        supabase.removeChannel(channel);
       }
-    }
-  }, [userId])
+    };
+  }, [userId]);
 
-  return { tasks, isConnected, error }
+  return { tasks, isConnected, error };
 }
 
 /**
  * Hook for real-time notifications
  */
 export function useRealtimeNotifications(userId: string) {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const supabase = createClient()
-    let channel: RealtimeChannel | null = null
+    const supabase = createClient();
+    let channel: RealtimeChannel | null = null;
 
     const setupSubscription = async () => {
       try {
@@ -197,9 +192,9 @@ export function useRealtimeNotifications(userId: string) {
           .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
-          .limit(50)
+          .limit(50);
 
-        if (fetchError) throw fetchError
+        if (fetchError) throw fetchError;
 
         const notificationsData = (initialData || []).map((n: any) => ({
           id: n.id,
@@ -210,10 +205,10 @@ export function useRealtimeNotifications(userId: string) {
           message: n.message,
           read: n.read || false,
           createdAt: n.created_at || new Date().toISOString(),
-        })) as Notification[]
-        
-        setNotifications(notificationsData)
-        setUnreadCount(notificationsData.filter((n: Notification) => !n.read).length)
+        })) as Notification[];
+
+        setNotifications(notificationsData);
+        setUnreadCount(notificationsData.filter((n: Notification) => !n.read).length);
 
         // Set up real-time subscription
         channel = supabase
@@ -228,7 +223,7 @@ export function useRealtimeNotifications(userId: string) {
             },
             (payload: RealtimePostgresChangesPayload<any>) => {
               if (payload.eventType === "INSERT") {
-                const rawNotification = payload.new
+                const rawNotification = payload.new;
                 const newNotification: Notification = {
                   id: rawNotification.id,
                   userId: rawNotification.user_id,
@@ -238,11 +233,11 @@ export function useRealtimeNotifications(userId: string) {
                   message: rawNotification.message,
                   read: rawNotification.read || false,
                   createdAt: rawNotification.created_at || new Date().toISOString(),
-                }
-                setNotifications((prev) => [newNotification, ...prev])
-                setUnreadCount((prev) => prev + 1)
+                };
+                setNotifications((prev) => [newNotification, ...prev]);
+                setUnreadCount((prev) => prev + 1);
               } else if (payload.eventType === "UPDATE") {
-                const rawNotification = payload.new
+                const rawNotification = payload.new;
                 const updatedNotification: Notification = {
                   id: rawNotification.id,
                   userId: rawNotification.user_id,
@@ -252,76 +247,69 @@ export function useRealtimeNotifications(userId: string) {
                   message: rawNotification.message,
                   read: rawNotification.read || false,
                   createdAt: rawNotification.created_at || new Date().toISOString(),
-                }
+                };
                 setNotifications((prev) =>
-                  prev.map((n) =>
-                    n.id === updatedNotification.id ? updatedNotification : n
-                  )
-                )
+                  prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
+                );
                 // Recalculate unread count
                 setNotifications((prev) => {
-                  const unread = prev.filter((n) => !n.read).length
-                  setUnreadCount(unread)
-                  return prev
-                })
+                  const unread = prev.filter((n) => !n.read).length;
+                  setUnreadCount(unread);
+                  return prev;
+                });
               } else if (payload.eventType === "DELETE") {
-                setNotifications((prev) =>
-                  prev.filter((n) => n.id !== payload.old.id)
-                )
-                setUnreadCount((prev) => Math.max(0, prev - 1))
+                setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
+                setUnreadCount((prev) => Math.max(0, prev - 1));
               }
             }
           )
           .subscribe((status: RealtimeChannelStatus) => {
-            setIsConnected(status === "SUBSCRIBED")
+            setIsConnected(status === "SUBSCRIBED");
             if (status === "SUBSCRIBED") {
-              setError(null)
+              setError(null);
             }
-          })
+          });
 
-        setIsConnected(true)
+        setIsConnected(true);
       } catch (err) {
-        setError(err instanceof Error ? err : new Error("Unknown error"))
-        setIsConnected(false)
+        setError(err instanceof Error ? err : new Error("Unknown error"));
+        setIsConnected(false);
       }
-    }
+    };
 
-    setupSubscription()
+    setupSubscription();
 
     return () => {
       if (channel) {
-        supabase.removeChannel(channel)
+        supabase.removeChannel(channel);
       }
+    };
+  }, [userId]);
+
+  const markAsRead = useCallback(async (notificationId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", notificationId);
+
+    if (error) {
+      setError(error);
     }
-  }, [userId])
-
-  const markAsRead = useCallback(
-    async (notificationId: string) => {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("id", notificationId)
-
-      if (error) {
-        setError(error)
-      }
-    },
-    []
-  )
+  }, []);
 
   const markAllAsRead = useCallback(async () => {
-    const supabase = createClient()
+    const supabase = createClient();
     const { error } = await supabase
       .from("notifications")
       .update({ read: true })
       .eq("user_id", userId)
-      .eq("read", false)
+      .eq("read", false);
 
     if (error) {
-      setError(error)
+      setError(error);
     }
-  }, [userId])
+  }, [userId]);
 
   return {
     notifications,
@@ -330,7 +318,7 @@ export function useRealtimeNotifications(userId: string) {
     error,
     markAsRead,
     markAllAsRead,
-  }
+  };
 }
 
 /**
@@ -343,53 +331,53 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
     availableSqFt: 0,
     utilizationPercent: 0,
     floors: [] as Array<{
-      floorNumber: number
-      totalSqFt: number
-      occupiedSqFt: number
-      availableSqFt: number
-      utilizationPercent: number
+      floorNumber: number;
+      totalSqFt: number;
+      occupiedSqFt: number;
+      availableSqFt: number;
+      utilizationPercent: number;
       halls: Array<{
-        hallName: string
-        totalSqFt: number
-        occupiedSqFt: number
-        availableSqFt: number
-        utilizationPercent: number
-      }>
+        hallName: string;
+        totalSqFt: number;
+        occupiedSqFt: number;
+        availableSqFt: number;
+        utilizationPercent: number;
+      }>;
     }>,
-  })
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
+  });
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const supabase = createClient()
-    const channels: RealtimeChannel[] = []
+    const supabase = createClient();
+    const channels: RealtimeChannel[] = [];
 
     const calculateUtilization = async () => {
       try {
         // Get warehouse data
-        let warehouseQuery = supabase.from("warehouses").select("*")
+        let warehouseQuery = supabase.from("warehouses").select("*");
         if (warehouseId) {
-          warehouseQuery = warehouseQuery.eq("id", warehouseId)
+          warehouseQuery = warehouseQuery.eq("id", warehouseId);
         }
 
-        const { data: warehouses, error: warehouseError } = await warehouseQuery
+        const { data: warehouses, error: warehouseError } = await warehouseQuery;
 
-        if (warehouseError) throw warehouseError
+        if (warehouseError) throw warehouseError;
 
         if (!warehouses || warehouses.length === 0) {
-          return
+          return;
         }
 
-        const warehouse = warehouses[0]
+        const warehouse = warehouses[0];
 
         // Get floors
         const { data: floors, error: floorsError } = await supabase
           .from("warehouse_floors")
           .select("*")
           .eq("warehouse_id", warehouse.id)
-          .order("floor_number", { ascending: true })
+          .order("floor_number", { ascending: true });
 
-        if (floorsError) throw floorsError
+        if (floorsError) throw floorsError;
 
         // Get halls and calculate utilization
         const floorsData = await Promise.all(
@@ -398,9 +386,9 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
               .from("warehouse_halls")
               .select("*")
               .eq("floor_id", floor.id)
-              .order("hall_name", { ascending: true })
+              .order("hall_name", { ascending: true });
 
-            if (hallsError) throw hallsError
+            if (hallsError) throw hallsError;
 
             const hallsData = (halls || []).map((hall: any) => ({
               hallName: hall.hall_name,
@@ -408,19 +396,17 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
               occupiedSqFt: hall.occupied_sq_ft || 0,
               availableSqFt: hall.available_sq_ft || 0,
               utilizationPercent:
-                hall.sq_ft > 0
-                  ? Math.round(((hall.occupied_sq_ft || 0) / hall.sq_ft) * 100)
-                  : 0,
-            }))
+                hall.sq_ft > 0 ? Math.round(((hall.occupied_sq_ft || 0) / hall.sq_ft) * 100) : 0,
+            }));
 
             const floorOccupied = hallsData.reduce(
               (sum: number, hall: any) => sum + hall.occupiedSqFt,
               0
-            )
+            );
             const floorTotal = hallsData.reduce(
               (sum: number, hall: any) => sum + hall.totalSqFt,
               0
-            )
+            );
 
             return {
               floorNumber: floor.floor_number,
@@ -430,27 +416,23 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
               utilizationPercent:
                 floorTotal > 0 ? Math.round((floorOccupied / floorTotal) * 100) : 0,
               halls: hallsData,
-            }
+            };
           })
-        )
+        );
 
         const totalOccupied = floorsData.reduce(
           (sum: number, floor: any) => sum + floor.occupiedSqFt,
           0
-        )
-        const totalSqFt = floorsData.reduce(
-          (sum: number, floor: any) => sum + floor.totalSqFt,
-          0
-        )
+        );
+        const totalSqFt = floorsData.reduce((sum: number, floor: any) => sum + floor.totalSqFt, 0);
 
         setUtilization({
           totalSqFt,
           occupiedSqFt: totalOccupied,
           availableSqFt: totalSqFt - totalOccupied,
-          utilizationPercent:
-            totalSqFt > 0 ? Math.round((totalOccupied / totalSqFt) * 100) : 0,
+          utilizationPercent: totalSqFt > 0 ? Math.round((totalOccupied / totalSqFt) * 100) : 0,
           floors: floorsData,
-        })
+        });
 
         // Subscribe to warehouse_halls changes for real-time updates
         const hallsChannel = supabase
@@ -464,12 +446,12 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
             },
             () => {
               // Recalculate when halls change
-              calculateUtilization()
+              calculateUtilization();
             }
           )
-          .subscribe()
+          .subscribe();
 
-        channels.push(hallsChannel)
+        channels.push(hallsChannel);
 
         // Subscribe to bookings changes (affects utilization)
         const bookingsChannel = supabase
@@ -483,51 +465,50 @@ export function useRealtimeWarehouseUtilization(warehouseId?: string) {
             },
             () => {
               // Recalculate when bookings change
-              calculateUtilization()
+              calculateUtilization();
             }
           )
-          .subscribe()
+          .subscribe();
 
-        channels.push(bookingsChannel)
+        channels.push(bookingsChannel);
 
-        setIsConnected(true)
+        setIsConnected(true);
       } catch (err) {
-        setError(err instanceof Error ? err : new Error("Unknown error"))
-        setIsConnected(false)
+        setError(err instanceof Error ? err : new Error("Unknown error"));
+        setIsConnected(false);
       }
-    }
+    };
 
-    calculateUtilization()
+    calculateUtilization();
 
     return () => {
       channels.forEach((channel) => {
-        supabase.removeChannel(channel)
-      })
-    }
-  }, [warehouseId])
+        supabase.removeChannel(channel);
+      });
+    };
+  }, [warehouseId]);
 
-  return { utilization, isConnected, error }
+  return { utilization, isConnected, error };
 }
 
 /**
  * Hook for real-time connection status indicator
  */
 export function useRealtimeConnectionStatus() {
-  const [isConnected, setIsConnected] = useState(false)
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient();
     const channel = supabase
       .channel("connection_status")
       .subscribe((status: RealtimeChannelStatus) => {
-        setIsConnected(status === "SUBSCRIBED")
-      })
+        setIsConnected(status === "SUBSCRIBED");
+      });
 
     return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
-  return isConnected
+  return isConnected;
 }
-

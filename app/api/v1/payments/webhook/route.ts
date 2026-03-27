@@ -138,6 +138,32 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     console.error("Failed to update booking:", updateError);
     return;
   }
+
+  // Send payment success email (deposit confirmed → booking confirmed)
+  if (isDeposit && booking) {
+    try {
+      const { getNotificationService } = await import("@/lib/notifications/service");
+      const notificationService = getNotificationService();
+      const totalAmount = Number(booking.total_amount) || 0;
+      const depositPaid = amountPaidDollars;
+      await notificationService.sendNotification({
+        userId: (booking as any).customer_id ?? bookingIdFromMeta ?? "",
+        type: "booking",
+        channels: ["email"],
+        title: "Deposit Payment Confirmed",
+        message: `Your deposit of $${depositPaid.toFixed(2)} has been received. Booking #${booking.id} is now confirmed.`,
+        template: "payment-deposit-success",
+        templateData: {
+          bookingId: booking.id,
+          depositAmount: depositPaid.toFixed(2),
+          remainingAmount: Math.max(0, totalAmount - depositPaid).toFixed(2),
+        },
+      });
+    } catch (notifErr) {
+      // Non-fatal: log but don't fail the webhook
+      console.error("Failed to send deposit success notification:", notifErr);
+    }
+  }
 }
 
 async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentIntent) {
@@ -182,7 +208,27 @@ async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentInt
     console.error("Failed to update booking:", updateError);
   }
 
-  // TODO: Send failure notification email to customer
+  // Send payment failure email
+  try {
+    const { getNotificationService } = await import("@/lib/notifications/service");
+    const notificationService = getNotificationService();
+    const errorMsg = paymentIntent.last_payment_error?.message || "Payment failed";
+    await notificationService.sendNotification({
+      userId: booking.customer_id,
+      type: "booking",
+      channels: ["email"],
+      title: "Deposit Payment Failed",
+      message: `Your deposit payment for booking #${booking.id} could not be processed. Please retry.`,
+      template: "payment-deposit-failed",
+      templateData: {
+        bookingId: booking.id,
+        depositAmount: (paymentIntent.amount / 100).toFixed(2),
+        errorMessage: errorMsg,
+      },
+    });
+  } catch (notifErr) {
+    console.error("Failed to send payment failure notification:", notifErr);
+  }
 }
 
 /**
@@ -217,29 +263,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 401 });
     }
 
-    // Check for duplicate webhook event (replay attack prevention)
+    // Atomic deduplication: INSERT ... ON CONFLICT DO NOTHING.
+    // This replaces the non-atomic check-then-insert pattern that had a
+    // TOCTOU race window under concurrent re-deliveries of the same event.
+    // If the row already exists (UNIQUE constraint on stripe_event_id), the
+    // insert is a no-op and `count` will be 0, signalling a duplicate.
     const supabase = await createServerSupabaseClient();
-    const { data: existingEvent } = await supabase
+    const { count, error: insertError } = await supabase
       .from("stripe_webhook_events")
-      .select("id")
-      .eq("stripe_event_id", event.id)
-      .maybeSingle();
+      .upsert(
+        {
+          stripe_event_id: event.id,
+          event_type: event.type,
+          payload: event as any,
+          processing_result: "processing",
+        },
+        { onConflict: "stripe_event_id", ignoreDuplicates: true, count: "exact" }
+      )
+      .execute();
 
-    if (existingEvent) {
+    if (insertError) {
+      // A DB error here is unexpected — log it but do not proceed to avoid
+      // processing an event whose deduplication state is unknown.
+      console.error("Webhook deduplication insert error:", insertError);
+      return NextResponse.json(
+        { success: false, error: "Deduplication check failed", statusCode: 500 },
+        { status: 500 }
+      );
+    }
+
+    if (count === 0) {
+      // Row already existed — this is a duplicate delivery.
       console.log("Duplicate webhook event ignored:", event.id);
       return NextResponse.json({
         success: true,
         message: "Event already processed",
       });
     }
-
-    // Log webhook event for deduplication
-    await supabase.from("stripe_webhook_events").insert({
-      stripe_event_id: event.id,
-      event_type: event.type,
-      payload: event as any,
-      processing_result: "processing",
-    });
 
     let processingResult = "success";
     let errorMessage: string | null = null;
