@@ -1,8 +1,24 @@
 # Warebnb (TSmart Warehouse) — Project TODO List for Ruflo
 
 **Generated**: March 27, 2026
-**Project Status**: ~70% Complete
+**Last Updated**: March 27, 2026 (post-ruflo push)
+**Project Status**: ~75% Complete
 **Tech Stack**: Next.js 16 + React 19 + TypeScript + Supabase + Prisma + Stripe
+
+---
+
+## Recently Completed (March 27, 2026)
+
+- [x] Booking cancellation API with time-based refund policy (>48h=100%, 24-48h=50%, <24h=0%)
+- [x] Stripe refund integration for cancelled bookings
+- [x] Cron job to auto-expire unpaid bookings after 24h (`/api/cron/expire-unpaid-bookings`)
+- [x] Payment retry card component for failed/timed-out deposits
+- [x] Payment events audit trail table (`payment_events`)
+- [x] Enhanced Stripe webhook handler (deposit success, checkout remaining, refund tracking)
+- [x] DB migration: cancellation fields, refund tracking, payment_intent_id on bookings
+- [x] Claude-flow / Ruflo infrastructure (`.claude/` agents, skills, commands, helpers)
+- [x] MCP server configuration (`.mcp.json`)
+- [x] Swarm memory & state setup (`.swarm/`)
 
 ---
 
@@ -20,8 +36,8 @@ Only 1 test file exists (`lib/planner/capacity.test.ts`). This is the biggest ga
 
 - [ ] **P0** Set up Jest/Vitest test configuration properly (jest.config or vitest.config)
 - [ ] **P0** Write unit tests for core business logic:
-  - [ ] `lib/business-logic/bookings.ts` — booking creation, confirmation, cancellation
-  - [ ] `lib/business-logic/payments.ts` — payment processing, deposit calculations
+  - [ ] `lib/business-logic/bookings.ts` — booking creation, confirmation, cancellation, refund calculation
+  - [ ] `lib/business-logic/payments.ts` — payment processing, deposit calculations, refund processing
   - [ ] `lib/business-logic/pricing.ts` — dynamic pricing calculations
   - [ ] `lib/business-logic/invoices.ts` — invoice generation
   - [ ] `lib/business-logic/availability.ts` — availability checks
@@ -36,6 +52,9 @@ Only 1 test file exists (`lib/planner/capacity.test.ts`). This is the biggest ga
   - [ ] `lib/business-logic/pallet-labels.ts` — pallet label generation
 - [ ] **P1** Write API endpoint integration tests for critical flows:
   - [ ] Booking creation → confirmation → deposit → check-in → check-out
+  - [ ] Booking cancellation → refund calculation → Stripe refund → capacity release
+  - [ ] Cron: expire unpaid bookings (24h threshold)
+  - [ ] Payment webhook handling (deposit, checkout_remaining, refund events)
   - [ ] Invoice generation → payment → settlement
   - [ ] User registration → company creation → team setup
   - [ ] Warehouse listing → availability check → booking
@@ -188,7 +207,22 @@ Current CI: lint + type-check + build only.
 
 ---
 
-## 12. NOTIFICATION SYSTEM ENHANCEMENTS (P2)
+## 12. BOOKING & PAYMENT FOLLOW-UPS (P1-P2)
+
+Cancellation, refund, and payment retry are now implemented. Remaining work:
+
+- [ ] **P1** Wire PaymentRetryCard into booking detail pages (customer dashboard)
+- [ ] **P1** Add cancellation button/flow to customer booking detail UI
+- [ ] **P1** Admin UI for managing cancellations and reviewing refunds
+- [ ] **P2** Email notification on booking cancellation (to customer + warehouse owner)
+- [ ] **P2** Email notification on refund processed/failed
+- [ ] **P2** Email notification on booking auto-expired (unpaid 24h)
+- [ ] **P2** Vercel cron schedule configuration for expire-unpaid-bookings job
+- [ ] **P3** Cancellation analytics (rates, reasons, refund totals)
+
+---
+
+## 13. NOTIFICATION SYSTEM ENHANCEMENTS (P2)
 
 Core notification infrastructure exists (email, SMS, push, WhatsApp). Missing:
 
@@ -199,7 +233,7 @@ Core notification infrastructure exists (email, SMS, push, WhatsApp). Missing:
 
 ---
 
-## 13. PERFORMANCE & OPTIMIZATION (P3)
+## 14. PERFORMANCE & OPTIMIZATION (P3)
 
 - [ ] **P3** Bundle size audit and code splitting optimization
 - [ ] **P3** Database query optimization (add missing indexes)
@@ -209,7 +243,7 @@ Core notification infrastructure exists (email, SMS, push, WhatsApp). Missing:
 
 ---
 
-## 14. DOCUMENTATION (P3)
+## 15. DOCUMENTATION (P3)
 
 - [ ] **P3** API documentation (OpenAPI/Swagger spec for 193 endpoints)
 - [ ] **P3** Developer onboarding guide
@@ -219,7 +253,7 @@ Core notification infrastructure exists (email, SMS, push, WhatsApp). Missing:
 
 ---
 
-## 15. FUTURE FEATURES (P3 — Backlog)
+## 16. FUTURE FEATURES (P3 — Backlog)
 
 - [ ] **P3** Rating & review system for warehouses
 - [ ] **P3** Advanced search with filters (location, capacity, amenities)
@@ -235,17 +269,18 @@ Core notification infrastructure exists (email, SMS, push, WhatsApp). Missing:
 | Priority | Count | Description |
 |----------|-------|-------------|
 | **P0** | ~25 | Testing infrastructure, legal compliance, critical agreement templates |
-| **P1** | ~35 | CRM UI, agreement integration, PDF generation, admin pages, in-code fixes |
-| **P2** | ~25 | CI/CD, notifications, onboarding flows, secondary templates |
+| **P1** | ~40 | CRM UI, agreement integration, PDF generation, admin pages, booking/payment follow-ups, in-code fixes |
+| **P2** | ~30 | CI/CD, notifications, onboarding flows, secondary templates, cancellation emails |
 | **P3** | ~20 | Performance, documentation, future features |
-| **Total** | **~105** | |
+| **Total** | **~115** | |
 
 ## Recommended Execution Order
 
 1. **Week 1-2**: Testing setup + legal/compliance pages + cookie consent (P0)
 2. **Week 3-4**: Agreement templates (remaining 15) + agreement UI components (P0/P1)
 3. **Week 5-6**: CRM UI components + admin CRM pages (P1)
-4. **Week 7-8**: PDF generation + agreement integration into all flows (P1)
-5. **Week 9-10**: Fix in-code TODOs + env/config cleanup + CI/CD improvements (P1/P2)
-6. **Week 11-12**: Notification enhancements + onboarding flows (P2)
-7. **Ongoing**: Performance, documentation, backlog features (P3)
+4. **Week 7-8**: Booking/payment follow-ups (cancellation UI, payment retry wiring, cron config) (P1)
+5. **Week 9-10**: PDF generation + agreement integration into all flows (P1)
+6. **Week 11-12**: Fix in-code TODOs + env/config cleanup + CI/CD improvements (P1/P2)
+7. **Week 13-14**: Notification enhancements + onboarding flows (P2)
+8. **Ongoing**: Performance, documentation, backlog features (P3)
