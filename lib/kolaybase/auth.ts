@@ -5,7 +5,7 @@
  * Base: /api/rest/v1/auth
  */
 
-const API_BASE = "https://api.kolaybase.com/api";
+const API_BASE = "https://api.kolaybase.com";
 const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
 
 const TOKEN_KEY = "kb_access_token";
