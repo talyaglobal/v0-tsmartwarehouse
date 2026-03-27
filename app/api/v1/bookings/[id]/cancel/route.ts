@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/api-middleware";
 import { getBookingById } from "@/lib/db/bookings";
 import { createRefund, getPaymentIntent } from "@/lib/payments/stripe";
+import { generateIdempotencyKey } from "@/lib/payments/idempotency";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/utils/logger";
 import type { ErrorResponse } from "@/types/api";
@@ -175,10 +176,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           if (charges.length > 0) {
             const chargeId = charges[0].id;
 
+            // Generate idempotency key for exactly-once refund processing
+            const idempotencyKey = generateIdempotencyKey("refund", bookingId, {
+              chargeId,
+              amount: refundCalc.refundAmount,
+              reason: cancel_type,
+            });
+
             const refund = await createRefund({
               chargeId,
               amount: refundCalc.refundAmount,
               reason: "requested_by_customer",
+              idempotencyKey,
               metadata: {
                 booking_id: bookingId,
                 cancel_type,

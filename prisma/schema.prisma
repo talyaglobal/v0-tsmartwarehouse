@@ -11,5 +11,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://kb_user_warebnb:0Oug-vAw5PJIFUewk0wmyt6V4Djv7NPb@db.kolaybase.com:6432/kb_warebnb"
+  directUrl = "postgresql://kb_user_warebnb:0Oug-vAw5PJIFUewk0wmyt6V4Djv7NPb@db.kolaybase.com:6432/kb_warebnb"
 }
