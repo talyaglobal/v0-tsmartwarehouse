@@ -1,0 +1,7 @@
+{
+  "key": "booking-flow-pattern",
+  "value": "Booking workflow: 1) Client searches warehouse → 2) Create booking with 10% deposit (Stripe) → 3) QR code generated for pallets → 4) Check-in: scan QR + upload photos → 5) Storage period with real-time chat → 6) Check-out: scan QR + photos + final payment → 7) Invoice generated",
+  "tags": ["booking", "workflow", "payment", "qr", "verification"],
+  "created": "2026-03-27T12:45:00Z",
+  "confidence": 1.0
+}

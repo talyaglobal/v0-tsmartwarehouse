@@ -1,0 +1,7 @@
+{
+  "key": "warebnb-core",
+  "value": "Warehouse marketplace platform - Airbnb for warehouse space. Features: booking with 10% deposits, QR-based pallet tracking with photo verification, real-time chat between clients and warehouse staff, Stripe payment processing, admin dashboard, 3D warehouse visualization",
+  "tags": ["marketplace", "warehouse", "booking", "saas"],
+  "created": "2026-03-27T12:45:00Z",
+  "confidence": 1.0
+}

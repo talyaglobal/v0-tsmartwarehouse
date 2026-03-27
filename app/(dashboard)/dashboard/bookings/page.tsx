@@ -13,6 +13,7 @@ import { Plus, Package, Building2, Eye, Loader2, Edit, Trash, XCircle, DollarSig
 import { formatCurrency, formatDate, getBookingTypeLabel, formatNumber } from "@/lib/utils/format"
 import type { Booking, BookingStatus } from "@/types"
 import { api } from "@/lib/api/client"
+import { useUIStore } from "@/stores/ui.store"
 import { useUser } from "@/lib/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
@@ -468,10 +469,10 @@ export default function BookingsPage() {
                                   if (result.success && result.data?.conversationId) {
                                     router.push(`/dashboard/chats?conversation=${result.data.conversationId}`)
                                   } else {
-                                    api.showToast?.('Failed to start chat', 'error')
+                                    useUIStore.getState().addNotification({ type: 'error', message: 'Failed to start chat' })
                                   }
                                 } catch {
-                                  api.showToast?.('Failed to start chat', 'error')
+                                  useUIStore.getState().addNotification({ type: 'error', message: 'Failed to start chat' })
                                 } finally {
                                   setChatStartingForBookingId(null)
                                 }

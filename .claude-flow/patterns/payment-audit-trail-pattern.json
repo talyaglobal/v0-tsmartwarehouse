@@ -1,0 +1,12 @@
+{
+  "key": "payment-audit-trail-pattern",
+  "value": "Comprehensive payment event logging using SECURITY DEFINER PostgreSQL function. Tracks all payment state changes: deposit_created/succeeded/failed, checkout_created/succeeded/failed, refund_created/succeeded/failed, amount_adjusted. Stores amount, Stripe IDs, status, error messages, metadata. RLS policies allow customers to view own events, warehouse staff to view warehouse events, admins to view all",
+  "tags": ["audit", "payments", "compliance", "postgresql", "rls"],
+  "tables": ["payment_events"],
+  "function": "log_payment_event(booking_id, event_type, amount, ...)",
+  "created": "2026-03-27T13:30:00Z",
+  "confidence": 1.0,
+  "successRate": 1.0,
+  "benefits": ["Complete audit trail", "Dispute resolution", "Fraud detection", "Analytics"],
+  "reusable": ["financial-transactions", "order-processing", "subscription-billing"]
+}

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, CheckCircle } from "@/components/icons"
 import { api } from "@/lib/api/client"
+import { useUIStore } from "@/stores/ui.store"
 import { useUser } from "@/lib/hooks/use-user"
 
 interface WarehouseOption {
@@ -99,7 +100,7 @@ export default function WarehouseCheckOutPage() {
       !photos.loading ||
       !photos.empty_area
     ) {
-      api.showToast?.("Select a paid request and upload all 3 photos", "error")
+      useUIStore.getState().addNotification({ type: "error", message: "Select a paid request and upload all 3 photos" })
       return
     }
     setSubmitting(true)
@@ -134,12 +135,12 @@ export default function WarehouseCheckOutPage() {
           empty_area: null,
         })
         queryClient.invalidateQueries({ queryKey: ["warehouse-staff-checkout-requests", warehouseId] })
-        api.showToast?.("Check-out completed", "success")
+        useUIStore.getState().addNotification({ type: "success", message: "Check-out completed" })
       } else {
-        api.showToast?.(res.error || "Check-out failed", "error")
+        useUIStore.getState().addNotification({ type: "error", message: res.error || "Check-out failed" })
       }
     } catch (err) {
-      api.showToast?.(err instanceof Error ? err.message : "Check-out failed", "error")
+      useUIStore.getState().addNotification({ type: "error", message: err instanceof Error ? err.message : "Check-out failed" })
     } finally {
       setSubmitting(false)
     }

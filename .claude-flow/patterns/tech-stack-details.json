@@ -1,0 +1,7 @@
+{
+  "key": "tech-stack-details",
+  "value": "Frontend: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, Radix UI components, Zustand state management. Backend: Supabase (PostgreSQL + Auth + Realtime), Prisma ORM. Payments: Stripe with webhooks. Storage: Firebase for images/videos. Real-time: Supabase Realtime channels for chat. Analytics: Vercel Analytics. Node 24.x runtime",
+  "tags": ["tech-stack", "nextjs", "react", "supabase", "stripe"],
+  "created": "2026-03-27T12:45:00Z",
+  "confidence": 1.0
+}

@@ -31,15 +31,15 @@ export async function GET(request: NextRequest) {
     if (error) throw new Error(error.message)
 
     const templates: InvoiceTemplate[] = (data || []).map((row: Record<string, unknown>) => ({
-      id: row.id,
-      name: row.name,
-      description: row.description ?? undefined,
-      htmlContent: row.html_content ?? undefined,
-      companyId: row.company_id ?? undefined,
+      id: row.id as string,
+      name: row.name as string,
+      description: (row.description as string | null) ?? undefined,
+      htmlContent: (row.html_content as string | null) ?? undefined,
+      companyId: (row.company_id as string | null) ?? undefined,
       isSystem: Boolean(row.is_system),
       isActive: Boolean(row.is_active),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
     }))
 
     return NextResponse.json({ success: true, data: templates })

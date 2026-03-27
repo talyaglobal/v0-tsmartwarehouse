@@ -1,0 +1,102 @@
+# Ruflo V3.5 Runtime Configuration — Warebnb Production
+# Generated: 2026-03-27T12:45:00Z
+
+version: "3.5.0"
+
+project:
+  name: "Warebnb"
+  description: "The Marketplace for Warehouse Space"
+  type: "saas-marketplace"
+
+swarm:
+  topology: hierarchical
+  maxAgents: 12
+  autoScale: true
+  coordinationStrategy: raft
+  antiDrift: true
+  heartbeatInterval: 5000
+
+memory:
+  backend: hybrid
+  enableHNSW: true
+  persistPath: .claude-flow/data
+  cacheSize: 100
+
+  # ADR-049: Self-Learning Memory
+  learningBridge:
+    enabled: true
+    sonaMode: balanced
+    confidenceDecayRate: 0.005
+    accessBoostAmount: 0.03
+    consolidationThreshold: 10
+
+  memoryGraph:
+    enabled: true
+    pageRankDamping: 0.85
+    maxNodes: 5000
+    similarityThreshold: 0.8
+
+  agentScopes:
+    enabled: true
+    defaultScope: project
+
+neural:
+  enabled: true
+  modelPath: .claude-flow/neural
+  sonaEnabled: true
+  ewcEnabled: true
+  moe:
+    experts: 8
+    topK: 2
+
+hooks:
+  enabled: true
+  autoExecute: true
+  learning: true
+
+  # Key learning triggers for Warebnb
+  patterns:
+    - name: "successful-booking-flow"
+      action: "store-pattern"
+    - name: "stripe-integration-success"
+      action: "optimize-routing"
+    - name: "security-fix"
+      action: "store-security-pattern"
+    - name: "performance-optimization"
+      action: "store-optimization-pattern"
+    - name: "warehouse-capacity-algorithm"
+      action: "store-capacity-pattern"
+
+routing:
+  mode: intelligent
+  costOptimization: true
+  patternReuse: true
+  minConfidence: 0.7
+
+optimization:
+  enabled: true
+  tokenSavingsTarget: 0.40 # 40% token reduction
+  responseTimeTarget: 500 # <500ms API response
+  qualityCoverageTarget: 0.90 # 90% test coverage
+
+security:
+  enabled: true
+  scanOnCommit: true
+  criticalVulnerabilitiesBlocked: true
+  validationEnabled: true
+
+qualityGates:
+  enabled: true
+  minTestCoverage: 0.90
+  maxApiLatency: 500
+  maxCriticalIssues: 0
+
+learning:
+  enabled: true
+  continuousImprovement: true
+  patternExportInterval: 86400 # Daily export
+
+mcp:
+  autoStart: false
+  port: 3000
+  transport: stdio

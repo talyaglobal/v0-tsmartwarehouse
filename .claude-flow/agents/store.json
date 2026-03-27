@@ -1,0 +1,161 @@
+{
+  "agents": {
+    "agent-1774616059103-mqo17n": {
+      "agentId": "agent-1774616059103-mqo17n",
+      "agentType": "coordinator",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:19.103Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616075811-i09wp5": {
+      "agentId": "agent-1774616075811-i09wp5",
+      "agentType": "architect",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:35.811Z",
+      "model": "opus",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616078484-6c1yqs": {
+      "agentId": "agent-1774616078484-6c1yqs",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:38.484Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616081096-lhdccd": {
+      "agentId": "agent-1774616081096-lhdccd",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:41.096Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616095297-gnj395": {
+      "agentId": "agent-1774616095297-gnj395",
+      "agentType": "tester",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:55.298Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616097275-4d7rtc": {
+      "agentId": "agent-1774616097275-4d7rtc",
+      "agentType": "reviewer",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:57.275Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616099259-bd81pq": {
+      "agentId": "agent-1774616099259-bd81pq",
+      "agentType": "security-architect",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:54:59.260Z",
+      "model": "opus",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616113394-0mhc36": {
+      "agentId": "agent-1774616113394-0mhc36",
+      "agentType": "performance-engineer",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:55:13.394Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616115454-dqtek5": {
+      "agentId": "agent-1774616115454-dqtek5",
+      "agentType": "researcher",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:55:15.454Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616118365-o0o0m4": {
+      "agentId": "agent-1774616118365-o0o0m4",
+      "agentType": "optimizer",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:55:18.365Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616137010-a7aayn": {
+      "agentId": "agent-1774616137010-a7aayn",
+      "agentType": "memory-specialist",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:55:37.010Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1774616139088-pdyttv": {
+      "agentId": "agent-1774616139088-pdyttv",
+      "agentType": "analyst",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-03-27T12:55:39.088Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    }
+  },
+  "version": "3.0.0"
+}

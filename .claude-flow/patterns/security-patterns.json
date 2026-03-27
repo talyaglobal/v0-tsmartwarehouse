@@ -1,0 +1,7 @@
+{
+  "key": "security-patterns",
+  "value": "Security implementation: Supabase RLS policies for multi-tenant isolation, JWT authentication, role-based access control (admin/warehouse/client), API rate limiting via Upstash Redis, input validation with Zod schemas, CORS protection, secure payment handling via Stripe, photo upload validation",
+  "tags": ["security", "rls", "authentication", "validation"],
+  "created": "2026-03-27T12:45:00Z",
+  "confidence": 1.0
+}

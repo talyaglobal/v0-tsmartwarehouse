@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Package, Upload, CheckCircle } from "@/components/icons"
+import { Loader2, Package, CheckCircle } from "@/components/icons"
 import { api } from "@/lib/api/client"
+import { useUIStore } from "@/stores/ui.store"
 import { useUser } from "@/lib/hooks/use-user"
 
 interface WarehouseOption {
@@ -87,7 +88,7 @@ export default function WarehouseCheckInPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!bookingId || !warehouseId || !photos.sealed || !photos.opened_emptying || !photos.empty) {
-      api.showToast?.("Select booking, warehouse, and upload all 3 photos", "error")
+      useUIStore.getState().addNotification({ type: "error", message: "Select booking, warehouse, and upload all 3 photos" })
       return
     }
     setSubmitting(true)
@@ -110,12 +111,12 @@ export default function WarehouseCheckInPage() {
       )
       if (res.success && res.data) {
         setResult({ items: res.data.items })
-        api.showToast?.("Check-in successful", "success")
+        useUIStore.getState().addNotification({ type: "success", message: "Check-in successful" })
       } else {
-        api.showToast?.(res.error || "Check-in failed", "error")
+        useUIStore.getState().addNotification({ type: "error", message: res.error || "Check-in failed" })
       }
     } catch (err) {
-      api.showToast?.(err instanceof Error ? err.message : "Check-in failed", "error")
+      useUIStore.getState().addNotification({ type: "error", message: err instanceof Error ? err.message : "Check-in failed" })
     } finally {
       setSubmitting(false)
     }

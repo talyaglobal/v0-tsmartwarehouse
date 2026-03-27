@@ -90,7 +90,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { success: false, error: 'Invalid request body', statusCode: 400, code: 'VALIDATION_ERROR', details: error.flatten() } satisfies ErrorResponse,
+        { success: false, error: 'Invalid request body', statusCode: 400, code: 'VALIDATION_ERROR', details: JSON.stringify(error.flatten()) } satisfies ErrorResponse,
         { status: 400 }
       )
     }

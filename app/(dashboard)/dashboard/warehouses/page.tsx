@@ -51,7 +51,7 @@ export default function WarehousesPage() {
         // Convert photo paths to full URLs if they're stored in Supabase Storage
         const supabase = createClient()
         const warehousesWithUrls = await Promise.all(
-          warehouseData.map(async warehouse => {
+          warehouseData.map(async (warehouse: Warehouse) => {
             let photoUrls = warehouse.photos || []
             if (warehouse.photos && warehouse.photos.length > 0) {
               photoUrls = warehouse.photos.map(photo => {

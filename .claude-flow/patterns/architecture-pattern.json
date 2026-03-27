@@ -1,0 +1,7 @@
+{
+  "key": "architecture-pattern",
+  "value": "Multi-tenant SaaS architecture using Next.js 16 + React 19 + Supabase (PostgreSQL with RLS) + Prisma ORM + Stripe payments + Firebase storage. Row-level security enforced for data isolation. API response time target: <500ms",
+  "tags": ["architecture", "saas", "rls", "nextjs", "supabase"],
+  "created": "2026-03-27T12:45:00Z",
+  "confidence": 1.0
+}

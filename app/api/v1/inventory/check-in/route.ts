@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const parsed = bodySchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: "Invalid body", statusCode: 400, details: parsed.error.flatten() } satisfies ErrorResponse,
+        { success: false, error: "Invalid body", statusCode: 400, details: JSON.stringify(parsed.error.flatten()) } satisfies ErrorResponse,
         { status: 400 }
       )
     }

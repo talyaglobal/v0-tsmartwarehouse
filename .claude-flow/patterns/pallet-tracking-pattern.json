@@ -1,0 +1,7 @@
+{
+  "key": "pallet-tracking-pattern",
+  "value": "Pallet lifecycle tracking: Each pallet gets unique QR code. Operations logged: check-in (with photos), movements, condition updates, check-out (with photos). Photos stored in Firebase. Operation logs in Supabase with timestamps and staff verification",
+  "tags": ["pallet", "qr", "tracking", "verification", "photos"],
+  "created": "2026-03-27T12:45:00Z",
+  "confidence": 1.0
+}

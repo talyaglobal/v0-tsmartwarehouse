@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { MessageSquare, Send, Loader2 } from "@/components/icons"
 import { api } from "@/lib/api/client"
+import { useUIStore } from "@/stores/ui.store"
 import { formatDate } from "@/lib/utils/format"
 import { useUser } from "@/lib/hooks/use-user"
 import type { Conversation, Message } from "@/types/marketplace"
@@ -89,11 +90,11 @@ export default function DashboardChatsPage() {
       if (res.success && res.data) {
         setMessages((prev) => [...prev, res.data!])
       } else {
-        api.showToast?.("Failed to send message", "error")
+        useUIStore.getState().addNotification({ type: "error", message: "Failed to send message" })
       }
       fetchConversations()
     } catch {
-      api.showToast?.("Failed to send message", "error")
+      useUIStore.getState().addNotification({ type: "error", message: "Failed to send message" })
     } finally {
       setSending(false)
     }

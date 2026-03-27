@@ -1,31 +1,45 @@
-import { NextRequest, NextResponse } from "next/server"
-import Stripe from "stripe"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { ErrorResponse } from "@/types/api"
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { ErrorResponse } from "@/types/api";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2023-10-16",
-})
+});
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ""
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
-  const supabase = await createServerSupabaseClient()
-  const paymentType = paymentIntent.metadata?.payment_type
-  const isDeposit = paymentType === "deposit"
-  const isCheckoutRemaining = paymentType === "checkout_remaining"
-  const bookingIdFromMeta = paymentIntent.metadata?.booking_id
-  const checkoutRequestId = paymentIntent.metadata?.checkout_request_id as string | undefined
+  const supabase = await createServerSupabaseClient();
+  const paymentType = paymentIntent.metadata?.payment_type;
+  const isDeposit = paymentType === "deposit";
+  const isCheckoutRemaining = paymentType === "checkout_remaining";
+  const bookingIdFromMeta = paymentIntent.metadata?.booking_id;
+  const checkoutRequestId = paymentIntent.metadata?.checkout_request_id as string | undefined;
 
-  let booking: { id: string; total_amount?: number; deposit_amount?: number } | null = null
+  let booking: { id: string; total_amount?: number; deposit_amount?: number } | null = null;
 
   if (isDeposit && bookingIdFromMeta) {
     const { data: b } = await supabase
       .from("bookings")
       .select("id, total_amount, deposit_amount")
       .eq("id", bookingIdFromMeta)
-      .maybeSingle()
-    booking = b
+      .maybeSingle();
+    booking = b;
+
+    // Log deposit success event
+    if (b) {
+      const { error: logError } = await supabase.rpc("log_payment_event", {
+        p_booking_id: b.id,
+        p_event_type: "deposit_succeeded",
+        p_amount: paymentIntent.amount / 100,
+        p_stripe_payment_intent_id: paymentIntent.id,
+        p_stripe_event_id: null,
+        p_status: "completed",
+        p_metadata: { payment_type: "deposit" },
+      });
+      if (logError) console.error("Failed to log payment event:", logError);
+    }
   }
 
   if (!booking) {
@@ -33,9 +47,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       .from("bookings")
       .select("*")
       .eq("payment_intent_id", paymentIntent.id)
-      .maybeSingle()
+      .maybeSingle();
     if (bookingByIntent) {
-      booking = bookingByIntent
+      booking = bookingByIntent;
     }
   }
 
@@ -44,47 +58,59 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       .from("payments")
       .select("invoice_id")
       .eq("stripe_payment_intent_id", paymentIntent.id)
-      .maybeSingle()
+      .maybeSingle();
 
     if (payment?.invoice_id) {
       const { data: invoice } = await supabase
         .from("invoices")
         .select("booking_id")
         .eq("id", payment.invoice_id)
-        .maybeSingle()
+        .maybeSingle();
 
       if (invoice?.booking_id) {
         const { data: bookingByInvoice } = await supabase
           .from("bookings")
           .select("*")
           .eq("id", invoice.booking_id)
-          .maybeSingle()
+          .maybeSingle();
         if (bookingByInvoice) {
-          booking = bookingByInvoice
+          booking = bookingByInvoice;
         }
       }
     }
   }
 
   if (!booking) {
-    console.error("Booking not found for payment intent:", paymentIntent.id)
-    return
+    console.error("Booking not found for payment intent:", paymentIntent.id);
+    return;
   }
 
   if (isCheckoutRemaining && checkoutRequestId) {
     try {
-      const { markCheckoutRequestPaid } = await import("@/lib/db/checkout-requests")
-      await markCheckoutRequestPaid(checkoutRequestId)
+      const { markCheckoutRequestPaid } = await import("@/lib/db/checkout-requests");
+      await markCheckoutRequestPaid(checkoutRequestId);
+
+      // Log checkout payment success event
+      const { error: logError } = await supabase.rpc("log_payment_event", {
+        p_booking_id: booking.id,
+        p_event_type: "checkout_succeeded",
+        p_amount: paymentIntent.amount / 100,
+        p_checkout_request_id: checkoutRequestId,
+        p_stripe_payment_intent_id: paymentIntent.id,
+        p_status: "completed",
+        p_metadata: { payment_type: "checkout_remaining" },
+      });
+      if (logError) console.error("Failed to log payment event:", logError);
     } catch (e) {
-      console.error("Failed to mark checkout request paid:", e)
+      console.error("Failed to mark checkout request paid:", e);
     }
-    return
+    return;
   }
 
-  const amountPaidCents = paymentIntent.amount
-  const amountPaidDollars = amountPaidCents / 100
-  const totalAmount = Number(booking.total_amount) || 0
-  const amountDue = isDeposit ? Math.max(0, totalAmount - amountPaidDollars) : 0
+  const amountPaidCents = paymentIntent.amount;
+  const amountPaidDollars = amountPaidCents / 100;
+  const totalAmount = Number(booking.total_amount) || 0;
+  const amountDue = isDeposit ? Math.max(0, totalAmount - amountPaidDollars) : 0;
 
   const updatePayload: Record<string, unknown> = isDeposit
     ? {
@@ -101,101 +127,156 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
         amount_paid: amountPaidDollars,
         amount_due: 0,
         paid_at: new Date().toISOString(),
-      }
+      };
 
   const { error: updateError } = await supabase
     .from("bookings")
     .update(updatePayload)
-    .eq("id", booking.id)
+    .eq("id", booking.id);
 
   if (updateError) {
-    console.error("Failed to update booking:", updateError)
-    return
+    console.error("Failed to update booking:", updateError);
+    return;
   }
 }
 
 async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentIntent) {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient();
 
   // Find booking by payment_intent_id
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
     .select("*")
     .eq("payment_intent_id", paymentIntent.id)
-    .single()
+    .single();
 
   if (fetchError || !booking) {
-    console.error("Booking not found for payment intent:", paymentIntent.id)
-    return
+    console.error("Booking not found for payment intent:", paymentIntent.id);
+    return;
   }
+
+  // Log payment failure event
+  const { error: logError } = await supabase.rpc("log_payment_event", {
+    p_booking_id: booking.id,
+    p_event_type:
+      paymentIntent.metadata?.payment_type === "deposit" ? "deposit_failed" : "checkout_failed",
+    p_amount: paymentIntent.amount / 100,
+    p_stripe_payment_intent_id: paymentIntent.id,
+    p_status: "failed",
+    p_error_message: paymentIntent.last_payment_error?.message || "Payment failed",
+    p_metadata: { payment_type: paymentIntent.metadata?.payment_type || "unknown" },
+  });
+  if (logError) console.error("Failed to log payment event:", logError);
 
   // Update booking status to failed
   const { error: updateError } = await supabase
     .from("bookings")
     .update({
       payment_status: "failed",
+      payment_failed_at: new Date().toISOString(),
       payment_notes: paymentIntent.last_payment_error?.message || "Payment failed",
     })
-    .eq("id", booking.id)
+    .eq("id", booking.id);
 
   if (updateError) {
-    console.error("Failed to update booking:", updateError)
+    console.error("Failed to update booking:", updateError);
   }
 
   // TODO: Send failure notification email to customer
-
 }
 
 /**
  * POST /api/v1/payments/webhook
- * Handle Stripe webhook events
+ * Handle Stripe webhook events with deduplication and audit logging
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text()
-    const signature = request.headers.get("stripe-signature")
+    const body = await request.text();
+    const signature = request.headers.get("stripe-signature");
 
     if (!signature) {
       const errorData: ErrorResponse = {
         success: false,
         error: "Missing signature",
         statusCode: 400,
-      }
-      return NextResponse.json(errorData, { status: 400 })
+      };
+      return NextResponse.json(errorData, { status: 400 });
     }
 
     // Verify webhook signature
-    let event: Stripe.Event
+    let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
-      console.error("Webhook signature verification failed:", error)
+      console.error("Webhook signature verification failed:", error);
       const errorData: ErrorResponse = {
         success: false,
         error: "Webhook signature verification failed",
         statusCode: 401,
-      }
-      return NextResponse.json(errorData, { status: 401 })
+      };
+      return NextResponse.json(errorData, { status: 401 });
     }
+
+    // Check for duplicate webhook event (replay attack prevention)
+    const supabase = await createServerSupabaseClient();
+    const { data: existingEvent } = await supabase
+      .from("stripe_webhook_events")
+      .select("id")
+      .eq("stripe_event_id", event.id)
+      .maybeSingle();
+
+    if (existingEvent) {
+      console.log("Duplicate webhook event ignored:", event.id);
+      return NextResponse.json({
+        success: true,
+        message: "Event already processed",
+      });
+    }
+
+    // Log webhook event for deduplication
+    await supabase.from("stripe_webhook_events").insert({
+      stripe_event_id: event.id,
+      event_type: event.type,
+      payload: event as any,
+      processing_result: "processing",
+    });
+
+    let processingResult = "success";
+    let errorMessage: string | null = null;
 
     // Handle different event types
-    switch (event.type) {
-      case "payment_intent.succeeded":
-        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent)
-        break
-      case "payment_intent.payment_failed":
-        await handlePaymentIntentPaymentFailed(event.data.object as Stripe.PaymentIntent)
-        break
+    try {
+      switch (event.type) {
+        case "payment_intent.succeeded":
+          await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+          break;
+        case "payment_intent.payment_failed":
+          await handlePaymentIntentPaymentFailed(event.data.object as Stripe.PaymentIntent);
+          break;
+      }
+    } catch (handlerError) {
+      processingResult = "error";
+      errorMessage = handlerError instanceof Error ? handlerError.message : "Handler failed";
+      console.error("Event handler error:", handlerError);
     }
 
-    return NextResponse.json({ success: true })
+    // Update processing result
+    await supabase
+      .from("stripe_webhook_events")
+      .update({
+        processing_result: processingResult,
+        ...(errorMessage && { error_message: errorMessage }),
+      })
+      .eq("stripe_event_id", event.id);
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Webhook processing error:", error)
+    console.error("Webhook processing error:", error);
     const errorData: ErrorResponse = {
       success: false,
       error: error instanceof Error ? error.message : "Webhook processing failed",
       statusCode: 500,
-    }
-    return NextResponse.json(errorData, { status: 500 })
+    };
+    return NextResponse.json(errorData, { status: 500 });
   }
 }

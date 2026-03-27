@@ -1,0 +1,10 @@
+{
+  "key": "cancellation-refund-pattern",
+  "value": "Time-based refund policy implementation: >48h before start = 100% refund, 24-48h = 50% refund, <24h = 0% refund. Integrates with Stripe refund API, stores audit trail (cancelled_by, cancel_type, refund_amount, refund_percent), gracefully handles Stripe failures, continues cancellation even if refund fails for manual admin processing",
+  "tags": ["cancellation", "refund", "stripe", "policy", "audit"],
+  "formula": "if (hours > 48) 100% else if (hours > 24) 50% else 0%",
+  "created": "2026-03-27T13:30:00Z",
+  "confidence": 1.0,
+  "successRate": 1.0,
+  "reusable": ["booking-cancellation", "event-cancellation", "subscription-cancellation"]
+}

@@ -1,0 +1,23 @@
+{
+  "swarms": {
+    "swarm-1774616034642-rfdyyz": {
+      "swarmId": "swarm-1774616034642-rfdyyz",
+      "topology": "hierarchical",
+      "maxAgents": 12,
+      "status": "running",
+      "agents": [],
+      "tasks": [],
+      "config": {
+        "topology": "hierarchical",
+        "maxAgents": 12,
+        "strategy": "specialized",
+        "communicationProtocol": "message-bus",
+        "autoScaling": true,
+        "consensusMechanism": "majority"
+      },
+      "createdAt": "2026-03-27T12:53:54.642Z",
+      "updatedAt": "2026-03-27T12:53:54.642Z"
+    }
+  },
+  "version": "3.0.0"
+}

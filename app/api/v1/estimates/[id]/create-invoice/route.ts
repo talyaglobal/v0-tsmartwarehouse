@@ -40,7 +40,7 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}))
     const parsed = bodySchema.safeParse(body)
-    const { templateId, sendEmail, toEmail } = parsed.success ? parsed.data : {}
+    const { sendEmail, toEmail } = parsed.success ? parsed.data : {}
 
     const dueDate = estimate.dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 

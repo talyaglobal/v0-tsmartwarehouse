@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: "Invalid body",
           statusCode: 400,
-          details: parsed.error.flatten(),
+          details: JSON.stringify(parsed.error.flatten()),
         } satisfies ErrorResponse,
         { status: 400 }
       )

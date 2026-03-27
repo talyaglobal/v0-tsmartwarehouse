@@ -1,0 +1,11 @@
+{
+  "key": "webhook-deduplication-pattern",
+  "value": "Stripe webhook replay attack prevention: Store stripe_event_id in stripe_webhook_events table with UNIQUE constraint. Check for duplicate before processing. Log processing_result (success/error) and payload. Enables idempotent webhook processing, prevents double-charging, provides audit trail for debugging",
+  "tags": ["webhook", "stripe", "security", "deduplication", "idempotency"],
+  "implementation": "Check existingEvent → Insert event row → Process → Update result",
+  "created": "2026-03-27T13:30:00Z",
+  "confidence": 1.0,
+  "successRate": 1.0,
+  "security": "Prevents replay attacks, ensures exactly-once processing",
+  "reusable": ["stripe-webhooks", "payment-webhooks", "external-api-callbacks"]
+}
