@@ -1,12 +1,12 @@
 import Link from "next/link"
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase/server"
+import { createAuthenticatedServerClient } from "@/lib/kolaybase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { JobStatusBadge } from "@/components/crm-search/job-status-badge"
 import { getSerpAPIAccountInfo } from "@/lib/crm-search/serpapi"
 
 export default async function CRMSearchDashboard() {
-  const supabase = await createAuthenticatedSupabaseClient()
+  const supabase = await createAuthenticatedServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

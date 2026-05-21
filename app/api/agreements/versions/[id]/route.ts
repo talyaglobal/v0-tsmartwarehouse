@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/kolaybase/server';
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -21,7 +21,7 @@ export async function GET(
   context: RouteContext
 ) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const params = context.params instanceof Promise ? await context.params : context.params;
     
     // Get authenticated user
@@ -65,7 +65,7 @@ export async function PATCH(
   context: RouteContext
 ) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const params = context.params instanceof Promise ? await context.params : context.params;
     
     // Get authenticated user
@@ -152,7 +152,7 @@ export async function DELETE(
   context: RouteContext
 ) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const params = context.params instanceof Promise ? await context.params : context.params;
     
     // Get authenticated user

@@ -11,7 +11,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { cn } from "@/lib/utils"
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'

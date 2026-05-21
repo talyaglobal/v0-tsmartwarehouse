@@ -4,7 +4,7 @@
  * Handles conversations and messages management
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Conversation, Message } from '@/types/marketplace'
 import { createNotification } from '@/lib/db/notifications'
 
@@ -12,7 +12,7 @@ import { createNotification } from '@/lib/db/notifications'
  * Get conversations for a user
  */
 export async function getUserConversations(userId: string): Promise<Conversation[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data: conversations, error } = await supabase
@@ -64,7 +64,7 @@ export async function getConversationMessages(
   limit = 50,
   offset = 0
 ): Promise<{ messages: Message[]; total: number }> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data: messages, error, count } = await supabase
@@ -120,7 +120,7 @@ export async function getOrCreateConversation(
   guestId: string,
   bookingId?: string
 ): Promise<Conversation> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     // Check if conversation already exists
@@ -225,7 +225,7 @@ export async function sendMessage(
   attachments?: Message['attachments'],
   metadata?: Record<string, any>
 ): Promise<Message> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data: conv, error: convError } = await supabase
     .from('conversations')
@@ -292,7 +292,7 @@ export async function markMessagesAsRead(
   conversationId: string,
   userId: string
 ): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { error } = await supabase
@@ -334,7 +334,7 @@ export async function markMessagesAsRead(
  * Get unread message count for a user
  */
 export async function getUnreadCount(userId: string): Promise<number> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data: conversations } = await supabase
@@ -365,7 +365,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
  * Priority: (1) warehouse_staff with role manager, (2) any warehouse_staff, (3) company admin for owner_company_id.
  */
 export async function resolveHostForWarehouse(warehouseId: string): Promise<string | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data: warehouse } = await supabase
     .from('warehouses')
@@ -418,7 +418,7 @@ export async function resolveHostForWarehouse(warehouseId: string): Promise<stri
  * Returns conversations where warehouse_id is in the user's assigned/owned warehouses.
  */
 export async function getConversationsForWarehouseUser(userId: string): Promise<Conversation[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const warehouseIds: string[] = []
 
@@ -500,7 +500,7 @@ export async function canUserAccessConversation(
   conversationId: string,
   userId: string
 ): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data: conv, error } = await supabase
     .from('conversations')
@@ -557,7 +557,7 @@ export async function notifyWarehouseSideForNewChat(
   bookingId: string,
   warehouseId: string
 ): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const notified = new Set<string>()
 
   const { data: warehouse } = await supabase

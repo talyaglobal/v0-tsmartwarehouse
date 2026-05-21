@@ -18,7 +18,7 @@ import { api } from "@/lib/api/client"
 import { formatNumber, formatCurrency } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 import type { Warehouse } from "@/types"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { AssignStaffDialog } from "@/components/warehouses/assign-staff-dialog"
 
 type ViewMode = "grid" | "list"
@@ -66,7 +66,7 @@ export default function WarehousesPage() {
             }
 
             // Fetch pricing for this warehouse (from warehouse_pricing table)
-            let pricing = null
+            let pricing: any[] | null = null
             try {
               const pricingResult = await api.get<any[]>(`/api/v1/warehouses/${warehouse.id}/pricing`, { showToast: false })
               if (pricingResult.success && pricingResult.data && pricingResult.data.length > 0) {
@@ -77,7 +77,7 @@ export default function WarehousesPage() {
             }
 
             // Fetch detailed warehouse data to get palletPricing and rentMethods
-            let palletPricing = null
+            let palletPricing: any = null
             let rentMethods: string[] = (warehouse as any).rentMethods || []
             try {
               const detailResult = await api.get<any>(`/api/v1/warehouses/${warehouse.id}`, { showToast: false })

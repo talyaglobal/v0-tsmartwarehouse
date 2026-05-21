@@ -3,7 +3,7 @@
  * Handles team CRUD operations and team membership management
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { ClientTeam, TeamMember, TeamRole } from '@/types'
 
 // =====================================================
@@ -21,7 +21,7 @@ interface GetTeamsOptions {
  * Get teams with optional filters
  */
 export async function getTeams(filters?: GetTeamsOptions): Promise<ClientTeam[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   let query = supabase
     .from('client_teams')
     .select(`
@@ -65,7 +65,7 @@ export async function getTeamsByCompany(companyId: string): Promise<ClientTeam[]
  * Get team by ID
  */
 export async function getTeamById(teamId: string): Promise<ClientTeam | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_teams')
@@ -104,7 +104,7 @@ export async function createTeam(
     createdBy: string
   }
 ): Promise<ClientTeam> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_teams')
@@ -139,7 +139,7 @@ export async function updateTeam(
     status: boolean
   }>
 ): Promise<ClientTeam> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const updateData: Record<string, unknown> = {}
   if (updates.name !== undefined) updateData.name = updates.name
@@ -164,7 +164,7 @@ export async function updateTeam(
  * Soft delete team (set status to false)
  */
 export async function deleteTeam(teamId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { error } = await supabase
     .from('client_teams')
@@ -184,7 +184,7 @@ export async function deleteTeam(teamId: string): Promise<void> {
  * Get team members
  */
 export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_team_members')
@@ -215,7 +215,7 @@ export async function addTeamMember(
   role: TeamRole = 'member',
   invitedBy?: string
 ): Promise<TeamMember> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_team_members')
@@ -246,7 +246,7 @@ export async function addTeamMember(
  * Remove a member from a team
  */
 export async function removeTeamMember(teamId: string, memberId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { error } = await supabase
     .from('client_team_members')
@@ -267,7 +267,7 @@ export async function updateMemberRole(
   memberId: string,
   role: TeamRole
 ): Promise<TeamMember> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_team_members')
@@ -299,7 +299,7 @@ export async function updateMemberRole(
  * Check if user is a team admin
  */
 export async function isTeamAdmin(teamId: string, userId: string): Promise<boolean> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_team_members')
@@ -319,7 +319,7 @@ export async function isTeamAdmin(teamId: string, userId: string): Promise<boole
  * Check if user is a member of a team
  */
 export async function isTeamMember(teamId: string, userId: string): Promise<boolean> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_team_members')
@@ -335,7 +335,7 @@ export async function isTeamMember(teamId: string, userId: string): Promise<bool
  * Get user's teams
  */
 export async function getUserTeams(userId: string): Promise<ClientTeam[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('client_team_members')
@@ -372,7 +372,7 @@ export async function getUserTeams(userId: string): Promise<ClientTeam[]> {
  * Uses: 1) teams where user is in client_team_members, or 2) if none, teams for user's company_id (so company admins see members).
  */
 export async function getTeamMembersForBooking(userId: string): Promise<Array<TeamMember & { teamId: string; teamName: string }>> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   let teamIds: string[] = []
 
@@ -428,7 +428,7 @@ export async function getTeamMembersForBooking(userId: string): Promise<Array<Te
  * Check if user can book on behalf of another user (same team)
  */
 export async function canBookOnBehalf(bookerId: string, customerId: string): Promise<boolean> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase.rpc('can_book_on_behalf', {
     p_booker_id: bookerId,
@@ -448,7 +448,7 @@ export async function canBookOnBehalf(bookerId: string, customerId: string): Pro
  * Only team admins can create pre-approved (no approval required) on-behalf bookings.
  */
 export async function isTeamAdminForBooking(bookerId: string, customerId: string): Promise<boolean> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data: adminTeams } = await supabase
     .from('client_team_members')

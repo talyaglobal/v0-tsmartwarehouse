@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { MapPin, Building2, Warehouse as WarehouseIcon, ArrowLeft, AlertCircle, FileText } from "@/components/icons"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { AgreementModal } from "@/features/agreements/components/AgreementModal"
 import { AgreementType } from "@/features/agreements/types"
 

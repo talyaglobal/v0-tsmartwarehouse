@@ -10,7 +10,7 @@ import { MessageSquare, Send, X, Bot, Loader2, Minus, Sparkles, Trash2, User } f
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUser } from "@/lib/hooks/use-user"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 
 interface Message {
   id: string

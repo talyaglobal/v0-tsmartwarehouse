@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
 import { z } from "zod"
@@ -52,7 +52,7 @@ export async function GET(
     const resolvedParams = await Promise.resolve(params)
     const contactId = resolvedParams.id
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get user profile
     const { data: profile } = await supabase
@@ -135,7 +135,7 @@ export async function PATCH(
     const resolvedParams = await Promise.resolve(params)
     const contactId = resolvedParams.id
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get user profile
     const { data: profile } = await supabase
@@ -281,7 +281,7 @@ export async function DELETE(
     const resolvedParams = await Promise.resolve(params)
     const contactId = resolvedParams.id
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get user profile
     const { data: profile } = await supabase

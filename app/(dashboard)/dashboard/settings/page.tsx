@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { User, Shield, Bell, Save, Loader2, Upload, X } from "@/components/icons"
 import { useUser } from "@/lib/hooks/use-user"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { useUIStore } from "@/stores/ui.store"
 import { api } from "@/lib/api/client"
 import { PhoneInput } from 'react-international-phone'
@@ -52,7 +52,7 @@ export default function SettingsPage() {
       const supabase = createClient()
       
       // First get profile - try with avatar_url first, then fallback to avatar only
-      let profileData = null
+      let profileData: any = null
       
       // Try to fetch with avatar_url first
       const { data: dataWithAvatar, error: errorWithAvatar } = await supabase

@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { MoreHorizontal, Edit, Trash2, Loader2, UserPlus, Eye, EyeOff, User, Mail, Users, Plus, RefreshCw } from "@/components/icons"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { useUIStore } from "@/stores/ui.store"
 import { PhoneInput } from 'react-international-phone'
 import 'react-international-phone/style.css'

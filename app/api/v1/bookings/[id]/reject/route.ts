@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { rejectOnBehalfBooking } from "@/lib/business-logic/bookings"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
 
 interface RouteParams {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { message } = body
 
     // Get user's name
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: profile } = await supabase
       .from("profiles")
       .select("name, email")

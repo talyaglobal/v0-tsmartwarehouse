@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { requireAuth } from '@/lib/auth/api-middleware'
 import {
   validateFile,
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Supabase client (server-side with service role for storage operations)
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Generate file path
     // For logo uploads, use logo folder without user ID prefix
@@ -174,7 +174,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { error } = await supabase.storage.from(bucket).remove([path])
 
     if (error) {

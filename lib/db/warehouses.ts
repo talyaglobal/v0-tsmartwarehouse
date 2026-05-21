@@ -2,7 +2,7 @@
  * Database operations for Warehouses
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { invalidateCache, CACHE_PREFIXES } from '@/lib/cache/redis'
 import type { Warehouse, WarehouseRegion, CapacityUtilization } from '@/types'
 
@@ -19,7 +19,7 @@ interface GetWarehousesOptions {
 export async function getWarehouses(
   filters?: GetWarehousesOptions
 ): Promise<Warehouse[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   // Note: Include latitude and longitude for Google Maps
   let query = supabase
     .from('warehouses')
@@ -53,7 +53,7 @@ export async function getWarehouses(
  * Get warehouse by ID
  */
 export async function getWarehouseById(id: string): Promise<Warehouse | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('warehouses')
@@ -183,7 +183,7 @@ export async function createWarehouse(
     ownerCompanyId: string
   }
 ): Promise<Warehouse> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Debug: Log overtimePrice before insert
   if ((warehouse as any).overtimePrice) {
@@ -239,7 +239,7 @@ export async function createWarehouse(
       late_arrival_penalty_amount: (warehouse as any).lateArrivalPenaltyAmount ?? null,
       late_arrival_penalty_type: (warehouse as any).lateArrivalPenaltyType ?? null,
       payment_terms_days: (warehouse as any).paymentTermsDays ?? null,
-      overtime_price: overtimePriceValue, // New field - JSONB format (Supabase automatically converts objects to JSONB)
+      overtime_price: overtimePriceValue, // New field - JSONB format (KolayBase automatically converts objects to JSONB)
       ports: (warehouse as any).ports || [],
       free_storage_rules: (warehouse as any).freeStorageRules || [],
     })
@@ -263,7 +263,7 @@ export async function updateWarehouse(
     Omit<Warehouse, 'id' | 'floors' | 'createdAt' | 'updatedAt'>
   >
 ): Promise<Warehouse> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const updateData: any = {}
   if (updates.name !== undefined) updateData.name = updates.name
@@ -342,7 +342,7 @@ export async function updateWarehouse(
          overtimePrice.afterRegularWorkTime?.out !== undefined || 
          overtimePrice.holidays?.in !== undefined ||
          overtimePrice.holidays?.out !== undefined)) {
-      updateData.overtime_price = overtimePrice // New field - JSONB format (Supabase automatically converts objects to JSONB)
+      updateData.overtime_price = overtimePrice // New field - JSONB format (KolayBase automatically converts objects to JSONB)
       console.log('[UPDATE DB] OvertimePrice set in updateData:', JSON.stringify(updateData.overtime_price, null, 2))
     } else {
       updateData.overtime_price = null
@@ -373,7 +373,7 @@ export async function updateWarehouse(
  * Delete warehouse (soft delete)
  */
 export async function deleteWarehouse(id: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Soft delete: set status = false
   const { error } = await supabase
@@ -599,7 +599,7 @@ function transformWarehouseRow(row: any): Warehouse & { ownerCompanyId?: string 
  * Get warehouse regions for a floor
  */
 export async function getWarehouseRegions(floorId: string): Promise<WarehouseRegion[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('warehouse_regions')
@@ -629,7 +629,7 @@ export async function getCapacityUtilization(
   zoneId?: string,
   customerId?: string
 ): Promise<CapacityUtilization[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   // Build parameters for the function call
   const params: any = {}
@@ -674,7 +674,7 @@ export async function getWarehouseFloorById(floorId: string): Promise<{
   name: string
   totalSqFt: number
 } | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('warehouse_floors')
@@ -710,7 +710,7 @@ export async function getWarehouseHallById(hallId: string): Promise<{
   availableSqFt: number
   occupiedSqFt: number
 } | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('warehouse_halls')
@@ -749,7 +749,7 @@ export async function getWarehouseZoneById(zoneId: string): Promise<{
   totalSqFt?: number | null
   availableSqFt?: number | null
 } | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('warehouse_zones')
@@ -780,7 +780,7 @@ export async function getWarehouseZoneById(zoneId: string): Promise<{
  * Get warehouse region by ID
  */
 export async function getWarehouseRegionById(regionId: string): Promise<WarehouseRegion | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('warehouse_regions')

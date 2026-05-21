@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import {
   fetchServiceOrders,
   fetchServiceOrderById,
@@ -20,7 +20,7 @@ export async function getServiceOrders(filters?: {
   bookingId?: string
 }) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -49,7 +49,7 @@ export async function getServiceOrders(filters?: {
  */
 export async function getServiceOrderById(id: string) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -83,7 +83,7 @@ export async function getServiceOrderById(id: string) {
  */
 export async function createServiceOrder(input: CreateServiceOrderInput) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -149,7 +149,7 @@ export async function createServiceOrder(input: CreateServiceOrderInput) {
  */
 export async function updateServiceOrder(id: string, input: UpdateServiceOrderInput) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -191,7 +191,7 @@ export async function updateServiceOrder(id: string, input: UpdateServiceOrderIn
  */
 export async function cancelServiceOrder(id: string) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()

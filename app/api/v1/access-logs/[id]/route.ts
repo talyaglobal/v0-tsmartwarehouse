@@ -119,8 +119,8 @@ export async function DELETE(
     const { id } = await params
 
     // Check if user is admin (deletion restricted to admins)
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')

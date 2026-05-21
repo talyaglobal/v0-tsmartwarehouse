@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -43,7 +43,7 @@ export async function GET(
       }
     }
 
-    const supabaseAdmin = createServerSupabaseClient()
+    const supabaseAdmin = createServerClient()
     
     // Fetch pending invitations from profiles table
     // Simple rule: Show invitation ONLY if:
@@ -223,8 +223,8 @@ export async function POST(
       }
     }
 
-    const supabase = createServerSupabaseClient()
-    const supabaseAdmin = createServerSupabaseClient()
+    const supabase = createServerClient()
+    const supabaseAdmin = createServerClient()
     
     // Get inviter's storage_interest to inherit it
     const { data: inviterProfile } = await supabaseAdmin

@@ -69,8 +69,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    const supabase = await import("@/lib/supabase/server").then((m) =>
-      m.createServerSupabaseClient()
+    const supabase = await import("@/lib/kolaybase/server").then((m) =>
+      m.createServerClient()
     );
 
     // Generate deterministic idempotency key (same inputs → same key on retry)

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/kolaybase/server';
 import { getLatestAgreementVersion, getUserAgreementStatuses } from '@/features/agreements/actions';
 import { AgreementType } from '@/features/agreements/types';
 
@@ -14,7 +14,7 @@ import { AgreementType } from '@/features/agreements/types';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();

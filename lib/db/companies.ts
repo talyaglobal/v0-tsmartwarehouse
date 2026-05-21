@@ -2,7 +2,7 @@
  * Database operations for Companies
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export type CompanyType = 'warehouse_company' | 'customer_company' | 'client_company'
 
@@ -30,7 +30,7 @@ interface GetCompaniesOptions {
 export async function getCompanies(
   filters?: GetCompaniesOptions
 ): Promise<Company[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   let query = supabase.from('companies').select('*')
 
   if (filters?.type) {
@@ -57,7 +57,7 @@ export async function getCompanies(
  * Get company by ID
  */
 export async function getCompanyById(id: string): Promise<Company | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('companies')
@@ -81,7 +81,7 @@ export async function getCompanyById(id: string): Promise<Company | null> {
 export async function createCompany(
   company: Omit<Company, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Company> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('companies')
@@ -108,7 +108,7 @@ export async function updateCompany(
   id: string,
   updates: Partial<Omit<Company, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<Company> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const updateData: any = {}
   if (updates.shortName !== undefined) updateData.short_name = updates.shortName
@@ -136,7 +136,7 @@ export async function updateCompany(
  * Delete company
  */
 export async function deleteCompany(id: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { error } = await supabase.from('companies').delete().eq('id', id)
 

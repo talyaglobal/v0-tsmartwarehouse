@@ -1,5 +1,5 @@
 /**
- * File storage utilities for Supabase Storage
+ * File storage utilities for KolayBase Storage
  */
 
 export interface FileUploadOptions {

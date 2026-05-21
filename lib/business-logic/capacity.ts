@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { BookingType } from "@/types"
 
 /**
@@ -39,7 +39,7 @@ export async function checkPalletCapacity(
   requiredPallets: number,
   zoneType?: "pallet" | "cold-storage" | "hazmat"
 ): Promise<CapacityCheck> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get total capacity from zones
   const { data: zones, error: zonesError } = await supabase
@@ -74,7 +74,7 @@ export async function checkAreaRentalCapacity(
   requiredSqFt: number,
   floorNumber?: 3
 ): Promise<CapacityCheck> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Area rentals are only on floor 3
   const targetFloor = floorNumber || 3
@@ -129,7 +129,7 @@ export async function checkAreaRentalCapacity(
 export async function getWarehouseCapacity(
   warehouseId: string
 ): Promise<WarehouseCapacity> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get all zones for pallet capacity
   const { data: zones, error: zonesError } = await supabase
@@ -193,7 +193,7 @@ export async function reserveCapacity(
   amount: number, // pallet count or sq ft
   hallId?: string
 ): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   if (type === "pallet") {
     // Update zone capacity
@@ -264,7 +264,7 @@ export async function releaseCapacity(
   hallId?: string,
   zoneId?: string
 ): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   if (type === "pallet" && zoneId) {
     const { data: zone, error: zoneError } = await supabase

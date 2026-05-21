@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 
 /**
@@ -30,7 +30,7 @@ export async function POST(
     }
 
     // Use server client for admin operations (bypass RLS)
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Verify user company owns the warehouse or user is admin/root
     const { data: profile, error: profileError } = await supabase
@@ -168,7 +168,7 @@ export async function GET(
     const params = await context.params
     const warehouseId = params.id
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data, error } = await supabase
       .from('warehouse_pricing')
       .select('id, pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts, status')

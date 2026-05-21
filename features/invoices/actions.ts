@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import { invalidateCache, CACHE_PREFIXES } from '@/lib/cache/redis'
 import type { Invoice } from '@/types'
@@ -13,7 +13,7 @@ export async function createInvoiceAction(
   input: CreateInvoiceInput
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -87,7 +87,7 @@ export async function updateInvoiceAction(
   input: UpdateInvoiceInput
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -153,7 +153,7 @@ export async function markInvoiceAsPaidAction(
   input: MarkInvoiceAsPaidInput
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -219,7 +219,7 @@ export async function cancelInvoiceAction(
   id: string
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -282,7 +282,7 @@ export async function generateInvoiceForBookingAction(
   bookingId: string
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -327,7 +327,7 @@ export async function generateInvoiceForBookingAction(
     }
 
     // Calculate invoice items and totals
-    const items = []
+    const items: any[] = []
     let subtotal = 0
 
     if (booking.type === 'pallet') {

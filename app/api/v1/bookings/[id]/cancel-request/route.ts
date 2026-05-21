@@ -3,7 +3,7 @@ import { getBookingById } from "@/lib/db/bookings"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, BookingResponse } from "@/types/api"
 import { getCurrentUser } from "@/lib/auth/utils"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { getNotificationService } from "@/lib/notifications/service"
 
 /**
@@ -48,7 +48,7 @@ export async function POST(
     }
 
     // Check if booking is paid (has invoice with status paid)
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: invoice } = await supabase
       .from('invoices')
       .select('id, status')

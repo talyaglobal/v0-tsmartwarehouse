@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse, ApiResponse } from "@/types/api"
 
 /**
@@ -14,7 +14,7 @@ export async function POST(
     const params = await context.params
     const bookingId = params.id
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get the booking first
     const { data: booking, error: fetchError } = await supabase

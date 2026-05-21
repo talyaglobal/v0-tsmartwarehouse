@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { getUserCompanyId, isCompanyAdmin } from "@/lib/auth/company-admin"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient } from "@/lib/kolaybase/server"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
 
 /**
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(errorData, { status: 500 })
     }
 
-    let memberIds = [...new Set((membersRows || []).map((r: { member_id: string }) => r.member_id))]
+    let memberIds = Array.from(new Set(((membersRows || []) as any[]).map((r) => r.member_id as string)))
 
     if (memberIds.length === 0 && forCustomerId) {
       const { data: customerProfile } = await admin

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getEstimates } from "@/lib/db/estimates"
 import { createEstimate } from "@/lib/db/estimates"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { EstimateStatus } from "@/types"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     if (authResult instanceof NextResponse) return authResult
     const { user } = authResult
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
     const role = profile?.role ?? user.role
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     if (authResult instanceof NextResponse) return authResult
     const { user } = authResult
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
     const role = profile?.role ?? user.role
     if (role !== "root" && role !== "warehouse_admin") {

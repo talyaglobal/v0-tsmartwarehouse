@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch company data from Supabase
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get company info
     const { data: company, error: companyError } = await supabase

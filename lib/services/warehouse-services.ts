@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export interface WarehouseService {
   id: string
@@ -22,7 +22,7 @@ export async function getWarehouseServices(
   warehouseId: string,
   includeInactive: boolean = false
 ): Promise<WarehouseService[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   let query = supabase
     .from('warehouse_services')

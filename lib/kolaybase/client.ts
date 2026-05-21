@@ -127,8 +127,11 @@ export class KolaybaseRealtimeChannel {
 // ---------------------------------------------------------------------------
 
 const STORAGE_URL =
-  (process.env.NEXT_PUBLIC_KOLAYBASE_URL || "https://api.kolaybase.com") + "/storage/v1";
-const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
+  (process.env.NEXT_PUBLIC_KOLAYBASE_URL || process.env.REST_BASE_URL || "https://api.kolaybase.com") + "/storage/v1";
+const ANON_KEY =
+  process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
+  process.env.ANON_KEY ||
+  "";
 
 /**
  * Minimal storage client mirroring Supabase's storage interface.
@@ -161,7 +164,7 @@ export class KolaybaseStorageBucket {
     if (typeof window !== "undefined") {
       return localStorage.getItem("kb_access_token") || ANON_KEY;
     }
-    return process.env.KOLAYBASE_SERVICE_KEY || ANON_KEY;
+    return process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
   }
 
   private headers(): Record<string, string> {

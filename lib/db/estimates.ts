@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Estimate, EstimateStatus, InvoiceItem } from '@/types'
 
 export interface GetEstimatesFilters {
@@ -36,7 +36,7 @@ function transformEstimateRow(row: Record<string, unknown>): Estimate {
 }
 
 export async function getEstimates(filters?: GetEstimatesFilters): Promise<Estimate[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase
     .from('estimates')
     .select('*')
@@ -65,7 +65,7 @@ export async function getEstimates(filters?: GetEstimatesFilters): Promise<Estim
 }
 
 export async function getEstimateById(id: string): Promise<Estimate | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('estimates')
     .select('*')
@@ -98,7 +98,7 @@ export interface CreateEstimateInput {
 }
 
 export async function createEstimate(input: CreateEstimateInput): Promise<Estimate> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const row = {
     service_order_id: input.serviceOrderId ?? null,
     booking_id: input.bookingId ?? null,
@@ -126,7 +126,7 @@ export async function updateEstimate(
   id: string,
   updates: Partial<Pick<Estimate, 'status' | 'items' | 'subtotal' | 'tax' | 'total' | 'dueDate' | 'validUntil' | 'notes'>>
 ): Promise<Estimate> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const updateRow: Record<string, unknown> = {}
   if (updates.status !== undefined) updateRow.estimate_status = updates.status
   if (updates.items !== undefined) updateRow.items = updates.items

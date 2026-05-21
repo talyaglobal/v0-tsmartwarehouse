@@ -1,15 +1,15 @@
 /**
- * Warehouse Search Service (Supabase Implementation)
+ * Warehouse Search Service (KolayBase Implementation)
  * 
- * Provides search functionality for warehouses using Supabase.
+ * Provides search functionality for warehouses using KolayBase.
  * Handles filtering, sorting, pagination, and availability calculation.
  * Uses PostGIS for geographic search when coordinates are provided.
  * 
- * NOTE: This is the current implementation using Supabase.
+ * NOTE: This is the current implementation using KolayBase.
  * Prisma version is available in warehouse-search.ts for future migration.
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { WarehouseSearchParams, WarehouseSearchResult, SearchResponse } from '@/types/marketplace'
 import { getStoragePublicUrls } from '@/lib/utils/storage'
 
@@ -140,7 +140,7 @@ function calculateAveragePalletPrice(palletPricing: any[]): number | undefined {
 export async function searchWarehouses(
   params: WarehouseSearchParams
 ): Promise<SearchResponse> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const page = params.page || 1
   const limit = params.limit || 20
   const offset = (page - 1) * limit
@@ -433,7 +433,7 @@ export async function searchWarehouses(
     const { data, error, count } = await query
 
     if (error) {
-      console.error('[warehouse-search] Supabase query error:', error)
+      console.error('[warehouse-search] KolayBase query error:', error)
       throw error
     }
 
@@ -574,7 +574,7 @@ export async function searchWarehouses(
  */
 export async function getWarehouseById(id: string): Promise<WarehouseSearchResult | null> {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get warehouse with all fields from warehouses table
     const { data: warehouse, error } = await supabase

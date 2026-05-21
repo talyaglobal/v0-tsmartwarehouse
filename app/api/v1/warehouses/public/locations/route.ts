@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
 
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("q")?.toLowerCase().trim() || ""
     const limit = Math.min(parseInt(searchParams.get("limit") || "10"), 20)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get all active warehouses with location data
     // Note: 'state' column doesn't exist in the current schema, using only city and zip_code

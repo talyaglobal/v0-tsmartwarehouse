@@ -1,13 +1,13 @@
 /**
  * Database client wrapper
  * Provides a unified interface for database operations
- * Uses Supabase for auth/realtime and Prisma for data queries
+ * Uses KolayBase for auth/realtime and Prisma for data queries
  */
 
 import {
-  createServerSupabaseClient,
-  createAuthenticatedSupabaseClient,
-} from "@/lib/supabase/server";
+  createServerClient,
+  createAuthenticatedServerClient,
+} from "@/lib/kolaybase/server";
 import type { KolaybaseClient } from "@/lib/kolaybase/client";
 
 // Export Prisma client for marketplace queries
@@ -18,7 +18,7 @@ export { prisma, withPrisma } from "@/lib/prisma/client";
  * Use this in API routes and Server Components
  */
 export function getDbClient(): KolaybaseClient {
-  return createServerSupabaseClient() as unknown as KolaybaseClient;
+  return createServerClient() as unknown as KolaybaseClient;
 }
 
 /**
@@ -26,7 +26,7 @@ export function getDbClient(): KolaybaseClient {
  * Use this when you need to perform operations as a specific user
  */
 export async function getAuthenticatedDbClient(): Promise<KolaybaseClient> {
-  return (await createAuthenticatedSupabaseClient()) as unknown as KolaybaseClient;
+  return (await createAuthenticatedServerClient()) as unknown as KolaybaseClient;
 }
 
 /**

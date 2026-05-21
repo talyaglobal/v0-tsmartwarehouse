@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { getCache, setCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 import { PRICING } from '@/lib/constants'
 
@@ -48,7 +48,7 @@ export async function getRevenueData(months: number = 6): Promise<RevenueData[]>
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Get invoices from the last N months
   const startDate = new Date()
@@ -127,7 +127,7 @@ export async function getUtilizationData(months: number = 6): Promise<Utilizatio
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Get warehouse halls data
   const { data: halls, error: hallsError } = await supabase
@@ -146,7 +146,7 @@ export async function getUtilizationData(months: number = 6): Promise<Utilizatio
     .select('id, floor_number')
     .in('id', floorIds) : { data: [] }
 
-  const floorNumberMap = new Map(floors?.map((f: any) => [f.id, f.floor_number]) || [])
+  const floorNumberMap = new Map<string, number>(floors?.map((f: any) => [f.id, f.floor_number]) || [])
 
   if (hallsError) {
     throw new Error(`Failed to fetch utilization data: ${hallsError.message}`)
@@ -245,7 +245,7 @@ export async function getServiceBreakdown(): Promise<ServiceBreakdown[]> {
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Get total revenue by service type
   const { data: invoices, error } = await supabase
@@ -328,7 +328,7 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Get total revenue
   const { data: invoices, error: invoicesError } = await supabase

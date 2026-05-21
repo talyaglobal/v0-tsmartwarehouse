@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Claim, ClaimStatus } from '@/types'
 
 /**
@@ -12,7 +12,7 @@ export async function getClaims(filters?: {
   bookingId?: string
   incidentId?: string
 }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from('claims').select('*')
 
   if (filters?.customerId) {
@@ -55,7 +55,7 @@ export async function getClaims(filters?: {
 }
 
 export async function getClaimById(id: string): Promise<Claim | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('claims')
     .select('*')
@@ -73,7 +73,7 @@ export async function getClaimById(id: string): Promise<Claim | null> {
 }
 
 export async function createClaim(claim: Omit<Claim, 'id' | 'createdAt'>): Promise<Claim> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const claimRow = {
     customer_id: claim.customerId,
@@ -107,7 +107,7 @@ export async function updateClaim(
   id: string,
   updates: Partial<Omit<Claim, 'id' | 'createdAt'>>,
 ): Promise<Claim> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateRow: Record<string, any> = {}
   if (updates.status !== undefined) updateRow.status = updates.status
@@ -131,7 +131,7 @@ export async function updateClaim(
 }
 
 export async function deleteClaim(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   // Soft delete: set status = false
   const { error } = await supabase
     .from('claims')

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchInventoryByCode } from "@/lib/db/inventory";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 import { handleApiError } from "@/lib/utils/logger";
 import { decodePalletQRPayload } from "@/lib/utils/qr-payload";
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const item = await searchInventoryByCode(code);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

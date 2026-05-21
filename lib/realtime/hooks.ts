@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/kolaybase/client";
 // RealtimeChannel type aliased to any since we use KolayBase channel stubs
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type RealtimeChannel = any;

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get("role") as "root" | "warehouse_client" | "warehouse_staff" | "warehouse_supervisor" | null
     const companyId = searchParams.get("companyId")
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Build query
     let query = supabase

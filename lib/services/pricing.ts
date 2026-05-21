@@ -5,7 +5,7 @@
  * Handles volume discounts, date-based price overrides, and different pricing units
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { PriceCalculation, PriceBreakdown, PalletBookingDetails } from '@/types/marketplace'
 import { getFreeStorageDays } from '@/lib/utils/free-storage'
 
@@ -42,7 +42,7 @@ const pickPricingPeriod = (
 }
 
 async function calculatePalletDetailsPrice(
-  supabase: ReturnType<typeof createServerSupabaseClient>,
+  supabase: ReturnType<typeof createServerClient>,
   warehouseId: string,
   startDate: string,
   endDate: string,
@@ -118,7 +118,7 @@ async function calculatePalletDetailsPrice(
       return
     }
 
-    const availablePeriods = new Set(rowsForType.map((row) => row.pricing_period))
+    const availablePeriods = new Set<string>(rowsForType.map((row: any) => row.pricing_period))
     const period = pickPricingPeriod(availablePeriods, billableDays)
     const pricingRow = rowsForType.find((row) => row.pricing_period === period) || rowsForType[0]
     let heightPrice = 0
@@ -231,7 +231,7 @@ async function calculatePalletDetailsPrice(
 export async function calculatePrice(
   params: PriceCalculation
 ): Promise<PriceBreakdown> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { warehouse_id, type, quantity, start_date, end_date, pallet_details } = params
 
   try {
@@ -363,7 +363,7 @@ export async function calculatePrice(
  * Get pricing information for a warehouse
  */
 export async function getWarehousePricing(warehouseId: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data: pricing, error } = await supabase

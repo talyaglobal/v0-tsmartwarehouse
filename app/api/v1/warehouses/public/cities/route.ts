@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
 
@@ -10,7 +10,7 @@ import type { ErrorResponse } from "@/types/api"
  */
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get all unique cities from active warehouses
     const { data, error } = await supabase

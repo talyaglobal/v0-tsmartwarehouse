@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/kolaybase/server"
 import { NetGSMProvider } from "@/lib/notifications/providers/sms"
 import { z } from "zod"
 

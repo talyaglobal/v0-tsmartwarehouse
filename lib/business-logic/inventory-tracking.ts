@@ -7,7 +7,7 @@
  * - Location updates with region support
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { updateInventoryItem } from '@/lib/db/inventory'
 
 /**
@@ -15,7 +15,7 @@ import { updateInventoryItem } from '@/lib/db/inventory'
  * Format: WH-YYYY-NNNNNN
  */
 export async function generateWarehouseTrackingNumber(): Promise<string> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Call the database function to generate tracking number
   const { data, error } = await supabase.rpc('generate_warehouse_tracking_number')

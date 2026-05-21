@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 
 async function canManageRequest(
@@ -9,7 +9,7 @@ async function canManageRequest(
   request: { customer_id: string; requested_by_id: string | null }
 ): Promise<boolean> {
   if (request.requested_by_id === userId || request.customer_id === userId) return true
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const { data: profile } = await supabase
     .from("profiles")
     .select("company_id")
@@ -25,7 +25,7 @@ async function canAssignCustomer(editorId: string, newCustomerId: string): Promi
   if (editorId === newCustomerId) return true
   const editorCompanyId = await getUserCompanyId(editorId)
   if (!editorCompanyId) return false
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const { data: teams } = await supabase
     .from("client_teams")
     .select("id")
@@ -56,7 +56,7 @@ export async function PATCH(
     if (authResult instanceof NextResponse) return authResult
 
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     const { data: row, error: fetchError } = await supabase
       .from("booking_requests")
@@ -147,7 +147,7 @@ export async function DELETE(
     if (authResult instanceof NextResponse) return authResult
 
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     const { data: row, error: fetchError } = await supabase
       .from("booking_requests")

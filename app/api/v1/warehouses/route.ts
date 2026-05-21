@@ -5,7 +5,7 @@ import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ListResponse, ApiResponse } from "@/types/api"
 import { createWarehouse, getWarehouses } from "@/lib/db/warehouses"
 import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { z } from "zod"
 
 const freeStorageRuleSchema = z.object({
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
       }
       // Fallback: show warehouses where user is assigned as staff (warehouse_staff table)
       if (!userCompanyId) {
-        const supabase = createServerSupabaseClient()
+        const supabase = createServerClient()
         const { data: staffRows } = await supabase
           .from("warehouse_staff")
           .select("warehouse_id")
@@ -249,7 +249,7 @@ export async function GET(request: NextRequest) {
       const targetCompanyId = companyId || userCompanyId
       let warehouses = await getWarehouses({ ownerCompanyId: targetCompanyId })
       // Also include warehouses where user is assigned as staff (in case profile company differs)
-        const supabaseForStaff = createServerSupabaseClient()
+        const supabaseForStaff = createServerClient()
       const { data: staffRows } = await supabaseForStaff
         .from("warehouse_staff")
         .select("warehouse_id")
@@ -418,7 +418,7 @@ export async function POST(request: NextRequest) {
 
     // Create pricing entries if provided
     if (validated.pricing && validated.pricing.length > 0) {
-      const supabase = await createServerSupabaseClient()
+      const supabase = await createServerClient()
       for (const price of validated.pricing) {
         await supabase.from('warehouse_pricing').insert({
           warehouse_id: warehouse.id,
@@ -435,7 +435,7 @@ export async function POST(request: NextRequest) {
 
     // Create pallet pricing entries if provided
     if (validated.palletPricing && validated.palletPricing.length > 0) {
-      const supabase = await createServerSupabaseClient()
+      const supabase = await createServerClient()
       
       // For custom pallet type, find customDimensions from any period (they should be the same across all periods)
       const customPalletPricing = validated.palletPricing.find(p => p.palletType === 'custom')
@@ -551,7 +551,7 @@ export async function POST(request: NextRequest) {
 
     // Create floor plans if provided
     if (validated.floorPlans && validated.floorPlans.length > 0) {
-      const supabase = await createServerSupabaseClient()
+      const supabase = await createServerClient()
       const { data: floorRows, error: floorError } = await supabase
         .from('warehouse_floors')
         .insert(

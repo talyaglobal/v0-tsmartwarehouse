@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase/server";
+import { createAuthenticatedServerClient } from "@/lib/kolaybase/server";
 import { searchSerpAPI, normalizeDomain, generateDedupeKey } from "@/lib/crm-search/serpapi";
 import { classifyResult, type Segment } from "@/lib/crm-search/classifier";
 import { extractCompanyName, extractContactInfo } from "@/lib/crm-search/extractor";
@@ -22,7 +22,7 @@ const chunk = <T>(items: T[], size: number) => {
 
 export async function POST(_request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await params;
-  const supabase = await createAuthenticatedSupabaseClient();
+  const supabase = await createAuthenticatedServerClient();
   const {
     data: { user },
     error: authError,

@@ -15,7 +15,7 @@ import {
 } from "@/lib/db/payments";
 import { getInvoiceById, updateInvoice } from "@/lib/db/invoices";
 import { getBookingById } from "@/lib/db/bookings";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 import type { Payment, PaymentStatus, Refund } from "@/types";
 
 /**
@@ -131,7 +131,7 @@ export async function processInvoicePayment(
         }
       } else {
         // If no booking, try to get from auth (for service orders or other invoice types)
-        const supabase = createServerSupabaseClient();
+        const supabase = createServerClient();
 
         // Use service role to get user by ID
         try {
@@ -529,7 +529,7 @@ export async function processCancellationRefund(
   // Hard guard: never refund more than what was actually paid
   const safeRefundAmount = Math.min(refundAmount, amountPaid);
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
   let stripeRefundId: string | null = null;
   let refundError: string | null = null;
 

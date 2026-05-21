@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Invoice, InvoiceStatus } from '@/types'
 import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
@@ -47,7 +47,7 @@ export async function getInvoices(filters?: GetInvoicesOptions) {
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Optimize: Only select needed fields instead of '*'
   // Note: invoice_status is the business status, status is for soft delete
@@ -119,7 +119,7 @@ export async function getInvoiceById(id: string, useCache: boolean = true): Prom
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('invoices')
     .select('id, booking_id, service_order_id, estimate_id, customer_id, customer_name, invoice_status, status, items, subtotal, tax, total, due_date, paid_date, created_at')
@@ -145,7 +145,7 @@ export async function getInvoiceById(id: string, useCache: boolean = true): Prom
 }
 
 export async function createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt'>): Promise<Invoice> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const invoiceRow: Record<string, unknown> = {
     booking_id: invoice.bookingId || null,
@@ -187,7 +187,7 @@ export async function updateInvoice(
   id: string,
   updates: Partial<Omit<Invoice, 'id' | 'createdAt'>>,
 ): Promise<Invoice> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateRow: Record<string, any> = {}
   if (updates.status !== undefined) updateRow.invoice_status = updates.status // Business status

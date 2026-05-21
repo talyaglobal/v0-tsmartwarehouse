@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import { getEventEmitter } from '@/lib/events/event-emitter'
 import type {
@@ -28,8 +28,8 @@ export async function createBookingRequest(input: {
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     // Use authenticated client to read user session from cookies
-    const { createAuthenticatedSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = await createAuthenticatedSupabaseClient()
+    const { createAuthenticatedServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = await createAuthenticatedServerClient()
 
     // Get current user
     const {
@@ -289,7 +289,7 @@ export async function createBookingProposal(input: {
   expiresAt?: string
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -378,7 +378,7 @@ export async function acceptBookingProposal(
   proposalId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -451,7 +451,7 @@ export async function rejectBookingProposal(
   proposalId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -505,7 +505,7 @@ export async function approveBooking(
   bookingId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -593,7 +593,7 @@ export async function rejectBooking(
   reason?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -670,7 +670,7 @@ export async function cancelBookingAction(
   bookingId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {

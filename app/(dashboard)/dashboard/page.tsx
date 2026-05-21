@@ -13,7 +13,7 @@ import { Package, DollarSign, FileText, ArrowRight, Building2, Loader2, AlertCir
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils/format"
 import type { Booking, Invoice, Claim, UserRole } from "@/types"
 import { api } from "@/lib/api/client"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { TimeSlotSelectionModal } from "@/components/bookings/time-slot-selection-modal"
 import { AcceptProposedTimeModal } from "@/components/bookings/accept-proposed-time-modal"
 import { RootTestDataIndicator } from "@/components/ui/root-test-data-badge"

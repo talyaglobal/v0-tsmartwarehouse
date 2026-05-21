@@ -7,7 +7,7 @@
  * @see documents/DEVELOPMENT_RULES.md - Root User Test Modu section
  */
 
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 
 // Cache for root user IDs to avoid repeated database queries
 let rootUserIdsCache: string[] | null = null

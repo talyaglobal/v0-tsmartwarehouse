@@ -12,7 +12,7 @@ import {
   type EmailQueueItem,
 } from './queue'
 import { sendEmail } from '@/lib/email/nodemailer'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export interface ProcessedEmail {
   id: string
@@ -114,7 +114,7 @@ export async function processRetryableEmails(
   }
 
   // Reset status to pending for retry
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const emailIds = retryableEmails.map((e) => e.id)
 
   if (emailIds.length > 0) {

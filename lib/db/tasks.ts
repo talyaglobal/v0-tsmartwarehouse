@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Task, TaskStatus, TaskPriority, TaskType } from '@/types'
 
 /**
@@ -12,7 +12,7 @@ export async function getTasks(filters?: {
   warehouseId?: string
   bookingId?: string
 }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from('tasks').select('*')
 
   if (filters?.assignedTo) {
@@ -41,7 +41,7 @@ export async function getTasks(filters?: {
 }
 
 export async function getTaskById(id: string): Promise<Task | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
@@ -59,7 +59,7 @@ export async function getTaskById(id: string): Promise<Task | null> {
 }
 
 export async function createTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const taskRow = {
     type: task.type,
@@ -94,7 +94,7 @@ export async function updateTask(
   id: string,
   updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>,
 ): Promise<Task> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateRow: Record<string, any> = {}
   if (updates.status !== undefined) updateRow.status = updates.status
@@ -121,7 +121,7 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   // Soft delete: set status = false
   const { error } = await supabase
     .from('tasks')

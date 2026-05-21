@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'crypto'
 import { getEventEmitter } from '@/lib/events/event-emitter'
@@ -18,7 +18,7 @@ export async function inviteTeamMember(input: {
   role: 'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_client'
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -61,13 +61,13 @@ export async function inviteTeamMember(input: {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiry
 
-    const supabaseAdmin = await createServerSupabaseClient()
+    const adminClient = await createServerClient()
 
     // Update or create profile with invitation data
     let invitation: any
     if (existingUser) {
       // Update existing profile with invitation data
-      const { data: updatedProfile, error: updateError } = await supabaseAdmin
+      const { data: updatedProfile, error: updateError } = await adminClient
         .from('profiles')
         .update({
           invitation_token: token,
@@ -170,7 +170,7 @@ export async function acceptInvitation(
   token: string
 ): Promise<{ success: boolean; error?: string; requiresRegistration?: boolean }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -178,10 +178,10 @@ export async function acceptInvitation(
     } = await supabase.auth.getUser()
 
     // Get admin client for profile operations
-    const supabaseAdmin = await createServerSupabaseClient()
+    const adminClient = await createServerClient()
 
     // Find profile with this invitation token
-    const { data: invitationProfile, error: invitationError } = await supabaseAdmin
+    const { data: invitationProfile, error: invitationError } = await adminClient
       .from('profiles')
       .select('id, email, name, invitation_token, invitation_expires_at, company_id, role, invited_by')
       .eq('invitation_token', token)
@@ -224,7 +224,7 @@ export async function acceptInvitation(
     }
 
     // Get user details from auth
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+    const { data: authUser } = await adminClient.auth.admin.getUserById(user.id)
     if (!authUser?.user) {
       return {
         success: false,
@@ -245,7 +245,7 @@ export async function acceptInvitation(
     let targetCompanyId: string | null = null
     
     if (invitationProfile.invited_by) {
-      const { data: inviterProfile } = await supabaseAdmin
+      const { data: inviterProfile } = await adminClient
         .from('profiles')
         .select('company_id')
         .eq('id', invitationProfile.invited_by)
@@ -288,7 +288,7 @@ export async function acceptInvitation(
     // Update profile using the invitation profile ID
     // Clear invitation_token and invitation_expires_at to mark invitation as accepted
     // company_id and role are already set when invitation was created
-    const { error: updateProfileError } = await supabaseAdmin
+    const { error: updateProfileError } = await adminClient
       .from('profiles')
       .update(updateData)
       .eq('id', invitationProfile.id)
@@ -302,7 +302,7 @@ export async function acceptInvitation(
     }
     
     // Verify the update was successful - check that invitation fields were cleared
-    const { data: updatedProfile, error: verifyError } = await supabaseAdmin
+    const { data: updatedProfile, error: verifyError } = await adminClient
       .from('profiles')
       .select('id, company_id, invitation_token, email, role')
       .eq('id', invitationProfile.id)
@@ -319,7 +319,7 @@ export async function acceptInvitation(
     // Verify that invitation_token was cleared (invitation accepted)
     if (updatedProfile.invitation_token !== null) {
       console.error('Warning: invitation_token was not cleared! Attempting to clear again...')
-      const { error: fixError } = await supabaseAdmin
+      const { error: fixError } = await adminClient
         .from('profiles')
         .update({ invitation_token: null, invitation_expires_at: null })
         .eq('id', invitationProfile.id)

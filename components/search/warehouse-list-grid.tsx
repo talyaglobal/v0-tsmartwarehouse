@@ -9,7 +9,7 @@ import { Star } from "lucide-react"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import Link from "next/link"
 import Image from "next/image"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { WarehouseCard } from "@/components/marketplace/warehouse-card"
 
 interface Warehouse {

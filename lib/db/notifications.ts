@@ -2,7 +2,7 @@
  * Database functions for notifications
  */
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/kolaybase/server"
 import type { Notification, NotificationType, NotificationChannel } from "@/types"
 
 export interface CreateNotificationParams {

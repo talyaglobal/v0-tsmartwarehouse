@@ -11,7 +11,7 @@ import {
   getUserTeams,
   getTeamMembersForBooking,
 } from "@/lib/business-logic/teams"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ClientTeam, TeamMember, TeamRole } from "@/types"
 
 // =====================================================
@@ -23,7 +23,7 @@ export async function createTeamAction(
   description?: string
 ): Promise<{ success: boolean; data?: ClientTeam; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -62,7 +62,7 @@ export async function updateTeamAction(
   updates: { name?: string; description?: string }
 ): Promise<{ success: boolean; data?: ClientTeam; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -83,7 +83,7 @@ export async function deleteTeamAction(
   teamId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -110,7 +110,7 @@ export async function addTeamMemberAction(
   role: TeamRole = "member"
 ): Promise<{ success: boolean; data?: TeamMember; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -138,7 +138,7 @@ export async function removeTeamMemberAction(
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -161,7 +161,7 @@ export async function updateMemberRoleAction(
   role: TeamRole
 ): Promise<{ success: boolean; data?: TeamMember; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -188,7 +188,7 @@ export async function getMyTeamsAction(): Promise<{
   error?: string 
 }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -209,7 +209,7 @@ export async function getTeamDetailsAction(
   teamId: string
 ): Promise<{ success: boolean; data?: ClientTeam; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -232,7 +232,7 @@ export async function getBookingMembersAction(): Promise<{
   error?: string
 }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {

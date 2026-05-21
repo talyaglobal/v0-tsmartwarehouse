@@ -18,7 +18,7 @@ import type {
   WarehouseOccupancyUpdatedPayload,
   TeamMemberInvitedPayload,
 } from './types'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 /**
  * Register all event handlers
@@ -72,7 +72,7 @@ export function registerEventHandlers(): void {
  * Creates notification event in database for warehouse owner
  */
 async function handleBookingRequested(payload: BookingRequestedPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Create notification event in database
   await supabase.from('notification_events').insert({
@@ -101,7 +101,7 @@ async function handleBookingRequested(payload: BookingRequestedPayload): Promise
 async function handleBookingProposalCreated(
   payload: BookingProposalCreatedPayload
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -127,7 +127,7 @@ async function handleBookingProposalCreated(
 async function handleBookingProposalAccepted(
   payload: BookingProposalAcceptedPayload
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -153,7 +153,7 @@ async function handleBookingProposalAccepted(
 async function handleBookingProposalRejected(
   payload: BookingProposalRejectedPayload
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -178,7 +178,7 @@ async function handleBookingProposalRejected(
  * Notifies customer and warehouse staff
  */
 async function handleBookingApproved(payload: BookingApprovedPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -217,7 +217,7 @@ async function handleBookingApproved(payload: BookingApprovedPayload): Promise<v
  * Handle booking rejected event
  */
 async function handleBookingRejected(payload: BookingRejectedPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -241,7 +241,7 @@ async function handleBookingRejected(payload: BookingRejectedPayload): Promise<v
  * Handle booking modified event
  */
 async function handleBookingModified(payload: EventPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -256,7 +256,7 @@ async function handleBookingModified(payload: EventPayload): Promise<void> {
  * Handle invoice generated event
  */
 async function handleInvoiceGenerated(payload: InvoiceGeneratedPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -280,7 +280,7 @@ async function handleInvoiceGenerated(payload: InvoiceGeneratedPayload): Promise
  * Handle invoice paid event
  */
 async function handleInvoicePaid(payload: InvoicePaidPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -295,7 +295,7 @@ async function handleInvoicePaid(payload: InvoicePaidPayload): Promise<void> {
  * Handle invoice overdue event
  */
 async function handleInvoiceOverdue(payload: InvoiceOverduePayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -321,7 +321,7 @@ async function handleInvoiceOverdue(payload: InvoiceOverduePayload): Promise<voi
 async function handleWarehouseOccupancyUpdated(
   payload: WarehouseOccupancyUpdatedPayload
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -348,7 +348,7 @@ async function handleWarehouseOccupancyUpdated(
  * Handle team member invited event
  */
 async function handleTeamMemberInvited(payload: TeamMemberInvitedPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,
@@ -365,7 +365,7 @@ async function handleTeamMemberInvited(payload: TeamMemberInvitedPayload): Promi
  * Handle team member joined event
  */
 async function handleTeamMemberJoined(payload: EventPayload): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   await supabase.from('notification_events').insert({
     event_type: payload.eventType,

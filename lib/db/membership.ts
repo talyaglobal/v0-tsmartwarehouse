@@ -2,7 +2,7 @@
  * Database operations for Membership Settings
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { MembershipTier } from '@/types'
 import { getCache, setCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
@@ -38,7 +38,7 @@ export async function getMembershipProgramStatus(
     }
   }
 
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('membership_settings')
@@ -81,7 +81,7 @@ export async function getMembershipSettingByTier(
     }
   }
 
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('membership_settings')
@@ -150,7 +150,7 @@ export async function getMembershipTierDiscount(
 export async function updateMembershipProgramStatus(
   enabled: boolean
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Tüm tier'lerin program_enabled değerini güncelle
   const { error } = await supabase
@@ -178,7 +178,7 @@ export async function updateMembershipTierSetting(
     benefits?: string[]
   }
 ): Promise<MembershipSetting> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const updateData: any = {}
   if (updates.minSpend !== undefined) {

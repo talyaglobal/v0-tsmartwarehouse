@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Claim, ClaimStatus } from '@/types'
 import type { ClaimFilters } from '../types'
 
@@ -8,7 +8,7 @@ import type { ClaimFilters } from '../types'
  * Cached for request deduplication
  */
 export const getClaimsQuery = cache(async (filters?: ClaimFilters): Promise<Claim[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('claims').select('*')
 
@@ -56,7 +56,7 @@ export const getClaimsQuery = cache(async (filters?: ClaimFilters): Promise<Clai
  * Cached for request deduplication
  */
 export const getClaimByIdQuery = cache(async (id: string): Promise<Claim | null> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('claims')
@@ -78,7 +78,7 @@ export const getClaimByIdQuery = cache(async (id: string): Promise<Claim | null>
  * Get claims for current user
  */
 export const getMyClaimsQuery = cache(async (): Promise<Claim[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const {
     data: { user },
@@ -105,7 +105,7 @@ export const getMyClaimsQuery = cache(async (): Promise<Claim[]> => {
  * Get claim statistics
  */
 export const getClaimStatsQuery = cache(async (filters?: ClaimFilters) => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('claims').select('status, amount, approved_amount')
 

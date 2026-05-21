@@ -1,16 +1,1958 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = "postgresql://kb_user_warebnb:0Oug-vAw5PJIFUewk0wmyt6V4Djv7NPb@db.kolaybase.com:6432/kb_warebnb"
-  directUrl = "postgresql://kb_user_warebnb:0Oug-vAw5PJIFUewk0wmyt6V4Djv7NPb@db.kolaybase.com:6432/kb_warebnb"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model migrations {
+  id         Int       @id @default(dbgenerated("nextval('_migrations_id_seq'::regclass)"))
+  name       String    @unique
+  applied_at DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@map("_migrations")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model access_logs {
+  id                                              String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  visitor_type                                    String
+  warehouse_id                                    String     @db.Uuid
+  entry_time                                      DateTime   @default(now()) @db.Timestamptz(6)
+  exit_time                                       DateTime?  @db.Timestamptz(6)
+  status                                          String     @default("checked_in")
+  person_name                                     String
+  person_id_number                                String?
+  person_phone                                    String?
+  person_email                                    String?
+  company_name                                    String?
+  person_id                                       String?    @db.Uuid
+  vehicle_license_plate                           String?
+  vehicle_make                                    String?
+  vehicle_model                                   String?
+  vehicle_color                                   String?
+  vehicle_type                                    String?
+  purpose                                         String?
+  authorized_by                                   String?
+  authorized_by_id                                String?    @db.Uuid
+  booking_id                                      String?    @db.Uuid
+  notes                                           String?
+  photo_url                                       String?
+  checked_in_by                                   String?    @db.Uuid
+  checked_out_by                                  String?    @db.Uuid
+  created_at                                      DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at                                      DateTime?  @default(now()) @db.Timestamptz(6)
+  profiles_access_logs_authorized_by_idToprofiles profiles?  @relation("access_logs_authorized_by_idToprofiles", fields: [authorized_by_id], references: [id], onUpdate: NoAction)
+  bookings                                        bookings?  @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles_access_logs_checked_in_byToprofiles    profiles?  @relation("access_logs_checked_in_byToprofiles", fields: [checked_in_by], references: [id], onUpdate: NoAction)
+  profiles_access_logs_checked_out_byToprofiles   profiles?  @relation("access_logs_checked_out_byToprofiles", fields: [checked_out_by], references: [id], onUpdate: NoAction)
+  profiles_access_logs_person_idToprofiles        profiles?  @relation("access_logs_person_idToprofiles", fields: [person_id], references: [id], onUpdate: NoAction)
+  warehouses                                      warehouses @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_access_logs_booking_id")
+  @@index([entry_time(sort: Desc)], map: "idx_access_logs_entry_time")
+  @@index([person_id], map: "idx_access_logs_person_id")
+  @@index([person_id_number], map: "idx_access_logs_person_id_number")
+  @@index([person_name], map: "idx_access_logs_person_name")
+  @@index([status], map: "idx_access_logs_status")
+  @@index([visitor_type, warehouse_id, status, entry_time(sort: Desc)], map: "idx_access_logs_type_warehouse_status")
+  @@index([vehicle_license_plate], map: "idx_access_logs_vehicle_license_plate")
+  @@index([visitor_type], map: "idx_access_logs_visitor_type")
+  @@index([warehouse_id, entry_time(sort: Desc)], map: "idx_access_logs_warehouse_date")
+  @@index([warehouse_id], map: "idx_access_logs_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model appointment_participants {
+  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  appointment_id String       @db.Uuid
+  user_id        String       @db.Uuid
+  role           String       @default("attendee")
+  status         String       @default("pending")
+  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
+  appointments   appointments @relation(fields: [appointment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles       profiles     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([appointment_id, user_id])
+  @@index([appointment_id], map: "idx_appointment_participants_appointment_id")
+  @@index([status], map: "idx_appointment_participants_status")
+  @@index([user_id], map: "idx_appointment_participants_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model appointment_types {
+  id                       String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                     String
+  slug                     String         @unique
+  description              String?
+  color                    String         @default("#3b82f6")
+  icon                     String?
+  duration_minutes         Int            @default(60)
+  requires_warehouse_staff Boolean?       @default(false)
+  is_active                Boolean?       @default(true)
+  created_by               String         @db.Uuid
+  created_at               DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?      @default(now()) @db.Timestamptz(6)
+  profiles                 profiles       @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  appointments             appointments[]
+
+  @@index([created_by], map: "idx_appointment_types_created_by")
+  @@index([is_active], map: "idx_appointment_types_is_active")
+  @@index([slug], map: "idx_appointment_types_slug")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model appointments {
+  id                       String                     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id             String                     @db.Uuid
+  appointment_type_id      String                     @db.Uuid
+  title                    String
+  description              String?
+  start_time               DateTime                   @db.Timestamptz(6)
+  end_time                 DateTime                   @db.Timestamptz(6)
+  status                   String                     @default("pending")
+  created_by               String                     @db.Uuid
+  location                 String?
+  meeting_link             String?
+  phone_number             String?
+  notes                    String?
+  created_at               DateTime?                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamptz(6)
+  appointment_participants appointment_participants[]
+  appointment_types        appointment_types          @relation(fields: [appointment_type_id], references: [id], onUpdate: NoAction)
+  profiles                 profiles                   @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  warehouses               warehouses                 @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+
+  @@index([appointment_type_id], map: "idx_appointments_appointment_type_id")
+  @@index([created_by], map: "idx_appointments_created_by")
+  @@index([start_time, end_time], map: "idx_appointments_date_range")
+  @@index([start_time], map: "idx_appointments_start_time")
+  @@index([status], map: "idx_appointments_status")
+  @@index([warehouse_id], map: "idx_appointments_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model audit_logs {
+  id         String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String     @db.Uuid
+  user_email String
+  user_name  String
+  action     String
+  entity     String
+  entity_id  String
+  changes    Json?
+  metadata   Json?
+  ip_address String?
+  user_agent String?
+  created_at DateTime?  @default(now()) @db.Timestamptz(6)
+  company_id String?    @db.Uuid
+  companies  companies? @relation(fields: [company_id], references: [id], onUpdate: NoAction)
+
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([company_id], map: "idx_audit_logs_company_id")
+  @@index([created_at(sort: Desc)], map: "idx_audit_logs_created_at")
+  @@index([entity], map: "idx_audit_logs_entity")
+  @@index([entity_id], map: "idx_audit_logs_entity_id")
+  @@index([user_id, entity, created_at(sort: Desc)], map: "idx_audit_logs_user_entity")
+  @@index([user_id], map: "idx_audit_logs_user_id")
+}
+
+model booking_approvals {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id  String    @db.Uuid
+  approved_by String?   @db.Uuid
+  status      String?   @default("pending")
+  notes       String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  profiles    profiles? @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookings    bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model booking_modifications {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id        String    @db.Uuid
+  modification_type String
+  old_value         Int?
+  new_value         Int?
+  effective_date    DateTime  @db.Date
+  reason            String?
+  approved_by       String?   @db.Uuid
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  profiles          profiles? @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookings          bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_booking_modifications_booking_id")
+  @@index([effective_date], map: "idx_booking_modifications_effective_date")
+  @@index([modification_type], map: "idx_booking_modifications_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model booking_proposals {
+  id                                               String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id                                       String     @db.Uuid
+  proposed_by                                      String     @db.Uuid
+  proposed_price                                   Decimal    @db.Decimal(10, 2)
+  terms                                            Json?
+  status                                           String     @default("pending")
+  expires_at                                       DateTime?  @db.Timestamptz(6)
+  created_at                                       DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at                                       DateTime?  @default(now()) @db.Timestamptz(6)
+  bookings_booking_proposals_booking_idTobookings  bookings   @relation("booking_proposals_booking_idTobookings", fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles                                         profiles   @relation(fields: [proposed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookings_bookings_proposal_idTobooking_proposals bookings[] @relation("bookings_proposal_idTobooking_proposals")
+
+  @@index([booking_id], map: "idx_booking_proposals_booking_id")
+  @@index([expires_at], map: "idx_booking_proposals_expires_at")
+  @@index([proposed_by], map: "idx_booking_proposals_proposed_by")
+  @@index([status], map: "idx_booking_proposals_status")
+}
+
+model booking_requests {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id   String?   @db.Uuid
+  requested_by String?   @db.Uuid
+  status       String?   @default("pending")
+  request_type String?   @default("new")
+  notes        String?
+  po_number    String?
+  metadata     Json?
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  bookings     bookings? @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles     profiles? @relation(fields: [requested_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model booking_services {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id   String    @db.Uuid
+  service_id   String?   @db.Uuid
+  service_name String
+  quantity     Int?      @default(1)
+  unit_price   Decimal?  @default(0) @db.Decimal(10, 2)
+  total_price  Decimal?  @default(0) @db.Decimal(10, 2)
+  notes        String?
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  bookings     bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model booking_usage_periods {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id   String    @db.Uuid
+  period_start DateTime  @db.Date
+  period_end   DateTime  @db.Date
+  pallet_count Int?
+  area_sq_ft   Int?
+  daily_usage  Json?
+  total_days   Int
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  bookings     bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([booking_id, period_start])
+  @@index([booking_id], map: "idx_booking_usage_periods_booking_id")
+  @@index([period_end], map: "idx_booking_usage_periods_period_end")
+  @@index([period_start], map: "idx_booking_usage_periods_period_start")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bookings {
+  id                                                        String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id                                               String                     @db.Uuid
+  customer_name                                             String
+  customer_email                                            String
+  warehouse_id                                              String                     @db.Uuid
+  type                                                      String
+  status                                                    String
+  pallet_count                                              Int?
+  area_sq_ft                                                Int?
+  floor_number                                              Int?
+  hall_id                                                   String?                    @db.Uuid
+  start_date                                                DateTime                   @db.Date
+  end_date                                                  DateTime?                  @db.Date
+  total_amount                                              Decimal                    @db.Decimal(10, 2)
+  notes                                                     String?
+  created_at                                                DateTime?                  @default(now()) @db.Timestamptz(6)
+  updated_at                                                DateTime?                  @default(now()) @db.Timestamptz(6)
+  metadata                                                  Json?                      @default("{}")
+  proposal_id                                               String?                    @db.Uuid
+  approved_by                                               String?                    @db.Uuid
+  approved_at                                               DateTime?                  @db.Timestamptz(6)
+  payment_status                                            String?                    @default("pending")
+  payment_intent_id                                         String?
+  payment_method_id                                         String?
+  guest_email                                               String?
+  is_guest_booking                                          Boolean?                   @default(false)
+  stripe_customer_id                                        String?
+  amount_paid                                               Decimal?                   @default(0) @db.Decimal(10, 2)
+  amount_due                                                Decimal?                   @db.Decimal(10, 2)
+  paid_at                                                   DateTime?                  @db.Timestamptz(6)
+  payment_notes                                             String?
+  booking_status                                            String?                    @default("pending")
+  cancel_requested_by                                       String?                    @db.Uuid
+  cancel_requested_at                                       DateTime?                  @db.Timestamptz(6)
+  cancellation_reason                                       String?
+  refund_amount                                             Decimal?                   @db.Decimal(10, 2)
+  refund_status                                             String?
+  deposit_amount                                            Decimal?                   @db.Decimal(10, 2)
+  deposit_status                                            String?                    @default("none")
+  deposit_paid_at                                           DateTime?                  @db.Timestamptz(6)
+  booked_by                                                 String?                    @db.Uuid
+  booked_on_behalf_of                                       String?                    @db.Uuid
+  requires_approval                                         Boolean?                   @default(false)
+  approval_status                                           String?
+  short_id                                                  String?
+  created_by                                                String?                    @db.Uuid
+  updated_by                                                String?                    @db.Uuid
+  access_logs                                               access_logs[]
+  booking_approvals                                         booking_approvals[]
+  booking_modifications                                     booking_modifications[]
+  booking_proposals_booking_proposals_booking_idTobookings  booking_proposals[]        @relation("booking_proposals_booking_idTobookings")
+  booking_requests                                          booking_requests[]
+  booking_services                                          booking_services[]
+  booking_usage_periods                                     booking_usage_periods[]
+  profiles_bookings_approved_byToprofiles                   profiles?                  @relation("bookings_approved_byToprofiles", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profiles_bookings_customer_idToprofiles                   profiles                   @relation("bookings_customer_idToprofiles", fields: [customer_id], references: [id], onUpdate: NoAction)
+  warehouse_halls                                           warehouse_halls?           @relation(fields: [hall_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  booking_proposals_bookings_proposal_idTobooking_proposals booking_proposals?         @relation("bookings_proposal_idTobooking_proposals", fields: [proposal_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                                                warehouses                 @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+  claims                                                    claims[]
+  estimates                                                 estimates[]
+  incidents                                                 incidents[]
+  inventory_items                                           inventory_items[]
+  invoices                                                  invoices[]
+  pallet_checkout_requests                                  pallet_checkout_requests[]
+  service_orders                                            service_orders[]
+  shipments                                                 shipments[]
+  tasks                                                     tasks[]
+  warehouse_messages                                        warehouse_messages[]
+  warehouse_reviews                                         warehouse_reviews[]
+
+  @@index([approved_by], map: "idx_bookings_approved_by")
+  @@index([customer_id], map: "idx_bookings_customer_id")
+  @@index([metadata], map: "idx_bookings_metadata", type: Gin)
+  @@index([proposal_id], map: "idx_bookings_proposal_id")
+  @@index([start_date], map: "idx_bookings_start_date")
+  @@index([status], map: "idx_bookings_status")
+  @@index([type], map: "idx_bookings_type")
+  @@index([warehouse_id], map: "idx_bookings_warehouse_id")
+}
+
+model broker_customers {
+  broker_id   String    @db.Uuid
+  customer_id String    @db.Uuid
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  brokers     brokers   @relation(fields: [broker_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles    profiles  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([broker_id, customer_id])
+  @@index([broker_id], map: "idx_broker_customers_broker_id")
+  @@index([customer_id], map: "idx_broker_customers_customer_id")
+}
+
+model brokers {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name             String
+  email            String?            @unique
+  company          String?
+  phone            String?
+  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  broker_customers broker_customers[]
+
+  @@index([email], map: "idx_brokers_email")
+  @@index([name], map: "idx_brokers_name")
+}
+
+model cash_collections {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  invoice_id     String?   @db.Uuid
+  collected_by   String?   @db.Uuid
+  amount         Decimal   @db.Decimal(10, 2)
+  currency       String?   @default("USD")
+  notes          String?
+  receipt_number String?
+  collected_at   DateTime? @default(now()) @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  profiles       profiles? @relation(fields: [collected_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  invoices       invoices? @relation(fields: [invoice_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model claims {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id     String     @db.Uuid
+  customer_name   String
+  incident_id     String?    @db.Uuid
+  booking_id      String     @db.Uuid
+  type            String
+  description     String
+  amount          Decimal    @db.Decimal(10, 2)
+  status          String
+  evidence        String[]
+  resolution      String?
+  approved_amount Decimal?   @db.Decimal(10, 2)
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  resolved_at     DateTime?  @db.Timestamptz(6)
+  is_deleted      Boolean?   @default(false)
+  deleted_at      DateTime?  @db.Timestamptz(6)
+  bookings        bookings   @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles        profiles   @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  incidents       incidents? @relation(fields: [incident_id], references: [id], onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_claims_booking_id")
+  @@index([customer_id], map: "idx_claims_customer_id")
+  @@index([incident_id], map: "idx_claims_incident_id")
+  @@index([status], map: "idx_claims_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model client_team_members {
+  team_id                                           String       @db.Uuid
+  member_id                                         String       @db.Uuid
+  role                                              String       @default("member")
+  joined_at                                         DateTime?    @default(now()) @db.Timestamptz(6)
+  invited_by                                        String?      @db.Uuid
+  profiles_client_team_members_invited_byToprofiles profiles?    @relation("client_team_members_invited_byToprofiles", fields: [invited_by], references: [id], onUpdate: NoAction)
+  profiles_client_team_members_member_idToprofiles  profiles     @relation("client_team_members_member_idToprofiles", fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  client_teams                                      client_teams @relation(fields: [team_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([team_id, member_id])
+  @@index([invited_by], map: "idx_client_team_members_invited_by")
+  @@index([member_id], map: "idx_client_team_members_member_id")
+  @@index([role], map: "idx_client_team_members_role")
+  @@index([team_id], map: "idx_client_team_members_team_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model client_teams {
+  id                                              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id                                      String                @db.Uuid
+  name                                            String
+  description                                     String?
+  created_by                                      String?               @db.Uuid
+  status                                          Boolean?              @default(true)
+  created_at                                      DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                                      DateTime?             @default(now()) @db.Timestamptz(6)
+  is_default                                      Boolean?              @default(false)
+  client_team_members                             client_team_members[]
+  companies                                       companies             @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles_client_teams_created_byToprofiles      profiles?             @relation("client_teams_created_byToprofiles", fields: [created_by], references: [id], onUpdate: NoAction)
+  profiles_profiles_default_team_idToclient_teams profiles[]            @relation("profiles_default_team_idToclient_teams")
+
+  @@unique([company_id, name])
+  @@index([company_id], map: "idx_client_teams_company_id")
+  @@index([created_by], map: "idx_client_teams_created_by")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model companies {
+  id                   String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  short_name           String
+  logo_url             String?
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  vat                  String?
+  address              String?
+  postal_code          String?
+  city                 String?
+  country              String?
+  type                 String                 @default("customer_company")
+  is_system            Boolean?               @default(false)
+  billing_type         String?                @default("individual")
+  trading_name         String?
+  audit_logs           audit_logs[]
+  client_teams         client_teams[]
+  company_services     company_services[]
+  crm_accounts         crm_accounts[]
+  crm_activities       crm_activities[]
+  crm_contacts         crm_contacts[]
+  crm_leads            crm_leads[]
+  crm_opportunities    crm_opportunities[]
+  crm_search_jobs      crm_search_jobs[]
+  crm_search_queries   crm_search_queries[]
+  crm_search_results   crm_search_results[]
+  crm_source_log       crm_source_log[]
+  crm_suppression_list crm_suppression_list[]
+  profiles             profiles[]
+  warehouses           warehouses[]
+
+  @@index([city])
+  @@index([country])
+  @@index([short_name])
+  @@index([trading_name])
+  @@index([vat])
+  @@index([billing_type], map: "idx_companies_billing_type")
+  @@index([type], map: "idx_companies_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model company_services {
+  id                  String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  company_id          String               @db.Uuid
+  service_name        String
+  service_description String?
+  pricing_type        String
+  base_price          Decimal              @db.Decimal(10, 2)
+  is_active           Boolean?             @default(true)
+  created_at          DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?            @default(now()) @db.Timestamptz(6)
+  companies           companies            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse_services  warehouse_services[]
+
+  @@index([company_id, is_active], map: "idx_company_services_active")
+  @@index([company_id], map: "idx_company_services_company_id")
+}
+
+model conversation_messages {
+  id              String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  conversation_id String        @db.Uuid
+  sender_id       String?       @db.Uuid
+  message         String
+  is_read         Boolean?      @default(false)
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  conversations   conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles        profiles?     @relation(fields: [sender_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model conversations {
+  id                    String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id          String?                 @db.Uuid
+  customer_id           String?                 @db.Uuid
+  subject               String?
+  status                String?                 @default("open")
+  created_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  conversation_messages conversation_messages[]
+  profiles              profiles?               @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses            warehouses?             @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model crm_accounts {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id         String              @db.Uuid
+  name               String
+  domain             String?
+  segments           segment_type[]      @default([])
+  tags               String[]            @default([])
+  hq_address         String?
+  hq_city            String?
+  hq_state           String?
+  hq_zip             String?
+  hq_country         String?             @default("US")
+  score              Int?                @default(0)
+  source_count       Int?                @default(0)
+  is_verified        Boolean?            @default(false)
+  needs_verification Boolean?            @default(true)
+  created_at         DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime            @default(now()) @db.Timestamptz(6)
+  companies          companies           @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_activities     crm_activities[]
+  crm_contacts       crm_contacts[]
+  crm_leads          crm_leads[]
+  crm_opportunities  crm_opportunities[]
+
+  @@index([company_id, domain], map: "idx_accounts_company_domain")
+}
+
+model crm_activities {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id        String             @db.Uuid
+  account_id        String?            @db.Uuid
+  contact_id        String?            @db.Uuid
+  lead_id           String?            @db.Uuid
+  opportunity_id    String?            @db.Uuid
+  type              String
+  subject           String
+  description       String?
+  status            String?            @default("pending")
+  due_date          DateTime?          @db.Timestamptz(6)
+  completed_at      DateTime?          @db.Timestamptz(6)
+  assigned_to       String?            @db.Uuid
+  created_by        String             @db.Uuid
+  created_at        DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime           @default(now()) @db.Timestamptz(6)
+  crm_accounts      crm_accounts?      @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  companies         companies          @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_contacts      crm_contacts?      @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_leads         crm_leads?         @relation(fields: [lead_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_opportunities crm_opportunities? @relation(fields: [opportunity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model crm_contacts {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id     String           @db.Uuid
+  account_id     String?          @db.Uuid
+  first_name     String?
+  last_name      String?
+  full_name      String?
+  title          String?
+  email          String?
+  phone          String?
+  linkedin_url   String?
+  consent_status consent_status?  @default(unknown)
+  is_verified    Boolean?         @default(false)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  crm_activities crm_activities[]
+  crm_accounts   crm_accounts?    @relation(fields: [account_id], references: [id], onUpdate: NoAction)
+  companies      companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model crm_leads {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id              String              @db.Uuid
+  name                    String
+  domain                  String?
+  company_name            String?
+  segments                segment_type[]      @default([])
+  score                   Int?                @default(0)
+  score_breakdown_json    Json?               @default("{}")
+  stage                   String?             @default("new")
+  source                  String?             @default("serpapi")
+  source_job_id           String?             @db.Uuid
+  converted_to_account_id String?             @db.Uuid
+  converted_at            DateTime?           @db.Timestamptz(6)
+  created_at              DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime            @default(now()) @db.Timestamptz(6)
+  crm_activities          crm_activities[]
+  companies               companies           @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_accounts            crm_accounts?       @relation(fields: [converted_to_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  crm_search_jobs         crm_search_jobs?    @relation(fields: [source_job_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  crm_opportunities       crm_opportunities[]
+
+  @@index([company_id, domain], map: "idx_leads_company_domain")
+}
+
+model crm_opportunities {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id          String           @db.Uuid
+  account_id          String?          @db.Uuid
+  lead_id             String?          @db.Uuid
+  name                String
+  type                opportunity_type
+  stage               String?          @default("new")
+  estimated_value     Decimal?         @db.Decimal(12, 2)
+  space_sqft          Int?
+  location_preference String?
+  close_date          DateTime?        @db.Date
+  created_at          DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime         @default(now()) @db.Timestamptz(6)
+  crm_activities      crm_activities[]
+  crm_accounts        crm_accounts?    @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  companies           companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_leads           crm_leads?       @relation(fields: [lead_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model crm_search_jobs {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id          String               @db.Uuid
+  created_by          String               @db.Uuid
+  status              search_job_status    @default(draft)
+  segments            segment_type[]
+  geo_json            Json                 @default("{}")
+  serpapi_params_json Json?                @default("{}")
+  exclusions_json     Json?                @default("{\"domains\": [], \"keywords\": []}")
+  started_at          DateTime?            @db.Timestamptz(6)
+  finished_at         DateTime?            @db.Timestamptz(6)
+  error               String?
+  total_queries       Int?                 @default(0)
+  total_results       Int?                 @default(0)
+  created_leads       Int?                 @default(0)
+  api_credits_used    Int?                 @default(0)
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime             @default(now()) @db.Timestamptz(6)
+  crm_leads           crm_leads[]
+  companies           companies            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_search_queries  crm_search_queries[]
+  crm_search_results  crm_search_results[]
+
+  @@index([company_id, status], map: "idx_search_jobs_company_status")
+}
+
+model crm_search_queries {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job_id              String               @db.Uuid
+  company_id          String               @db.Uuid
+  query_text          String
+  serpapi_location    String?
+  serpapi_params_json Json?                @default("{}")
+  serpapi_search_id   String?
+  executed_at         DateTime?            @db.Timestamptz(6)
+  results_count       Int?                 @default(0)
+  from_cache          Boolean?             @default(false)
+  error               String?
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  companies           companies            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_search_jobs     crm_search_jobs      @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_search_results  crm_search_results[]
+}
+
+model crm_search_results {
+  id                        String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job_id                    String               @db.Uuid
+  query_id                  String               @db.Uuid
+  company_id                String               @db.Uuid
+  title                     String
+  snippet                   String?
+  url                       String
+  displayed_link            String?
+  domain                    String
+  position                  Int?
+  result_date               String?
+  cache_hash                String?
+  classification_segment    segment_type?
+  classification_confidence Decimal?             @default(0) @db.Decimal(3, 2)
+  extracted_emails          String[]             @default([])
+  extracted_phones          String[]             @default([])
+  extracted_address_text    String?
+  contact_confidence        Decimal?             @default(0) @db.Decimal(3, 2)
+  score                     Int?                 @default(0)
+  score_breakdown_json      Json?                @default("{}")
+  dedupe_key                String?
+  status                    search_result_status @default(new)
+  reviewed_by               String?              @db.Uuid
+  reviewed_at               DateTime?            @db.Timestamptz(6)
+  created_account_id        String?              @db.Uuid
+  created_lead_id           String?              @db.Uuid
+  created_at                DateTime             @default(now()) @db.Timestamptz(6)
+  companies                 companies            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_search_jobs           crm_search_jobs      @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  crm_search_queries        crm_search_queries   @relation(fields: [query_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([company_id, domain], map: "idx_search_results_company_domain")
+  @@index([company_id, dedupe_key], map: "idx_search_results_dedupe")
+  @@index([job_id], map: "idx_search_results_job_id")
+}
+
+model crm_source_log {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id        String    @db.Uuid
+  entity_type       String
+  entity_id         String    @db.Uuid
+  source_url        String
+  source_query      String?
+  source_title      String?
+  source_snippet    String?
+  serpapi_search_id String?
+  captured_at       DateTime  @default(now()) @db.Timestamptz(6)
+  companies         companies @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model crm_suppression_list {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id String           @db.Uuid
+  type       suppression_type
+  value      String
+  reason     String?
+  source     String?
+  created_at DateTime         @default(now()) @db.Timestamptz(6)
+  created_by String?          @db.Uuid
+  companies  companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([company_id, type, value])
+  @@index([company_id, type], map: "idx_suppression_company_type")
+}
+
+model customer_group_members {
+  group_id        String          @db.Uuid
+  customer_id     String          @db.Uuid
+  created_at      DateTime?       @default(now()) @db.Timestamptz(6)
+  profiles        profiles        @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customer_groups customer_groups @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([group_id, customer_id])
+  @@index([customer_id], map: "idx_customer_group_members_customer_id")
+  @@index([group_id], map: "idx_customer_group_members_group_id")
+}
+
+model customer_groups {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                   String
+  description            String?
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  customer_group_members customer_group_members[]
+
+  @@index([name], map: "idx_customer_groups_name")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model email_queue {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  to_email      String
+  subject       String
+  html_content  String
+  text_content  String?
+  priority      Int?      @default(0)
+  status        String    @default("pending")
+  retry_count   Int?      @default(0)
+  max_retries   Int?      @default(3)
+  sent_at       DateTime? @db.Timestamptz(6)
+  error_message String?
+  metadata      Json?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([status, priority(sort: Desc), created_at], map: "idx_email_queue_status")
+}
+
+model estimates {
+  id           String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id   String?     @db.Uuid
+  customer_id  String?     @db.Uuid
+  warehouse_id String?     @db.Uuid
+  status       String?     @default("draft")
+  items        Json?       @default("[]")
+  subtotal     Decimal?    @default(0) @db.Decimal(10, 2)
+  tax          Decimal?    @default(0) @db.Decimal(10, 2)
+  total        Decimal?    @default(0) @db.Decimal(10, 2)
+  valid_until  DateTime?   @db.Date
+  notes        String?
+  created_at   DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?   @default(now()) @db.Timestamptz(6)
+  bookings     bookings?   @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles     profiles?   @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses   warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model floor_plans {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouse_id    String    @db.Uuid
+  name            String?   @default("Floor Plan") @db.VarChar(255)
+  vertices        Json      @default("[]")
+  items           Json      @default("[]")
+  wall_openings   Json?     @default("[]")
+  wall_height     Int?      @default(20)
+  settings        Json?     @default("{}")
+  total_area      Decimal?  @default(0) @db.Decimal(12, 2)
+  equipment_area  Decimal?  @default(0) @db.Decimal(12, 2)
+  pallet_capacity Int?      @default(0)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  created_by      String?   @db.Uuid
+  floor_number    Int       @default(1)
+  zoom            Decimal?  @default(1) @db.Decimal
+  pan_x           Decimal?  @default(0) @db.Decimal
+  pan_y           Decimal?  @default(0) @db.Decimal
+  areas           Json?     @default("[]")
+
+  @@unique([warehouse_id, floor_number], map: "floor_plans_warehouse_floor_unique")
+  @@index([areas], map: "idx_floor_plans_areas", type: Gin)
+  @@index([warehouse_id, floor_number], map: "idx_floor_plans_warehouse_floor")
+  @@index([warehouse_id], map: "idx_floor_plans_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model incidents {
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type                String
+  title               String
+  description         String
+  severity            String
+  status              String
+  reported_by         String     @db.Uuid
+  reported_by_name    String
+  warehouse_id        String     @db.Uuid
+  location            String?
+  affected_booking_id String?    @db.Uuid
+  resolution          String?
+  created_at          DateTime?  @default(now()) @db.Timestamptz(6)
+  resolved_at         DateTime?  @db.Timestamptz(6)
+  is_deleted          Boolean?   @default(false)
+  deleted_at          DateTime?  @db.Timestamptz(6)
+  claims              claims[]
+  bookings            bookings?  @relation(fields: [affected_booking_id], references: [id], onUpdate: NoAction)
+  profiles            profiles   @relation(fields: [reported_by], references: [id], onUpdate: NoAction)
+  warehouses          warehouses @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+
+  @@index([affected_booking_id], map: "idx_incidents_affected_booking_id")
+  @@index([reported_by], map: "idx_incidents_reported_by")
+  @@index([severity], map: "idx_incidents_severity")
+  @@index([status], map: "idx_incidents_status")
+  @@index([warehouse_id], map: "idx_incidents_warehouse_id")
+}
+
+model inventory_items {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id          String                @db.Uuid
+  customer_id         String                @db.Uuid
+  warehouse_id        String                @db.Uuid
+  floor_id            String?               @db.Uuid
+  hall_id             String?               @db.Uuid
+  zone_id             String?               @db.Uuid
+  region_id           String?               @db.Uuid
+  pallet_id           String                @unique
+  barcode             String?
+  qr_code             String?
+  description         String?
+  item_type           String?
+  weight_kg           Decimal?              @db.Decimal(10, 2)
+  dimensions          Json?
+  location_code       String?
+  row_number          Int?
+  level_number        Int?
+  status              String                @default("received")
+  received_at         DateTime?             @db.Timestamptz(6)
+  stored_at           DateTime?             @db.Timestamptz(6)
+  last_moved_at       DateTime?             @db.Timestamptz(6)
+  shipped_at          DateTime?             @db.Timestamptz(6)
+  notes               String?
+  is_deleted          Boolean?              @default(false)
+  deleted_at          DateTime?             @db.Timestamptz(6)
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  bookings            bookings              @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles            profiles              @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  warehouse_floors    warehouse_floors?     @relation(fields: [floor_id], references: [id], onUpdate: NoAction)
+  warehouse_halls     warehouse_halls?      @relation(fields: [hall_id], references: [id], onUpdate: NoAction)
+  warehouse_regions   warehouse_regions?    @relation(fields: [region_id], references: [id], onUpdate: NoAction)
+  warehouses          warehouses            @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+  warehouse_zones     warehouse_zones?      @relation(fields: [zone_id], references: [id], onUpdate: NoAction)
+  inventory_movements inventory_movements[]
+}
+
+model inventory_movements {
+  id                                                                String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  inventory_item_id                                                 String           @db.Uuid
+  moved_by                                                          String           @db.Uuid
+  moved_by_name                                                     String           @default("")
+  movement_type                                                     String           @default("received")
+  from_location                                                     String?
+  to_location                                                       String?
+  from_location_code                                                String?
+  to_location_code                                                  String?
+  from_hall_id                                                      String?          @db.Uuid
+  to_hall_id                                                        String?          @db.Uuid
+  from_zone_id                                                      String?          @db.Uuid
+  to_zone_id                                                        String?          @db.Uuid
+  reason                                                            String?
+  notes                                                             String?
+  created_at                                                        DateTime?        @default(now()) @db.Timestamptz(6)
+  warehouse_halls_inventory_movements_from_hall_idTowarehouse_halls warehouse_halls? @relation("inventory_movements_from_hall_idTowarehouse_halls", fields: [from_hall_id], references: [id], onUpdate: NoAction)
+  warehouse_zones_inventory_movements_from_zone_idTowarehouse_zones warehouse_zones? @relation("inventory_movements_from_zone_idTowarehouse_zones", fields: [from_zone_id], references: [id], onUpdate: NoAction)
+  inventory_items                                                   inventory_items  @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles                                                          profiles         @relation(fields: [moved_by], references: [id], onUpdate: NoAction)
+  warehouse_halls_inventory_movements_to_hall_idTowarehouse_halls   warehouse_halls? @relation("inventory_movements_to_hall_idTowarehouse_halls", fields: [to_hall_id], references: [id], onUpdate: NoAction)
+  warehouse_zones_inventory_movements_to_zone_idTowarehouse_zones   warehouse_zones? @relation("inventory_movements_to_zone_idTowarehouse_zones", fields: [to_zone_id], references: [id], onUpdate: NoAction)
+}
+
+model invoice_templates {
+  id           String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id String?     @db.Uuid
+  name         String
+  items        Json?       @default("[]")
+  notes        String?
+  is_default   Boolean?    @default(false)
+  created_at   DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?   @default(now()) @db.Timestamptz(6)
+  warehouses   warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model invoices {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booking_id       String             @db.Uuid
+  customer_id      String             @db.Uuid
+  customer_name    String
+  status           String
+  items            Json
+  subtotal         Decimal            @db.Decimal(10, 2)
+  tax              Decimal            @db.Decimal(10, 2)
+  total            Decimal            @db.Decimal(10, 2)
+  due_date         DateTime           @db.Date
+  paid_date        DateTime?          @db.Date
+  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  service_order_id String?            @db.Uuid
+  is_deleted       Boolean?           @default(false)
+  deleted_at       DateTime?          @db.Timestamptz(6)
+  cash_collections cash_collections[]
+  bookings         bookings           @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles         profiles           @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  service_orders   service_orders?    @relation(fields: [service_order_id], references: [id], onUpdate: NoAction)
+  payments         payments[]
+  refunds          refunds[]
+
+  @@index([booking_id], map: "idx_invoices_booking_id")
+  @@index([customer_id], map: "idx_invoices_customer_id")
+  @@index([due_date], map: "idx_invoices_due_date")
+  @@index([service_order_id], map: "idx_invoices_service_order_id")
+  @@index([status], map: "idx_invoices_status")
+}
+
+model kb_embeddings {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content_hash        String               @db.VarChar(64)
+  namespace           String               @default("default") @db.VarChar(128)
+  content             String
+  metadata            Json?
+  token_count         Int?
+  created_at          DateTime             @default(now())
+  updated_at          DateTime             @default(now())
+  kb_embeddings_store kb_embeddings_store?
+
+  @@unique([content_hash, namespace], map: "kb_embeddings_hash_ns_key")
+  @@index([content(ops: raw("gin_trgm_ops"))], map: "kb_embeddings_content_trgm_idx", type: Gin)
+  @@index([metadata], type: Gin)
+  @@index([namespace])
+}
+
+model kb_embeddings_store {
+  id            String                @id @db.Uuid
+  embedding     Unsupported("vector")
+  kb_embeddings kb_embeddings         @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([embedding], map: "kb_embeddings_store_hnsw_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model membership_settings {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  program_enabled  Boolean   @default(false)
+  tier_name        String
+  min_spend        Decimal   @db.Decimal(10, 2)
+  discount_percent Decimal   @db.Decimal(5, 2)
+  benefits         String[]
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  status           Boolean   @default(true)
+
+  @@unique([tier_name, status], map: "unique_tier")
+  @@index([program_enabled], map: "idx_membership_settings_program_enabled")
+  @@index([status], map: "idx_membership_settings_status")
+  @@index([tier_name], map: "idx_membership_settings_tier_name")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notification_events {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_type    String
+  entity_type   String
+  entity_id     String    @db.Uuid
+  payload       Json
+  status        String    @default("pending")
+  retry_count   Int?      @default(0)
+  max_retries   Int?      @default(3)
+  processed_at  DateTime? @db.Timestamptz(6)
+  error_message String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([entity_type, entity_id], map: "idx_notification_events_entity")
+  @@index([status, created_at], map: "idx_notification_events_status")
+  @@index([event_type], map: "idx_notification_events_type")
+}
+
+model notification_preferences {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id          String    @unique @db.Uuid
+  email_enabled    Boolean?  @default(true)
+  sms_enabled      Boolean?  @default(false)
+  push_enabled     Boolean?  @default(true)
+  whatsapp_enabled Boolean?  @default(false)
+  type_preferences Json?     @default("{\"task\": {\"sms\": false, \"push\": true, \"email\": false, \"whatsapp\": false}, \"system\": {\"sms\": false, \"push\": true, \"email\": true, \"whatsapp\": false}, \"booking\": {\"sms\": false, \"push\": true, \"email\": true, \"whatsapp\": false}, \"invoice\": {\"sms\": false, \"push\": true, \"email\": true, \"whatsapp\": false}, \"incident\": {\"sms\": true, \"push\": true, \"email\": true, \"whatsapp\": false}}")
+  email_address    String?
+  phone_number     String?
+  whatsapp_number  String?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  profiles         profiles  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_notification_preferences_user_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notifications {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String    @db.Uuid
+  type          String
+  channel       String
+  title         String
+  message       String
+  read          Boolean?  @default(false)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  metadata      Json?     @default("{}")
+  sent_at       DateTime? @db.Timestamptz(6)
+  delivered_at  DateTime? @db.Timestamptz(6)
+  failed_at     DateTime? @db.Timestamptz(6)
+  error_message String?
+  profiles      profiles  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_notifications_created_at")
+  @@index([delivered_at], map: "idx_notifications_delivered_at")
+  @@index([read], map: "idx_notifications_read")
+  @@index([sent_at], map: "idx_notifications_sent_at")
+  @@index([user_id], map: "idx_notifications_user_id")
+}
+
+model pallet_checkout_requests {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id    String    @db.Uuid
+  requested_by  String?   @db.Uuid
+  pallet_ids    String[]
+  status        String?   @default("pending")
+  checkout_date DateTime? @db.Timestamptz(6)
+  notes         String?
+  qr_code       String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+  bookings      bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles      profiles? @relation(fields: [requested_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model payment_transactions {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  payment_id  String    @db.Uuid
+  type        String    @default("payment")
+  amount      Decimal   @db.Decimal(10, 2)
+  currency    String    @default("USD")
+  status      String    @default("pending")
+  description String    @default("")
+  metadata    Json?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  payments    payments  @relation(fields: [payment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model payments {
+  id                       String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  invoice_id               String                 @db.Uuid
+  customer_id              String                 @db.Uuid
+  amount                   Decimal                @db.Decimal(10, 2)
+  currency                 String                 @default("USD")
+  status                   String                 @default("pending")
+  payment_method           String                 @default("card")
+  stripe_payment_intent_id String?
+  stripe_charge_id         String?
+  credit_balance_used      Decimal?               @default(0.00) @db.Decimal(10, 2)
+  metadata                 Json?
+  is_deleted               Boolean?               @default(false)
+  deleted_at               DateTime?              @db.Timestamptz(6)
+  created_at               DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?              @default(now()) @db.Timestamptz(6)
+  completed_at             DateTime?              @db.Timestamptz(6)
+  payment_transactions     payment_transactions[]
+  profiles                 profiles               @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invoices                 invoices               @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  refunds                  refunds[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model performance_targets {
+  id                         String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id               String?     @db.Uuid
+  floor_number               Int?
+  target_capacity_percent    Decimal     @default(80.00) @db.Decimal(5, 2)
+  target_utilization_percent Decimal     @default(75.00) @db.Decimal(5, 2)
+  filter_type                String?
+  filter_id                  String?     @db.Uuid
+  created_at                 DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?   @default(now()) @db.Timestamptz(6)
+  warehouses                 warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([warehouse_id, floor_number, filter_type, filter_id])
+  @@index([filter_type, filter_id], map: "idx_performance_targets_filter")
+  @@index([floor_number], map: "idx_performance_targets_floor")
+  @@index([warehouse_id], map: "idx_performance_targets_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model profiles {
+  id                                                           String                         @id @db.Uuid
+  email                                                        String                         @unique
+  name                                                         String?
+  phone                                                        String?
+  role                                                         String                         @default("member")
+  membership_tier                                              String?
+  credit_balance                                               Decimal?                       @default(0) @db.Decimal(10, 2)
+  avatar_url                                                   String?
+  created_at                                                   DateTime?                      @default(now()) @db.Timestamptz(6)
+  updated_at                                                   DateTime?                      @default(now()) @db.Timestamptz(6)
+  storage_interest                                             String?
+  company_id                                                   String?                        @db.Uuid
+  invited_by                                                   String?                        @db.Uuid
+  invitation_token                                             String?                        @unique
+  invitation_expires_at                                        DateTime?                      @db.Timestamptz(6)
+  invitation_password                                          String?
+  fcm_token                                                    String?
+  client_type                                                  String?                        @default("individual")
+  default_team_id                                              String?                        @db.Uuid
+  access_logs_access_logs_authorized_by_idToprofiles           access_logs[]                  @relation("access_logs_authorized_by_idToprofiles")
+  access_logs_access_logs_checked_in_byToprofiles              access_logs[]                  @relation("access_logs_checked_in_byToprofiles")
+  access_logs_access_logs_checked_out_byToprofiles             access_logs[]                  @relation("access_logs_checked_out_byToprofiles")
+  access_logs_access_logs_person_idToprofiles                  access_logs[]                  @relation("access_logs_person_idToprofiles")
+  appointment_participants                                     appointment_participants[]
+  appointment_types                                            appointment_types[]
+  appointments                                                 appointments[]
+  booking_approvals                                            booking_approvals[]
+  booking_modifications                                        booking_modifications[]
+  booking_proposals                                            booking_proposals[]
+  booking_requests                                             booking_requests[]
+  bookings_bookings_approved_byToprofiles                      bookings[]                     @relation("bookings_approved_byToprofiles")
+  bookings_bookings_customer_idToprofiles                      bookings[]                     @relation("bookings_customer_idToprofiles")
+  broker_customers                                             broker_customers[]
+  cash_collections                                             cash_collections[]
+  claims                                                       claims[]
+  client_team_members_client_team_members_invited_byToprofiles client_team_members[]          @relation("client_team_members_invited_byToprofiles")
+  client_team_members_client_team_members_member_idToprofiles  client_team_members[]          @relation("client_team_members_member_idToprofiles")
+  client_teams_client_teams_created_byToprofiles               client_teams[]                 @relation("client_teams_created_byToprofiles")
+  conversation_messages                                        conversation_messages[]
+  conversations                                                conversations[]
+  customer_group_members                                       customer_group_members[]
+  estimates                                                    estimates[]
+  incidents                                                    incidents[]
+  inventory_items                                              inventory_items[]
+  inventory_movements                                          inventory_movements[]
+  invoices                                                     invoices[]
+  notification_preferences                                     notification_preferences?
+  notifications                                                notifications[]
+  pallet_checkout_requests                                     pallet_checkout_requests[]
+  payments                                                     payments[]
+  companies                                                    companies?                     @relation(fields: [company_id], references: [id], onUpdate: NoAction)
+  client_teams_profiles_default_team_idToclient_teams          client_teams?                  @relation("profiles_default_team_idToclient_teams", fields: [default_team_id], references: [id], onUpdate: NoAction)
+  profiles                                                     profiles?                      @relation("profilesToprofiles", fields: [invited_by], references: [id], onUpdate: NoAction)
+  other_profiles                                               profiles[]                     @relation("profilesToprofiles")
+  refunds                                                      refunds[]
+  service_orders                                               service_orders[]
+  tasks                                                        tasks[]
+  warehouse_capacity_snapshots                                 warehouse_capacity_snapshots[]
+  warehouse_favorites                                          warehouse_favorites[]
+  warehouse_messages_warehouse_messages_receiver_idToprofiles  warehouse_messages[]           @relation("warehouse_messages_receiver_idToprofiles")
+  warehouse_messages_warehouse_messages_sender_idToprofiles    warehouse_messages[]           @relation("warehouse_messages_sender_idToprofiles")
+  warehouse_reviews                                            warehouse_reviews[]
+  warehouse_staff                                              warehouse_staff[]
+  worker_shifts                                                worker_shifts[]
+
+  @@index([client_type], map: "idx_profiles_client_type")
+  @@index([default_team_id], map: "idx_profiles_default_team_id")
+  @@index([invited_by], map: "idx_profiles_invited_by")
+  @@index([role], map: "idx_profiles_role")
+  @@index([company_id])
+  @@index([email])
+  @@index([role])
+  @@index([storage_interest])
+}
+
+model refunds {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  payment_id       String    @db.Uuid
+  invoice_id       String    @db.Uuid
+  customer_id      String    @db.Uuid
+  amount           Decimal   @db.Decimal(10, 2)
+  currency         String    @default("USD")
+  reason           String?
+  status           String    @default("pending")
+  stripe_refund_id String?
+  metadata         Json?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  processed_at     DateTime? @db.Timestamptz(6)
+  profiles         profiles  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invoices         invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payments         payments  @relation(fields: [payment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model service_order_items {
+  id                 String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  order_id           String             @db.Uuid
+  service_id         String             @db.Uuid
+  service_name       String
+  quantity           Decimal            @db.Decimal(10, 2)
+  unit_price         Decimal            @db.Decimal(10, 2)
+  total_price        Decimal            @db.Decimal(10, 2)
+  notes              String?
+  status             String             @default("pending")
+  created_at         DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?          @default(now()) @db.Timestamptz(6)
+  service_orders     service_orders     @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse_services warehouse_services @relation(fields: [service_id], references: [id], onUpdate: NoAction)
+
+  @@index([order_id], map: "idx_service_order_items_order_id")
+  @@index([service_id], map: "idx_service_order_items_service_id")
+  @@index([status], map: "idx_service_order_items_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model service_orders {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  order_number        String                @unique
+  customer_id         String                @db.Uuid
+  customer_name       String
+  booking_id          String?               @db.Uuid
+  status              String
+  priority            String                @default("normal")
+  requested_date      DateTime?             @db.Date
+  due_date            DateTime?             @db.Date
+  completed_date      DateTime?             @db.Date
+  notes               String?
+  total_amount        Decimal               @default(0) @db.Decimal(10, 2)
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  invoices            invoices[]
+  service_order_items service_order_items[]
+  bookings            bookings?             @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles            profiles              @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_service_orders_booking_id")
+  @@index([customer_id], map: "idx_service_orders_customer_id")
+  @@index([due_date], map: "idx_service_orders_due_date")
+  @@index([order_number], map: "idx_service_orders_order_number")
+  @@index([status], map: "idx_service_orders_status")
+}
+
+model shipments {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  booking_id      String    @db.Uuid
+  tracking_number String?
+  carrier         String?
+  status          String?   @default("pending")
+  shipped_at      DateTime? @db.Timestamptz(6)
+  delivered_at    DateTime? @db.Timestamptz(6)
+  metadata        Json?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  bookings        bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tasks {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type             String
+  title            String
+  description      String
+  status           String
+  priority         String
+  assigned_to      String?    @db.Uuid
+  assigned_to_name String?
+  booking_id       String?    @db.Uuid
+  warehouse_id     String     @db.Uuid
+  zone             String?
+  location         String?
+  due_date         DateTime?  @db.Timestamptz(6)
+  completed_at     DateTime?  @db.Timestamptz(6)
+  created_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  is_deleted       Boolean?   @default(false)
+  deleted_at       DateTime?  @db.Timestamptz(6)
+  profiles         profiles?  @relation(fields: [assigned_to], references: [id], onUpdate: NoAction)
+  bookings         bookings?  @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  warehouses       warehouses @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+
+  @@index([assigned_to], map: "idx_tasks_assigned_to")
+  @@index([booking_id], map: "idx_tasks_booking_id")
+  @@index([due_date], map: "idx_tasks_due_date")
+  @@index([priority], map: "idx_tasks_priority")
+  @@index([status], map: "idx_tasks_status")
+  @@index([warehouse_id], map: "idx_tasks_warehouse_id")
+}
+
+model warehouse_capacity_snapshots {
+  id              String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id    String           @db.Uuid
+  zone_id         String?          @db.Uuid
+  customer_id     String?          @db.Uuid
+  total_capacity  Int
+  used_capacity   Int              @default(0)
+  percentage_used Decimal          @default(0) @db.Decimal(5, 2)
+  snapshot_date   DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  profiles        profiles?        @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  warehouses      warehouses       @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse_zones warehouse_zones? @relation(fields: [zone_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([customer_id], map: "idx_capacity_snapshots_customer_id")
+  @@index([snapshot_date], map: "idx_capacity_snapshots_snapshot_date")
+  @@index([warehouse_id], map: "idx_capacity_snapshots_warehouse_id")
+  @@index([zone_id], map: "idx_capacity_snapshots_zone_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_custom_pallet_size_height_pricing {
+  id                            String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  custom_pallet_size_id         String                        @db.Uuid
+  height_min_cm                 Decimal                       @db.Decimal
+  height_max_cm                 Decimal?                      @db.Decimal
+  price_per_unit                Decimal                       @db.Decimal(10, 2)
+  created_at                    DateTime?                     @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime?                     @default(now()) @db.Timestamptz(6)
+  status                        Boolean                       @default(true)
+  unstackable_method            String?                       @default("rate")
+  unstackable_value             Decimal?                      @default(0) @db.Decimal
+  warehouse_custom_pallet_sizes warehouse_custom_pallet_sizes @relation(fields: [custom_pallet_size_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "warehouse_custom_pallet_size_height__custom_pallet_size_id_fkey")
+
+  @@unique([custom_pallet_size_id, height_min_cm, height_max_cm], map: "warehouse_custom_pallet_size__custom_pallet_size_id_height__key")
+  @@index([custom_pallet_size_id], map: "idx_warehouse_custom_pallet_size_height_pricing_size_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_custom_pallet_sizes {
+  id                                          String                                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pallet_pricing_id                           String                                        @db.Uuid
+  length_cm                                   Decimal                                       @db.Decimal
+  width_cm                                    Decimal                                       @db.Decimal
+  created_at                                  DateTime?                                     @default(now()) @db.Timestamptz(6)
+  updated_at                                  DateTime?                                     @default(now()) @db.Timestamptz(6)
+  status                                      Boolean                                       @default(true)
+  length_min_cm                               Decimal                                       @db.Decimal
+  length_max_cm                               Decimal                                       @db.Decimal
+  width_min_cm                                Decimal                                       @db.Decimal
+  width_max_cm                                Decimal                                       @db.Decimal
+  stackable_adjustment_type                   String?                                       @default("plus_per_unit")
+  stackable_adjustment_value                  Decimal?                                      @default(0) @db.Decimal(10, 2)
+  unstackable_adjustment_type                 String?                                       @default("plus_per_unit")
+  unstackable_adjustment_value                Decimal?                                      @default(0) @db.Decimal(10, 2)
+  warehouse_custom_pallet_size_height_pricing warehouse_custom_pallet_size_height_pricing[]
+  warehouse_pallet_pricing                    warehouse_pallet_pricing                      @relation(fields: [pallet_pricing_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([pallet_pricing_id, length_cm, width_cm])
+  @@unique([pallet_pricing_id, length_min_cm, length_max_cm, width_min_cm, width_max_cm], map: "warehouse_custom_pallet_sizes_unique_range")
+  @@index([pallet_pricing_id], map: "idx_warehouse_custom_pallet_sizes_pallet_pricing_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_favorites {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String     @db.Uuid
+  warehouse_id String     @db.Uuid
+  created_at   DateTime?  @default(now()) @db.Timestamptz(6)
+  profiles     profiles   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses   warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, warehouse_id])
+  @@index([created_at(sort: Desc)], map: "idx_warehouse_favorites_created_at")
+  @@index([user_id], map: "idx_warehouse_favorites_user_id")
+  @@index([warehouse_id], map: "idx_warehouse_favorites_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model warehouse_floor_aisle_defs {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  floor_id         String           @db.Uuid
+  aisle_type       String
+  width_m          Decimal          @db.Decimal(10, 2)
+  status           Boolean          @default(true)
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  warehouse_floors warehouse_floors @relation(fields: [floor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([floor_id], map: "idx_warehouse_floor_aisle_defs_floor_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model warehouse_floor_pallet_layouts {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  floor_id         String           @db.Uuid
+  pallet_type      String
+  custom_length_cm Int?
+  custom_width_cm  Int?
+  custom_height_cm Int?
+  position_x_m     Decimal          @db.Decimal(10, 2)
+  position_y_m     Decimal          @db.Decimal(10, 2)
+  rotation_deg     Decimal          @default(0) @db.Decimal(10, 2)
+  stack_count      Int              @default(1)
+  status           Boolean          @default(true)
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  warehouse_floors warehouse_floors @relation(fields: [floor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([floor_id], map: "idx_warehouse_floor_pallet_layouts_floor_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model warehouse_floor_planner_settings {
+  id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouse_id         String     @unique @db.Uuid
+  custom_min_length_cm Int        @default(80)
+  custom_min_width_cm  Int        @default(80)
+  custom_min_height_cm Int        @default(10)
+  custom_max_length_cm Int        @default(120)
+  custom_max_width_cm  Int        @default(120)
+  custom_max_height_cm Int        @default(200)
+  status               Boolean    @default(true)
+  created_at           DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?  @default(now()) @db.Timestamptz(6)
+  warehouses           warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model warehouse_floor_zones {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  floor_id         String           @db.Uuid
+  zone_type        String
+  x_m              Decimal          @db.Decimal(10, 2)
+  y_m              Decimal          @db.Decimal(10, 2)
+  width_m          Decimal          @db.Decimal(10, 2)
+  height_m         Decimal          @db.Decimal(10, 2)
+  rotation_deg     Decimal          @default(0) @db.Decimal(10, 2)
+  status           Boolean          @default(true)
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  warehouse_floors warehouse_floors @relation(fields: [floor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([floor_id], map: "idx_warehouse_floor_zones_floor_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouse_floors {
+  id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouse_id                   String                           @db.Uuid
+  floor_number                   Int
+  name                           String
+  total_sq_ft                    Int
+  created_at                     DateTime?                        @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime?                        @default(now()) @db.Timestamptz(6)
+  custom_pallet_height_cm        Decimal                          @default(150) @db.Decimal
+  custom_pallet_length_cm        Decimal                          @default(100) @db.Decimal
+  custom_pallet_width_cm         Decimal                          @default(100) @db.Decimal
+  dock_zone_depth_m              Decimal                          @default(4.5) @db.Decimal
+  standard_pallet_height_m       Decimal                          @default(1.5) @db.Decimal
+  euro_pallet_height_m           Decimal                          @default(1.5) @db.Decimal
+  floor_level                    Int                              @default(1)
+  height_m                       Decimal                          @default(10) @db.Decimal
+  length_m                       Decimal                          @default(50) @db.Decimal
+  width_m                        Decimal                          @default(30) @db.Decimal
+  loading_zone_depth_m           Decimal                          @default(3.0) @db.Decimal
+  wall_clearance_m               Decimal                          @default(0.5) @db.Decimal
+  sprinkler_clearance_m          Decimal                          @default(0.9) @db.Decimal
+  safety_clearance_m             Decimal                          @default(0.5) @db.Decimal
+  main_aisle_m                   Decimal                          @default(3.5) @db.Decimal
+  side_aisle_m                   Decimal                          @default(2.5) @db.Decimal
+  pedestrian_aisle_m             Decimal                          @default(1.0) @db.Decimal
+  stacking_override              Int?
+  status                         Boolean                          @default(true)
+  outline_points                 Json?
+  inventory_items                inventory_items[]
+  warehouse_floor_aisle_defs     warehouse_floor_aisle_defs[]
+  warehouse_floor_pallet_layouts warehouse_floor_pallet_layouts[]
+  warehouse_floor_zones          warehouse_floor_zones[]
+  warehouses                     warehouses                       @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse_halls                warehouse_halls[]
+  warehouse_regions              warehouse_regions[]
+
+  @@unique([warehouse_id, floor_number])
+  @@index([warehouse_id], map: "idx_warehouse_floors_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouse_halls {
+  id                                                                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  floor_id                                                              String                @db.Uuid
+  hall_name                                                             String
+  sq_ft                                                                 Int
+  available_sq_ft                                                       Int
+  occupied_sq_ft                                                        Int                   @default(0)
+  created_at                                                            DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime?             @default(now()) @db.Timestamptz(6)
+  region_id                                                             String?               @db.Uuid
+  bookings                                                              bookings[]
+  inventory_items                                                       inventory_items[]
+  inventory_movements_inventory_movements_from_hall_idTowarehouse_halls inventory_movements[] @relation("inventory_movements_from_hall_idTowarehouse_halls")
+  inventory_movements_inventory_movements_to_hall_idTowarehouse_halls   inventory_movements[] @relation("inventory_movements_to_hall_idTowarehouse_halls")
+  warehouse_floors                                                      warehouse_floors      @relation(fields: [floor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse_regions                                                     warehouse_regions?    @relation(fields: [region_id], references: [id], onUpdate: NoAction)
+  warehouse_zones                                                       warehouse_zones[]
+
+  @@unique([floor_id, hall_name])
+  @@index([floor_id], map: "idx_warehouse_halls_floor_id")
+  @@index([region_id], map: "idx_warehouse_halls_region_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_messages {
+  id                                                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id                                   String      @db.Uuid
+  sender_id                                         String      @db.Uuid
+  receiver_id                                       String      @db.Uuid
+  warehouse_id                                      String?     @db.Uuid
+  booking_id                                        String?     @db.Uuid
+  content                                           String
+  attachments                                       String[]
+  read_at                                           DateTime?   @db.Timestamptz(6)
+  created_at                                        DateTime?   @default(now()) @db.Timestamptz(6)
+  bookings                                          bookings?   @relation(fields: [booking_id], references: [id], onUpdate: NoAction)
+  profiles_warehouse_messages_receiver_idToprofiles profiles    @relation("warehouse_messages_receiver_idToprofiles", fields: [receiver_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles_warehouse_messages_sender_idToprofiles   profiles    @relation("warehouse_messages_sender_idToprofiles", fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses                                        warehouses? @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_warehouse_messages_booking_id")
+  @@index([conversation_id, created_at(sort: Desc)], map: "idx_warehouse_messages_conversation_created")
+  @@index([conversation_id], map: "idx_warehouse_messages_conversation_id")
+  @@index([created_at(sort: Desc)], map: "idx_warehouse_messages_created_at")
+  @@index([receiver_id], map: "idx_warehouse_messages_receiver_id")
+  @@index([sender_id], map: "idx_warehouse_messages_sender_id")
+  @@index([warehouse_id], map: "idx_warehouse_messages_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_pallet_height_pricing {
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pallet_pricing_id        String                   @db.Uuid
+  height_min_cm            Decimal                  @db.Decimal
+  height_max_cm            Decimal?                 @db.Decimal
+  price_per_unit           Decimal                  @db.Decimal(10, 2)
+  created_at               DateTime?                @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?                @default(now()) @db.Timestamptz(6)
+  status                   Boolean                  @default(true)
+  unstackable_method       String?                  @default("rate")
+  unstackable_value        Decimal?                 @default(0) @db.Decimal
+  warehouse_pallet_pricing warehouse_pallet_pricing @relation(fields: [pallet_pricing_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([pallet_pricing_id, height_min_cm, height_max_cm], map: "warehouse_pallet_height_prici_pallet_pricing_id_height_min__key")
+  @@index([pallet_pricing_id], map: "idx_warehouse_pallet_height_pricing_pallet_pricing_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_pallet_pricing {
+  id                              String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouse_id                    String                            @db.Uuid
+  pallet_type                     String
+  pricing_period                  String
+  custom_length_cm                Int?
+  custom_width_cm                 Int?
+  custom_height_cm                Int?
+  created_at                      DateTime?                         @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime?                         @default(now()) @db.Timestamptz(6)
+  status                          Boolean                           @default(true)
+  stackable                       Boolean?                          @default(true)
+  stackable_adjustment_type       String?                           @default("plus_per_unit")
+  stackable_adjustment_value      Decimal?                          @default(0) @db.Decimal(10, 2)
+  unstackable_adjustment_type     String?                           @default("plus_per_unit")
+  unstackable_adjustment_value    Decimal?                          @default(0) @db.Decimal(10, 2)
+  goods_type                      String                            @default("general")
+  warehouse_custom_pallet_sizes   warehouse_custom_pallet_sizes[]
+  warehouse_pallet_height_pricing warehouse_pallet_height_pricing[]
+  warehouses                      warehouses                        @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouse_pallet_weight_pricing warehouse_pallet_weight_pricing[]
+
+  @@unique([warehouse_id, pallet_type, pricing_period, custom_length_cm, custom_width_cm, custom_height_cm])
+  @@index([goods_type], map: "idx_warehouse_pallet_pricing_goods_type")
+  @@index([pallet_type], map: "idx_warehouse_pallet_pricing_pallet_type")
+  @@index([warehouse_id], map: "idx_warehouse_pallet_pricing_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_pallet_weight_pricing {
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pallet_pricing_id        String                   @db.Uuid
+  weight_min_kg            Decimal                  @db.Decimal
+  weight_max_kg            Decimal?                 @db.Decimal
+  price_per_pallet         Decimal                  @db.Decimal(10, 2)
+  created_at               DateTime?                @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?                @default(now()) @db.Timestamptz(6)
+  status                   Boolean                  @default(true)
+  unstackable_method       String?                  @default("rate")
+  unstackable_value        Decimal?                 @default(0) @db.Decimal
+  warehouse_pallet_pricing warehouse_pallet_pricing @relation(fields: [pallet_pricing_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([pallet_pricing_id, weight_min_kg, weight_max_kg], map: "warehouse_pallet_weight_prici_pallet_pricing_id_weight_min__key")
+  @@index([pallet_pricing_id], map: "idx_warehouse_pallet_weight_pricing_pallet_pricing_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model warehouse_pricing {
+  id               String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id     String     @db.Uuid
+  pricing_type     String
+  base_price       Decimal    @db.Decimal(10, 2)
+  unit             String
+  min_quantity     Int?
+  max_quantity     Int?
+  volume_discounts Json?
+  created_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  warehouses       warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([warehouse_id, pricing_type])
+  @@index([pricing_type], map: "idx_warehouse_pricing_type")
+  @@index([warehouse_id], map: "idx_warehouse_pricing_warehouse_id")
+}
+
+model warehouse_regions {
+  id               String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  floor_id         String            @db.Uuid
+  name             String
+  description      String?
+  created_at       DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?         @default(now()) @db.Timestamptz(6)
+  inventory_items  inventory_items[]
+  warehouse_halls  warehouse_halls[]
+  warehouse_floors warehouse_floors  @relation(fields: [floor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([floor_id, name])
+  @@index([floor_id], map: "idx_warehouse_regions_floor_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_reviews {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouse_id     String     @db.Uuid
+  booking_id       String     @db.Uuid
+  user_id          String     @db.Uuid
+  rating           Int
+  title            String?
+  comment          String?
+  host_response    String?
+  host_response_at DateTime?  @db.Timestamptz(6)
+  created_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?  @default(now()) @db.Timestamptz(6)
+  bookings         bookings   @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles         profiles   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses       warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([booking_id, user_id])
+  @@index([booking_id], map: "idx_warehouse_reviews_booking_id")
+  @@index([created_at(sort: Desc)], map: "idx_warehouse_reviews_created_at")
+  @@index([rating], map: "idx_warehouse_reviews_rating")
+  @@index([user_id], map: "idx_warehouse_reviews_user_id")
+  @@index([warehouse_id], map: "idx_warehouse_reviews_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model warehouse_services {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  code                String?
+  name                String?
+  description         String?
+  category            String?
+  unit_type           String?
+  base_price          Decimal               @db.Decimal(10, 2)
+  min_quantity        Int?                  @default(1)
+  is_active           Boolean?              @default(true)
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  company_service_id  String?               @db.Uuid
+  pricing_type        String                @default("one_time")
+  service_name        String
+  service_description String?
+  warehouse_id        String?               @db.Uuid
+  service_order_items service_order_items[]
+  company_services    company_services?     @relation(fields: [company_service_id], references: [id], onUpdate: NoAction)
+  warehouses          warehouses?           @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([is_active], map: "idx_warehouse_services_active")
+  @@index([category], map: "idx_warehouse_services_category")
+  @@index([code], map: "idx_warehouse_services_code")
+  @@index([company_service_id], map: "idx_warehouse_services_company_service_id")
+  @@index([warehouse_id], map: "idx_warehouse_services_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model warehouse_staff {
+  id           String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  warehouse_id String     @db.Uuid
+  user_id      String     @db.Uuid
+  role         String     @default("staff")
+  created_at   DateTime?  @default(now()) @db.Timestamptz(6)
+  profiles     profiles   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses   warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([warehouse_id, user_id])
+  @@index([role], map: "idx_warehouse_staff_role")
+  @@index([user_id], map: "idx_warehouse_staff_user_id")
+  @@index([warehouse_id], map: "idx_warehouse_staff_warehouse_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouse_zones {
+  id                                                                    String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hall_id                                                               String                         @db.Uuid
+  name                                                                  String
+  type                                                                  String
+  total_slots                                                           Int?
+  available_slots                                                       Int?
+  total_sq_ft                                                           Int?
+  available_sq_ft                                                       Int?
+  created_at                                                            DateTime?                      @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime?                      @default(now()) @db.Timestamptz(6)
+  inventory_items                                                       inventory_items[]
+  inventory_movements_inventory_movements_from_zone_idTowarehouse_zones inventory_movements[]          @relation("inventory_movements_from_zone_idTowarehouse_zones")
+  inventory_movements_inventory_movements_to_zone_idTowarehouse_zones   inventory_movements[]          @relation("inventory_movements_to_zone_idTowarehouse_zones")
+  warehouse_capacity_snapshots                                          warehouse_capacity_snapshots[]
+  warehouse_halls                                                       warehouse_halls                @relation(fields: [hall_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([hall_id], map: "idx_warehouse_zones_hall_id")
+  @@index([type], map: "idx_warehouse_zones_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouses {
+  id                               String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                             String
+  address                          String
+  city                             String
+  zip_code                         String
+  total_sq_ft                      Int
+  amenities                        String[]
+  operating_hours                  Json?
+  created_at                       DateTime?                         @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime?                         @default(now()) @db.Timestamptz(6)
+  latitude                         Decimal?                          @db.Decimal(10, 8)
+  longitude                        Decimal?                          @db.Decimal(11, 8)
+  storage_types                    String[]
+  temperature_types                String[]
+  custom_status                    String?
+  at_capacity_sq_ft                Boolean?                          @default(false)
+  at_capacity_pallet               Boolean?                          @default(false)
+  min_pallet                       Int?
+  max_pallet                       Int?
+  min_sq_ft                        Int?
+  max_sq_ft                        Int?
+  rent_methods                     String[]                          @default([])
+  security                         String[]                          @default([])
+  goods_type                       String[]
+  video_url                        String?
+  access_info                      Json?
+  product_acceptance_start_time    DateTime?                         @db.Time(6)
+  product_acceptance_end_time      DateTime?                         @db.Time(6)
+  working_days                     String[]
+  warehouse_in_fee                 Decimal?                          @db.Decimal(10, 2)
+  warehouse_out_fee                Decimal?                          @db.Decimal(10, 2)
+  ports                            Json?                             @default("[]")
+  total_pallet_storage             Int?
+  free_storage_rules               Json?                             @default("[]")
+  description                      String?
+  late_arrival_grace_minutes       Int?
+  late_arrival_penalty_amount      Decimal?                          @db.Decimal(10, 2)
+  late_arrival_penalty_type        String?
+  payment_terms_days               Int?
+  owner_company_id                 String?                           @db.Uuid
+  warehouse_type                   String[]
+  access_logs                      access_logs[]
+  appointments                     appointments[]
+  bookings                         bookings[]
+  conversations                    conversations[]
+  estimates                        estimates[]
+  incidents                        incidents[]
+  inventory_items                  inventory_items[]
+  invoice_templates                invoice_templates[]
+  performance_targets              performance_targets[]
+  tasks                            tasks[]
+  warehouse_capacity_snapshots     warehouse_capacity_snapshots[]
+  warehouse_favorites              warehouse_favorites[]
+  warehouse_floor_planner_settings warehouse_floor_planner_settings?
+  warehouse_floors                 warehouse_floors[]
+  warehouse_messages               warehouse_messages[]
+  warehouse_pallet_pricing         warehouse_pallet_pricing[]
+  warehouse_pricing                warehouse_pricing[]
+  warehouse_reviews                warehouse_reviews[]
+  warehouse_services               warehouse_services[]
+  warehouse_staff                  warehouse_staff[]
+  companies                        companies?                        @relation(fields: [owner_company_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  worker_shifts                    worker_shifts[]
+
+  @@index([at_capacity_pallet], map: "idx_warehouses_at_capacity_pallet")
+  @@index([at_capacity_sq_ft], map: "idx_warehouses_at_capacity_sq_ft")
+  @@index([custom_status], map: "idx_warehouses_custom_status")
+  @@index([goods_type], map: "idx_warehouses_goods_type_gin", type: Gin)
+  @@index([owner_company_id], map: "idx_warehouses_owner_company_id")
+  @@index([rent_methods], map: "idx_warehouses_rent_methods", type: Gin)
+  @@index([security], map: "idx_warehouses_security", type: Gin)
+  @@index([storage_types], map: "idx_warehouses_storage_types", type: Gin)
+  @@index([temperature_types], map: "idx_warehouses_temperature_types", type: Gin)
+  @@index([warehouse_type], map: "idx_warehouses_warehouse_type", type: Gin)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model worker_shifts {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  worker_id       String     @db.Uuid
+  worker_name     String
+  check_in_time   DateTime   @db.Timestamptz(6)
+  check_out_time  DateTime?  @db.Timestamptz(6)
+  hours_worked    Decimal?   @db.Decimal(4, 2)
+  breaks          Json?      @default("[]")
+  tasks_completed Int?       @default(0)
+  warehouse_id    String     @db.Uuid
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  warehouses      warehouses @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+  profiles        profiles   @relation(fields: [worker_id], references: [id], onUpdate: NoAction)
+
+  @@index([check_in_time], map: "idx_worker_shifts_check_in_time")
+  @@index([warehouse_id], map: "idx_worker_shifts_warehouse_id")
+  @@index([worker_id], map: "idx_worker_shifts_worker_id")
+}
+
+enum consent_status {
+  unknown
+  pending
+  opted_in
+  opted_out
+}
+
+enum opportunity_type {
+  space_available
+  space_needed
+  services_partner
+  hiring_signal
+}
+
+enum search_job_status {
+  draft
+  queued
+  running
+  done
+  failed
+}
+
+enum search_result_status {
+  new
+  reviewed
+  approved
+  rejected
+  merged
+}
+
+enum segment_type {
+  warehouse_space_owner
+  warehouse_space_seeker
+  pl_operator                     @map("3pl_operator")
+  customs_broker
+  freight_forwarder_international
+  drayage_trucking_local
+  warehouse_staffing_jobs
+  warehouse_job_seekers
+  equipment_vendor
+  fmcg_distributor
+  warehouse_real_estate_broker
+  bonded_warehouse_antrepo
+  customs_cbp_facility_directory
+}
+
+enum suppression_type {
+  email
+  domain
+  phone
 }

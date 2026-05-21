@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { createTask, getTasks, updateTask } from "@/lib/db/tasks"
 import { getNotificationService } from "@/lib/notifications/service"
 import type { Task, TaskType, TaskPriority } from "@/types"
@@ -120,7 +120,7 @@ async function getAvailableWorkers(
   _warehouseId: string,
   taskType: TaskType
 ): Promise<WorkerAvailability[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get all workers for this warehouse
   const { data: workers, error: workersError } = await supabase
@@ -251,7 +251,7 @@ export async function reassignTask(
   taskId: string,
   newWorkerId: string
 ): Promise<Task> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get new worker name
   const { data: worker, error: workerError } = await supabase
@@ -326,7 +326,7 @@ export async function autoAssignPendingTasks(
 export async function balanceWorkload(
   _warehouseId: string
 ): Promise<{ reassigned: number; errors: string[] }> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get all workers
   const { data: workers } = await supabase

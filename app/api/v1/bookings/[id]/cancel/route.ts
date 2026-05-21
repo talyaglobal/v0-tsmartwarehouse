@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth/api-middleware";
 import { getBookingById } from "@/lib/db/bookings";
 import { createRefund, getPaymentIntent } from "@/lib/payments/stripe";
 import { generateIdempotencyKey } from "@/lib/payments/idempotency";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 import { handleApiError } from "@/lib/utils/logger";
 import type { ErrorResponse } from "@/types/api";
 import type { Booking } from "@/types";
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Auth check: customer, warehouse staff, or admin
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const isCustomer = booking.customerId === user.id;
 
     // Check if user is warehouse staff
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (refundCalc.refundAmount > 0) {
       try {
         // Need to get payment intent first to find charge ID
-        const supabaseAdmin = createServerSupabaseClient();
+        const supabaseAdmin = createServerClient();
         const { data: bookingRow } = await supabaseAdmin
           .from("bookings")
           .select("payment_intent_id")

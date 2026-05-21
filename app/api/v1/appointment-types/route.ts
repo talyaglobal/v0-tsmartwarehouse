@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
 
     // Check if user is root admin
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')

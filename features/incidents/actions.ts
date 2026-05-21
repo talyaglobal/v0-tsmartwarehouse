@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import { createIncidentSchema } from '@/lib/validation/schemas'
 import type { Incident } from '@/types'
@@ -13,7 +13,7 @@ export async function createIncidentAction(
   input: CreateIncidentInput
 ): Promise<{ success: boolean; data?: Incident; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -87,7 +87,7 @@ export async function updateIncidentAction(
   input: UpdateIncidentInput
 ): Promise<{ success: boolean; data?: Incident; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -151,7 +151,7 @@ export async function resolveIncidentAction(
   input: ResolveIncidentInput
 ): Promise<{ success: boolean; data?: Incident; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -212,7 +212,7 @@ export async function deleteIncidentAction(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {

@@ -5,7 +5,7 @@
  * Handles all server-side operations for agreement management
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/kolaybase/server';
 import {
   AgreementType,
   AgreementVersion,
@@ -17,18 +17,6 @@ import {
   AgreementStatus,
 } from './types';
 
-// Type for RPC result
-interface AgreementVersionRpcResult {
-  id: string;
-  agreement_type: string;
-  version: string;
-  title: string;
-  content: string;
-  pdf_url: string | null;
-  is_major_version: boolean;
-  effective_date: string;
-}
-
 /**
  * Get latest agreement version
  */
@@ -37,14 +25,14 @@ export async function getLatestAgreementVersion(
   language: string = 'en'
 ): Promise<{ success: boolean; data?: AgreementVersion; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     const { data, error } = await supabase
       .rpc('get_latest_agreement_version', {
         p_agreement_type: agreementType,
         p_language: language,
       })
-      .single<AgreementVersionRpcResult>();
+      .single();
 
     if (error) {
       throw error;
@@ -89,7 +77,7 @@ export async function checkUserAgreement(
   agreementType: AgreementType
 ): Promise<{ success: boolean; data?: AgreementCheckResult; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     // Get latest version
     const latestVersionResult = await getLatestAgreementVersion(agreementType);
@@ -145,7 +133,7 @@ export async function acceptUserAgreement(
   input: AgreementAcceptanceInput
 ): Promise<{ success: boolean; data?: UserAgreement; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     // Get latest version
     const latestVersionResult = await getLatestAgreementVersion(input.agreementType);
@@ -269,7 +257,7 @@ export async function acceptWarehouseAgreement(
   input: AgreementAcceptanceInput & { warehouseId: string }
 ): Promise<{ success: boolean; data?: WarehouseAgreement; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     // Get latest version
     const latestVersionResult = await getLatestAgreementVersion(input.agreementType);
@@ -395,7 +383,7 @@ export async function acceptBookingAgreement(
   input: AgreementAcceptanceInput & { bookingId: string }
 ): Promise<{ success: boolean; data?: BookingAgreement; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     // Get latest version
     const latestVersionResult = await getLatestAgreementVersion(input.agreementType);
@@ -521,7 +509,7 @@ export async function getUserAgreementStatuses(
   userId: string
 ): Promise<{ success: boolean; data?: AgreementStatus[]; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     // Get all user agreements
     const { data: userAgreements, error } = await supabase

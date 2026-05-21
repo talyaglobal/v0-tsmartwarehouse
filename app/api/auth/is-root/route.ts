@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server'
+import { createAuthenticatedServerClient } from '@/lib/kolaybase/server'
 
 export async function GET() {
   try {
-    const supabase = await createAuthenticatedSupabaseClient()
+    const supabase = await createAuthenticatedServerClient()
     const {
       data: { user },
       error: userError,

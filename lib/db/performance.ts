@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { getCache, setCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
 /**
@@ -53,7 +53,7 @@ export async function getPerformanceMetrics(
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get target capacity based on filters
   const targetCapacity = await getTargetCapacity(filters)
@@ -222,7 +222,7 @@ export async function getPerformanceMetrics(
 export async function getTargetCapacity(
   filters: PerformanceFilters = {}
 ): Promise<number> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Determine filter type
   let filterType: 'all' | 'floor' | 'warehouse' | 'customer' | 'broker' | 'customer_group' = 'all'
@@ -284,7 +284,7 @@ export async function getBrokers(): Promise<Broker[]> {
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data: brokers, error } = await supabase
     .from('brokers')
@@ -312,7 +312,7 @@ export async function getCustomerGroups(): Promise<CustomerGroup[]> {
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data: groups, error } = await supabase
     .from('customer_groups')

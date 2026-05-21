@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import { createTaskSchema, updateTaskSchema } from '@/lib/validation/schemas'
 import type { Task } from '@/types'
@@ -13,7 +13,7 @@ export async function createTaskAction(
   input: CreateTaskInput
 ): Promise<{ success: boolean; data?: Task; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -80,7 +80,7 @@ export async function updateTaskAction(
   input: UpdateTaskInput
 ): Promise<{ success: boolean; data?: Task; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -137,7 +137,7 @@ export async function assignTaskAction(
   input: AssignTaskInput
 ): Promise<{ success: boolean; data?: Task; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -200,7 +200,7 @@ export async function completeTaskAction(
   input: CompleteTaskInput
 ): Promise<{ success: boolean; data?: Task; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -273,7 +273,7 @@ export async function deleteTaskAction(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -322,7 +322,7 @@ export async function cancelTaskAction(
   id: string
 ): Promise<{ success: boolean; data?: Task; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {

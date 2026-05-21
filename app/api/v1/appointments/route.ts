@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
     let warehouseIds: string[] | null = null
     
     if (authenticatedUserId) {
-      const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-      const supabase = createServerSupabaseClient()
+      const { createServerClient } = await import('@/lib/kolaybase/server')
+      const supabase = createServerClient()
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')

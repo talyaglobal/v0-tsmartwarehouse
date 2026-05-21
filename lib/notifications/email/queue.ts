@@ -3,7 +3,7 @@
  * Manages email queue operations (add, retrieve, update)
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export interface EmailQueueItem {
   id: string
@@ -36,7 +36,7 @@ export interface AddEmailToQueueOptions {
 export async function addEmailToQueue(
   options: AddEmailToQueueOptions
 ): Promise<string> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('email_queue')
@@ -66,7 +66,7 @@ export async function addEmailToQueue(
 export async function getPendingEmails(
   limit: number = 10
 ): Promise<EmailQueueItem[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('email_queue')
@@ -89,9 +89,9 @@ export async function getPendingEmails(
 export async function getRetryableEmails(
   limit: number = 10
 ): Promise<EmailQueueItem[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
-  // Get failed emails and filter in memory (since we can't use raw SQL in Supabase client)
+  // Get failed emails and filter in memory (since we can't use raw SQL in KolayBase client)
   const { data: allFailed, error: fetchError } = await supabase
     .from('email_queue')
     .select('*')
@@ -116,7 +116,7 @@ export async function getRetryableEmails(
  * Mark email as sending
  */
 export async function markEmailAsSending(emailId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { error } = await supabase
     .from('email_queue')
@@ -132,7 +132,7 @@ export async function markEmailAsSending(emailId: string): Promise<void> {
  * Mark email as sent
  */
 export async function markEmailAsSent(emailId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { error } = await supabase
     .from('email_queue')
@@ -155,7 +155,7 @@ export async function markEmailAsFailed(
   errorMessage: string,
   incrementRetry: boolean = true
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const updateData: any = {
     status: 'failed',

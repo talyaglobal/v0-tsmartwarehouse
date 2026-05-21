@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Booking, BookingStatus, BookingType } from '@/types'
 import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
@@ -52,7 +52,7 @@ export async function getBookings(filters?: GetBookingsOptions) {
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Optimize: Only select needed fields instead of '*'
   // Note: booking_status is business status, status is for soft delete
@@ -147,7 +147,7 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('bookings')
     .select(`
@@ -210,7 +210,7 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
 }
 
 export async function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): Promise<Booking> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Get warehouse city for booking ID generation
   const { data: warehouse } = await supabase
@@ -280,7 +280,7 @@ export async function updateBooking(
   id: string,
   updates: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>>,
 ): Promise<Booking> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateRow: Record<string, any> = {}
   if (updates.type !== undefined) updateRow.type = updates.type
@@ -329,7 +329,7 @@ export async function updateBooking(
 }
 
 export async function deleteBooking(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   // Soft delete: set status = false
   const { error } = await supabase
     .from('bookings')

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/kolaybase/server';
 import { AgreementType } from '@/features/agreements/types';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
@@ -16,7 +16,7 @@ import { join } from 'path';
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();

@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Task, TaskStatus, TaskPriority } from '@/types'
 import type { TaskFilters } from '../types'
 
@@ -8,7 +8,7 @@ import type { TaskFilters } from '../types'
  * Cached for request deduplication
  */
 export const getTasksQuery = cache(async (filters?: TaskFilters): Promise<Task[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('tasks').select('*')
 
@@ -42,7 +42,7 @@ export const getTasksQuery = cache(async (filters?: TaskFilters): Promise<Task[]
  * Cached for request deduplication
  */
 export const getTaskByIdQuery = cache(async (id: string): Promise<Task | null> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('tasks')
@@ -64,7 +64,7 @@ export const getTaskByIdQuery = cache(async (id: string): Promise<Task | null> =
  * Get tasks assigned to current user
  */
 export const getMyTasksQuery = cache(async (): Promise<Task[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const {
     data: { user },
@@ -92,7 +92,7 @@ export const getMyTasksQuery = cache(async (): Promise<Task[]> => {
  * Get task statistics
  */
 export const getTaskStatsQuery = cache(async (filters?: TaskFilters) => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('tasks').select('status, priority')
 

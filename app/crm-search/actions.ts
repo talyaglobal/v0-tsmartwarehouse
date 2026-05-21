@@ -1,6 +1,6 @@
 "use server"
 
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase/server"
+import { createAuthenticatedServerClient } from "@/lib/kolaybase/server"
 import { extractCompanyName } from "@/lib/crm-search/extractor"
 
 export async function createSearchJob(input: {
@@ -10,7 +10,7 @@ export async function createSearchJob(input: {
   exclusions: { domains: string[]; keywords: string[] }
   resultsPerQuery: number
 }) {
-  const supabase = await createAuthenticatedSupabaseClient()
+  const supabase = await createAuthenticatedServerClient()
   const {
     data: { user },
     error: authError,
@@ -58,7 +58,7 @@ export async function updateResultStatus(input: {
   resultId: string
   status: "approved" | "rejected" | "reviewed"
 }) {
-  const supabase = await createAuthenticatedSupabaseClient()
+  const supabase = await createAuthenticatedServerClient()
   const {
     data: { user },
     error: authError,

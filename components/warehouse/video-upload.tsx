@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Upload, X, Video, Link as LinkIcon, Youtube, Play } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { cn } from "@/lib/utils"
 
 interface VideoUploadProps {
@@ -25,7 +25,7 @@ function getVideoType(url: string): 'youtube' | 'vimeo' | 'file' | 'other' {
   if (url.includes('vimeo.com')) {
     return 'vimeo'
   }
-  if (url.includes('storage.googleapis.com') || url.includes('supabase')) {
+  if (url.includes('storage.googleapis.com') || url.includes('kolaybase')) {
     return 'file'
   }
   return 'other'

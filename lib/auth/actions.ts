@@ -1,6 +1,6 @@
 'use server'
 
-import { createAuthenticatedSupabaseClient, createClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAuthenticatedServerClient, createClient, createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -69,7 +69,7 @@ export async function signIn(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
-    const supabase = await createAuthenticatedSupabaseClient()
+    const supabase = await createAuthenticatedServerClient()
     const { data, error } = await supabase.auth.signInWithPassword({
       email: validation.data.email,
       password: validation.data.password,
@@ -158,12 +158,12 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     }
 
     // Use admin API to create user directly (no email sent)
-    const supabaseAdmin = createServerSupabaseClient()
-    
+    const supabaseAdmin = createServerClient()
+
     // Check if service role key is configured
-    const hasServiceRoleKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    const hasServiceRoleKey = !!process.env.KOLAYBASE_SERVICE_ROLE_KEY
     if (!hasServiceRoleKey) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured!')
+      console.error('KOLAYBASE_SERVICE_ROLE_KEY is not configured!')
       return {
         error: {
           message: 'Server configuration error. Please contact support.',
@@ -911,7 +911,7 @@ export async function resetPassword(formData: FormData): Promise<{ error?: AuthE
     }
 
     // Get user profile to determine role and redirect path
-    const supabaseAdmin = await createServerSupabaseClient()
+    const supabaseAdmin = await createServerClient()
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')

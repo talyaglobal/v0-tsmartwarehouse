@@ -3,7 +3,7 @@
  * Calculates pricing with volume discounts and membership tiers
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export interface PricingCalculation {
   basePrice: number
@@ -33,7 +33,7 @@ export async function calculatePalletPricing(
   palletCount: number,
   membershipTier?: 'bronze' | 'silver' | 'gold' | 'platinum'
 ): Promise<PricingCalculation> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Get warehouse pricing
   const { data: pricing, error } = await supabase
@@ -100,7 +100,7 @@ export async function calculateAreaRentalPricing(
   areaSqFt: number,
   membershipTier?: 'bronze' | 'silver' | 'gold' | 'platinum'
 ): Promise<PricingCalculation> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Get warehouse pricing
   const { data: pricing, error } = await supabase

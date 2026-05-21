@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getEstimateById, updateEstimate } from "@/lib/db/estimates"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
 
@@ -17,7 +17,7 @@ export async function GET(
     if (!estimate) {
       return NextResponse.json({ success: false, error: "Estimate not found", statusCode: 404 } as ErrorResponse, { status: 404 })
     }
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", authResult.user.id).maybeSingle()
     const role = profile?.role ?? authResult.user.role
     if (role !== "root" && role !== "warehouse_admin" && estimate.customerId !== authResult.user.id) {
@@ -37,7 +37,7 @@ export async function PATCH(
   try {
     const authResult = await requireAuth(request)
     if (authResult instanceof NextResponse) return authResult
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", authResult.user.id).maybeSingle()
     const role = profile?.role ?? authResult.user.role
     if (role !== "root" && role !== "warehouse_admin") {

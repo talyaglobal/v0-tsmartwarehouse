@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { getBookings } from "@/lib/db/bookings"
 import type { Booking } from "@/types"
 
@@ -37,7 +37,7 @@ export interface WarehouseOperatingHours {
 async function getWarehouseOperatingHours(
   warehouseId: string
 ): Promise<WarehouseOperatingHours> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data, error } = await supabase
     .from("warehouses")
@@ -304,7 +304,7 @@ export async function getAvailableTimeSlots(
   warehouseId: string,
   date: string
 ): Promise<TimeSlot[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get operating hours
   const operatingHours = await getWarehouseOperatingHours(warehouseId)

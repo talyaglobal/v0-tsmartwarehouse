@@ -1,14 +1,14 @@
 import { redirect } from 'next/navigation'
 import { OrderDetails } from '@/components/dashboard/order-details'
 import { fetchServiceOrderById } from '@/features/orders/lib/queries'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export default async function OrderDetailPage({
   params,
 }: {
   params: { id: string }
 }) {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

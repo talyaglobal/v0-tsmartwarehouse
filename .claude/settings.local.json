@@ -25,7 +25,9 @@
       "Bash(node scripts/check-pricing-type-enum.js:*)",
       "Bash(node scripts/fix-pricing-enum.js:*)",
       "Bash(node:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx next:*)"
     ]
   }
 }

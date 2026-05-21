@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse } from "@/types/api"
 
 /**
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
 
     // Get user profile with additional information
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, email, name, role, company_id, membership_tier, credit_balance, avatar_url')

@@ -5,9 +5,17 @@
  */
 
 const REST_URL =
-  process.env.NEXT_PUBLIC_KOLAYBASE_REST_URL || "https://api.kolaybase.com/api/rest/v1";
-const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
-const SERVICE_KEY = process.env.KOLAYBASE_SERVICE_KEY || "";
+  process.env.NEXT_PUBLIC_KOLAYBASE_REST_URL ||
+  (process.env.NEXT_PUBLIC_KOLAYBASE_URL ? process.env.NEXT_PUBLIC_KOLAYBASE_URL + "/rest/v1" : null) ||
+  "https://api.kolaybase.com/api/proxy/rest/v1";
+const ANON_KEY =
+  process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
+  process.env.ANON_KEY ||
+  "";
+const SERVICE_KEY =
+  process.env.KOLAYBASE_SERVICE_ROLE_KEY ||
+  process.env.SERVICE_KEY ||
+  "";
 
 /**
  * Get auth token for API requests

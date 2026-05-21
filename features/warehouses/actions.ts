@@ -1,7 +1,7 @@
 'use server'
 
 import { createWarehouse, updateWarehouse, getWarehouseById } from '@/lib/db/warehouses'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { revalidatePath } from 'next/cache'
 import type { Warehouse } from '@/types'
 
@@ -45,7 +45,7 @@ export async function createWarehouseAction(
   input: CreateWarehouseInput
 ): Promise<{ success: boolean; data?: Warehouse; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {
@@ -112,7 +112,7 @@ export async function updateWarehouseAction(
   input: UpdateWarehouseInput
 ): Promise<{ success: boolean; data?: Warehouse; error?: string }> {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get current user
     const {

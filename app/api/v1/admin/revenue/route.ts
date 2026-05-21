@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/kolaybase/server'
 import { getCurrentUser } from '@/lib/auth/utils'
 
 export const dynamic = 'force-dynamic'

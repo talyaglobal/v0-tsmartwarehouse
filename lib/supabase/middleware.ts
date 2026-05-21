@@ -1,7 +1,7 @@
 /**
  * Next.js middleware session handler — backed by KolayBase.
  *
- * Replaces the Supabase middleware; all session validation and role-based
+ * Replaces the legacy Supabase middleware; all session validation and role-based
  * route protection logic is preserved identically.
  */
 

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2, CheckCircle, XCircle, AlertCircle, Eye } from "@/components/icons"
 import { EyeOff } from "lucide-react"
 import { api } from "@/lib/api/client"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import Link from "next/link"
 
 export default function AcceptInvitationPage() {

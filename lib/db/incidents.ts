@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Incident, IncidentStatus, IncidentSeverity } from '@/types'
 
 /**
@@ -12,7 +12,7 @@ export async function getIncidents(filters?: {
   warehouseId?: string
   affectedBookingId?: string
 }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from('incidents').select('*')
 
   if (filters?.reportedBy) {
@@ -41,7 +41,7 @@ export async function getIncidents(filters?: {
 }
 
 export async function getIncidentById(id: string): Promise<Incident | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('incidents')
     .select('*')
@@ -59,7 +59,7 @@ export async function getIncidentById(id: string): Promise<Incident | null> {
 }
 
 export async function createIncident(incident: Omit<Incident, 'id' | 'createdAt'>): Promise<Incident> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const incidentRow = {
     type: incident.type,
@@ -93,7 +93,7 @@ export async function updateIncident(
   id: string,
   updates: Partial<Omit<Incident, 'id' | 'createdAt'>>,
 ): Promise<Incident> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateRow: Record<string, any> = {}
   if (updates.status !== undefined) updateRow.status = updates.status
@@ -116,7 +116,7 @@ export async function updateIncident(
 }
 
 export async function deleteIncident(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   // Soft delete: set status = false
   const { error } = await supabase
     .from('incidents')

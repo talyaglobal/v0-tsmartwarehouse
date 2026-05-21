@@ -4,8 +4,8 @@ import { updateWarehouse } from "@/lib/db/warehouses"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createServerClient } from "@/lib/kolaybase/server"
+import { createAdminClient } from "@/lib/kolaybase/server"
 import { generateWarehouseName } from "@/lib/utils/warehouse-name-generator"
 import { z } from "zod"
 
@@ -485,7 +485,7 @@ export async function PUT(
 
     // Update pricing entries if provided
     if (validated.pricing && validated.pricing.length > 0) {
-      const supabase = createServerSupabaseClient()
+      const supabase = createServerClient()
       
       // Delete existing pricing for this warehouse
       await supabase
@@ -516,7 +516,7 @@ export async function PUT(
     
     if (validated.palletPricing !== undefined) {
       console.log('[EDIT API] Processing pallet pricing update...')
-      const supabase = createServerSupabaseClient()
+      const supabase = createServerClient()
       
       // Get existing pallet pricing IDs to delete related records
       const { data: existingPalletPricing, error: fetchError } = await supabase
@@ -735,7 +735,7 @@ export async function PUT(
     }
 
     if (validated.floorPlans) {
-      const supabaseFloors = createServerSupabaseClient()
+      const supabaseFloors = createServerClient()
       const { data: existingFloors } = await supabaseFloors
         .from('warehouse_floors')
         .select('id')

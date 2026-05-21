@@ -11,7 +11,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell"
 import { RealtimeNotificationToast } from "@/components/notifications/realtime-notification-toast"
 import type { UserRole } from "@/types"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 
 const ROOT_ROLE_SELECTOR_KEY = 'root-role-selector'
 

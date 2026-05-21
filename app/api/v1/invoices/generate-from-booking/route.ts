@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { generateBookingInvoice } from "@/lib/business-logic/invoices"
 import { getBookingById } from "@/lib/db/bookings"
 import { getInvoices } from "@/lib/db/invoices"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse } from "@/types/api"
 
 /**
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's membership tier (if any)
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('membership_tier')

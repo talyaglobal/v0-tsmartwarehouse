@@ -5,7 +5,7 @@
  * header, resolves the role from the profiles table, and returns the user
  * object (or a 401 NextResponse on failure).
  *
- * All named exports are identical to the previous Supabase version so every
+ * All named exports are identical to the previous KolayBase version so every
  * API route continues to work without changes.
  */
 
@@ -16,7 +16,7 @@ import { createMiddlewareClient } from "@/lib/kolaybase/server";
 
 /**
  * Get the authenticated user from the request.
- * Reads the KB / Supabase access token from request cookies.
+ * Reads the KolayBase access token from request cookies.
  */
 export async function getAuthUser(request: NextRequest) {
   try {

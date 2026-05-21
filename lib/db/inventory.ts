@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_PREFIXES, CACHE_TTL } from '@/lib/cache/redis'
 
 /**
@@ -118,7 +118,7 @@ export async function getInventoryItems(filters?: GetInventoryOptions) {
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase
     .from('inventory_items')
     .select('*')
@@ -175,7 +175,7 @@ export async function getInventoryItemById(id: string) {
     return cached
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('inventory_items')
     .select('*')
@@ -195,7 +195,7 @@ export async function getInventoryItemById(id: string) {
 }
 
 export async function searchInventoryByCode(code: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Search by pallet_id, barcode, qr_code, or warehouse_tracking_number
   const { data, error } = await supabase
@@ -224,7 +224,7 @@ export async function searchInventoryByCode(code: string) {
 }
 
 export async function createInventoryItem(item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase
     .from('inventory_items')
@@ -250,7 +250,7 @@ export async function updateInventoryItem(
   id: string,
   updates: Partial<Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>>
 ) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateData: any = { ...updates }
   
@@ -283,7 +283,7 @@ export async function updateInventoryItem(
 }
 
 export async function createInventoryMovement(movement: Omit<InventoryMovement, 'id' | 'created_at'>) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase
     .from('inventory_movements')
@@ -307,7 +307,7 @@ export async function createInventoryMovement(movement: Omit<InventoryMovement, 
 }
 
 export async function getInventoryMovements(itemId: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase
     .from('inventory_movements')
@@ -323,7 +323,7 @@ export async function getInventoryMovements(itemId: string) {
 }
 
 export async function getInventoryStats(warehouseId?: string, hallId?: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('inventory_items')
@@ -385,7 +385,7 @@ export async function getInventoryByCustomerLot(
   batchNumber?: string,
   customerId?: string
 ) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase
     .from('inventory_items')
     .select('*')
@@ -436,7 +436,7 @@ export async function calculateStorageDuration(itemId: string) {
  * Get customer stock levels
  */
 export async function getCustomerStockLevels(customerId: string, warehouseId?: string) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('customer_stock_levels')

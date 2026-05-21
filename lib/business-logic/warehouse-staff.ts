@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { getBookings, getBookingById, updateBooking } from "@/lib/db/bookings"
 import type { Booking, BookingStatus } from "@/types"
 
@@ -26,7 +26,7 @@ export interface WarehouseStaffAssignment {
 export async function getWarehouseStaffWarehouses(
   staffId: string
 ): Promise<WarehouseStaffAssignment[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data, error } = await supabase
     .from("warehouse_staff")

@@ -18,7 +18,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     const smtpFromName = process.env.SMTP_FROM_NAME || 'Warebnb'
 
     if (!smtpHost || !smtpUser || !smtpPassword) {
-      const missingVars = []
+      const missingVars: string[] = []
       if (!smtpHost) missingVars.push('SMTP_HOST')
       if (!smtpUser) missingVars.push('SMTP_USER')
       if (!smtpPassword) missingVars.push('SMTP_PASSWORD')

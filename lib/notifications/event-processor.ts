@@ -3,7 +3,7 @@
  * Processes notification events from the queue and creates notifications
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import { getNotificationService } from './service'
 import type { EventPayload } from '@/lib/events/types'
 
@@ -22,7 +22,7 @@ export interface ProcessedEvent {
 export async function processNotificationEvent(
   eventId: string
 ): Promise<ProcessedEvent> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   let event: any = null
 
@@ -451,7 +451,7 @@ async function buildNotificationOptions(
 export async function processPendingEvents(
   batchSize: number = 10
 ): Promise<ProcessedEvent[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Fetch pending events
   const { data: events, error } = await supabase

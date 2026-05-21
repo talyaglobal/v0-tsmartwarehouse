@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { Payment, PaymentTransaction, Refund, PaymentStatus, RefundStatus, PaymentRemaining } from "@/types"
 
 /**
@@ -10,7 +10,7 @@ export async function getPayments(filters?: {
   invoiceId?: string
   status?: PaymentStatus
 }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from("payments").select("*")
 
   if (filters?.customerId) {
@@ -33,7 +33,7 @@ export async function getPayments(filters?: {
 }
 
 export async function getPaymentById(id: string): Promise<Payment | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from("payments")
     .select("*")
@@ -53,7 +53,7 @@ export async function getPaymentById(id: string): Promise<Payment | null> {
 export async function createPayment(
   payment: Omit<Payment, "id" | "createdAt" | "updatedAt">
 ): Promise<Payment> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const paymentRow = {
     invoice_id: payment.invoiceId,
@@ -86,7 +86,7 @@ export async function updatePayment(
   id: string,
   updates: Partial<Omit<Payment, "id" | "createdAt">>
 ): Promise<Payment> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const updateRow: Record<string, any> = {}
   if (updates.status !== undefined) updateRow.status = updates.status
@@ -117,7 +117,7 @@ export async function getPaymentTransactions(filters?: {
   paymentId?: string
   type?: "payment" | "refund" | "credit_adjustment"
 }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from("payment_transactions").select("*")
 
   if (filters?.paymentId) {
@@ -139,7 +139,7 @@ export async function getPaymentTransactions(filters?: {
 export async function createPaymentTransaction(
   transaction: Omit<PaymentTransaction, "id" | "createdAt">
 ): Promise<PaymentTransaction> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const transactionRow = {
     payment_id: transaction.paymentId,
@@ -173,7 +173,7 @@ export async function getRefunds(filters?: {
   invoiceId?: string
   status?: RefundStatus
 }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from("refunds").select("*")
 
   if (filters?.customerId) {
@@ -199,7 +199,7 @@ export async function getRefunds(filters?: {
 }
 
 export async function getRefundById(id: string): Promise<Refund | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from("refunds")
     .select("*")
@@ -217,7 +217,7 @@ export async function getRefundById(id: string): Promise<Refund | null> {
 }
 
 export async function createRefund(refund: Omit<Refund, "id" | "createdAt">): Promise<Refund> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const refundRow = {
     payment_id: refund.paymentId,
@@ -249,7 +249,7 @@ export async function updateRefund(
   id: string,
   updates: Partial<Omit<Refund, "id" | "createdAt">>
 ): Promise<Refund> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const updateRow: Record<string, any> = {}
   if (updates.status !== undefined) updateRow.status = updates.status
@@ -275,7 +275,7 @@ export async function updateRefund(
  * Credit Balance Management
  */
 export async function getCustomerCreditBalance(customerId: string): Promise<number> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from("users")
     .select("credit_balance")
@@ -293,7 +293,7 @@ export async function updateCustomerCreditBalance(
   customerId: string,
   amount: number
 ): Promise<number> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Use the database function to update credit balance
   const { data, error } = await supabase.rpc("update_customer_credit_balance", {
@@ -365,7 +365,7 @@ function transformRefundRow(row: any): Refund {
  * Get customer payment remaining (unpaid invoice amounts)
  */
 export async function getCustomerPaymentRemaining(customerId: string): Promise<number> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase.rpc('get_customer_payment_remaining', {
     p_customer_id: customerId,
@@ -382,7 +382,7 @@ export async function getCustomerPaymentRemaining(customerId: string): Promise<n
  * Get customer payment summary
  */
 export async function getCustomerPaymentSummary(customerId: string): Promise<PaymentRemaining> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase.rpc('get_customer_payment_summary', {
     p_customer_id: customerId,

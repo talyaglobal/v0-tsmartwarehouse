@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { formatCurrency, formatNumber } from "@/lib/utils/format"
 import { formatGoodsType } from "@/lib/constants/warehouse-types"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 
 interface Warehouse {
   id: string

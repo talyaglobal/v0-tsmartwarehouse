@@ -25,7 +25,7 @@ export default async function WarehouseDetailPage({ params, searchParams }: Page
   }
 
   // Get availability if dates provided
-  let availability = null
+  let availability: any = null
   if (search.start_date && search.end_date) {
     availability = await getAvailabilityCalendar(
       id,

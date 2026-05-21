@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { AccessLog, AccessLogVisitorType, AccessLogStatus } from '@/types'
 
 /**
@@ -19,7 +19,7 @@ export interface AccessLogFilters {
 }
 
 export async function getAccessLogs(filters?: AccessLogFilters): Promise<AccessLog[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase.from('access_logs').select('*')
 
   if (filters?.visitorType) {
@@ -79,7 +79,7 @@ export async function getAccessLogs(filters?: AccessLogFilters): Promise<AccessL
 }
 
 export async function getAccessLogById(id: string): Promise<AccessLog | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from('access_logs')
     .select('*')
@@ -99,7 +99,7 @@ export async function getAccessLogById(id: string): Promise<AccessLog | null> {
 export async function createAccessLog(
   accessLog: Omit<AccessLog, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<AccessLog> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const accessLogRow = {
     visitor_type: accessLog.visitorType,
@@ -145,7 +145,7 @@ export async function updateAccessLog(
   id: string,
   updates: Partial<Omit<AccessLog, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<AccessLog> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const updateRow: Record<string, any> = {}
   
@@ -193,7 +193,7 @@ export async function checkOutAccessLog(
   exitTime: string,
   checkedOutBy: string
 ): Promise<AccessLog> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data, error } = await supabase
     .from('access_logs')
@@ -214,7 +214,7 @@ export async function checkOutAccessLog(
 }
 
 export async function deleteAccessLog(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { error } = await supabase
     .from('access_logs')
     .delete()

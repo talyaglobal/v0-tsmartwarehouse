@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth/api-middleware'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/kolaybase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 /**
  * GET /api/v1/client-teams/[companyId]/corporate-companies
@@ -17,7 +17,7 @@ export async function GET(
     if (authResult instanceof NextResponse) return authResult
 
     const { companyId } = await params
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     const { data: profile } = await supabase
       .from('profiles')

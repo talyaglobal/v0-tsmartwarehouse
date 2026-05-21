@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -47,7 +47,7 @@ export async function PATCH(
       }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     
     const updates: Record<string, any> = {}
     

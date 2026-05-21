@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { PRICING } from "@/lib/constants"
 import { getBookingById } from "@/lib/db/bookings"
 import { createInvoice, getInvoices } from "@/lib/db/invoices"
@@ -213,7 +213,7 @@ export async function generateMonthlyStorageInvoice(
   }
 
   // Calculate storage cost using warehouse-specific pricing
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let storagePerPalletPerMonth: number
   let membershipDiscountPercent = 0
 
@@ -387,7 +387,7 @@ export async function generateMonthlyInvoicesForActiveBookings(): Promise<{
   generated: number
   errors: string[]
 }> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get all active pallet bookings
   const { data: bookings, error } = await supabase

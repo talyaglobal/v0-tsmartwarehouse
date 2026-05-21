@@ -2,14 +2,14 @@
  * Database operations for audit logging
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { CreateAuditLogParams, AuditLog } from '@/lib/audit/types'
 
 /**
  * Create an audit log entry in the database
  */
 export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get user's company_id from profile
   let companyId: string | null = null
@@ -87,7 +87,7 @@ export async function getAuditLogs(filters: {
   limit?: number
   offset?: number
 } = {}): Promise<AuditLog[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let query = supabase
     .from('audit_logs')
     .select('*')
@@ -157,7 +157,7 @@ export async function getAuditLogs(filters: {
  * Get audit log by ID
  */
 export async function getAuditLogById(id: string): Promise<AuditLog | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data, error } = await supabase
     .from('audit_logs')

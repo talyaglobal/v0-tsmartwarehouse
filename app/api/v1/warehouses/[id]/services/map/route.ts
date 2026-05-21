@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse } from "@/types/api"
 import { z } from "zod"
 
@@ -28,7 +28,7 @@ export async function POST(
     const { user } = authResult
 
     const { id: warehouseId } = await params
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get user's company
     const { data: profile } = await supabase

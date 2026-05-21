@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
-import { createServerSupabaseClient, createAuthenticatedSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient, createAuthenticatedServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse } from "@/types/api"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     if (!body.isGuest) {
       // Use authenticated client to read user session from cookies
-      const authSupabase = await createAuthenticatedSupabaseClient()
+      const authSupabase = await createAuthenticatedServerClient()
       const { data: { user }, error: authError } = await authSupabase.auth.getUser()
 
       console.log('[create-intent] Auth check:', {
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         userId = user.id
 
         // Get user's name from profile
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createServerClient()
         const { data: profile } = await supabase
           .from('profiles')
           .select('name')
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check warehouse availability before proceeding
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: warehouse, error: warehouseError } = await supabase
       .from('warehouses')
       .select('available_pallet_storage, available_sq_ft, city')

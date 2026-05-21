@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { checkPalletCapacity, checkAreaRentalCapacity, reserveCapacity } from "./capacity"
 import { calculatePalletPricing, calculateAreaRentalPricing } from "./pricing"
 import { getBookings, getBookingById, createBooking, updateBooking } from "@/lib/db/bookings"
@@ -147,7 +147,7 @@ export async function createBookingWithAvailability(
  * Confirm a booking and reserve capacity
  */
 export async function confirmBooking(bookingId: string): Promise<Booking> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get booking
   const { data: bookingData, error: bookingError } = await supabase
@@ -231,7 +231,7 @@ export async function activateBooking(bookingId: string): Promise<Booking> {
  * Complete a booking and release capacity
  */
 export async function completeBooking(bookingId: string): Promise<Booking> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get booking
   const { data: bookingData, error: bookingError } = await supabase
@@ -275,7 +275,7 @@ export async function completeBooking(bookingId: string): Promise<Booking> {
  * Cancel a booking and release capacity
  */
 export async function cancelBooking(bookingId: string): Promise<Booking> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get booking
   const { data: bookingData, error: bookingError } = await supabase
@@ -477,7 +477,7 @@ export async function createBookingOnBehalf(
   const result = await createBookingWithAvailability(input)
 
   // Step 4: Update booking with on-behalf information
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   await supabase
     .from("bookings")
     .update({

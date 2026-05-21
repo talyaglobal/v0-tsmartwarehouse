@@ -3,7 +3,7 @@
  * Tracks booking usage for pro-rata billing
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export interface UsagePeriod {
   id: string
@@ -27,7 +27,7 @@ export async function trackBookingUsage(
   palletCount?: number,
   areaSqFt?: number
 ): Promise<UsagePeriod> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Calculate daily usage
   const dailyUsage: Record<string, { palletCount?: number; areaSqFt?: number }> =
@@ -84,7 +84,7 @@ export async function updateDailyUsage(
   palletCount?: number,
   areaSqFt?: number
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Find the usage period for this date
   const dateStr = date.toISOString().split('T')[0]
@@ -126,7 +126,7 @@ export async function updateDailyUsage(
 export async function getBookingUsagePeriods(
   bookingId: string
 ): Promise<UsagePeriod[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('booking_usage_periods')

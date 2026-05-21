@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
 import { z } from "zod"
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { user } = authResult
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get user profile to check role and company
     const { data: profile } = await supabase
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { user } = authResult
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get user profile to check role and company
     const { data: profile } = await supabase
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build location geography if lat/lng provided
-    let locationValue = null
+    let locationValue: string | null = null
     if (validatedData.latitude !== undefined && validatedData.longitude !== undefined) {
       locationValue = `POINT(${validatedData.longitude} ${validatedData.latitude})`
     }

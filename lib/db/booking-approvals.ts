@@ -3,7 +3,7 @@
  * Handles approval workflow for on-behalf bookings
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { BookingApproval, BookingApprovalStatus } from '@/types'
 
 // =====================================================
@@ -23,7 +23,7 @@ interface GetApprovalsOptions {
  * Get approvals with optional filters
  */
 export async function getApprovals(filters?: GetApprovalsOptions): Promise<BookingApproval[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   let query = supabase
     .from('booking_approvals')
     .select(`
@@ -92,7 +92,7 @@ export async function getApprovals(filters?: GetApprovalsOptions): Promise<Booki
  * Get approval by booking ID
  */
 export async function getApprovalByBookingId(bookingId: string): Promise<BookingApproval | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('booking_approvals')
@@ -126,7 +126,7 @@ export async function getApprovalByBookingId(bookingId: string): Promise<Booking
  * Get pending approvals for a user (as customer who needs to approve)
  */
 export async function getPendingApprovalsForUser(userId: string): Promise<BookingApproval[]> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('booking_approvals')
@@ -171,7 +171,7 @@ export async function createApprovalRequest(
   requestMessage?: string,
   expiresAt?: string
 ): Promise<BookingApproval> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // First, update the booking to mark it as requiring approval
   const { error: bookingError } = await supabase
@@ -229,7 +229,7 @@ export async function approveBooking(
   respondedByName: string,
   responseMessage?: string
 ): Promise<BookingApproval> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Update approval record
   const { data, error } = await supabase
@@ -279,7 +279,7 @@ export async function rejectBooking(
   respondedByName: string,
   responseMessage?: string
 ): Promise<BookingApproval> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Update approval record
   const { data, error } = await supabase
@@ -331,7 +331,7 @@ export async function getApprovalStats(userId: string): Promise<{
   approvedCount: number
   rejectedCount: number
 }> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Get pending approvals where user is the customer
   // First, get the user's booking IDs

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { getEstimates, createEstimate } from "@/lib/db/estimates"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import type { ErrorResponse } from "@/types/api"
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth(request)
     if (authResult instanceof NextResponse) return authResult
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", authResult.user.id).maybeSingle()
     const role = profile?.role ?? authResult.user.role
     if (role !== "root" && role !== "warehouse_admin") {

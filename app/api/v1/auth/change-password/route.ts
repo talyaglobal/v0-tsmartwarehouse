@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     await verifyClient.auth.signOut()
 
     // Use Admin API to update password (since we already verified current password)
-    const supabaseAdmin = createServerSupabaseClient()
+    const supabaseAdmin = createServerClient()
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
       { password: newPassword }

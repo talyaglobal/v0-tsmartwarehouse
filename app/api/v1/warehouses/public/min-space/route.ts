@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/kolaybase/server'
 
 /**
  * GET /api/v1/warehouses/public/min-space

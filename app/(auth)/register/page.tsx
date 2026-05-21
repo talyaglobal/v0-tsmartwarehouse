@@ -18,7 +18,7 @@ import { signUp } from "@/lib/auth/actions"
 import { acceptInvitation } from "@/features/companies/actions"
 import { useUIStore } from "@/stores/ui.store"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 
 const roles = [
   {

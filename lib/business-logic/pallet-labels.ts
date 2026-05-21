@@ -34,10 +34,10 @@ export async function generatePalletLabelData(
   await getWarehouseById(item.warehouse_id)
 
   // Fetch full location hierarchy
-  let floor = null
-  let region = null
-  let hall = null
-  let zone = null
+  let floor: any = null
+  let region: any = null
+  let hall: any = null
+  let zone: any = null
 
   if (item.floor_id) {
     const floorData = await getWarehouseFloorById(item.floor_id)

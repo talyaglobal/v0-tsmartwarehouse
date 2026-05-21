@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { TeamList } from "@/features/teams/components/team-list"
 import { useUser } from "@/lib/hooks/use-user"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { Loader2 } from "@/components/icons"
 
 export default function TeamsPage() {

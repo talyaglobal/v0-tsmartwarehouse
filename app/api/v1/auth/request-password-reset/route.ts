@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { sendEmail } from "@/lib/email/nodemailer"
 import { getPasswordResetEmailTemplate } from "@/lib/email/templates/password-reset"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     
     // First check profiles table (much faster than listing all users)
     // This is more efficient as it uses indexed email column

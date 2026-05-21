@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
       // If user is company admin, they can see invoices of users in their company
       if (isAdmin && userCompanyId) {
         // Verify the requested customerId belongs to the same company
-        const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-        const supabase = createServerSupabaseClient()
+        const { createServerClient } = await import('@/lib/kolaybase/server')
+        const supabase = createServerClient()
         const { data: customerProfile } = await supabase
           .from('profiles')
           .select('company_id')

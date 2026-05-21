@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/kolaybase/client";
 // RealtimeChannel aliased to any — using KolayBase channel stubs
 type RealtimeChannel = any;
 import type { Notification } from "@/types";

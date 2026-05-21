@@ -50,8 +50,8 @@ export async function POST(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -131,8 +131,8 @@ export async function DELETE(
       return NextResponse.json(errorData, { status: 404 })
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')

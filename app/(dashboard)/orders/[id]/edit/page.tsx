@@ -3,10 +3,10 @@ import { OrderForm } from "@/components/dashboard/order-form";
 import { fetchServiceOrderById } from "@/features/orders/lib/queries";
 import { fetchServices } from "@/features/services/lib/queries";
 import { getBookings } from "@/lib/db/bookings";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 
 export default async function EditOrderPage({ params }: { params: { id: string } }) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

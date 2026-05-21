@@ -12,7 +12,7 @@ import { PlacesAutocomplete } from "@/components/ui/places-autocomplete"
 import { MapLocationPicker } from "@/components/ui/map-location-picker"
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { useUIStore } from "@/stores/ui.store"
 
 /** Normalize a single address component from classic (long_name) or new API (longText) format */

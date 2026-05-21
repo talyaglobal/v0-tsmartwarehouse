@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 import type { ErrorResponse } from "@/types/api";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
   const paymentType = paymentIntent.metadata?.payment_type;
   const isDeposit = paymentType === "deposit";
   const isCheckoutRemaining = paymentType === "checkout_remaining";
@@ -167,7 +167,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 }
 
 async function handlePaymentIntentPaymentFailed(paymentIntent: Stripe.PaymentIntent) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
 
   // Find booking by payment_intent_id
   const { data: booking, error: fetchError } = await supabase
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
     // TOCTOU race window under concurrent re-deliveries of the same event.
     // If the row already exists (UNIQUE constraint on stripe_event_id), the
     // insert is a no-op and `count` will be 0, signalling a duplicate.
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { count, error: insertError } = await supabase
       .from("stripe_webhook_events")
       .upsert(

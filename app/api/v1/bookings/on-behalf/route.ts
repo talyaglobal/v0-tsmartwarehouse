@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { createBookingOnBehalf } from "@/lib/business-logic/bookings"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
 import type { BookingType, MembershipTier } from "@/types"
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get customer info
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: customerProfile, error: customerError } = await supabase
       .from("profiles")
       .select("name, email, membership_tier")

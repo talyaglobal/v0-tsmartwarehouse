@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { AppointmentType } from '@/types'
 
 /**
@@ -6,7 +6,7 @@ import type { AppointmentType } from '@/types'
  */
 
 export async function getAppointmentTypes(includeInactive = false): Promise<AppointmentType[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('appointment_types')
@@ -27,7 +27,7 @@ export async function getAppointmentTypes(includeInactive = false): Promise<Appo
 }
 
 export async function getAppointmentTypeById(id: string): Promise<AppointmentType | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase
     .from('appointment_types')
@@ -56,7 +56,7 @@ export async function createAppointmentType(data: {
   isActive?: boolean
   createdBy: string
 }): Promise<AppointmentType> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: appointmentType, error } = await supabase
     .from('appointment_types')
@@ -94,7 +94,7 @@ export async function updateAppointmentType(
     isActive?: boolean
   }
 ): Promise<AppointmentType> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateData: Record<string, any> = {}
   if (data.name !== undefined) updateData.name = data.name

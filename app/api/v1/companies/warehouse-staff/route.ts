@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(errorData, { status: 403 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get user's company_id
     const { data: profile, error: profileError } = await supabase

@@ -1,10 +1,10 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 /**
  * Check if user is Root (System Admin)
  */
 export async function isRoot(userId: string): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -35,7 +35,7 @@ export async function isRoot(userId: string): Promise<boolean> {
  * Check if user is Company Admin
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('profiles')
@@ -56,7 +56,7 @@ export async function isCompanyAdmin(userId: string, companyId?: string): Promis
  * Check if user is Warehouse Staff
  */
 export async function isWarehouseStaff(userId: string, companyId?: string): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('profiles')
@@ -77,7 +77,7 @@ export async function isWarehouseStaff(userId: string, companyId?: string): Prom
  * Check if user is Warehouse Client (Customer)
  */
 export async function isWarehouseClient(userId: string, companyId?: string): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('profiles')
@@ -100,7 +100,7 @@ export async function isWarehouseClient(userId: string, companyId?: string): Pro
  * Other users can only access their own company's data
  */
 export async function canAccessCompanyData(userId: string, targetCompanyId: string): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Get user's profile
   const { data: userProfile, error: profileError } = await supabase
@@ -133,7 +133,7 @@ export async function canAccessCompanyData(userId: string, targetCompanyId: stri
  * Get System Company ID
  */
 export async function getSystemCompanyId(): Promise<string | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: company, error } = await supabase
     .from('companies')
@@ -152,7 +152,7 @@ export async function getSystemCompanyId(): Promise<string | null> {
  * Get user's company ID
  */
 export async function getUserCompanyId(userId: string): Promise<string | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: profile, error } = await supabase
     .from('profiles')

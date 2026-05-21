@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Eye, EyeOff } from "@/components/icons"
 import { resetPassword } from "@/lib/auth/actions"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import { useUIStore } from "@/stores/ui.store"
 
 export default function ResetPasswordPage() {

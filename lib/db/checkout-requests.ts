@@ -2,7 +2,7 @@
  * Pallet checkout requests: remaining payment before check-out
  */
 
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 
 export interface PalletCheckoutRequest {
   id: string
@@ -27,7 +27,7 @@ export async function createCheckoutRequest(params: {
   createdBy: string
   metadata?: Record<string, unknown>
 }): Promise<PalletCheckoutRequest> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from("pallet_checkout_requests")
     .insert({
@@ -48,7 +48,7 @@ export async function createCheckoutRequest(params: {
 }
 
 export async function getCheckoutRequestsByBookingId(bookingId: string): Promise<PalletCheckoutRequest[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from("pallet_checkout_requests")
     .select("*")
@@ -63,7 +63,7 @@ export async function getCheckoutRequestsForWarehouse(options: {
   warehouseId: string
   status?: "pending_payment" | "paid" | "completed"
 }): Promise<PalletCheckoutRequest[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   let q = supabase
     .from("pallet_checkout_requests")
     .select("*")
@@ -78,7 +78,7 @@ export async function getCheckoutRequestsForWarehouse(options: {
 }
 
 export async function getCheckoutRequestById(id: string): Promise<PalletCheckoutRequest | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { data, error } = await supabase
     .from("pallet_checkout_requests")
     .select("*")
@@ -90,7 +90,7 @@ export async function getCheckoutRequestById(id: string): Promise<PalletCheckout
 }
 
 export async function markCheckoutRequestPaid(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { error } = await supabase
     .from("pallet_checkout_requests")
     .update({ status: "paid", paid_at: new Date().toISOString() })
@@ -100,7 +100,7 @@ export async function markCheckoutRequestPaid(id: string): Promise<void> {
 }
 
 export async function markCheckoutRequestCompleted(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { error } = await supabase
     .from("pallet_checkout_requests")
     .update({ status: "completed" })

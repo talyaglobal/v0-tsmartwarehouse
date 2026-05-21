@@ -50,8 +50,8 @@ export async function PUT(
     const { user } = authResult
 
     // Check if user is root admin
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -121,8 +121,8 @@ export async function DELETE(
     const { user } = authResult
 
     // Check if user is root admin
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')

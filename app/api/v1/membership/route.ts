@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { getInvoices } from "@/lib/db/invoices"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { calculateMembershipTierFromSpend, getMembershipTierInfoFromSpend } from "@/lib/business-logic/membership"
 import { isMembershipProgramEnabled } from "@/lib/business-logic/membership"
 import type { ErrorResponse } from "@/types/api"
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
     const { user } = authResult
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     // Get user profile for credit balance and member since date
     const { data: profile, error: profileError } = await supabase

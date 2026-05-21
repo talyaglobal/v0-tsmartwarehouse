@@ -252,7 +252,7 @@ export async function POST(
 
     // Check if user exists in auth by listing users (with pagination support)
     // Note: listUsers() may not return all users if there are many, but we'll try to find the user
-    let existingAuthUser = null
+    let existingAuthUser: any = null
     const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
     
     if (!listError && existingUsers?.users) {
@@ -468,8 +468,8 @@ export async function POST(
     }
 
     // Get the created/updated member data with retry logic
-    let member = null
-    let memberFetchError = null
+    let member: any = null
+    let memberFetchError: any = null
     
     // Retry up to 3 times with increasing delays
     for (let attempt = 0; attempt < 3; attempt++) {

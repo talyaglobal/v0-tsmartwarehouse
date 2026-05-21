@@ -4,7 +4,7 @@
  * Handles review CRUD operations and review summary updates
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Review, ReviewSummary } from '@/types/marketplace'
 
 /**
@@ -15,7 +15,7 @@ export async function getWarehouseReviews(
   limit = 10,
   offset = 0
 ): Promise<{ reviews: Review[]; total: number }> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data: reviews, error, count } = await supabase
@@ -77,7 +77,7 @@ export async function getWarehouseReviews(
  * Get review summary for a warehouse
  */
 export async function getReviewSummary(warehouseId: string): Promise<ReviewSummary | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data: summary, error } = await supabase
@@ -118,7 +118,7 @@ export async function getReviewSummary(warehouseId: string): Promise<ReviewSumma
  * Create a review
  */
 export async function createReview(review: Partial<Review>): Promise<Review | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data, error } = await supabase
@@ -184,7 +184,7 @@ export async function updateHostResponse(
   reviewId: string,
   response: string
 ): Promise<Review | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     const { data, error } = await supabase

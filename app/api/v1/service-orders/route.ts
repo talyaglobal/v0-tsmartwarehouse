@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
     const bookingId = searchParams.get("bookingId")
 
     // Get user role from profiles table for accurate role checking
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user profile for customer name
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, name, email')

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { getUserCompanyId } from "@/lib/auth/company-admin"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createServerClient } from "@/lib/kolaybase/server"
+import { createAdminClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse, ApiResponse, ListResponse } from "@/types/api"
 import { handleApiError } from "@/lib/utils/logger"
 
@@ -49,7 +49,7 @@ const floorPlanSchema = z.object({
 
 const floorPlansSchema = z.array(floorPlanSchema)
 
-const ensureWarehouseAccess = async (supabase: ReturnType<typeof createServerSupabaseClient>, warehouseId: string, user: { id: string; role: string }) => {
+const ensureWarehouseAccess = async (supabase: ReturnType<typeof createServerClient>, warehouseId: string, user: { id: string; role: string }) => {
   if (user.role === "root") return true
   const userCompanyId = await getUserCompanyId(user.id)
   if (!userCompanyId) return false
@@ -70,7 +70,7 @@ export async function GET(
     const authResult = await requireAuth(request)
     if (authResult instanceof NextResponse) return authResult
     const { user } = authResult
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const resolvedParams = await Promise.resolve(params)
 
     const hasAccess = await ensureWarehouseAccess(supabase, resolvedParams.id, user)
@@ -121,7 +121,7 @@ export async function POST(
     const authResult = await requireAuth(request)
     if (authResult instanceof NextResponse) return authResult
     const { user } = authResult
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
     const resolvedParams = await Promise.resolve(params)
 

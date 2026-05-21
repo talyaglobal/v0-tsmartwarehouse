@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/kolaybase/client'
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import type { UserRole } from '@/types'
 import type { AuthUser } from '@/lib/auth/utils'
@@ -29,23 +29,23 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
-  const [supabase, setSupabase] = useState<any>(null)
+  const [supabase, setSupabase] = useState<any>(null) // KolayBase client instance
   const [isRoot, setIsRoot] = useState<boolean>(false)
 
-  // Lazy initialize Supabase client only in useEffect (client-side only)
+  // Lazy initialize KolayBase client only in useEffect (client-side only)
   // This prevents it from being called during static generation
   useEffect(() => {
-    // Check if Supabase environment variables are available
-    const hasSupabaseConfig = !!(
-      process.env.NEXT_PUBLIC_SUPABASE_URL && 
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    // Check if KolayBase environment variables are available
+    const hasKolaybaseConfig = !!(
+      process.env.NEXT_PUBLIC_KOLAYBASE_URL &&
+      process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY
     )
 
-    if (hasSupabaseConfig) {
+    if (hasKolaybaseConfig) {
       try {
         setSupabase(createClient())
       } catch (error) {
-        console.warn('Failed to initialize Supabase client:', error)
+        console.warn('Failed to initialize KolayBase client:', error)
         setSupabase(null)
       }
     } else {
@@ -150,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase]) // Run when supabase is initialized
+  }, [supabase]) // Run when KolayBase client is initialized
 
   return (
     <AuthContext.Provider value={{ user, loading, refresh, signOut, isRoot, setRoleOverride }}>

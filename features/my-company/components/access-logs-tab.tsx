@@ -8,7 +8,7 @@ import { Loader2, Search } from "@/components/icons"
 import { Input } from "@/components/ui/input"
 import { formatDateTime } from "@/lib/utils/format"
 import { useUser } from "@/lib/hooks/use-user"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import type { AuditLog } from "@/lib/audit/types"
 
 export function AccessLogsTab() {

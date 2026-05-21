@@ -11,7 +11,7 @@
 
 import { KolaybaseClient } from "./client";
 
-const SERVICE_KEY = process.env.KOLAYBASE_SERVICE_KEY || "";
+const SERVICE_KEY = process.env.KOLAYBASE_SERVICE_ROLE_KEY || "";
 const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
 
 // ---------------------------------------------------------------------------
@@ -26,11 +26,11 @@ const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
 export function createServerClient(): KolaybaseClient {
   if (!SERVICE_KEY && !ANON_KEY) {
     throw new Error(
-      "Missing KolayBase credentials. Set KOLAYBASE_SERVICE_KEY or NEXT_PUBLIC_KOLAYBASE_ANON_KEY."
+      "Missing KolayBase credentials. Set KOLAYBASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_KOLAYBASE_ANON_KEY."
     );
   }
   const token = SERVICE_KEY || ANON_KEY;
-  const auth = new KolaybaseServerAuth(token);
+  const auth = new KolaybaseServerAuth(token) as any;
   return new KolaybaseClient(auth, token);
 }
 
@@ -71,7 +71,7 @@ export async function createAuthenticatedServerClient(): Promise<KolaybaseClient
   }
 
   const token = userToken || SERVICE_KEY || ANON_KEY;
-  const auth = new KolaybaseServerAuth(token);
+  const auth = new KolaybaseServerAuth(token) as any;
   return new KolaybaseClient(auth, token);
 }
 
@@ -88,7 +88,7 @@ export function createMiddlewareClient(request: {
     null;
 
   const token = userToken || ANON_KEY;
-  const auth = new KolaybaseServerAuth(token);
+  const auth = new KolaybaseServerAuth(token) as any;
   return new KolaybaseClient(auth, token);
 }
 
@@ -103,10 +103,10 @@ export function createMiddlewareClient(request: {
 export function createAdminClient(): KolaybaseClient {
   if (!SERVICE_KEY) {
     throw new Error(
-      "Missing KOLAYBASE_SERVICE_KEY environment variable. Admin operations require the service key."
+      "Missing KOLAYBASE_SERVICE_ROLE_KEY environment variable. Admin operations require the service key."
     );
   }
-  const auth = new KolaybaseServerAuth(SERVICE_KEY);
+  const auth = new KolaybaseServerAuth(SERVICE_KEY) as any;
   return new KolaybaseClient(auth, SERVICE_KEY);
 }
 
@@ -134,12 +134,13 @@ class KolaybaseServerAuth {
       return { data: { user: null }, error: null };
     }
 
-    const apiBase = process.env.NEXT_PUBLIC_KOLAYBASE_URL || "https://api.kolaybase.com";
+    const keycloakUrl = process.env.NEXT_PUBLIC_KEYCLOAK_URL || process.env.KEYCLOAK_URL || "https://auth.kolaybase.com";
+    const realm = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || process.env.KEYCLOAK_REALM || "kb-warebnb_dev";
+    const userinfoUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/userinfo`;
 
     try {
-      const response = await fetch(`${apiBase}/api/rest/v1/auth/user`, {
+      const response = await fetch(userinfoUrl, {
         headers: {
-          apikey: ANON_KEY,
           Authorization: `Bearer ${this.token}`,
         },
       });
@@ -148,7 +149,15 @@ class KolaybaseServerAuth {
         return { data: { user: null }, error: { message: "Invalid session" } };
       }
 
-      const user = await response.json();
+      const claims = await response.json();
+      const user = {
+        id: claims.sub,
+        email: claims.email || claims.preferred_username,
+        username: claims.preferred_username,
+        emailVerified: claims.email_verified ?? false,
+        firstName: claims.given_name,
+        lastName: claims.family_name,
+      };
       return { data: { user }, error: null };
     } catch (err: any) {
       return {

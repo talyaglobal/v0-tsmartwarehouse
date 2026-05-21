@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -40,7 +40,7 @@ export async function DELETE(
       }
     }
 
-    const supabaseAdmin = createServerSupabaseClient()
+    const supabaseAdmin = createServerClient()
     
     // Verify invitation belongs to this company (invitationId is now profile ID)
     // Check invitation by verifying that the inviter's company matches

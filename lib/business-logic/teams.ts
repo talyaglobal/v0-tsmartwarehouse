@@ -23,7 +23,7 @@ import {
   getTeamMembersForBooking,
   canBookOnBehalf,
 } from '@/lib/db/teams'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { ClientTeam, TeamMember, TeamRole } from '@/types'
 
 // =====================================================
@@ -49,7 +49,7 @@ export async function createTeamWithValidation(
   input: CreateTeamInput
 ): Promise<CreateTeamResult> {
   // Validate user is part of the company and is corporate type
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -186,7 +186,7 @@ export async function addMemberWithValidation(
   }
 
   // Check if new member is in the same company
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const { data: memberProfile, error: memberError } = await supabase
     .from('profiles')
     .select('company_id, client_type, name, email')
@@ -303,7 +303,7 @@ export async function getCompanyTeams(
   userId: string
 ): Promise<ClientTeam[]> {
   // Verify user is part of the company
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('company_id')
@@ -333,7 +333,7 @@ export async function getTeamDetails(
   const isMember = await isTeamMember(teamId, userId)
   if (!isMember) {
     // Check if user is root (can view all)
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')

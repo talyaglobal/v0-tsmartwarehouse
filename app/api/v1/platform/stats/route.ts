@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 300 // Cache for 5 minutes
@@ -10,7 +10,7 @@ export const revalidate = 300 // Cache for 5 minutes
  */
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get total warehouse count
     const { count: warehouseCount, error: warehouseError } = await supabase

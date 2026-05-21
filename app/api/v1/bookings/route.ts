@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
       // If user is company admin, they can see bookings of users in their company
       if (isAdmin && userCompanyId) {
         // Verify the requested customerId belongs to the same company
-        const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-        const supabase = createServerSupabaseClient()
+        const { createServerClient } = await import('@/lib/kolaybase/server')
+        const supabase = createServerClient()
         const { data: customerProfile } = await supabase
           .from('profiles')
           .select('company_id')
@@ -193,8 +193,8 @@ export async function POST(request: NextRequest) {
     const selectedServices = body.selectedServices || [] // Array of { serviceId: string, quantity?: number }
 
     // Get customer profile information
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('name, email')

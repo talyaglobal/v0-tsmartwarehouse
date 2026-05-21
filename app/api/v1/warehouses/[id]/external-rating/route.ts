@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { searchGoogleMapsPlace, searchGoogleMapsReviews } from "@/lib/crm-search/serpapi"
 
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data: warehouse } = await supabase
     .from("warehouses")

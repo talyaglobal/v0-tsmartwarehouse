@@ -62,8 +62,8 @@ export async function sendPushNotificationToUser(
   payload: PushNotificationPayload
 ): Promise<boolean> {
   try {
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = await createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = await createServerClient()
 
     // Get user's FCM token from profile
     const { data: profile } = await supabase
@@ -90,8 +90,8 @@ export async function sendPushNotificationToAdmins(
   payload: PushNotificationPayload
 ): Promise<number> {
   try {
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = await createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = await createServerClient()
 
     // Get all admin FCM tokens
     const { data: admins } = await supabase
@@ -130,8 +130,8 @@ export async function sendPushNotificationToUsers(
   payload: PushNotificationPayload
 ): Promise<number> {
   try {
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = await createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = await createServerClient()
 
     // Get FCM tokens for all users
     const { data: profiles } = await supabase

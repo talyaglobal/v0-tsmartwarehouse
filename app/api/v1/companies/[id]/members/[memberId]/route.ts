@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { isCompanyAdmin, getUserCompanyId } from "@/lib/auth/company-admin"
 import { handleApiError } from "@/lib/utils/logger"
@@ -49,7 +49,7 @@ export async function PATCH(
       }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     
     // Verify member belongs to this company (from profiles table)
     const { data: member, error: memberError } = await supabase
@@ -294,7 +294,7 @@ export async function DELETE(
       }
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     
     // Verify member belongs to this company (from profiles table)
     // Note: We check status = true to ensure member is active

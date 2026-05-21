@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/utils";
 import { isCompanyAdmin } from "@/lib/auth/company-admin";
 import { cancelBooking } from "@/lib/business-logic/bookings";
 import { processCancellationRefund } from "@/lib/business-logic/payments";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 import { getNotificationService } from "@/lib/notifications/service";
 
 /**
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Get warehouse company ID
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const { data: warehouse } = await supabase
       .from("warehouses")
       .select("owner_company_id, name")

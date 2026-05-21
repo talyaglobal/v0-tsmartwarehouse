@@ -1,4 +1,4 @@
-import { createAuthenticatedSupabaseClient } from "@/lib/supabase/server"
+import { createAuthenticatedServerClient } from "@/lib/kolaybase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ResultsTable } from "@/components/crm-search/results-table"
@@ -8,7 +8,7 @@ import Link from "next/link"
 
 export default async function CRMSearchJobPage({ params }: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await params
-  const supabase = await createAuthenticatedSupabaseClient()
+  const supabase = await createAuthenticatedServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

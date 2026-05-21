@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createMiddlewareClient } from '@/lib/kolaybase/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { applySecurityHeaders } from '@/lib/security/headers'
 
@@ -36,69 +36,11 @@ export async function proxy(request: NextRequest) {
     strictTransportSecurity: process.env.NODE_ENV === 'production',
   })
 
-  // Check if Supabase environment variables are available
-  // During build time, these may not be available, so we skip auth checks
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  // Create KolayBase middleware client (reads kb_access_token from cookies)
+  const supabase = createMiddlewareClient(request)
 
-  // If env vars are missing (e.g., during build), skip auth checks and return early
-  if (!supabaseUrl || !supabaseAnonKey) {
-    // For public routes, allow access during build
-    const pathname = request.nextUrl.pathname
-    const publicRoutes = ['/', '/login', '/admin-login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/auth/callback', '/find-warehouses']
-    // Public warehouse detail pages (e.g., /warehouse/[id] or /warehouses/[id])
-    const isPublicWarehouseDetailRoute = (pathname.startsWith('/warehouse/') && pathname.match(/^\/warehouse\/[^\/]+$/)) || (pathname.startsWith('/warehouses/') && pathname.match(/^\/warehouses\/[^\/]+$/))
-    const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/')) || isPublicWarehouseDetailRoute
-    
-    if (isPublicRoute || pathname.startsWith('/api')) {
-      return response
-    }
-    
-    // For protected routes during build, redirect to login
-    // This will be handled properly at runtime when env vars are available
-    const isAdminRoute = pathname.startsWith('/admin')
-    const isDashboardRoute = pathname.startsWith('/dashboard')
-    const isWorkerRoute = pathname.startsWith('/worker')
-    
-    if (isAdminRoute) {
-      const redirectUrl = new URL('/admin-login', request.url)
-      redirectUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
-    if (isDashboardRoute || isWorkerRoute) {
-      const redirectUrl = new URL('/login', request.url)
-      redirectUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
-    
-    return response
-  }
-
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  // Refresh session if expired - required for Server Components
-  let user = null
+  // Get user from session
+  let user: any = null
   try {
     const {
       data: { user: authUser },
@@ -106,7 +48,6 @@ export async function proxy(request: NextRequest) {
     user = authUser
   } catch (error) {
     // If auth check fails (e.g., during build), continue without user
-    // This allows the build to complete
     console.warn('Auth check failed in middleware:', error)
   }
 
@@ -127,7 +68,7 @@ export async function proxy(request: NextRequest) {
 
   // If user is authenticated and tries to access auth pages, redirect to appropriate dashboard
   // BUT: Only redirect if not already on accept-invitation route (that needs to complete first)
-  if (user && isAuthRoute && !pathname.startsWith('/accept-invitation/') && supabaseUrl && supabaseAnonKey) {
+  if (user && isAuthRoute && !pathname.startsWith('/accept-invitation/')) {
     // Check if there's a redirect parameter - if so, redirect directly to that page
     const redirectParam = request.nextUrl.searchParams.get('redirect')
     if (redirectParam) {

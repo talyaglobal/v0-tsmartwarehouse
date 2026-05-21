@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth/api-middleware'
 import { isCompanyAdmin } from '@/lib/auth/company-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createAdminClient } from '@/lib/kolaybase/server'
 
 /**
  * PATCH /api/v1/client-teams/[companyId]/[teamId]

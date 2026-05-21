@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth/api-middleware'
 import { isCompanyAdmin, getUserCompanyId } from '@/lib/auth/company-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createAdminClient } from '@/lib/kolaybase/server'
 import { nanoid } from 'nanoid'
 
 // POST - Create an invitation for a new team member

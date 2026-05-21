@@ -1164,7 +1164,7 @@ export default function FloorPlanCanvas({
   
   // Find closest wall to a point (for door/window placement)
   const findClosestWall = useCallback((pos: { x: number; y: number }): { wallIndex: number; position: number } | null => {
-    let closestWall = null
+    let closestWall: { wallIndex: number; position: number } | null = null
     let minDist = Infinity
     
     for (let i = 0; i < vertices.length; i++) {

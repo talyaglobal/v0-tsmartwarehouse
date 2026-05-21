@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/api-middleware";
 import { getBookingById } from "@/lib/db/bookings";
 import { createCheckoutRequest, getCheckoutRequestsByBookingId } from "@/lib/db/checkout-requests";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/kolaybase/server";
 import { getOrCreateStripeCustomer } from "@/lib/payments/stripe";
 import { generateIdempotencyKey } from "@/lib/payments/idempotency";
 import Stripe from "stripe";
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     if (booking.customerId !== user.id) {
-      const supabase = createServerSupabaseClient();
+      const supabase = createServerClient();
       const { data: staff } = await supabase
         .from("warehouse_staff")
         .select("user_id")
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const remainingTotal = Math.max(0, totalAmount - depositPaid);
 
     const totalPalletCount = booking.palletCount ?? 1;
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     let palletIds: string[];
     if (parsed.data.pallet_ids?.length) {

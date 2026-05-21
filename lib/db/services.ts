@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { WarehouseService, ServiceCategory } from '@/types'
 import { getCache, setCache, invalidateCache, generateCacheKey, CACHE_TTL } from '@/lib/cache/redis'
 
@@ -62,7 +62,7 @@ export async function getServices(filters?: GetServicesOptions): Promise<Warehou
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   let query = supabase
     .from('warehouse_services')
@@ -110,7 +110,7 @@ export async function getServiceById(id: string, useCache: boolean = true): Prom
     }
   }
 
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { data, error } = await supabase
     .from('warehouse_services')
@@ -139,7 +139,7 @@ export async function getServiceById(id: string, useCache: boolean = true): Prom
  * Create a new service (admin only)
  */
 export async function createService(service: Omit<WarehouseService, 'id' | 'createdAt' | 'updatedAt'>): Promise<WarehouseService> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const serviceRow = {
     code: service.code,
@@ -175,7 +175,7 @@ export async function updateService(
   id: string,
   updates: Partial<Omit<WarehouseService, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<WarehouseService> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const updateRow: any = {}
 
@@ -210,7 +210,7 @@ export async function updateService(
  * Delete a service (admin only)
  */
 export async function deleteService(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const { error } = await supabase
     .from('warehouse_services')

@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
       authenticatedUserId = authResult.user.id
       
       // Check if user is warehouse staff
-      const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-      const supabase = createServerSupabaseClient()
+      const { createServerClient } = await import('@/lib/kolaybase/server')
+      const supabase = createServerClient()
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       // If warehouse staff, get their assigned warehouses
       if (userRole === 'warehouse_staff') {
         const { getWarehouseStaffWarehouses } = await import('@/lib/business-logic/warehouse-staff')
-        const warehouses = await getWarehouseStaffWarehouses(authenticatedUserId)
+        const warehouses = await getWarehouseStaffWarehouses(authenticatedUserId!)
         warehouseIds = warehouses.map(w => w.warehouseId)
       }
     }

@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Incident, IncidentStatus, IncidentSeverity } from '@/types'
 import type { IncidentFilters } from '../types'
 
@@ -8,7 +8,7 @@ import type { IncidentFilters } from '../types'
  * Cached for request deduplication
  */
 export const getIncidentsQuery = cache(async (filters?: IncidentFilters): Promise<Incident[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('incidents').select('*')
 
@@ -42,7 +42,7 @@ export const getIncidentsQuery = cache(async (filters?: IncidentFilters): Promis
  * Cached for request deduplication
  */
 export const getIncidentByIdQuery = cache(async (id: string): Promise<Incident | null> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('incidents')
@@ -64,7 +64,7 @@ export const getIncidentByIdQuery = cache(async (id: string): Promise<Incident |
  * Get incident statistics
  */
 export const getIncidentStatsQuery = cache(async (filters?: IncidentFilters) => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('incidents').select('status, severity')
 

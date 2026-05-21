@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse, ApiResponse } from "@/types/api"
 
@@ -23,7 +23,7 @@ export async function GET(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Find profile with this invitation token
     const { data: profile, error: profileError } = await supabase

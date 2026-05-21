@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth/api-middleware'
 import { isCompanyAdmin } from '@/lib/auth/company-admin'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/kolaybase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 // GET - List client team members for the company (server-side so RLS does not hide newly added members)
 export async function GET(
@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const { companyId } = await params
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
 
     const { data: profile } = await supabase
       .from('profiles')

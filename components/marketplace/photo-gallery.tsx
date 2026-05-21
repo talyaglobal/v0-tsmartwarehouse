@@ -88,7 +88,7 @@ export function PhotoGallery({
               className="object-cover cursor-pointer"
               onClick={() => openLightbox(safeIndex)}
               onError={() => handleImageError(safeIndex)}
-              unoptimized={mainPhoto.startsWith('http') && !mainPhoto.includes('supabase')}
+              unoptimized={mainPhoto.startsWith('http') && !mainPhoto.includes('kolaybase')}
               sizes="(max-width: 1024px) 100vw, 66vw"
             />
           ) : (
@@ -162,7 +162,7 @@ export function PhotoGallery({
                     fill
                     className="object-cover"
                     onError={() => handleImageError(index)}
-                    unoptimized={photo.startsWith('http') && !photo.includes('supabase')}
+                    unoptimized={photo.startsWith('http') && !photo.includes('kolaybase')}
                     sizes="(max-width: 768px) 25vw, 12vw"
                   />
                 ) : (
@@ -228,7 +228,7 @@ export function PhotoGallery({
                 className="object-contain max-w-full max-h-full"
                 onClick={(e) => e.stopPropagation()}
                 onError={() => handleImageError(safeIndex)}
-                unoptimized={mainPhoto.startsWith('http') && !mainPhoto.includes('supabase')}
+                unoptimized={mainPhoto.startsWith('http') && !mainPhoto.includes('kolaybase')}
               />
             ) : (
               <div className="text-white text-lg">No photo available</div>

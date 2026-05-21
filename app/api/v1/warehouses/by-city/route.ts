@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { getWarehouses } from "@/lib/db/warehouses"
 import { calculateWarehouseAvailability, type WarehouseAvailability } from "@/lib/business-logic/capacity-management"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse } from "@/types/api"
 
 export interface WarehousePricing {
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(responseData)
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get pricing for all warehouses
     const warehouseIds = warehouses.map(w => w.id)

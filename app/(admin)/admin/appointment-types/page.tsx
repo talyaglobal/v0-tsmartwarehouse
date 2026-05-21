@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Plus, Edit, Trash2, Check, X } from "@/components/icons"
 import { useUser } from "@/lib/hooks/use-user"
 import { useUIStore } from "@/stores/ui.store"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import type { AppointmentType } from "@/types"
 
 interface AppointmentTypeFormData {

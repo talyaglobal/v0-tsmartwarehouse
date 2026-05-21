@@ -1,6 +1,6 @@
 import { PRICING } from "@/lib/constants"
 import type { MembershipTier, PricingConfig } from "@/types"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { getFreeStorageDays } from "@/lib/utils/free-storage"
 import type { FreeStorageRule } from "@/types"
 import { getMembershipSettingByTier } from "@/lib/db/membership"
@@ -54,7 +54,7 @@ interface WarehousePricingData {
 async function getWarehouseFreeStorageRules(
   warehouseId: string
 ): Promise<FreeStorageRule[] | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   const { data, error } = await supabase
     .from('warehouses')
     .select('free_storage_rules')
@@ -72,7 +72,7 @@ async function getWarehousePricing(
   warehouseId: string,
   pricingType: 'pallet' | 'area'
 ): Promise<WarehousePricingData | null> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('warehouse_pricing')
@@ -201,7 +201,7 @@ export async function calculatePalletPricing(
   const finalAmount = baseAmount - totalDiscount
 
   // Build breakdown
-  const breakdown = []
+  const breakdown: any[] = []
   if (palletInCost > 0) {
     breakdown.push({
       item: "Pallet In",

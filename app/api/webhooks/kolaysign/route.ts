@@ -4,14 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/kolaybase/server';
 import { initializeKolaySignService } from '@/features/contacts/api/kolaysign-service';
 import { updateSignatureRequestStatus } from '@/features/contacts/actions';
 import { SignatureStatus } from '@/features/contacts/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const kolaySignService = initializeKolaySignService();
 
     // Get raw body for signature verification

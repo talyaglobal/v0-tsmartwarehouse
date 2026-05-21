@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { ErrorResponse } from "@/types/api"
 
 export async function GET(
@@ -19,7 +19,7 @@ export async function GET(
     const resolvedParams = await params
     const bookingId = resolvedParams.id
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     // Get booking to verify access
     const { data: booking, error: bookingError } = await supabase

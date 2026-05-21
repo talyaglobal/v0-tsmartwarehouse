@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 /**
  * Check if user is a company admin:
@@ -7,7 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
  * - Corporate client side: warehouse_client with client_team_members.role = 'admin' for a team of this company
  */
 export async function isCompanyAdmin(userId: string, companyId?: string): Promise<boolean> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // 0) Platform admin (admin/super_admin/root) with matching company – can update their company
   if (companyId) {
@@ -86,7 +86,7 @@ export async function isCompanyAdmin(userId: string, companyId?: string): Promis
  * Get user's company ID
  */
 export async function getUserCompanyId(userId: string): Promise<string | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -106,7 +106,7 @@ export async function getUserCompanyId(userId: string): Promise<string | null> {
  * Maps new role names to old format for backward compatibility
  */
 export async function getUserCompanyRole(userId: string, companyId: string): Promise<'warehouse_admin' | 'warehouse_supervisor' | 'warehouse_staff' | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -132,7 +132,7 @@ export async function getUserCompanyRole(userId: string, companyId: string): Pro
  * - Corporate client side: client_team_members.role = 'admin' for a team of that company
  */
 export async function getUserAdminCompanies(userId: string): Promise<string[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const companyIds = new Set<string>()
 
   // 1) Warehouse admin companies (include legacy: owner, company_admin)

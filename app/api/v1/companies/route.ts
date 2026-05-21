@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return authResult
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data, error } = await supabase
       .from('companies')
       .select('*')
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data, error } = await supabase
       .from('companies')
       .insert({

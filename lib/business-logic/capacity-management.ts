@@ -9,7 +9,7 @@
  */
 
 import { getCapacityUtilization, getCustomerCapacityUsage } from '@/lib/db/warehouses'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { CapacityUtilization } from '@/types'
 
 /**
@@ -50,7 +50,7 @@ export async function createCapacitySnapshot(
   customerId?: string,
   snapshotDate?: Date
 ): Promise<string> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   const date = snapshotDate || new Date()
   const dateStr = date.toISOString().split('T')[0]
@@ -89,7 +89,7 @@ export async function calculateWarehouseAvailability(
   toDate: string, // ISO date string (YYYY-MM-DD)
   bookingType: 'pallet' | 'area-rental'
 ): Promise<WarehouseAvailability> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   // Get total capacity from warehouse
   let totalCapacity = 0

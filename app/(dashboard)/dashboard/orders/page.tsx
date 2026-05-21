@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
 import { Plus } from '@/components/icons'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/kolaybase/client'
 
 export default function OrdersPage() {
   const [isCustomer, setIsCustomer] = useState(false)

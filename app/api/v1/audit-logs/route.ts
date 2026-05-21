@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getAuditLogs } from "@/lib/db/audit"
 import { handleApiError } from "@/lib/utils/logger"
 import { requireAuth } from "@/lib/auth/api-middleware"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { AuditLogsListResponse, ErrorResponse } from "@/types/api"
 import type { AuditAction, AuditEntity } from "@/lib/audit/types"
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const offset = searchParams.get("offset") ? parseInt(searchParams.get("offset")!) : undefined
 
     // Check user role
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, company_id')

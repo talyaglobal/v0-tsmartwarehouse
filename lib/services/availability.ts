@@ -5,7 +5,7 @@
  * and availability calendar table.
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { AvailabilityCheck, AvailabilityResult } from '@/types/marketplace'
 
 /**
@@ -14,7 +14,7 @@ import type { AvailabilityCheck, AvailabilityResult } from '@/types/marketplace'
 export async function checkAvailability(
   params: AvailabilityCheck
 ): Promise<AvailabilityResult> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   const { warehouse_id, type, quantity, start_date, end_date } = params
 
   try {
@@ -127,7 +127,7 @@ export async function getAvailabilityCalendar(
   startDate: string,
   endDate: string
 ) {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
 
   try {
     // Get warehouse capacity

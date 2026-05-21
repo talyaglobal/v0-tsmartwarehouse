@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/kolaybase/server'
 import { requireAuth } from '@/lib/auth/utils'
 import {
   validateFile,
@@ -18,7 +18,7 @@ export interface UploadFileResult {
 }
 
 /**
- * Upload a file to Supabase Storage
+ * Upload a file to KolayBase Storage
  */
 export async function uploadFile(
   file: File,
@@ -42,7 +42,7 @@ export async function uploadFile(
       }
     }
 
-    // Create Supabase client
+    // Create KolayBase client
     const supabase = await createClient()
 
     // Generate file path
@@ -86,7 +86,7 @@ export async function uploadFile(
 }
 
 /**
- * Delete a file from Supabase Storage
+ * Delete a file from KolayBase Storage
  */
 export async function deleteFile(
   filePath: string,

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ErrorResponse } from "@/types/api"
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const authResult = await requireAuth(request)
     if (authResult instanceof NextResponse) return authResult
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
     const { data, error } = await supabase
       .from("invoice_templates")
       .select("id, name, description, html_content, company_id, is_system, is_active, created_at, updated_at")

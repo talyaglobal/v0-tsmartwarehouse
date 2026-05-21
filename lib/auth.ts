@@ -1,4 +1,4 @@
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server'
+import { createAuthenticatedServerClient } from '@/lib/kolaybase/server'
 import type { UserRole } from '@/types'
 
 export interface AuthUser {
@@ -14,7 +14,7 @@ export interface AuthUser {
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const supabase = await createAuthenticatedSupabaseClient()
+    const supabase = await createAuthenticatedServerClient()
     const {
       data: { user },
       error,

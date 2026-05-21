@@ -12,7 +12,7 @@ import {
 } from "@/components/icons"
 import { formatCurrency } from "@/lib/utils/format"
 import { api } from "@/lib/api/client"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import type { CRMContact } from "@/types"
 
 export default function WarehouseFinderDashboardPage() {

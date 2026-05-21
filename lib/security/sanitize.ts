@@ -56,7 +56,7 @@ export function escapeHtml(text: string): string {
 
 /**
  * Sanitize user input for database queries
- * Removes SQL injection patterns (though Supabase uses parameterized queries)
+ * Removes SQL injection patterns (though KolayBase uses parameterized queries)
  */
 export function sanitizeSqlInput(input: string): string {
   if (!input || typeof input !== 'string') {

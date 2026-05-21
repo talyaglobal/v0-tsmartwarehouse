@@ -5,7 +5,7 @@
  * Adapted to work with existing CRM system (crm_contacts table)
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/kolaybase/server';
 import {
   Contact,
   ContactStatus,
@@ -78,7 +78,7 @@ export async function createContact(
   userId: string
 ): Promise<{ success: boolean; data?: Contact; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     // Generate contact_name if not provided
     const contactName = input.contactName || 
@@ -135,7 +135,7 @@ export async function getContact(
   contactId: string
 ): Promise<{ success: boolean; data?: Contact; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     const { data, error } = await supabase
       .from('crm_contacts')
@@ -170,7 +170,7 @@ export async function listContacts(
   }
 ): Promise<{ success: boolean; data?: Contact[]; error?: string; total?: number }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     let query = supabase.from('crm_contacts').select('*', { count: 'exact' });
 
@@ -218,7 +218,7 @@ export async function updateContact(
   userId: string
 ): Promise<{ success: boolean; data?: Contact; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     const updateData: any = {};
 
@@ -283,7 +283,7 @@ export async function deleteContact(
   contactId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     const { error } = await supabase
       .from('crm_contacts')
@@ -312,7 +312,7 @@ export async function createSignatureRequest(
   userId: string
 ): Promise<{ success: boolean; data?: SignatureRequest; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const kolaySignService = initializeKolaySignService();
 
     // Get contact details
@@ -417,7 +417,7 @@ export async function getSignatureRequest(
   requestId: string
 ): Promise<{ success: boolean; data?: SignatureRequest; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     const { data, error } = await supabase
       .from('signature_requests')
@@ -470,7 +470,7 @@ export async function listSignatureRequests(
   }
 ): Promise<{ success: boolean; data?: SignatureRequest[]; error?: string; total?: number }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     let query = supabase
       .from('signature_requests')
@@ -530,7 +530,7 @@ export async function updateSignatureRequestStatus(
   signedDocumentUrl?: string
 ): Promise<{ success: boolean; data?: SignatureRequest; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
 
     const updateData: any = {
       status,
@@ -588,7 +588,7 @@ export async function cancelSignatureRequest(
   requestId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const kolaySignService = initializeKolaySignService();
 
     // Get signature request
@@ -636,7 +636,7 @@ export async function resendSigningInvitation(
   requestId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServerClient();
     const kolaySignService = initializeKolaySignService();
 
     // Get signature request

@@ -1,11 +1,11 @@
 /**
  * Storage utility functions
  * 
- * Helper functions for working with Supabase Storage URLs
+ * Helper functions for working with KolayBase Storage URLs
  */
 
 /**
- * Convert a relative storage path to a full Supabase Storage public URL
+ * Convert a relative storage path to a full KolayBase Storage public URL
  * 
  * @param path - Relative path (e.g., "warehouse/id/file.jpg") or full URL
  * @param bucket - Storage bucket name (default: "docs")
@@ -20,7 +20,7 @@ export function getStoragePublicUrl(path: string, bucket: string = 'docs'): stri
   // If path starts with /, remove it
   const cleanPath = path.startsWith('/') ? path.slice(1) : path
 
-  // Get Supabase URL from environment
+  // Get KolayBase URL from environment
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!supabaseUrl) {
     console.warn('[storage] NEXT_PUBLIC_SUPABASE_URL not set, returning path as-is')
@@ -33,7 +33,7 @@ export function getStoragePublicUrl(path: string, bucket: string = 'docs'): stri
 }
 
 /**
- * Convert an array of photo paths to full Supabase Storage public URLs
+ * Convert an array of photo paths to full KolayBase Storage public URLs
  * 
  * @param photos - Array of relative paths or full URLs
  * @param bucket - Storage bucket name (default: "docs")

@@ -138,8 +138,8 @@ export function generateBookingId(params: GenerateBookingIdParams): string {
  * Check if a booking ID already exists
  */
 export async function bookingIdExists(id: string): Promise<boolean> {
-  const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-  const supabase = createServerSupabaseClient()
+  const { createServerClient } = await import('@/lib/kolaybase/server')
+  const supabase = createServerClient()
   
   const { data, error } = await supabase
     .from('bookings')

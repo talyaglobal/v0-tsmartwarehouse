@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import { updateMembershipTierSetting } from "@/lib/db/membership"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import type { MembershipTier } from "@/types"
 import type { ErrorResponse } from "@/types/api"
 
@@ -23,7 +23,7 @@ export async function PUT(
     const { user } = authResult
 
     // Check if user is root
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createServerClient()
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')

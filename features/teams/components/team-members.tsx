@@ -53,7 +53,7 @@ export function TeamMembers({ teamId, isAdmin = false }: TeamMembersProps) {
     queryKey: ["company-members-for-team"],
     queryFn: async () => {
       // Get current user's company
-      const supabase = (await import("@/lib/supabase/client")).createClient()
+      const supabase = (await import("@/lib/kolaybase/client")).createClient()
       const { data: profile } = await supabase
         .from("profiles")
         .select("company_id")

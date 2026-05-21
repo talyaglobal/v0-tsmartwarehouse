@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Invoice, InvoiceStatus } from '@/types'
 import type { InvoiceFilters } from '../types'
 
@@ -8,7 +8,7 @@ import type { InvoiceFilters } from '../types'
  * Cached for request deduplication
  */
 export const getInvoicesQuery = cache(async (filters?: InvoiceFilters): Promise<Invoice[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const {
     customerId,
@@ -69,7 +69,7 @@ export const getInvoicesQuery = cache(async (filters?: InvoiceFilters): Promise<
  * Cached for request deduplication
  */
 export const getInvoiceByIdQuery = cache(async (id: string): Promise<Invoice | null> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const { data, error } = await supabase
     .from('invoices')
@@ -91,7 +91,7 @@ export const getInvoiceByIdQuery = cache(async (id: string): Promise<Invoice | n
  * Get invoices for current user
  */
 export const getMyInvoicesQuery = cache(async (): Promise<Invoice[]> => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   const {
     data: { user },
@@ -118,7 +118,7 @@ export const getMyInvoicesQuery = cache(async (): Promise<Invoice[]> => {
  * Get invoice statistics
  */
 export const getInvoiceStatsQuery = cache(async (filters?: InvoiceFilters) => {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
   
   let query = supabase.from('invoices').select('status, total')
 

@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { api } from "@/lib/api/client"
 import { useUser } from "@/lib/hooks/use-user"
 import { useRealtimeNotifications } from "@/lib/realtime/hooks"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/kolaybase/client"
 import type { Booking, Claim, MembershipTier } from "@/types"
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
@@ -216,7 +216,7 @@ export function DashboardSidebar() {
       const companyId = profileData?.company_id || null
 
       // Fetch company data if we have a company_id
-      let company = null
+      let company: any = null
       if (companyId) {
         const { data: companyData, error: companyError } = await supabase
           .from('companies')

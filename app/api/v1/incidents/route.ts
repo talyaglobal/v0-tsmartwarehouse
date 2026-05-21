@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getIncidents, createIncident } from "@/lib/db/incidents"
 import { handleApiError } from "@/lib/utils/logger"
 import { getNotificationService } from "@/lib/notifications/service"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/kolaybase/server"
 import { createIncidentSchema } from "@/lib/validation/schemas"
 import type { IncidentStatus, IncidentSeverity } from "@/types"
 import type { IncidentsListResponse, IncidentResponse, ErrorResponse } from "@/types/api"
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Send notification to admins
     try {
-      const supabase = createServerSupabaseClient()
+      const supabase = createServerClient()
       const notificationService = getNotificationService()
 
       // Get all admin users

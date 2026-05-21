@@ -5,7 +5,7 @@
  * Handles filtering, sorting, pagination, and availability calculation.
  * 
  * NOTE: This is the Prisma version for future migration.
- * Current implementation uses Supabase (warehouse-search-supabase.ts).
+ * Current implementation uses KolayBase (warehouse-search-supabase.ts).
  * 
  * To use this version:
  * 1. Set up DATABASE_URL in .env.local

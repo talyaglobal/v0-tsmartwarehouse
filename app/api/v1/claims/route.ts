@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get customer profile information
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    const supabase = createServerSupabaseClient()
+    const { createServerClient } = await import('@/lib/kolaybase/server')
+    const supabase = createServerClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select('name, email')

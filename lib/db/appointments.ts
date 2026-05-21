@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { Appointment, AppointmentParticipant, AppointmentStatus } from '@/types'
 
 /**
@@ -18,7 +18,7 @@ interface GetAppointmentsOptions {
 }
 
 export async function getAppointments(filters?: GetAppointmentsOptions): Promise<Appointment[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   let query = supabase
     .from('appointments')
@@ -98,7 +98,7 @@ export async function getAppointments(filters?: GetAppointmentsOptions): Promise
 }
 
 export async function getAppointmentById(id: string): Promise<Appointment | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data, error } = await supabase
     .from('appointments')
@@ -148,7 +148,7 @@ export async function createAppointment(data: {
   createdBy: string
   participantIds?: string[]
 }): Promise<Appointment> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: appointment, error } = await supabase
     .from('appointments')
@@ -257,7 +257,7 @@ export async function updateAppointment(
     notes?: string
   }
 ): Promise<Appointment> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const updateData: Record<string, any> = {}
   if (data.title !== undefined) updateData.title = data.title
@@ -303,7 +303,7 @@ export async function updateAppointment(
 }
 
 export async function deleteAppointment(id: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   // Cancel instead of hard delete
   const { error } = await supabase
@@ -321,7 +321,7 @@ export async function addParticipant(
   userId: string,
   role: 'requester' | 'attendee' | 'staff_assignee' = 'attendee'
 ): Promise<AppointmentParticipant> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { data: participant, error } = await supabase
     .from('appointment_participants')
@@ -345,7 +345,7 @@ export async function addParticipant(
 }
 
 export async function removeParticipant(appointmentId: string, userId: string): Promise<void> {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   
   const { error } = await supabase
     .from('appointment_participants')

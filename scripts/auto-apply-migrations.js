@@ -10,8 +10,8 @@ const path = require("path");
 
 const API_BASE = "https://api.kolaybase.com";
 const SERVICE_KEY =
-  process.env.KOLAYBASE_SERVICE_KEY || "kb_service_zhg_E3u8s3m605gv_OzQwohjQJEK7Kn9y5I4wNhp6cw";
-const PROJECT_ID = process.env.KOLAYBASE_PROJECT_ID || "kb-warebnb"; // Extracted from realm name
+  process.env.KOLAYBASE_SERVICE_ROLE_KEY || "";
+const PROJECT_ID = process.env.PROJECT_ID || "d83a5aff-802b-4093-8992-d0809df32276";
 
 async function executeSqlMigration(sql, migrationName) {
   console.log(`\n📄 Executing: ${migrationName}`);

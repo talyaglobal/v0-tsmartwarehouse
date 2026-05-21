@@ -4,7 +4,7 @@
  */
 
 import { getBookingUsagePeriods } from '@/features/bookings/lib/usage-tracker'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 import type { InvoiceItem } from '@/types'
 
 export interface ProRataCalculation {
@@ -31,7 +31,7 @@ export async function calculateProRataBilling(
   basePrice: number,
   isPalletBooking: boolean
 ): Promise<ProRataCalculation> {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerClient()
 
   // Get usage period
   const usagePeriods = await getBookingUsagePeriods(bookingId)

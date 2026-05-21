@@ -5,7 +5,7 @@
 
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/kolaybase/server"
 import { NetGSMProvider } from "@/lib/notifications/providers/sms"
 import { getNotificationService } from "@/lib/notifications"
 import { revalidatePath } from "next/cache"
