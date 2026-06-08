@@ -129,12 +129,19 @@ export default function LoginPage() {
           localStorage.removeItem("rememberMe")
         }
 
-        // Check if profile exists, if not create it from auth data
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, role, name, email, invitation_token, company_id')
-          .eq('id', data.user.id)
-          .maybeSingle()
+        // Check if profile exists via sync-profile API (server-side, avoids client REST issues)
+        let profile: any = null
+        try {
+          const syncRes = await fetch('/api/auth/sync-profile', { method: 'POST' })
+          if (syncRes.ok) {
+            const syncData = await syncRes.json()
+            if (syncData.profile) {
+              profile = syncData.profile
+            }
+          }
+        } catch {
+          // Continue without profile — will be created on next page load
+        }
 
         // If profile has a pending invitation (invitation_token exists and company_id is NULL),
         // automatically accept it since user has logged in with the correct credentials
@@ -162,36 +169,7 @@ export default function LoginPage() {
           }
         }
 
-        // If profile doesn't exist, create it from auth data
-        if (!profile) {
-          
-          const userMetadata = data.user.user_metadata || {}
-          const userEmail = data.user.email || email
-          const userName = userMetadata.name || userEmail.split('@')[0]
-          const userRole = userMetadata.role || 'warehouse_client'
-
-          // Call API to create profile (server-side to use admin client)
-          const createProfileResponse = await fetch('/api/v1/profile/create', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: data.user.id,
-              email: userEmail,
-              name: userName,
-              role: userRole,
-              phone: userMetadata.phone || null,
-              company: userMetadata.company || null,
-            }),
-          })
-
-          if (!createProfileResponse.ok) {
-            console.error('Failed to create profile, but continuing with login...')
-            // Don't fail login, continue
-          } else {
-          }
-        }
+        // Profile sync already handled above via /api/auth/sync-profile
 
         // Get role from profile and map legacy roles to new roles
         let role = profile?.role || data.user.user_metadata?.role || 'warehouse_client'

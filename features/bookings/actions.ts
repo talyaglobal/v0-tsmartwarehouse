@@ -27,27 +27,37 @@ export async function createBookingRequest(input: {
   palletDetails?: Record<string, any>
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    // Use authenticated client to read user session from cookies
-    const { createAuthenticatedServerClient } = await import('@/lib/kolaybase/server')
-    const supabase = await createAuthenticatedServerClient()
+    // Use authenticated client for auth, service client for DB queries
+    const { createAuthenticatedServerClient, createServerClient } = await import('@/lib/kolaybase/server')
+    const authClient = await createAuthenticatedServerClient()
+    const supabase = createServerClient()
 
-    // Get current user
+    // Get current user from auth
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
 
     if (authError || !user) {
       console.error('Auth error:', authError)
       return { success: false, error: 'Unauthorized. Please log in to create a booking.' }
     }
 
-    // Get user profile
-    const { data: profile } = await supabase
+    // Get user profile — try by ID first, then fallback to email (using service client)
+    let { data: profile } = await supabase
       .from('profiles')
       .select('id, name, email, company_id')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (!profile && user.email) {
+      const { data: emailProfile } = await supabase
+        .from('profiles')
+        .select('id, name, email, company_id')
+        .eq('email', user.email)
+        .maybeSingle()
+      profile = emailProfile
+    }
 
     if (!profile) {
       return { success: false, error: 'Profile not found' }
@@ -64,14 +74,21 @@ export async function createBookingRequest(input: {
       return { success: false, error: 'Warehouse not found' }
     }
 
-    // Generate unique booking ID
-    const { generateUniqueBookingId } = await import('@/lib/utils/booking-id')
-    const bookingId = await generateUniqueBookingId({
-      city: warehouse.city || 'UNK',
-      startDate: input.startDate,
-      endDate: input.endDate || input.startDate,
-      type: input.type,
-    })
+    // Generate unique booking ID (UUID for DB primary key, short_id for display)
+    const { v4: uuidv4 } = await import('uuid')
+    const bookingId = uuidv4()
+    let shortId: string | undefined
+    try {
+      const { generateUniqueBookingId } = await import('@/lib/utils/booking-id')
+      shortId = await generateUniqueBookingId({
+        city: warehouse.city || 'UNK',
+        startDate: input.startDate,
+        endDate: input.endDate || input.startDate,
+        type: input.type,
+      })
+    } catch {
+      // short_id generation failed, skip it
+    }
 
     // Determine booking status: pending for all bookings (customer selects date/time)
     const bookingStatus = 'pending'
@@ -134,30 +151,35 @@ export async function createBookingRequest(input: {
     const totalAmount = baseTotal + servicesTotal
 
     // Create booking
-    const { data: booking, error } = await supabase
+    const bookingData: Record<string, any> = {
+      id: bookingId,
+      customer_id: profile.id,
+      customer_name: profile.name,
+      customer_email: profile.email,
+      warehouse_id: input.warehouseId,
+      type: input.type,
+      status: bookingStatus,
+      pallet_count: input.palletCount,
+      area_sq_ft: input.areaSqFt,
+      floor_number: 3,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      total_amount: totalAmount,
+      notes: input.notes,
+      metadata: input.metadata || {},
+    }
+    if (shortId) bookingData.short_id = shortId
+
+    const { error } = await supabase
       .from('bookings')
-      .insert({
-        id: bookingId,
-        customer_id: profile.id,
-        customer_name: profile.name,
-        customer_email: profile.email,
-        warehouse_id: input.warehouseId,
-        type: input.type,
-        booking_status: bookingStatus,
-        pallet_count: input.palletCount,
-        area_sq_ft: input.areaSqFt,
-        start_date: input.startDate,
-        end_date: input.endDate,
-        total_amount: totalAmount,
-        notes: input.notes,
-        metadata: input.metadata || {},
-      })
-      .select()
-      .single()
+      .insert(bookingData)
 
     if (error) {
       return { success: false, error: error.message }
     }
+
+    // Return the booking data we just inserted
+    const booking = { id: bookingId, ...bookingData }
 
     // Add selected services to booking_services table
     if (input.serviceIds && input.serviceIds.length > 0) {

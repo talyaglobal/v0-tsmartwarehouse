@@ -150,45 +150,8 @@ export async function getBookingById(id: string, useCache: boolean = true): Prom
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('bookings')
-    .select(`
-      id,
-      customer_id,
-      customer_name,
-      customer_email,
-      warehouse_id,
-      type,
-      booking_status,
-      status,
-      pallet_count,
-      area_sq_ft,
-      floor_number,
-      hall_id,
-      start_date,
-      end_date,
-      total_amount,
-      deposit_amount,
-      deposit_paid_at,
-      notes,
-      scheduled_dropoff_datetime,
-      time_slot_set_by,
-      time_slot_set_at,
-      time_slot_confirmed_at,
-      proposed_start_date,
-      proposed_start_time,
-      date_change_requested_at,
-      date_change_requested_by,
-      cancel_requested_at,
-      cancel_requested_by,
-      cancel_reason,
-      cancel_processed_at,
-      cancel_processed_by,
-      metadata,
-      created_at,
-      updated_at,
-      warehouses(name, address, city)
-    `)
+    .select('id, customer_id, customer_name, customer_email, warehouse_id, type, booking_status, status, pallet_count, area_sq_ft, floor_number, hall_id, start_date, end_date, total_amount, deposit_amount, deposit_paid_at, notes, cancel_requested_at, cancel_requested_by, cancellation_reason, metadata, created_at, updated_at, short_id, approved_by, approved_at, payment_status')
     .eq('id', id)
-    .eq('status', true) // Soft delete filter
     .single()
 
   if (error) {

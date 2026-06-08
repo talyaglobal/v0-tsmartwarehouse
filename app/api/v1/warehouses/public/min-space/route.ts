@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/kolaybase/server'
+import { createServerClient } from '@/lib/kolaybase/server'
 
 /**
  * GET /api/v1/warehouses/public/min-space
@@ -14,30 +14,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ minSpace: 1000, source: 'default', warehouseCount: 0 })
     }
 
-    // Create Supabase client (server-side with service role key)
-    const supabase = createClient()
+    const supabase = createServerClient()
 
     // Parse location to get city name and zip code
     const searchTerm = location.trim().toLowerCase()
-    const cityName = searchTerm.split(',')[0].trim()
     const zipMatch = searchTerm.match(/\b\d{5}(?:-\d{4})?\b/)
+    // Remove zip code and comma parts to get just the city name
+    const cityName = searchTerm
+      .split(',')[0]
+      .replace(/\b\d{5}(?:-\d{4})?\b/, '')
+      .trim()
 
     console.log('[min-space] Searching for location:', location, 'cityName:', cityName, 'zipMatch:', zipMatch)
 
-    // Query all warehouses first (without status filter to debug)
-    const { data: allWarehouses, error: fetchError } = await supabase
+    // Note: warehouses table has no 'status' column; all rows are considered active
+    const result = await supabase
       .from('warehouses')
-      .select('id, name, min_sq_ft, city, zip_code, address, status')
-    
-    console.log('[min-space] All warehouses (no filter):', allWarehouses?.length, 'error:', fetchError)
-    if (allWarehouses && allWarehouses.length > 0) {
-      console.log('[min-space] Sample warehouse:', allWarehouses[0])
-      console.log('[min-space] Status values:', [...new Set(allWarehouses.map(w => w.status))])
-    }
-    
+      .select('id, name, min_sq_ft, city, zip_code, address')
+
+    const allWarehouses = result.data
+    const fetchError = result.error
+
+
     if (fetchError) {
-      console.error('[min-space] Fetch error:', fetchError)
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+      console.error('[min-space] Fetch error:', JSON.stringify(fetchError))
+      return NextResponse.json({ error: typeof fetchError === 'string' ? fetchError : fetchError?.message || 'Unknown error' }, { status: 500 })
     }
 
     // Filter warehouses by location (city name or zip code)
@@ -81,12 +82,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log('[min-space] No warehouse with min_sq_ft found')
-    // If no min_sq_ft found, return null (no minimum defined)
+    // No min_sq_ft found
     return NextResponse.json({
       minSpace: null,
       source: 'none',
-      warehouseCount: 0,
+      warehouseCount: matchingWarehouses.length,
       hasMinimum: false
     })
 

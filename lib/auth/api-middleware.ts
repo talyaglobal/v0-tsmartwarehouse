@@ -35,11 +35,22 @@ export async function getAuthUser(request: NextRequest) {
     // Resolve role from profiles table
     let userRole: UserRole = "warehouse_client";
     try {
-      const { data: profile } = await client
+      // Try by ID first, then fallback to email if ID doesn't match
+      let { data: profile } = await client
         .from("profiles")
         .select("role")
         .eq("id", user.id)
         .maybeSingle();
+
+      if (!profile && user.email) {
+        // Keycloak user ID doesn't match profile ID — try by email
+        const { data: emailProfile } = await client
+          .from("profiles")
+          .select("role")
+          .eq("email", user.email)
+          .maybeSingle();
+        profile = emailProfile;
+      }
 
       if (profile?.role) {
         if (profile.role === "super_admin" || profile.role === "admin") userRole = "root";

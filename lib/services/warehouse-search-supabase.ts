@@ -359,24 +359,18 @@ export async function searchWarehouses(
         latitude,
         longitude,
         total_sq_ft,
-        available_sq_ft,
         total_pallet_storage,
-        available_pallet_storage,
         min_sq_ft,
         max_sq_ft,
         goods_type,
-        storage_type,
+        storage_types,
         temperature_types,
         amenities,
-        photos,
         operating_hours,
-        external_rating,
-        external_reviews_count,
-        external_rating_source,
-        owner_company_id,
-        companies(id, short_name, logo_url, verification_status)
+        description,
+        rent_methods,
+        owner_company_id
       `, { count: 'exact' })
-      .eq('status', true)
 
     // City filter - support "Town, ST", "Town, ST 12345", state names, and zip codes
     if (params.city) {
@@ -450,14 +444,37 @@ export async function searchWarehouses(
       pricingData = pricing || []
     }
 
-    // Get review summaries
+    // Get review data from warehouse_reviews table directly
     let reviewData: any[] = []
     if (warehouseIds.length > 0) {
       const { data: reviews } = await supabase
-        .from('warehouse_review_summary')
-        .select('warehouse_id, average_rating, total_reviews')
+        .from('warehouse_reviews')
+        .select('warehouse_id, rating')
         .in('warehouse_id', warehouseIds)
-      reviewData = reviews || []
+      // Aggregate reviews per warehouse
+      const reviewMap = new Map<string, { total: number; sum: number }>()
+      for (const r of (reviews || [])) {
+        const entry = reviewMap.get(r.warehouse_id) || { total: 0, sum: 0 }
+        entry.total++
+        entry.sum += r.rating
+        reviewMap.set(r.warehouse_id, entry)
+      }
+      reviewData = Array.from(reviewMap.entries()).map(([wid, v]) => ({
+        warehouse_id: wid,
+        average_rating: v.sum / v.total,
+        total_reviews: v.total,
+      }))
+    }
+
+    // Get company data separately (REST API doesn't support embedded joins)
+    let companyData: any[] = []
+    const companyIds = [...new Set((data || []).map((w: any) => w.owner_company_id).filter(Boolean))]
+    if (companyIds.length > 0) {
+      const { data: companies } = await supabase
+        .from('companies')
+        .select('id, short_name, logo_url, verification_status')
+        .in('id', companyIds)
+      companyData = companies || []
     }
 
     // Transform results
@@ -465,8 +482,8 @@ export async function searchWarehouses(
       // Convert photo paths to full URLs
       const photos = wh.photos && Array.isArray(wh.photos) ? getStoragePublicUrls(wh.photos, 'docs') : []
       
-      // Get company info
-      const company = Array.isArray(wh.companies) ? wh.companies[0] : wh.companies
+      // Company info fetched separately (REST API doesn't support embedded joins)
+      const company = companyData.find((c: any) => c.id === wh.owner_company_id)
 
       // Get pricing for this warehouse
       const pricing = pricingData
@@ -489,29 +506,30 @@ export async function searchWarehouses(
         name: wh.name,
         address: wh.address,
         city: wh.city,
-        state: undefined, // state column doesn't exist in warehouses table
+        state: undefined,
         zipCode: wh.zip_code || '',
         latitude: wh.latitude ? parseFloat(wh.latitude) : 0,
         longitude: wh.longitude ? parseFloat(wh.longitude) : 0,
         total_sq_ft: wh.total_sq_ft || 0,
-        available_sq_ft: wh.available_sq_ft || 0,
+        available_sq_ft: wh.total_sq_ft || 0,
         total_pallet_storage: wh.total_pallet_storage || 0,
-        available_pallet_storage: wh.available_pallet_storage || 0,
+        available_pallet_storage: wh.total_pallet_storage || 0,
         min_sq_ft: wh.min_sq_ft || undefined,
         max_sq_ft: wh.max_sq_ft || undefined,
         goods_type: wh.goods_type || '',
-        storage_type: wh.storage_type || '',
+        storage_type: wh.storage_types || '',
         temperature_types: wh.temperature_types || [],
         amenities: wh.amenities || [],
         description: wh.description || undefined,
-        photos: photos,
+        photos: [],
         min_price: minPrice,
         pricing: pricing,
+        rent_methods: wh.rent_methods || [],
         average_rating: review?.average_rating ? parseFloat(review.average_rating) : 0,
         total_reviews: review?.total_reviews || 0,
-        external_rating: wh.external_rating != null ? parseFloat(wh.external_rating) : undefined,
-        external_reviews_count: wh.external_reviews_count || undefined,
-        external_rating_source: wh.external_rating_source || undefined,
+        external_rating: undefined,
+        external_reviews_count: undefined,
+        external_rating_source: undefined,
         company_name: company?.short_name || '',
         company_logo: company?.logo_url || undefined,
         is_verified: company?.verification_status === 'verified',
@@ -576,104 +594,61 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
   try {
     const supabase = createServerClient()
 
-    // Get warehouse with all fields from warehouses table
+    // Get warehouse basic data — explicit columns (KolayBase REST doesn't support select('*') or embedded joins)
+    const WAREHOUSE_COLUMNS = 'id,name,address,city,zip_code,total_sq_ft,amenities,operating_hours,latitude,longitude,storage_types,temperature_types,custom_status,at_capacity_sq_ft,at_capacity_pallet,min_pallet,max_pallet,min_sq_ft,max_sq_ft,rent_methods,security,goods_type,video_url,access_info,product_acceptance_start_time,product_acceptance_end_time,working_days,warehouse_in_fee,warehouse_out_fee,ports,total_pallet_storage,free_storage_rules,description,late_arrival_grace_minutes,late_arrival_penalty_amount,late_arrival_penalty_type,payment_terms_days,owner_company_id,warehouse_type'
     const { data: warehouse, error } = await supabase
       .from('warehouses')
-      .select(`
-        *,
-        companies(id, short_name, logo_url, verification_status),
-        warehouse_pricing(pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts),
-        warehouse_pallet_pricing(
-          id,
-          pallet_type,
-          pricing_period,
-          goods_type,
-          stackable,
-          stackable_adjustment_type,
-          stackable_adjustment_value,
-          unstackable_adjustment_type,
-          unstackable_adjustment_value,
-          custom_length_cm,
-          custom_width_cm,
-          custom_height_cm,
-          warehouse_pallet_height_pricing(id, height_min_cm, height_max_cm, price_per_unit),
-        warehouse_pallet_weight_pricing(id, weight_min_kg, weight_max_kg, price_per_pallet)
-        )
-      `)
+      .select(WAREHOUSE_COLUMNS)
       .eq('id', id)
-      .eq('status', true)
       .single()
 
     if (error || !warehouse) {
       return null
     }
 
-    // Get review summary
-    const { data: reviewSummary } = await supabase
-      .from('warehouse_review_summary')
-      .select('average_rating, total_reviews')
-      .eq('warehouse_id', id)
-      .single()
+    // Fetch related data in parallel
+    const [pricingResult, palletPricingResult, reviewsResult, companyResult] = await Promise.all([
+      supabase.from('warehouse_pricing').select('pricing_type, base_price, unit, min_quantity, max_quantity, volume_discounts').eq('warehouse_id', id),
+      supabase.from('warehouse_pallet_pricing').select('id, pallet_type, pricing_period, goods_type, stackable, stackable_adjustment_type, stackable_adjustment_value, unstackable_adjustment_type, unstackable_adjustment_value, custom_length_cm, custom_width_cm, custom_height_cm').eq('warehouse_id', id),
+      supabase.from('warehouse_reviews').select('rating').eq('warehouse_id', id),
+      warehouse.owner_company_id
+        ? supabase.from('companies').select('id, short_name, logo_url, verification_status').eq('id', warehouse.owner_company_id).single()
+        : Promise.resolve({ data: null }),
+    ])
 
-    // Get company info
-    const company = Array.isArray(warehouse.companies) ? warehouse.companies[0] as any : warehouse.companies as any
+    const company = companyResult.data as any
+
+    // Review summary from raw reviews
+    const reviews = reviewsResult.data || []
+    const reviewSummary = reviews.length > 0
+      ? { average_rating: reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length, total_reviews: reviews.length }
+      : { average_rating: 0, total_reviews: 0 }
 
     // Transform pricing
-    const pricing = (warehouse.warehouse_pricing || []).map((p: any) => ({
+    const pricing = (pricingResult.data || []).map((p: any) => ({
       type: p.pricing_type,
       price: parseFloat(p.base_price),
       unit: p.unit,
     }))
 
-    // Get min price
     const minPrice = pricing.length > 0 ? Math.min(...pricing.map((p: any) => p.price)) : 0
 
-    const palletPricing = (warehouse.warehouse_pallet_pricing || []).map((pp: any) => {
-      const heightRanges = (pp.warehouse_pallet_height_pricing || []).map((hp: any) => ({
-        id: hp.id,
-        heightMinCm: hp.height_min_cm,
-        heightMaxCm: hp.height_max_cm,
-        pricePerUnit: hp.price_per_unit != null ? parseFloat(hp.price_per_unit.toString()) : 0,
-      }))
-      const weightRanges = (pp.warehouse_pallet_weight_pricing || []).map((wp: any) => ({
-        id: wp.id,
-        weightMinKg: wp.weight_min_kg != null ? parseFloat(wp.weight_min_kg.toString()) : 0,
-        weightMaxKg: wp.weight_max_kg != null ? parseFloat(wp.weight_max_kg.toString()) : 0,
-        pricePerPallet: wp.price_per_pallet != null ? parseFloat(wp.price_per_pallet.toString()) : 0,
-      }))
+    // Transform pallet pricing (height/weight ranges fetched separately if needed)
+    const palletPricing = (palletPricingResult.data || []).map((pp: any) => ({
+      id: pp.id,
+      palletType: pp.pallet_type,
+      pricingPeriod: pp.pricing_period,
+      goodsType: pp.goods_type || 'general',
+      stackable: pp.stackable !== undefined ? pp.stackable : true,
+      stackableAdjustmentType: pp.stackable_adjustment_type || 'plus_per_unit',
+      stackableAdjustmentValue: pp.stackable_adjustment_value != null ? parseFloat(pp.stackable_adjustment_value.toString()) : 0,
+      unstackableAdjustmentType: pp.unstackable_adjustment_type || 'plus_per_unit',
+      unstackableAdjustmentValue: pp.unstackable_adjustment_value != null ? parseFloat(pp.unstackable_adjustment_value.toString()) : 0,
+      customDimensions: pp.custom_length_cm && pp.custom_width_cm && pp.custom_height_cm
+        ? { length: pp.custom_length_cm, width: pp.custom_width_cm, height: pp.custom_height_cm, unit: 'cm' }
+        : undefined,
+    }))
 
-      return {
-        id: pp.id,
-        palletType: pp.pallet_type,
-        pricingPeriod: pp.pricing_period,
-        goodsType: pp.goods_type || 'general',
-        stackable: pp.stackable !== undefined ? pp.stackable : true,
-        stackableAdjustmentType: pp.stackable_adjustment_type || 'plus_per_unit',
-        stackableAdjustmentValue:
-          pp.stackable_adjustment_value != null
-            ? parseFloat(pp.stackable_adjustment_value.toString())
-            : 0,
-        unstackableAdjustmentType: pp.unstackable_adjustment_type || 'plus_per_unit',
-        unstackableAdjustmentValue:
-          pp.unstackable_adjustment_value != null
-            ? parseFloat(pp.unstackable_adjustment_value.toString())
-            : 0,
-        customDimensions:
-          pp.custom_length_cm && pp.custom_width_cm && pp.custom_height_cm
-            ? {
-                length: pp.custom_length_cm,
-                width: pp.custom_width_cm,
-                height: pp.custom_height_cm,
-                unit: 'cm',
-              }
-            : undefined,
-        heightRanges: heightRanges.length > 0 ? heightRanges : undefined,
-        weightRanges: weightRanges.length > 0 ? weightRanges : undefined,
-      }
-    })
-
-    // Calculate average pallet price per day
-    // Algorithm: Get all day-based pricing, average the first height range prices across all pallet types
     const averagePalletPrice = calculateAveragePalletPrice(palletPricing)
 
     return {
@@ -681,27 +656,27 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       name: warehouse.name,
       address: warehouse.address,
       city: warehouse.city,
-      state: warehouse.state || undefined,
+      state: undefined,
       zipCode: warehouse.zip_code || '',
       latitude: warehouse.latitude ? parseFloat(warehouse.latitude) : 0,
       longitude: warehouse.longitude ? parseFloat(warehouse.longitude) : 0,
       total_sq_ft: warehouse.total_sq_ft || 0,
-      available_sq_ft: warehouse.available_sq_ft || 0,
+      available_sq_ft: warehouse.total_sq_ft || 0,
       total_pallet_storage: warehouse.total_pallet_storage || 0,
-      available_pallet_storage: warehouse.available_pallet_storage || 0,
+      available_pallet_storage: warehouse.total_pallet_storage || 0,
       goods_type: warehouse.goods_type || '',
-      storage_type: warehouse.storage_type || '',
+      storage_type: warehouse.storage_types || '',
       temperature_types: warehouse.temperature_types || [],
       amenities: warehouse.amenities || [],
       description: warehouse.description || undefined,
-      photos: warehouse.photos && Array.isArray(warehouse.photos) ? getStoragePublicUrls(warehouse.photos, 'docs') : [],
+      photos: [],
       min_price: minPrice,
       average_pallet_price: averagePalletPrice,
       pricing: pricing,
       palletPricing: palletPricing.length > 0 ? palletPricing : undefined,
-      external_rating: warehouse.external_rating != null ? parseFloat(warehouse.external_rating) : undefined,
-      external_reviews_count: warehouse.external_reviews_count || undefined,
-      external_rating_source: warehouse.external_rating_source || undefined,
+      external_rating: undefined,
+      external_reviews_count: undefined,
+      external_rating_source: undefined,
       average_rating: reviewSummary?.average_rating ? parseFloat(reviewSummary.average_rating) : 0,
       total_reviews: reviewSummary?.total_reviews || 0,
       company_name: company?.short_name || '',
@@ -715,8 +690,8 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       max_sq_ft: warehouse.max_sq_ft || undefined,
       rent_methods: warehouse.rent_methods || [],
       security: warehouse.security || [],
-      video_url: warehouse.video_url ? getStoragePublicUrls([warehouse.video_url], 'docs')[0] : undefined,
-      videos: warehouse.videos && Array.isArray(warehouse.videos) ? getStoragePublicUrls(warehouse.videos, 'docs') : [],
+      video_url: warehouse.video_url || undefined,
+      videos: [],
       access_info: warehouse.access_info || undefined,
       product_acceptance_start_time: warehouse.product_acceptance_start_time || undefined,
       product_acceptance_end_time: warehouse.product_acceptance_end_time || undefined,

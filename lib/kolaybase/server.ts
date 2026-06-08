@@ -134,9 +134,14 @@ class KolaybaseServerAuth {
       return { data: { user: null }, error: null };
     }
 
-    const keycloakUrl = process.env.NEXT_PUBLIC_KEYCLOAK_URL || process.env.KEYCLOAK_URL || "https://auth.kolaybase.com";
     const realm = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || process.env.KEYCLOAK_REALM || "kb-warebnb_dev";
-    const userinfoUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/userinfo`;
+    // Keycloak has migrated from auth.kolaybase.com to auth.basefyio.com
+    const keycloakBases = [
+      process.env.NEXT_PUBLIC_KEYCLOAK_URL || process.env.KEYCLOAK_URL,
+      "https://auth.basefyio.com",
+      "https://auth.kolaybase.com",
+    ].filter(Boolean) as string[];
+    const userinfoUrl = `${keycloakBases[0]}/realms/${realm}/protocol/openid-connect/userinfo`;
 
     try {
       const response = await fetch(userinfoUrl, {

@@ -6,8 +6,7 @@
 
 const REST_URL =
   process.env.NEXT_PUBLIC_KOLAYBASE_REST_URL ||
-  (process.env.NEXT_PUBLIC_KOLAYBASE_URL ? process.env.NEXT_PUBLIC_KOLAYBASE_URL + "/rest/v1" : null) ||
-  "https://api.kolaybase.com/api/proxy/rest/v1";
+  "https://api.kolaybase.com/api/rest/v1";
 const ANON_KEY =
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
   process.env.ANON_KEY ||
@@ -250,7 +249,10 @@ export class KolaybaseQueryBuilder<T = any> {
           `${resolution}${onConflict}${this.countOption ? `,count=${this.countOption}` : ""}`;
       }
 
-      if (token && token !== ANON_KEY) {
+      // Server-side: use service key for apikey + Authorization
+      // Client-side: only use apikey (KolayBase REST API rejects Keycloak JWTs)
+      if (typeof window === "undefined" && token && token !== ANON_KEY) {
+        headers.apikey = token;
         headers.Authorization = `Bearer ${token}`;
       }
 
@@ -292,10 +294,16 @@ export class KolaybaseQueryBuilder<T = any> {
         return { data: null, error: null };
       }
 
-      const data = await response.json();
-      const count = response.headers.get("content-range")
-        ? parseInt(response.headers.get("content-range")!.split("/")[1])
-        : undefined;
+      const json = await response.json();
+      // KolayBase REST API wraps results: { data: [...], count: N }
+      // Supabase returns the array directly. Unwrap to match Supabase behavior.
+      const data = json && typeof json === "object" && "data" in json && Array.isArray(json.data)
+        ? json.data
+        : json;
+      const count = json?.count ??
+        (response.headers.get("content-range")
+          ? parseInt(response.headers.get("content-range")!.split("/")[1])
+          : undefined);
 
       return { data, error: null, count };
     } catch (error: any) {
@@ -377,7 +385,8 @@ export class KolaybaseRPC<T = any> {
         "Content-Type": "application/json",
       };
 
-      if (token && token !== ANON_KEY) {
+      if (typeof window === "undefined" && token && token !== ANON_KEY) {
+        headers.apikey = token;
         headers.Authorization = `Bearer ${token}`;
       }
 
@@ -395,7 +404,8 @@ export class KolaybaseRPC<T = any> {
         };
       }
 
-      const data = await response.json();
+      const json = await response.json();
+      const data = json && typeof json === "object" && "data" in json ? json.data : json;
       return { data, error: null };
     } catch (error: any) {
       return {

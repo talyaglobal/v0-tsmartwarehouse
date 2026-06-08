@@ -20,16 +20,8 @@ export async function getWarehouseReviews(
   try {
     const { data: reviews, error, count } = await supabase
       .from('warehouse_reviews')
-      .select(
-        `
-        *,
-        profiles!warehouse_reviews_user_id_fkey(id, name, avatar_url)
-      `,
-        { count: 'exact' }
-      )
+      .select('id, warehouse_id, booking_id, user_id, rating, title, comment, host_response, host_response_at, created_at, updated_at', { count: 'exact' })
       .eq('warehouse_id', warehouseId)
-      .eq('is_published', true)
-      .eq('status', true)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -41,24 +33,17 @@ export async function getWarehouseReviews(
       id: r.id,
       booking_id: r.booking_id,
       reviewer_id: r.user_id,
-      reviewer_name: r.profiles?.name || 'Anonymous',
-      reviewer_avatar: r.profiles?.avatar_url,
-      reviewee_id: r.reviewee_id || r.user_id,
+      reviewer_name: 'Anonymous',
+      reviewer_avatar: undefined,
+      reviewee_id: r.user_id,
       warehouse_id: r.warehouse_id,
-      review_type: r.review_type || 'guest_to_host',
+      review_type: 'guest_to_host',
       overall_rating: r.rating,
-      communication_rating: r.communication_rating,
-      accuracy_rating: r.accuracy_rating,
-      location_rating: r.location_rating,
-      value_rating: r.value_rating,
-      cleanliness_rating: r.cleanliness_rating,
       title: r.title,
       content: r.comment,
-      pros: r.pros,
-      cons: r.cons,
       host_response: r.host_response,
       host_response_at: r.host_response_at,
-      is_published: r.is_published,
+      is_published: true,
       created_at: r.created_at,
       updated_at: r.updated_at,
     }))
@@ -80,33 +65,33 @@ export async function getReviewSummary(warehouseId: string): Promise<ReviewSumma
   const supabase = createServerClient()
 
   try {
-    const { data: summary, error } = await supabase
-      .from('warehouse_review_summary')
-      .select('*')
+    // No summary view — compute from warehouse_reviews directly
+    const { data: reviews, error } = await supabase
+      .from('warehouse_reviews')
+      .select('rating, created_at')
       .eq('warehouse_id', warehouseId)
-      .single()
 
-    if (error || !summary) {
+    if (error || !reviews || reviews.length === 0) {
       return null
     }
 
+    const total = reviews.length
+    const avg = reviews.reduce((s: number, r: any) => s + r.rating, 0) / total
+    const dist: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
+    reviews.forEach((r: any) => { dist[String(r.rating)] = (dist[String(r.rating)] || 0) + 1 })
+    const lastReview = reviews.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+
     return {
-      warehouse_id: summary.warehouse_id,
-      total_reviews: summary.total_reviews || 0,
-      average_rating: parseFloat(summary.average_rating) || 0,
-      average_communication: parseFloat(summary.average_communication) || 0,
-      average_accuracy: parseFloat(summary.average_accuracy) || 0,
-      average_location: parseFloat(summary.average_location) || 0,
-      average_value: parseFloat(summary.average_value) || 0,
-      average_cleanliness: parseFloat(summary.average_cleanliness) || 0,
-      rating_distribution: summary.rating_distribution || {
-        '1': 0,
-        '2': 0,
-        '3': 0,
-        '4': 0,
-        '5': 0,
-      },
-      last_review_at: summary.last_review_at,
+      warehouse_id: warehouseId,
+      total_reviews: total,
+      average_rating: Math.round(avg * 10) / 10,
+      average_communication: 0,
+      average_accuracy: 0,
+      average_location: 0,
+      average_value: 0,
+      average_cleanliness: 0,
+      rating_distribution: dist,
+      last_review_at: lastReview?.created_at,
     }
   } catch (error) {
     console.error('[reviews] Error fetching review summary:', error)

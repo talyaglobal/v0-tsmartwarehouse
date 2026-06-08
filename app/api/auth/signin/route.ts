@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || process.env.NEXT_PUBLIC_KEYCLOAK_URL || "https://auth.kolaybase.com";
 const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM || process.env.NEXT_PUBLIC_KEYCLOAK_REALM || "kb-warebnb_dev";
 const KEYCLOAK_CLIENT_ID = "admin-cli";
-const TOKEN_URL = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
+
+// Discover the real token endpoint from Keycloak's well-known config
+// auth.kolaybase.com redirects to auth.basefyio.com — use discovery to be resilient
+let _tokenUrl: string | null = null;
+async function getTokenUrl(): Promise<string> {
+  if (_tokenUrl) return _tokenUrl;
+  const discoveryUrls = [
+    process.env.KEYCLOAK_URL || process.env.NEXT_PUBLIC_KEYCLOAK_URL || "https://auth.kolaybase.com",
+    "https://auth.basefyio.com",
+  ];
+  for (const base of discoveryUrls) {
+    try {
+      const res = await fetch(`${base}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration`);
+      if (res.ok) {
+        const config = await res.json();
+        if (config.token_endpoint) {
+          _tokenUrl = config.token_endpoint;
+          console.log("[signin] Discovered token endpoint:", _tokenUrl);
+          return _tokenUrl;
+        }
+      }
+    } catch { /* try next */ }
+  }
+  // Fallback
+  _tokenUrl = `https://auth.basefyio.com/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
+  return _tokenUrl;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +49,7 @@ export async function POST(request: NextRequest) {
       scope: "openid",
     });
 
+    const TOKEN_URL = await getTokenUrl();
     const response = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

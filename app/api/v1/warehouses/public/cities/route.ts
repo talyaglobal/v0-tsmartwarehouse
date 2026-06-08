@@ -13,10 +13,10 @@ export async function GET() {
     const supabase = createServerClient()
 
     // Get all unique cities from active warehouses
+    // Note: warehouses table has no 'status' column; all rows are considered active
     const { data, error } = await supabase
       .from("warehouses")
       .select("city, zip_code")
-      .eq("status", true)
       .order("city", { ascending: true })
 
     if (error) {

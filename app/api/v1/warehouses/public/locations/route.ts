@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
 
     // Get all active warehouses with location data
     // Note: 'state' column doesn't exist in the current schema, using only city and zip_code
+    // Note: warehouses table has no 'status' column; all rows are considered active
     const { data, error } = await supabase
       .from("warehouses")
       .select("id, name, city, zip_code, address")
-      .eq("status", true)
       .order("city", { ascending: true })
 
     if (error) {

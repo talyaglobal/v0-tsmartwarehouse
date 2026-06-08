@@ -6,7 +6,7 @@
  */
 
 const KEYCLOAK_URL =
-  process.env.NEXT_PUBLIC_KEYCLOAK_URL || "https://auth.kolaybase.com";
+  process.env.NEXT_PUBLIC_KEYCLOAK_URL || "https://auth.basefyio.com";
 const KEYCLOAK_REALM =
   process.env.NEXT_PUBLIC_KEYCLOAK_REALM || "kb-warebnb_dev";
 const KEYCLOAK_CLIENT_ID = "admin-cli";

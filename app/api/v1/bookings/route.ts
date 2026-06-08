@@ -192,14 +192,23 @@ export async function POST(request: NextRequest) {
     const { type, palletCount, areaSqFt, hallId, startDate, endDate, notes } = validatedData
     const selectedServices = body.selectedServices || [] // Array of { serviceId: string, quantity?: number }
 
-    // Get customer profile information
+    // Get customer profile information — try by ID, fallback to email
     const { createServerClient } = await import('@/lib/kolaybase/server')
     const supabase = createServerClient()
-    const { data: profile } = await supabase
+    let { data: profile } = await supabase
       .from('profiles')
       .select('name, email')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (!profile && user.email) {
+      const { data: emailProfile } = await supabase
+        .from('profiles')
+        .select('name, email')
+        .eq('email', user.email)
+        .maybeSingle()
+      profile = emailProfile
+    }
 
     if (!profile) {
       const errorData: ErrorResponse = {
