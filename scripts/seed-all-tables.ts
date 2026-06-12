@@ -123,7 +123,6 @@ async function seedDatabase() {
 
     // 12. INVOICES - Skip (booking_id gerekli)
     console.log("⏭️ invoices: Booking gerekli - skip");
-    const invoiceId = null;
 
     // 13. PAYMENTS - Skip (invoice_id gerekli)
     console.log("⏭️ payments: Invoice gerekli - skip");

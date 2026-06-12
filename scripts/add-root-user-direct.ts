@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { createConnection } from "mysql2/promise";
 import { Pool } from "pg";
 
 async function main() {

@@ -493,7 +493,7 @@ export async function searchWarehouses(
           price: parseFloat(p.base_price) || 0,
           unit: p.unit,
         }))
-      
+
       const minPrice = pricing.length > 0
         ? Math.min(...pricing.map((p) => p.price))
         : 0
@@ -521,7 +521,7 @@ export async function searchWarehouses(
         temperature_types: wh.temperature_types || [],
         amenities: wh.amenities || [],
         description: wh.description || undefined,
-        photos: [],
+        photos: photos,
         min_price: minPrice,
         pricing: pricing,
         rent_methods: wh.rent_methods || [],
@@ -677,7 +677,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseSearchResul
       external_rating: undefined,
       external_reviews_count: undefined,
       external_rating_source: undefined,
-      average_rating: reviewSummary?.average_rating ? parseFloat(reviewSummary.average_rating) : 0,
+      average_rating: reviewSummary?.average_rating ? Number(reviewSummary.average_rating) : 0,
       total_reviews: reviewSummary?.total_reviews || 0,
       company_name: company?.short_name || '',
       company_logo: company?.logo_url || undefined,

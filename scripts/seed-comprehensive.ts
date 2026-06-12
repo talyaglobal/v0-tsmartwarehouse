@@ -27,7 +27,7 @@ async function main() {
 
   await q(`DELETE FROM companies WHERE short_name = 'Talya Logistics' AND id != (SELECT id FROM companies WHERE short_name = 'Talya Logistics' ORDER BY created_at LIMIT 1)`);
 
-  for (const [table, dependency] of [
+  for (const [table, _dependency] of [
     ["access_logs", null], ["audit_logs", null], ["tasks", null],
     ["notifications", null], ["appointment_participants", "appointment_id"],
   ] as [string, string | null][]) {

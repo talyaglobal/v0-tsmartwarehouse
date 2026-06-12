@@ -77,7 +77,7 @@ export async function getReviewSummary(warehouseId: string): Promise<ReviewSumma
 
     const total = reviews.length
     const avg = reviews.reduce((s: number, r: any) => s + r.rating, 0) / total
-    const dist: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
+    const dist: { '1': number; '2': number; '3': number; '4': number; '5': number } = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
     reviews.forEach((r: any) => { dist[String(r.rating)] = (dist[String(r.rating)] || 0) + 1 })
     const lastReview = reviews.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 
