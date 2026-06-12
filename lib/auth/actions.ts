@@ -157,48 +157,14 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       }
     }
 
-    // Use admin API to create user directly (no email sent)
     const supabaseAdmin = createServerClient()
-
-    const hasServiceRoleKey = !!(process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY)
-    if (!hasServiceRoleKey) {
-      console.error('BASEFYIO_SERVICE_ROLE_KEY is not configured!')
-      return {
-        error: {
-          message: 'Server configuration error. Please contact support.',
-        },
-      }
-    }
-    
-    // Check if user already exists
-    const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-    
-    if (listError) {
-      console.error('Error checking existing users:', listError)
-      return {
-        error: {
-          message: 'Database error. Please try again.',
-        },
-      }
-    }
-    
-    const userExists = existingUsers?.users?.find(u => u.email === validation.data.email)
-    
-    if (userExists) {
-      return {
-        error: {
-          message: 'An account with this email already exists.',
-        },
-      }
-    }
 
     // Determine user role based on userType
     const isCustomer = validation.data.userType === 'warehouse_client'
     const isReseller = validation.data.userType === 'warehouse_broker'
     const isFinder = validation.data.userType === 'warehouse_finder' || validation.data.userType === 'finder'
-    
-    // Map userType to role
-    let defaultRole = 'warehouse_admin' // Default
+
+    let defaultRole = 'warehouse_admin'
     if (isCustomer) {
       defaultRole = 'warehouse_client'
     } else if (isReseller) {
@@ -207,59 +173,51 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
       defaultRole = 'warehouse_finder'
     }
 
-    // Create user directly with admin API (no email sent)
-    console.log('Creating user with email:', validation.data.email, 'User type:', validation.data.userType || 'owner')
-    console.log('User metadata:', {
-      name: isCustomer ? null : (validation.data.name || null),
-      phone: validation.data.phone || null,
-      role: defaultRole,
-      storage_interest: validation.data.storageType || null,
-    })
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    // Use regular signup endpoint (basefyio doesn't support admin API)
+    const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.signUp({
       email: validation.data.email,
       password: validation.data.password,
-      email_confirm: true, // Auto-confirm email (no verification needed)
-      user_metadata: {
-        name: isCustomer ? null : (validation.data.name || null),
-        phone: validation.data.phone || null,
-        role: defaultRole,
-        storage_interest: validation.data.storageType || null,
-      },
     })
 
-    if (error) {
-      console.error('User creation error:', error)
-      console.error('Error details:', {
-        message: error.message,
-        status: error.status,
-        name: error.name,
-        code: (error as any).code,
-        details: (error as any).details,
-        hint: (error as any).hint,
-      })
-      // Return more detailed error message for debugging
-      const errorMessage = error.message || 'Database error creating new user'
-      const errorDetails = (error as any).details ? ` Details: ${(error as any).details}` : ''
-      const errorHint = (error as any).hint ? ` Hint: ${(error as any).hint}` : ''
-      return {
-        error: {
-          message: `${errorMessage}${errorDetails}${errorHint}`,
-        },
+    if (signUpError) {
+      console.error('Signup error:', signUpError)
+      const msg = signUpError.message || 'Registration failed'
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('exists') || msg.toLowerCase().includes('duplicate')) {
+        return { error: { message: 'An account with this email already exists.' } }
       }
+      return { error: { message: msg } }
     }
 
-    if (!data.user) {
-      return {
-        error: {
-          message: 'Registration failed. Please try again.',
-        },
+    // Extract user ID from signup response
+    let userId: string | null = null
+    if (signUpData?.user?.id) {
+      userId = signUpData.user.id
+    } else if (signUpData?.accessToken || signUpData?.access_token) {
+      // Decode JWT to get user ID
+      const token = signUpData.accessToken || signUpData.access_token
+      try {
+        const base64Url = token.split('.')[1]
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+        const json = Buffer.from(base64, 'base64').toString('utf-8')
+        const claims = JSON.parse(json)
+        userId = claims.sub
+      } catch {
+        console.error('Failed to decode signup token')
       }
+    } else if (signUpData?.userId) {
+      userId = signUpData.userId
     }
 
-    console.log('User created successfully, ID:', data.user.id)
-    
-    // Wait a moment for the trigger to create the profile
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    if (!userId) {
+      console.error('No user ID from signup response:', signUpData)
+      return { error: { message: 'Registration failed. Please try again.' } }
+    }
+
+    const data = { user: { id: userId, email: validation.data.email } }
+    console.log('User created successfully, ID:', userId)
+
+    // Brief delay for auth propagation
+    await new Promise(resolve => setTimeout(resolve, 500))
 
     // Corporate client: always run company + profile + team (works even if trigger already created profile)
     if (isCustomer && (validation.data.clientType || 'individual') === 'corporate') {
