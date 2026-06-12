@@ -66,8 +66,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser()
-      // Apply possible override only for root users (override stored in localStorage)
       const mapped = mapSupabaseUser(supabaseUser)
+      if (!mapped) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
+      // Fetch actual role from profile (JWT doesn't contain role)
+      try {
+        const res = await fetch('/api/auth/sync-profile')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.profile?.role) {
+            mapped.role = data.profile.role as UserRole
+          }
+        }
+      } catch {
+        // Fall back to cookie or default
+        const match = document.cookie.match(/(?:^| )kb_user_role=([^;]+)/)
+        if (match?.[1]) {
+          mapped.role = match[1] as UserRole
+        }
+      }
+
       const override = typeof window !== 'undefined' ? localStorage.getItem('roleOverride') : null
       if (override && isRoot && mapped) {
         setUser({ ...mapped, role: override as UserRole })
@@ -129,11 +151,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })()
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(mapSupabaseUser(session?.user ?? null))
+      const mapped = mapSupabaseUser(session?.user ?? null)
+      if (mapped) {
+        const match = document.cookie.match(/(?:^| )kb_user_role=([^;]+)/)
+        if (match?.[1]) {
+          mapped.role = match[1] as UserRole
+        }
+      }
+      setUser(mapped)
       setLoading(false)
     })
 
