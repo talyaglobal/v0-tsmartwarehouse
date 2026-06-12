@@ -1,39 +1,197 @@
 /**
- * Kolaybase REST API Client
+ * Basefyio REST API Client
  *
- * PostgREST-compatible client for Kolaybase data operations
+ * SQL-based query builder for basefyio data operations.
+ * Generates SQL and executes via basefyio /sql/execute endpoint.
  */
 
-const REST_URL =
-  process.env.NEXT_PUBLIC_KOLAYBASE_REST_URL ||
-  "https://api.kolaybase.com/api/rest/v1";
+const _rawUrl = (
+  process.env.BASEFYIO_API_URL ||
+  process.env.NEXT_PUBLIC_BASEFYIO_URL ||
+  "https://api.basefyio.com"
+).replace(/\/+$/, "");
+const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
 const ANON_KEY =
+  process.env.NEXT_PUBLIC_BASEFYIO_ANON_KEY ||
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
-  process.env.ANON_KEY ||
   "";
 const SERVICE_KEY =
+  process.env.BASEFYIO_SERVICE_ROLE_KEY ||
   process.env.KOLAYBASE_SERVICE_ROLE_KEY ||
-  process.env.SERVICE_KEY ||
+  "";
+const PROJECT_ID =
+  process.env.PROJECT_ID ||
+  process.env.BASEFYIO_PROJECT_ID ||
   "";
 
-/**
- * Get auth token for API requests
- */
 function getAuthToken(): string {
   if (typeof window !== "undefined") {
-    // Client-side: use Keycloak token
     return localStorage.getItem("kb_access_token") || ANON_KEY;
   }
-  // Server-side: use service key
   return SERVICE_KEY || ANON_KEY;
 }
 
-/**
- * Query Builder for PostgREST API
- */
+function qi(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+function qv(v: any): string {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  if (typeof v === "number") return String(v);
+  const str = String(v).replace(/'/g, "''");
+  return `'${str}'`;
+}
+
+type FilterEntry =
+  | { kind: "cmp"; col: string; op: string; val: any }
+  | { kind: "is"; col: string; val: null | boolean }
+  | { kind: "in"; col: string; vals: any[] }
+  | { kind: "not"; col: string; innerOp: string; val: any }
+  | { kind: "cs"; col: string; val: any }
+  | { kind: "ov"; col: string; vals: any[] }
+  | { kind: "or_raw"; postgrest: string };
+
+const OP_SQL: Record<string, string> = {
+  eq: "=", neq: "!=", gt: ">", gte: ">=", lt: "<", lte: "<=",
+  like: "LIKE", ilike: "ILIKE",
+};
+
+function filterToSQL(f: FilterEntry): string {
+  switch (f.kind) {
+    case "cmp":
+      return `${qi(f.col)} ${OP_SQL[f.op] || "="} ${qv(f.val)}`;
+    case "is":
+      if (f.val === null) return `${qi(f.col)} IS NULL`;
+      return `${qi(f.col)} IS ${f.val ? "TRUE" : "FALSE"}`;
+    case "in": {
+      const vals = f.vals.map((v) => qv(v)).join(", ");
+      return `${qi(f.col)} IN (${vals})`;
+    }
+    case "not":
+      return `NOT (${qi(f.col)} ${OP_SQL[f.innerOp] || "="} ${qv(f.val)})`;
+    case "cs": {
+      if (Array.isArray(f.val)) {
+        const items = f.val.map((v) => qv(v)).join(", ");
+        return `${qi(f.col)} @> ARRAY[${items}]::text[]`;
+      }
+      return `${qi(f.col)} @> ${qv(JSON.stringify(f.val))}::jsonb`;
+    }
+    case "ov": {
+      const items = f.vals.map((v) => qv(v)).join(", ");
+      return `${qi(f.col)} && ARRAY[${items}]::text[]`;
+    }
+    case "or_raw":
+      return `(${parsePostgrestOr(f.postgrest)})`;
+  }
+}
+
+const KNOWN_OPS = ["ilike", "like", "neq", "gte", "lte", "not", "gt", "lt", "eq", "is", "in", "cs", "ov"];
+
+function splitTopLevel(raw: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "(") depth++;
+    else if (raw[i] === ")") depth--;
+    else if (raw[i] === "," && depth === 0) {
+      parts.push(raw.substring(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(raw.substring(start));
+  return parts;
+}
+
+function parseSingleCondition(cond: string): string {
+  if (cond.startsWith("and(") && cond.endsWith(")")) {
+    const inner = cond.slice(4, -1);
+    return `(${splitTopLevel(inner).map(parseSingleCondition).join(" AND ")})`;
+  }
+  if (cond.startsWith("or(") && cond.endsWith(")")) {
+    const inner = cond.slice(3, -1);
+    return `(${splitTopLevel(inner).map(parseSingleCondition).join(" OR ")})`;
+  }
+
+  const firstDot = cond.indexOf(".");
+  if (firstDot === -1) return "TRUE";
+  const col = cond.substring(0, firstDot);
+  const rest = cond.substring(firstDot + 1);
+
+  for (const op of KNOWN_OPS) {
+    if (rest.startsWith(op + ".") || rest === op) {
+      const val = rest.length > op.length + 1 ? rest.substring(op.length + 1) : "";
+
+      if (op === "is") {
+        if (val === "null") return `${qi(col)} IS NULL`;
+        if (val === "true") return `${qi(col)} IS TRUE`;
+        if (val === "false") return `${qi(col)} IS FALSE`;
+      }
+      if (op === "in") {
+        const inner = val.startsWith("(") ? val.slice(1, -1) : val;
+        const items = inner.split(",").map((v) => qv(decodeURIComponent(v.trim())));
+        return `${qi(col)} IN (${items.join(", ")})`;
+      }
+      if (op === "not") {
+        const innerRest = rest.substring(4);
+        const innerDot = innerRest.indexOf(".");
+        const innerOp = innerRest.substring(0, innerDot);
+        const innerVal = innerRest.substring(innerDot + 1);
+        return `NOT (${qi(col)} ${OP_SQL[innerOp] || "="} ${qv(decodeURIComponent(innerVal))})`;
+      }
+
+      const sqlOp = OP_SQL[op];
+      if (sqlOp) {
+        return `${qi(col)} ${sqlOp} ${qv(decodeURIComponent(val))}`;
+      }
+      return `${qi(col)} = ${qv(decodeURIComponent(val))}`;
+    }
+  }
+
+  return `${qi(col)} = ${qv(decodeURIComponent(rest))}`;
+}
+
+function parsePostgrestOr(raw: string): string {
+  return splitTopLevel(raw).map(parseSingleCondition).join(" OR ");
+}
+
+async function executeSql(sql: string, token: string): Promise<{ rows: any[]; error: any }> {
+  const url = `${API_URL}/sql/execute`;
+  const headers: Record<string, string> = {
+    apikey: ANON_KEY,
+    "Content-Type": "application/json",
+  };
+  if (token && token !== ANON_KEY) {
+    headers.apikey = token;
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ projectId: PROJECT_ID, query: sql }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      let msg = text;
+      try { msg = JSON.parse(text).message || text; } catch {}
+      return { rows: [], error: { message: msg, status: res.status } };
+    }
+
+    const json = await res.json();
+    const rows = json.rows ?? json.data ?? (Array.isArray(json) ? json : []);
+    return { rows, error: null };
+  } catch (err: any) {
+    return { rows: [], error: { message: err.message || "SQL execution failed" } };
+  }
+}
+
 export class KolaybaseQueryBuilder<T = any> {
   private table: string;
-  private filters: string[] = [];
+  private _filters: FilterEntry[] = [];
   private selectFields = "*";
   private orderFields: string[] = [];
   private limitValue?: number;
@@ -43,7 +201,6 @@ export class KolaybaseQueryBuilder<T = any> {
   private upsertIgnoreDuplicates?: boolean;
   private method: "GET" | "POST" | "PATCH" | "DELETE" = "GET";
   private body?: any;
-  // Set by KolaybaseClient when a server-side token is available
   _tokenOverride?: string;
 
   constructor(table: string) {
@@ -60,89 +217,84 @@ export class KolaybaseQueryBuilder<T = any> {
   }
 
   eq(column: string, value: any) {
-    this.filters.push(`${column}=eq.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "eq", val: value });
     return this;
   }
 
   neq(column: string, value: any) {
-    this.filters.push(`${column}=neq.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "neq", val: value });
     return this;
   }
 
   not(column: string, operator: string, value: any) {
-    this.filters.push(`${column}=not.${operator}.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "not", col: column, innerOp: operator, val: value });
     return this;
   }
 
   in(column: string, values: any[]) {
-    const encoded = values.map((v) => encodeURIComponent(v)).join(",");
-    this.filters.push(`${column}=in.(${encoded})`);
+    this._filters.push({ kind: "in", col: column, vals: values });
     return this;
   }
 
   lt(column: string, value: any) {
-    this.filters.push(`${column}=lt.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "lt", val: value });
     return this;
   }
 
   lte(column: string, value: any) {
-    this.filters.push(`${column}=lte.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "lte", val: value });
     return this;
   }
 
   gt(column: string, value: any) {
-    this.filters.push(`${column}=gt.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "gt", val: value });
     return this;
   }
 
   gte(column: string, value: any) {
-    this.filters.push(`${column}=gte.${encodeURIComponent(value)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "gte", val: value });
     return this;
   }
 
   like(column: string, pattern: string) {
-    this.filters.push(`${column}=like.${encodeURIComponent(pattern)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "like", val: pattern });
     return this;
   }
 
   ilike(column: string, pattern: string) {
-    this.filters.push(`${column}=ilike.${encodeURIComponent(pattern)}`);
+    this._filters.push({ kind: "cmp", col: column, op: "ilike", val: pattern });
     return this;
   }
 
   is(column: string, value: null | boolean) {
-    this.filters.push(`${column}=is.${value === null ? "null" : value}`);
+    this._filters.push({ kind: "is", col: column, val: value });
     return this;
   }
 
   order(field: string, options?: { ascending?: boolean; nullsFirst?: boolean }) {
-    const direction = options?.ascending === false ? "desc" : "asc";
+    const direction = options?.ascending === false ? "DESC" : "ASC";
     const nulls =
       options?.nullsFirst === true
-        ? ".nullsfirst"
+        ? " NULLS FIRST"
         : options?.nullsFirst === false
-          ? ".nullslast"
+          ? " NULLS LAST"
           : "";
-    this.orderFields.push(`${field}.${direction}${nulls}`);
+    this.orderFields.push(`${qi(field)} ${direction}${nulls}`);
     return this;
   }
 
   or(filters: string) {
-    this.filters.push(`or=(${filters})`);
+    this._filters.push({ kind: "or_raw", postgrest: filters });
     return this;
   }
 
   contains(column: string, value: any) {
-    const encoded = Array.isArray(value)
-      ? `{${value.map((v) => encodeURIComponent(v)).join(",")}}`
-      : encodeURIComponent(JSON.stringify(value));
-    this.filters.push(`${column}=cs.${encoded}`);
+    this._filters.push({ kind: "cs", col: column, val: value });
     return this;
   }
 
   overlaps(column: string, value: any[]) {
-    const encoded = `{${value.map((v) => encodeURIComponent(v)).join(",")}}`;
-    this.filters.push(`${column}=ov.${encoded}`);
+    this._filters.push({ kind: "ov", col: column, vals: value });
     return this;
   }
 
@@ -163,12 +315,6 @@ export class KolaybaseQueryBuilder<T = any> {
     return this;
   }
 
-  /**
-   * Upsert (INSERT ... ON CONFLICT DO UPDATE/NOTHING)
-   * onConflict: comma-separated columns that form the unique key
-   * ignoreDuplicates: if true → ON CONFLICT DO NOTHING (returns count=0 for duplicates)
-   * count: 'exact' | 'planned' | 'estimated' — returned in result.count
-   */
   upsert(
     data: any,
     options?: {
@@ -196,125 +342,106 @@ export class KolaybaseQueryBuilder<T = any> {
     return this;
   }
 
-  private buildUrl(): string {
-    let url = `${REST_URL}/${this.table}`;
-    const params: string[] = [];
+  private buildWhere(): string {
+    if (this._filters.length === 0) return "";
+    const clauses = this._filters.map(filterToSQL);
+    return ` WHERE ${clauses.join(" AND ")}`;
+  }
 
-    if (this.selectFields && this.method === "GET") {
-      params.push(`select=${this.selectFields}`);
+  private buildOrderBy(): string {
+    if (this.orderFields.length === 0) return "";
+    return ` ORDER BY ${this.orderFields.join(", ")}`;
+  }
+
+  private buildLimitOffset(): string {
+    let s = "";
+    if (this.limitValue) s += ` LIMIT ${this.limitValue}`;
+    if (this.offsetValue) s += ` OFFSET ${this.offsetValue}`;
+    return s;
+  }
+
+  private buildSelectCols(): string {
+    if (this.selectFields === "*") return "*";
+    return this.selectFields
+      .split(",")
+      .map((c) => {
+        const col = c.trim();
+        if (col === "*") return "*";
+        if (col.includes("(")) return col;
+        return qi(col);
+      })
+      .join(", ");
+  }
+
+  private buildSQL(): string {
+    const table = qi(this.table);
+
+    if (this.method === "GET") {
+      return `SELECT ${this.buildSelectCols()} FROM ${table}${this.buildWhere()}${this.buildOrderBy()}${this.buildLimitOffset()}`;
     }
 
-    if (this.filters.length > 0) {
-      params.push(...this.filters);
+    if (this.method === "POST" && this.body) {
+      const rows = Array.isArray(this.body) ? this.body : [this.body];
+      if (rows.length === 0) return `SELECT 1 WHERE FALSE`;
+
+      const allKeys = Object.keys(rows[0]);
+      const cols = allKeys.map(qi).join(", ");
+      const valueRows = rows
+        .map((r) => `(${allKeys.map((k) => qv(r[k])).join(", ")})`)
+        .join(", ");
+
+      if (this.upsertOnConflict !== undefined) {
+        const conflictCols = this.upsertOnConflict
+          ? this.upsertOnConflict.split(",").map((c) => qi(c.trim())).join(", ")
+          : qi("id");
+
+        if (this.upsertIgnoreDuplicates) {
+          return `INSERT INTO ${table} (${cols}) VALUES ${valueRows} ON CONFLICT (${conflictCols}) DO NOTHING RETURNING *`;
+        }
+        const updateCols = allKeys
+          .filter((k) => !(this.upsertOnConflict || "id").split(",").map((c) => c.trim()).includes(k))
+          .map((k) => `${qi(k)} = EXCLUDED.${qi(k)}`)
+          .join(", ");
+        return `INSERT INTO ${table} (${cols}) VALUES ${valueRows} ON CONFLICT (${conflictCols}) DO UPDATE SET ${updateCols} RETURNING *`;
+      }
+
+      return `INSERT INTO ${table} (${cols}) VALUES ${valueRows} RETURNING *`;
     }
 
-    if (this.orderFields.length > 0) {
-      params.push(`order=${this.orderFields.join(",")}`);
+    if (this.method === "PATCH" && this.body) {
+      const sets = Object.entries(this.body)
+        .map(([k, v]) => `${qi(k)} = ${qv(v)}`)
+        .join(", ");
+      return `UPDATE ${table} SET ${sets}${this.buildWhere()} RETURNING *`;
     }
 
-    if (this.limitValue) {
-      params.push(`limit=${this.limitValue}`);
+    if (this.method === "DELETE") {
+      return `DELETE FROM ${table}${this.buildWhere()} RETURNING *`;
     }
 
-    if (this.offsetValue) {
-      params.push(`offset=${this.offsetValue}`);
-    }
-
-    if (params.length > 0) {
-      url += "?" + params.join("&");
-    }
-
-    return url;
+    return `SELECT * FROM ${table}`;
   }
 
   async execute(): Promise<{ data: T | T[] | null; error: any; count?: number }> {
-    const url = this.buildUrl();
     const token = this._tokenOverride ?? getAuthToken();
+    const sql = this.buildSQL();
 
-    try {
-      const headers: Record<string, string> = {
-        apikey: ANON_KEY,
-        "Content-Type": "application/json",
-        // Request count header when count option is set
-        ...(this.countOption && { Prefer: `count=${this.countOption}` }),
-      };
+    const { rows, error } = await executeSql(sql, token);
 
-      // Upsert resolution header
-      if (this.upsertOnConflict !== undefined) {
-        const resolution = this.upsertIgnoreDuplicates
-          ? "resolution=ignore-duplicates"
-          : "resolution=merge-duplicates";
-        const onConflict = this.upsertOnConflict ? `,on_conflict=${this.upsertOnConflict}` : "";
-        headers["Prefer"] =
-          `${resolution}${onConflict}${this.countOption ? `,count=${this.countOption}` : ""}`;
-      }
-
-      // Server-side: use service key for apikey + Authorization
-      // Client-side: only use apikey (KolayBase REST API rejects Keycloak JWTs)
-      if (typeof window === "undefined" && token && token !== ANON_KEY) {
-        headers.apikey = token;
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const options: RequestInit = {
-        method: this.method,
-        headers,
-      };
-
-      if (this.body && (this.method === "POST" || this.method === "PATCH")) {
-        options.body = JSON.stringify(this.body);
-      }
-
-      const response = await fetch(url, options);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = errorText;
-
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorJson.error || errorText;
-        } catch {
-          // Use text as-is
-        }
-
-        return {
-          data: null,
-          error: {
-            message: errorMessage,
-            status: response.status,
-            statusText: response.statusText,
-          },
-        };
-      }
-
-      // Handle empty responses (DELETE)
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        return { data: null, error: null };
-      }
-
-      const json = await response.json();
-      // KolayBase REST API wraps results: { data: [...], count: N }
-      // Supabase returns the array directly. Unwrap to match Supabase behavior.
-      const data = json && typeof json === "object" && "data" in json && Array.isArray(json.data)
-        ? json.data
-        : json;
-      const count = json?.count ??
-        (response.headers.get("content-range")
-          ? parseInt(response.headers.get("content-range")!.split("/")[1])
-          : undefined);
-
-      return { data, error: null, count };
-    } catch (error: any) {
-      console.error("Kolaybase query error:", error);
-      return {
-        data: null,
-        error: {
-          message: error.message || "Request failed",
-        },
-      };
+    if (error) {
+      return { data: null, error };
     }
+
+    let count: number | undefined;
+    if (this.countOption) {
+      const countSql = `SELECT COUNT(*) as cnt FROM ${qi(this.table)}${this.buildWhere()}`;
+      const countResult = await executeSql(countSql, token);
+      count = countResult.rows?.[0]?.cnt
+        ? parseInt(countResult.rows[0].cnt)
+        : rows.length;
+    }
+
+    return { data: rows as any, error: null, count };
   }
 
   async maybeSingle(): Promise<{ data: T | null; error: any }> {
@@ -343,7 +470,6 @@ export class KolaybaseQueryBuilder<T = any> {
     };
   }
 
-  // Promise compatibility — awaiting the builder resolves to { data, error, count }
   async then<TResult1 = any, TResult2 = never>(
     onfulfilled?:
       | ((value: {
@@ -363,12 +489,10 @@ export class KolaybaseQueryBuilder<T = any> {
   }
 }
 
-/**
- * RPC Function Caller
- */
 export class KolaybaseRPC<T = any> {
   private functionName: string;
   private params: any;
+  _tokenOverride?: string;
 
   constructor(functionName: string, params?: any) {
     this.functionName = functionName;
@@ -376,43 +500,19 @@ export class KolaybaseRPC<T = any> {
   }
 
   async execute(): Promise<{ data: T | null; error: any }> {
-    const url = `${REST_URL}/rpc/${this.functionName}`;
-    const token = getAuthToken();
+    const token = this._tokenOverride ?? getAuthToken();
+    const args = this.params
+      ? Object.entries(this.params)
+          .map(([k, v]) => `${qv(v)} AS ${qi(k)}`)
+          .join(", ")
+      : "";
+    const sql = args
+      ? `SELECT * FROM ${qi(this.functionName)}(${Object.entries(this.params).map(([, v]) => qv(v)).join(", ")})`
+      : `SELECT * FROM ${qi(this.functionName)}()`;
 
-    try {
-      const headers: Record<string, string> = {
-        apikey: ANON_KEY,
-        "Content-Type": "application/json",
-      };
-
-      if (typeof window === "undefined" && token && token !== ANON_KEY) {
-        headers.apikey = token;
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(this.params || {}),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return {
-          data: null,
-          error: { message: errorText, status: response.status },
-        };
-      }
-
-      const json = await response.json();
-      const data = json && typeof json === "object" && "data" in json ? json.data : json;
-      return { data, error: null };
-    } catch (error: any) {
-      return {
-        data: null,
-        error: { message: error.message },
-      };
-    }
+    const { rows, error } = await executeSql(sql, token);
+    if (error) return { data: null, error };
+    return { data: (rows.length === 1 ? rows[0] : rows) as any, error: null };
   }
 
   async single(): Promise<{ data: T | null; error: any }> {
@@ -429,17 +529,11 @@ export class KolaybaseRPC<T = any> {
       | null
   ): Promise<TResult1> {
     const result = await this.execute();
-    if (onfulfilled) {
-      return onfulfilled(result);
-    }
+    if (onfulfilled) return onfulfilled(result);
     return result as any;
   }
 }
 
-/**
- * Inner Kolaybase REST client used by the outer KolaybaseClient in client.ts.
- * Token overrides are applied by the outer client, not here.
- */
 export class KolaybaseClient {
   auth: any;
 

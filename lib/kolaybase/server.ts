@@ -1,84 +1,61 @@
 /**
- * Kolaybase Server Client
+ * Basefyio Server Client
  *
- * Server-side (API routes, Server Components, middleware) counterpart to the
- * browser client. Uses the service key by default so it can bypass RLS for
- * system operations, or the user's JWT extracted from cookies for
+ * Server-side counterpart to the browser client. Uses the service key
+ * for system operations, or the user's JWT from cookies for
  * authenticated-user operations.
- *
- * This is a drop-in replacement for lib/supabase/server.ts.
  */
 
 import { KolaybaseClient } from "./client";
 
-const SERVICE_KEY = process.env.KOLAYBASE_SERVICE_ROLE_KEY || "";
-const ANON_KEY = process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
+const SERVICE_KEY =
+  process.env.BASEFYIO_SERVICE_ROLE_KEY ||
+  process.env.KOLAYBASE_SERVICE_ROLE_KEY ||
+  "";
+const ANON_KEY =
+  process.env.NEXT_PUBLIC_BASEFYIO_ANON_KEY ||
+  process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
+  "";
+const _rawUrl = (
+  process.env.BASEFYIO_API_URL ||
+  process.env.NEXT_PUBLIC_BASEFYIO_URL ||
+  "https://api.basefyio.com"
+).replace(/\/+$/, "");
+const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
 
-// ---------------------------------------------------------------------------
-// Service-role client (bypasses RLS — equivalent to Supabase service role)
-// ---------------------------------------------------------------------------
-
-/**
- * Create a KolayBase client using the service key.
- * Use for all server-side DB operations in API routes.
- * Replaces createServerSupabaseClient() / createClient() from lib/supabase/server.ts.
- */
 export function createServerClient(): KolaybaseClient {
   if (!SERVICE_KEY && !ANON_KEY) {
     throw new Error(
-      "Missing KolayBase credentials. Set KOLAYBASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_KOLAYBASE_ANON_KEY."
+      "Missing basefyio credentials. Set BASEFYIO_SERVICE_ROLE_KEY or NEXT_PUBLIC_BASEFYIO_ANON_KEY."
     );
   }
   const token = SERVICE_KEY || ANON_KEY;
-  const auth = new KolaybaseServerAuth(token) as any;
+  const auth = new BasefyioServerAuth(token) as any;
   return new KolaybaseClient(auth, token);
 }
 
-/** Alias matching the Supabase naming convention used across API routes. */
 export const createServerSupabaseClient = createServerClient;
-
-/** Alias used by lib/supabase/server.ts's createClient() export. */
 export const createClient = createServerClient;
 
-// ---------------------------------------------------------------------------
-// Cookie-aware authenticated client (for middleware / SSR auth checks)
-// ---------------------------------------------------------------------------
-
-/**
- * Create a KolayBase client that reads the user JWT from the Next.js
- * cookies store (server components / route handlers).
- * Falls back to the service key if no user session cookie is found.
- *
- * Replaces createAuthenticatedSupabaseClient() from lib/supabase/server.ts.
- */
 export async function createAuthenticatedServerClient(): Promise<KolaybaseClient> {
   let userToken: string | null = null;
 
   try {
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
-
-    // KolayBase stores the access token in the kb_access_token cookie when
-    // using SSR (set by the client after sign-in via document.cookie / SSR
-    // cookie sync). Fall back to a Supabase-compatible auth-token cookie name
-    // for smooth migration.
     userToken =
       cookieStore.get("kb_access_token")?.value ??
       cookieStore.get("sb-access-token")?.value ??
       null;
   } catch {
-    // During build / middleware context cookies() is not available — fall through
+    // During build / middleware context cookies() is not available
   }
 
   const token = userToken || SERVICE_KEY || ANON_KEY;
-  const auth = new KolaybaseServerAuth(token) as any;
+  const auth = new BasefyioServerAuth(token) as any;
   return new KolaybaseClient(auth, token);
 }
 
-/**
- * Create a KolayBase client that reads the user JWT from a NextRequest's
- * cookies (middleware / edge context).
- */
 export function createMiddlewareClient(request: {
   cookies: { get: (name: string) => { value: string } | undefined };
 }): KolaybaseClient {
@@ -88,41 +65,21 @@ export function createMiddlewareClient(request: {
     null;
 
   const token = userToken || ANON_KEY;
-  const auth = new KolaybaseServerAuth(token) as any;
+  const auth = new BasefyioServerAuth(token) as any;
   return new KolaybaseClient(auth, token);
 }
 
-// ---------------------------------------------------------------------------
-// Admin client (service role, never expose to client)
-// ---------------------------------------------------------------------------
-
-/**
- * Admin client using the service key.
- * Replaces createAdminClient() from lib/supabase/admin.ts.
- */
 export function createAdminClient(): KolaybaseClient {
   if (!SERVICE_KEY) {
     throw new Error(
-      "Missing KOLAYBASE_SERVICE_ROLE_KEY environment variable. Admin operations require the service key."
+      "Missing BASEFYIO_SERVICE_ROLE_KEY environment variable. Admin operations require the service key."
     );
   }
-  const auth = new KolaybaseServerAuth(SERVICE_KEY) as any;
+  const auth = new BasefyioServerAuth(SERVICE_KEY) as any;
   return new KolaybaseClient(auth, SERVICE_KEY);
 }
 
-// ---------------------------------------------------------------------------
-// Server-side Auth stub
-// ---------------------------------------------------------------------------
-
-/**
- * Minimal server-side auth object.
- *
- * On the server we validate JWTs via the KolayBase API rather than
- * via localStorage. The `getUser()` method verifies the token with the
- * KolayBase auth endpoint and returns the user, mirroring the Supabase
- * `supabase.auth.getUser()` interface used across API middleware.
- */
-class KolaybaseServerAuth {
+class BasefyioServerAuth {
   private token: string;
 
   constructor(token: string) {
@@ -134,18 +91,10 @@ class KolaybaseServerAuth {
       return { data: { user: null }, error: null };
     }
 
-    const realm = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || process.env.KEYCLOAK_REALM || "kb-warebnb_dev";
-    // Keycloak has migrated from auth.kolaybase.com to auth.basefyio.com
-    const keycloakBases = [
-      process.env.NEXT_PUBLIC_KEYCLOAK_URL || process.env.KEYCLOAK_URL,
-      "https://auth.basefyio.com",
-      "https://auth.kolaybase.com",
-    ].filter(Boolean) as string[];
-    const userinfoUrl = `${keycloakBases[0]}/realms/${realm}/protocol/openid-connect/userinfo`;
-
     try {
-      const response = await fetch(userinfoUrl, {
+      const response = await fetch(`${API_URL}/rest/v1/auth/me`, {
         headers: {
+          apikey: ANON_KEY || this.token,
           Authorization: `Bearer ${this.token}`,
         },
       });
@@ -156,12 +105,12 @@ class KolaybaseServerAuth {
 
       const claims = await response.json();
       const user = {
-        id: claims.sub,
+        id: claims.sub || claims.id,
         email: claims.email || claims.preferred_username,
         username: claims.preferred_username,
         emailVerified: claims.email_verified ?? false,
-        firstName: claims.given_name,
-        lastName: claims.family_name,
+        firstName: claims.given_name || claims.firstName,
+        lastName: claims.family_name || claims.lastName,
       };
       return { data: { user }, error: null };
     } catch (err: any) {

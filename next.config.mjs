@@ -104,7 +104,7 @@ const nextConfig = {
               "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com https://maps.gstatic.com",
               "img-src 'self' data: https: blob: https://maps.gstatic.com https://*.googleapis.com https://*.googleusercontent.com",
               "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",
-              "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com https://*.vercel-scripts.com",
+              "connect-src 'self' https://*.basefyio.com https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com https://*.vercel-scripts.com",
               "frame-src 'self' https://js.stripe.com https://www.google.com https://maps.google.com https://*.google.com",
               "worker-src 'self' blob:",
               "child-src 'self' blob:",

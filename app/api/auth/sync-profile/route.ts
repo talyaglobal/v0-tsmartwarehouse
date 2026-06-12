@@ -1,8 +1,8 @@
 /**
  * Profile Sync API
  *
- * Syncs the Keycloak auth user ID with the profiles table.
- * Uses KolayBase REST client (no Prisma dependency).
+ * Syncs the basefyio auth user ID with the profiles table.
+ * Uses basefyio SQL client (no Prisma dependency).
  */
 import { NextResponse } from "next/server";
 import { createAuthenticatedServerClient, createServerClient } from "@/lib/kolaybase/server";

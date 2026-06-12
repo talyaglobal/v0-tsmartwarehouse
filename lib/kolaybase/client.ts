@@ -1,14 +1,13 @@
 /**
- * Kolaybase Client - Complete Integration
+ * Basefyio Client - Complete Integration
  *
- * Combines Keycloak Auth + PostgREST Data API
+ * Combines basefyio Auth + SQL-based Data API
  * Drop-in replacement for Supabase client
  */
 
 import { KolaybaseAuth } from "./auth";
 import { KolaybaseClient as RestClient, KolaybaseQueryBuilder, KolaybaseRPC } from "./rest-client";
 
-/** Auth interface covering all methods used across the codebase. */
 export interface KolaybaseAuthLike {
   getUser(): Promise<{ data: { user: any }; error: any }>;
   getSession(): Promise<{ data: { session: any }; error: any }>;
@@ -42,7 +41,6 @@ export interface KolaybaseAuthLike {
 
 export class KolaybaseClient {
   auth: KolaybaseAuthLike;
-  /** Storage bucket accessor — mirrors Supabase's supabase.storage.from(bucket) */
   storage: KolaybaseStorage;
   private restClient: RestClient;
   private tokenOverride?: string;
@@ -54,10 +52,6 @@ export class KolaybaseClient {
     this.storage = new KolaybaseStorage(tokenOverride);
   }
 
-  /**
-   * Realtime channel stub. KolayBase realtime is not yet implemented.
-   * Returns a no-op channel object so existing code doesn't crash.
-   */
   channel(_name: string): KolaybaseRealtimeChannel {
     return new KolaybaseRealtimeChannel();
   }
@@ -83,20 +77,12 @@ export class KolaybaseClient {
   }
 }
 
-/**
- * Create Kolaybase client instance (Supabase-compatible, browser-side)
- */
 export function createClient(): KolaybaseClient {
   return new KolaybaseClient();
 }
 
-// Re-export types and utilities
 export { KolaybaseAuth } from "./auth";
 export { KolaybaseQueryBuilder, KolaybaseRPC } from "./rest-client";
-
-// ---------------------------------------------------------------------------
-// Realtime stub (no-op until KolayBase realtime is implemented)
-// ---------------------------------------------------------------------------
 
 type RealtimeEventType = "INSERT" | "UPDATE" | "DELETE" | "*";
 
@@ -109,7 +95,7 @@ interface RealtimeFilter {
 
 export class KolaybaseRealtimeChannel {
   on(_type: string, _filter: RealtimeFilter, _callback: (payload: any) => void) {
-    return this; // fluent no-op
+    return this;
   }
 
   subscribe(_callback?: (status: any) => void) {
@@ -122,22 +108,21 @@ export class KolaybaseRealtimeChannel {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Storage stub
-// ---------------------------------------------------------------------------
-
-const STORAGE_URL =
-  (process.env.NEXT_PUBLIC_KOLAYBASE_URL || process.env.REST_BASE_URL || "https://api.kolaybase.com") + "/storage/v1";
+const _rawUrl = (
+  process.env.BASEFYIO_API_URL ||
+  process.env.NEXT_PUBLIC_BASEFYIO_URL ||
+  "https://api.basefyio.com"
+).replace(/\/+$/, "");
+const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
 const ANON_KEY =
+  process.env.NEXT_PUBLIC_BASEFYIO_ANON_KEY ||
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
-  process.env.ANON_KEY ||
+  "";
+const PROJECT_ID =
+  process.env.PROJECT_ID ||
+  process.env.BASEFYIO_PROJECT_ID ||
   "";
 
-/**
- * Minimal storage client mirroring Supabase's storage interface.
- * Exposes the methods actually called in the codebase: upload, remove,
- * getPublicUrl, createSignedUrl, list.
- */
 export class KolaybaseStorage {
   private tokenOverride?: string;
 
@@ -164,7 +149,7 @@ export class KolaybaseStorageBucket {
     if (typeof window !== "undefined") {
       return localStorage.getItem("kb_access_token") || ANON_KEY;
     }
-    return process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
+    return process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
   }
 
   private headers(): Record<string, string> {
@@ -174,71 +159,93 @@ export class KolaybaseStorageBucket {
     };
   }
 
+  private basePath(): string {
+    return `${API_URL}/projects/${PROJECT_ID}/storage/buckets/${encodeURIComponent(this.bucket)}`;
+  }
+
   async upload(path: string, fileBody: any, options?: any) {
-    const res = await fetch(`${STORAGE_URL}/object/${this.bucket}/${path}`, {
-      method: "POST",
-      headers: {
-        ...this.headers(),
-        "Content-Type": options?.contentType || "application/octet-stream",
-        ...(options?.upsert ? { "x-upsert": "true" } : {}),
-      },
-      body: fileBody,
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      return { data: null, error: { message: err } };
+    try {
+      const formData = new FormData();
+      const fileName = path.split("/").pop() || "file";
+      const ct = options?.contentType || "application/octet-stream";
+      if (fileBody instanceof Blob) {
+        formData.append("file", fileBody, fileName);
+      } else {
+        const blob = new Blob([fileBody], { type: ct });
+        formData.append("file", blob, fileName);
+      }
+
+      const res = await fetch(
+        `${this.basePath()}/objects?path=${encodeURIComponent(path)}`,
+        {
+          method: "POST",
+          headers: this.headers(),
+          body: formData,
+        }
+      );
+      if (!res.ok) {
+        const err = await res.text();
+        return { data: null, error: { message: err } };
+      }
+      return { data: { path }, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
     }
-    return { data: { path }, error: null };
   }
 
   async remove(paths: string[]) {
-    const res = await fetch(`${STORAGE_URL}/object/${this.bucket}`, {
-      method: "DELETE",
-      headers: { ...this.headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ prefixes: paths }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      return { data: null, error: { message: err } };
+    try {
+      const res = await fetch(`${this.basePath()}/objects`, {
+        method: "DELETE",
+        headers: { ...this.headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ prefixes: paths }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        return { data: null, error: { message: err } };
+      }
+      return { data: paths, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
     }
-    return { data: paths, error: null };
   }
 
   getPublicUrl(path: string) {
-    const url = `${STORAGE_URL}/object/public/${this.bucket}/${path}`;
+    const url = `${this.basePath()}/objects/public/${path}`;
     return { data: { publicUrl: url } };
   }
 
   async createSignedUrl(path: string, expiresIn: number) {
-    const res = await fetch(`${STORAGE_URL}/object/sign/${this.bucket}/${path}`, {
-      method: "POST",
-      headers: { ...this.headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ expiresIn }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      return { data: null, error: { message: err } };
+    try {
+      const res = await fetch(
+        `${this.basePath()}/objects/url?path=${encodeURIComponent(path)}&expiry=${expiresIn}`,
+        { headers: this.headers() }
+      );
+      if (!res.ok) {
+        const err = await res.text();
+        return { data: null, error: { message: err } };
+      }
+      const data = await res.json();
+      return { data: { signedUrl: data.url }, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
     }
-    const { signedURL } = await res.json();
-    return { data: { signedUrl: signedURL }, error: null };
   }
 
-  async list(prefix?: string, options?: any) {
-    const body: any = {
-      prefix: prefix || "",
-      limit: options?.limit || 100,
-      offset: options?.offset || 0,
-    };
-    const res = await fetch(`${STORAGE_URL}/object/list/${this.bucket}`, {
-      method: "POST",
-      headers: { ...this.headers(), "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      return { data: null, error: { message: err } };
+  async list(prefix?: string, _options?: any) {
+    try {
+      const q = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+      const res = await fetch(`${this.basePath()}/objects${q}`, {
+        headers: this.headers(),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        return { data: null, error: { message: err } };
+      }
+      const data = await res.json();
+      return { data, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
     }
-    const data = await res.json();
-    return { data, error: null };
   }
 }

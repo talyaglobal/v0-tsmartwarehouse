@@ -1,30 +1,20 @@
 /**
- * Kolaybase Authentication Client
+ * Basefyio Authentication Client
  *
- * Uses Keycloak OpenID Connect for authentication.
- * Token endpoint: https://auth.kolaybase.com/realms/{realm}/protocol/openid-connect/token
+ * Uses basefyio auth endpoints for authentication.
+ * Auth endpoint: https://api.basefyio.com/rest/v1/auth/*
  */
 
-const KEYCLOAK_URL =
-  process.env.NEXT_PUBLIC_KEYCLOAK_URL || "https://auth.basefyio.com";
-const KEYCLOAK_REALM =
-  process.env.NEXT_PUBLIC_KEYCLOAK_REALM || "kb-warebnb_dev";
-const KEYCLOAK_CLIENT_ID = "admin-cli";
-
-const TOKEN_URL = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
-const LOGOUT_URL = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`;
-
+const _rawUrl = (
+  process.env.BASEFYIO_API_URL ||
+  process.env.NEXT_PUBLIC_BASEFYIO_URL ||
+  "https://api.basefyio.com"
+).replace(/\/+$/, "");
+const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
 const ANON_KEY =
-  process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY || "";
-
-// Debug: Log configuration on load
-if (typeof window !== "undefined") {
-  console.log("[Kolaybase Auth] Configuration:", {
-    KEYCLOAK_URL,
-    KEYCLOAK_REALM,
-    TOKEN_URL,
-  });
-}
+  process.env.NEXT_PUBLIC_BASEFYIO_ANON_KEY ||
+  process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
+  "";
 
 const TOKEN_KEY = "kb_access_token";
 const REFRESH_KEY = "kb_refresh_token";
@@ -47,9 +37,6 @@ interface Session {
   expires_at: number;
 }
 
-/**
- * Parse JWT payload without verification (client-side user extraction)
- */
 function parseJwt(token: string): any {
   try {
     const base64Url = token.split(".")[1];
@@ -66,9 +53,6 @@ function parseJwt(token: string): any {
   }
 }
 
-/**
- * Extract User from Keycloak JWT claims
- */
 function userFromToken(token: string): User {
   const claims = parseJwt(token);
   return {
@@ -81,22 +65,21 @@ function userFromToken(token: string): User {
   };
 }
 
-/**
- * Kolaybase Auth Service (Keycloak-based)
- */
+function authHeaders(): Record<string, string> {
+  return {
+    apikey: ANON_KEY,
+    "Content-Type": "application/json",
+  };
+}
+
 export class KolaybaseAuth {
-  /**
-   * Sign in with email and password via Keycloak Resource Owner Password Credentials
-   */
   async signInWithPassword(credentials: {
     email: string;
     password: string;
   }): Promise<{ data: { user: User | null; session: Session | null } | null; error: any }> {
     try {
-      // Use local API route to avoid CORS issues with Keycloak
-      const signInUrl = "/api/auth/signin";
-      console.log("[Kolaybase SignIn] Attempting via proxy:", { email: credentials.email });
-
+      // Use proxy route to avoid CORS issues with basefyio API
+      const signInUrl = typeof window !== "undefined" ? "/api/auth/signin" : `${API_URL}/rest/v1/auth/signin`;
       const response = await fetch(signInUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,34 +91,29 @@ export class KolaybaseAuth {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        console.error("[Kolaybase SignIn] Error:", error);
         return {
           data: null,
-          error: { message: error.error || "Invalid credentials", status: response.status },
+          error: { message: error.message || "Invalid credentials", status: response.status },
         };
       }
 
       const result = await response.json();
-      const accessToken = result.access_token;
-      const refreshToken = result.refresh_token;
-      const expiresIn = result.expires_in || 3600;
+      const accessToken = result.accessToken || result.access_token;
+      const refreshToken = result.refreshToken || result.refresh_token;
+      const expiresIn = result.expiresIn || result.expires_in || 3600;
 
       const user = userFromToken(accessToken);
+      if (result.userId) user.id = result.userId;
+      if (result.emailVerified !== undefined) user.emailVerified = result.emailVerified;
       const expiresAt = Date.now() + expiresIn * 1000;
 
-      console.log("[Kolaybase SignIn] Success:", { user: user.id, email: user.email });
-
-      // Store tokens
       if (typeof window !== "undefined") {
         localStorage.setItem(TOKEN_KEY, accessToken);
         localStorage.setItem(REFRESH_KEY, refreshToken);
         localStorage.setItem(EXPIRES_KEY, expiresAt.toString());
         localStorage.setItem(USER_KEY, JSON.stringify(user));
-
-        // Set cookie so middleware can read the session
-        const maxAge = expiresIn || 3600;
-        document.cookie = `kb_access_token=${accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
-        document.cookie = `kb_refresh_token=${refreshToken}; path=/; max-age=${maxAge * 24}; SameSite=Lax`;
+        document.cookie = `kb_access_token=${accessToken}; path=/; max-age=${expiresIn}; SameSite=Lax`;
+        document.cookie = `kb_refresh_token=${refreshToken}; path=/; max-age=${expiresIn * 24}; SameSite=Lax`;
       }
 
       const session: Session = {
@@ -147,7 +125,6 @@ export class KolaybaseAuth {
 
       return { data: { user, session }, error: null };
     } catch (error: any) {
-      console.error("[Kolaybase SignIn] Network error:", error.message);
       return {
         data: null,
         error: { message: error.message || "Connection failed" },
@@ -155,24 +132,59 @@ export class KolaybaseAuth {
     }
   }
 
-  /**
-   * Sign up new user — Keycloak self-registration via admin API
-   * Note: Keycloak doesn't have a built-in public signup endpoint.
-   * This uses the admin-cli to create users. For production, configure
-   * Keycloak's self-registration or use a server-side API route.
-   */
   async signUp(credentials: {
     email: string;
     password: string;
     options?: { data?: { name?: string; firstName?: string; lastName?: string } };
   }): Promise<{ data: { user: User | null; session: Session | null } | null; error: any }> {
     try {
-      // For now, attempt to sign in — if the user was created via KolayBase dashboard
-      // they can sign in directly. Full self-registration requires a server-side endpoint.
-      return await this.signInWithPassword({
+      const body: any = {
         email: credentials.email,
         password: credentials.password,
+      };
+      if (credentials.options?.data?.firstName) body.firstName = credentials.options.data.firstName;
+      if (credentials.options?.data?.lastName) body.lastName = credentials.options.data.lastName;
+
+      const response = await fetch(`${API_URL}/rest/v1/auth/signup`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(body),
       });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return {
+          data: null,
+          error: { message: error.message || "Registration failed", status: response.status },
+        };
+      }
+
+      const result = await response.json();
+      const accessToken = result.accessToken || result.access_token;
+      const refreshToken = result.refreshToken || result.refresh_token;
+
+      if (accessToken) {
+        const user = userFromToken(accessToken);
+        const expiresIn = result.expiresIn || 3600;
+        const expiresAt = Date.now() + expiresIn * 1000;
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem(TOKEN_KEY, accessToken);
+          localStorage.setItem(REFRESH_KEY, refreshToken);
+          localStorage.setItem(EXPIRES_KEY, expiresAt.toString());
+          localStorage.setItem(USER_KEY, JSON.stringify(user));
+        }
+
+        return {
+          data: {
+            user,
+            session: { access_token: accessToken, refresh_token: refreshToken, user, expires_at: expiresAt },
+          },
+          error: null,
+        };
+      }
+
+      return { data: { user: null, session: null }, error: null };
     } catch (error: any) {
       return {
         data: null,
@@ -181,9 +193,6 @@ export class KolaybaseAuth {
     }
   }
 
-  /**
-   * Get current session
-   */
   async getSession(): Promise<{ data: { session: Session | null }; error: any }> {
     if (typeof window === "undefined") {
       return { data: { session: null }, error: null };
@@ -199,31 +208,19 @@ export class KolaybaseAuth {
     }
 
     const expires = parseInt(expiresAt || "0");
-    const now = Date.now();
-
-    // Auto-refresh if expired
-    if (now >= expires) {
+    if (Date.now() >= expires) {
       return await this.refreshSession(refreshToken);
     }
 
     const user = JSON.parse(userStr);
-
     return {
       data: {
-        session: {
-          access_token: token,
-          refresh_token: refreshToken,
-          user,
-          expires_at: expires,
-        },
+        session: { access_token: token, refresh_token: refreshToken, user, expires_at: expires },
       },
       error: null,
     };
   }
 
-  /**
-   * Get current user
-   */
   async getUser(): Promise<{ data: { user: User | null }; error: any }> {
     const sessionResult = await this.getSession();
     return {
@@ -232,14 +229,13 @@ export class KolaybaseAuth {
     };
   }
 
-  /**
-   * Refresh access token via Keycloak
-   */
   async refreshSession(
     refreshToken: string
   ): Promise<{ data: { session: Session | null }; error: any }> {
     try {
-      const response = await fetch("/api/auth/refresh", {
+      // Use proxy route to avoid CORS issues
+      const refreshUrl = typeof window !== "undefined" ? "/api/auth/refresh" : `${API_URL}/rest/v1/auth/refresh`;
+      const response = await fetch(refreshUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -247,16 +243,13 @@ export class KolaybaseAuth {
 
       if (!response.ok) {
         this.clearTokens();
-        return {
-          data: { session: null },
-          error: { message: "Session expired" },
-        };
+        return { data: { session: null }, error: { message: "Session expired" } };
       }
 
       const result = await response.json();
-      const accessToken = result.access_token;
-      const newRefreshToken = result.refresh_token;
-      const expiresIn = result.expires_in || 3600;
+      const accessToken = result.accessToken || result.access_token;
+      const newRefreshToken = result.refreshToken || result.refresh_token;
+      const expiresIn = result.expiresIn || result.expires_in || 3600;
 
       const user = userFromToken(accessToken);
       const expiresAt = Date.now() + expiresIn * 1000;
@@ -266,7 +259,6 @@ export class KolaybaseAuth {
         localStorage.setItem(REFRESH_KEY, newRefreshToken);
         localStorage.setItem(EXPIRES_KEY, expiresAt.toString());
         localStorage.setItem(USER_KEY, JSON.stringify(user));
-
         document.cookie = `kb_access_token=${accessToken}; path=/; max-age=${expiresIn}; SameSite=Lax`;
         document.cookie = `kb_refresh_token=${newRefreshToken}; path=/; max-age=${expiresIn * 24}; SameSite=Lax`;
       }
@@ -281,95 +273,70 @@ export class KolaybaseAuth {
       return { data: { session }, error: null };
     } catch (error: any) {
       this.clearTokens();
-      return {
-        data: { session: null },
-        error: { message: error.message },
-      };
+      return { data: { session: null }, error: { message: error.message } };
     }
   }
 
-  /**
-   * Sign out
-   */
   async signOut(): Promise<{ error: any }> {
-    const refreshToken =
-      typeof window !== "undefined" ? localStorage.getItem(REFRESH_KEY) : null;
-
-    // Revoke token at Keycloak
-    if (refreshToken) {
-      try {
-        await fetch(LOGOUT_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: KEYCLOAK_CLIENT_ID,
-            refresh_token: refreshToken,
-          }).toString(),
-        });
-      } catch {
-        // Ignore logout errors
-      }
-    }
-
     this.clearTokens();
     return { error: null };
   }
 
-  /**
-   * Reset password for email
-   */
-  async resetPasswordForEmail(_email: string): Promise<{ data: any; error: any }> {
-    // Keycloak handles password reset via its own UI
-    // Redirect user to Keycloak's forgot-password page
-    return {
-      data: {},
-      error: null,
-    };
+  async resetPasswordForEmail(email: string): Promise<{ data: any; error: any }> {
+    try {
+      const response = await fetch(`${API_URL}/rest/v1/auth/forgot-password`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        return { data: null, error: { message: err.message || "Failed" } };
+      }
+      return { data: {}, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
+    }
   }
 
-  /**
-   * OAuth sign in via Keycloak
-   */
   async signInWithOAuth(options: {
     provider: "google" | "github";
-    options?: { redirectTo?: string };
+    options?: { redirectTo?: string; queryParams?: any };
   }): Promise<{ data: any; error: any }> {
     try {
       const { provider, options: opts } = options;
       const redirectTo = opts?.redirectTo || `${window.location.origin}/auth/callback`;
-      const authUrl =
-        `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth` +
-        `?client_id=${KEYCLOAK_CLIENT_ID}` +
-        `&response_type=code` +
-        `&scope=openid email profile` +
-        `&redirect_uri=${encodeURIComponent(redirectTo)}` +
-        `&kc_idp_hint=${provider}`;
+      const params = new URLSearchParams();
+      params.set("redirect_to", redirectTo);
 
-      if (typeof window !== "undefined") {
-        window.location.href = authUrl;
+      const response = await fetch(
+        `${API_URL}/rest/v1/auth/signin/${provider}?${params.toString()}`,
+        { headers: authHeaders() }
+      );
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        return { data: null, error: { message: err.message || "OAuth failed" } };
       }
 
-      return { data: { url: authUrl }, error: null };
+      const data = await response.json();
+      if (data.url && typeof window !== "undefined") {
+        window.location.href = data.url;
+      }
+
+      return { data: { url: data.url }, error: null };
     } catch (error: any) {
-      return {
-        data: null,
-        error: { message: error.message },
-      };
+      return { data: null, error: { message: error.message } };
     }
   }
 
-  /**
-   * Auth state change listener
-   */
   onAuthStateChange(callback: (event: string, session: Session | null) => void) {
-    // Check session on load
     this.getSession().then((result) => {
       if (result.data.session) {
         callback("SIGNED_IN", result.data.session);
       }
     });
 
-    // Listen for storage events (multi-tab)
     if (typeof window !== "undefined") {
       const handler = (e: StorageEvent) => {
         if (e.key === TOKEN_KEY) {
@@ -396,16 +363,11 @@ export class KolaybaseAuth {
 
     return {
       data: {
-        subscription: {
-          unsubscribe: () => {},
-        },
+        subscription: { unsubscribe: () => {} },
       },
     };
   }
 
-  /**
-   * Set session from tokens (used after OAuth callback)
-   */
   async setSession(tokens: {
     access_token: string;
     refresh_token: string;
@@ -433,29 +395,20 @@ export class KolaybaseAuth {
     }
   }
 
-  /**
-   * Update the authenticated user's attributes
-   */
   async updateUser(_attrs: {
     email?: string;
     password?: string;
     data?: Record<string, any>;
   }): Promise<{ data: any; error: any }> {
-    // Keycloak user updates require admin API access (server-side)
     return { data: null, error: { message: "User updates require server-side admin API" } };
   }
 
-  /**
-   * Admin auth operations (service role only).
-   * Uses Keycloak Admin REST API.
-   */
   admin = {
     async getUserById(uid: string): Promise<{ data: any; error: any }> {
-      const serviceKey = process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
-      const adminUrl = `${KEYCLOAK_URL}/admin/realms/${KEYCLOAK_REALM}/users/${uid}`;
       try {
-        const res = await fetch(adminUrl, {
-          headers: { Authorization: `Bearer ${serviceKey}` },
+        const serviceKey = process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
+        const res = await fetch(`${API_URL}/rest/v1/auth/admin/users/${uid}`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
         });
         if (!res.ok) return { data: null, error: { message: "User not found" } };
         return { data: { user: await res.json() }, error: null };
@@ -464,15 +417,11 @@ export class KolaybaseAuth {
       }
     },
     async updateUserById(uid: string, attrs: any): Promise<{ data: any; error: any }> {
-      const serviceKey = process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
-      const adminUrl = `${KEYCLOAK_URL}/admin/realms/${KEYCLOAK_REALM}/users/${uid}`;
       try {
-        const res = await fetch(adminUrl, {
+        const serviceKey = process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
+        const res = await fetch(`${API_URL}/rest/v1/auth/admin/users/${uid}`, {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${serviceKey}`,
-            "Content-Type": "application/json",
-          },
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(attrs),
         });
         if (!res.ok) return { data: null, error: { message: "Update failed" } };
@@ -482,12 +431,11 @@ export class KolaybaseAuth {
       }
     },
     async deleteUser(uid: string): Promise<{ data: any; error: any }> {
-      const serviceKey = process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
-      const adminUrl = `${KEYCLOAK_URL}/admin/realms/${KEYCLOAK_REALM}/users/${uid}`;
       try {
-        const res = await fetch(adminUrl, {
+        const serviceKey = process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
+        const res = await fetch(`${API_URL}/rest/v1/auth/admin/users/${uid}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${serviceKey}` },
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
         });
         if (!res.ok) return { data: null, error: { message: "Delete failed" } };
         return { data: {}, error: null };
@@ -496,11 +444,10 @@ export class KolaybaseAuth {
       }
     },
     async listUsers(_options?: any): Promise<{ data: any; error: any }> {
-      const serviceKey = process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
-      const adminUrl = `${KEYCLOAK_URL}/admin/realms/${KEYCLOAK_REALM}/users`;
       try {
-        const res = await fetch(adminUrl, {
-          headers: { Authorization: `Bearer ${serviceKey}` },
+        const serviceKey = process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
+        const res = await fetch(`${API_URL}/rest/v1/auth/admin/users`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
         });
         if (!res.ok) return { data: null, error: { message: "Failed to list users" } };
         return { data: { users: await res.json() }, error: null };
@@ -509,15 +456,11 @@ export class KolaybaseAuth {
       }
     },
     async createUser(attrs: any): Promise<{ data: any; error: any }> {
-      const serviceKey = process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
-      const adminUrl = `${KEYCLOAK_URL}/admin/realms/${KEYCLOAK_REALM}/users`;
       try {
-        const res = await fetch(adminUrl, {
+        const serviceKey = process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY || ANON_KEY;
+        const res = await fetch(`${API_URL}/rest/v1/auth/admin/users`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceKey}`,
-            "Content-Type": "application/json",
-          },
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(attrs),
         });
         if (!res.ok) {
@@ -530,7 +473,7 @@ export class KolaybaseAuth {
       }
     },
     async generateLink(_params: any): Promise<{ data: any; error: any }> {
-      return { data: null, error: { message: "Not supported with Keycloak" } };
+      return { data: null, error: { message: "Not supported" } };
     },
   };
 
@@ -540,7 +483,6 @@ export class KolaybaseAuth {
       localStorage.removeItem(REFRESH_KEY);
       localStorage.removeItem(EXPIRES_KEY);
       localStorage.removeItem(USER_KEY);
-
       document.cookie = "kb_access_token=; path=/; max-age=0";
       document.cookie = "kb_refresh_token=; path=/; max-age=0";
     }
