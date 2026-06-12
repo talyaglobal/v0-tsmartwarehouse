@@ -35,20 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Lazy initialize KolayBase client only in useEffect (client-side only)
   // This prevents it from being called during static generation
   useEffect(() => {
-    // Check if KolayBase environment variables are available
-    const hasKolaybaseConfig = !!(
-      process.env.NEXT_PUBLIC_KOLAYBASE_URL &&
-      process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY
-    )
-
-    if (hasKolaybaseConfig) {
-      try {
-        setSupabase(createClient())
-      } catch (error) {
-        console.warn('Failed to initialize KolayBase client:', error)
-        setSupabase(null)
-      }
-    } else {
+    try {
+      setSupabase(createClient())
+    } catch (error) {
+      console.warn('Failed to initialize auth client:', error)
       setSupabase(null)
     }
   }, [])

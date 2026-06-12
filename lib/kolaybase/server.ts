@@ -17,13 +17,6 @@ const ANON_KEY =
   process.env.BASEFYIO_ANON_KEY ||
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
   "";
-const _rawUrl = (
-  process.env.BASEFYIO_API_URL ||
-  process.env.NEXT_PUBLIC_BASEFYIO_URL ||
-  "https://api.basefyio.com"
-).replace(/\/+$/, "");
-const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
-
 export function createServerClient(): KolaybaseClient {
   if (!SERVICE_KEY && !ANON_KEY) {
     throw new Error(
@@ -80,6 +73,18 @@ export function createAdminClient(): KolaybaseClient {
   return new KolaybaseClient(auth, SERVICE_KEY);
 }
 
+function parseJwtPayload(token: string): any {
+  try {
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const json = Buffer.from(base64, "base64").toString("utf-8");
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 class BasefyioServerAuth {
   private token: string;
 
@@ -92,34 +97,24 @@ class BasefyioServerAuth {
       return { data: { user: null }, error: null };
     }
 
-    try {
-      const response = await fetch(`${API_URL}/rest/v1/auth/me`, {
-        headers: {
-          apikey: ANON_KEY || this.token,
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
-
-      if (!response.ok) {
-        return { data: { user: null }, error: { message: "Invalid session" } };
-      }
-
-      const claims = await response.json();
-      const user = {
-        id: claims.sub || claims.id,
-        email: claims.email || claims.preferred_username,
-        username: claims.preferred_username,
-        emailVerified: claims.email_verified ?? false,
-        firstName: claims.given_name || claims.firstName,
-        lastName: claims.family_name || claims.lastName,
-      };
-      return { data: { user }, error: null };
-    } catch (err: any) {
-      return {
-        data: { user: null },
-        error: { message: err.message || "Auth check failed" },
-      };
+    const claims = parseJwtPayload(this.token);
+    if (!claims || !claims.sub) {
+      return { data: { user: null }, error: { message: "Invalid token" } };
     }
+
+    if (claims.exp && claims.exp * 1000 < Date.now()) {
+      return { data: { user: null }, error: { message: "Token expired" } };
+    }
+
+    const user = {
+      id: claims.sub,
+      email: claims.email || claims.preferred_username || "",
+      username: claims.preferred_username,
+      emailVerified: claims.email_verified ?? false,
+      firstName: claims.given_name || claims.firstName,
+      lastName: claims.family_name || claims.lastName,
+    };
+    return { data: { user }, error: null };
   }
 
   async getSession(): Promise<{ data: { session: any }; error: any }> {
