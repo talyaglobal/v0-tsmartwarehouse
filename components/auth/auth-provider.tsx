@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/kolaybase/client'
-import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import type { UserRole } from '@/types'
 import type { AuthUser } from '@/lib/auth/utils'
 
@@ -43,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const mapSupabaseUser = (supabaseUser: User | null): AuthUser | null => {
+  const mapSupabaseUser = (supabaseUser: any): AuthUser | null => {
     if (!supabaseUser) return null
 
     return {
@@ -153,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       const mapped = mapSupabaseUser(session?.user ?? null)
       if (mapped) {
         const match = document.cookie.match(/(?:^| )kb_user_role=([^;]+)/)

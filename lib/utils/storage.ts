@@ -20,16 +20,13 @@ export function getStoragePublicUrl(path: string, bucket: string = 'docs'): stri
   // If path starts with /, remove it
   const cleanPath = path.startsWith('/') ? path.slice(1) : path
 
-  // Get KolayBase URL from environment
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (!supabaseUrl) {
-    console.warn('[storage] NEXT_PUBLIC_SUPABASE_URL not set, returning path as-is')
+  const baseUrl = process.env.NEXT_PUBLIC_BASEFYIO_URL || process.env.BASEFYIO_API_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!baseUrl) {
+    console.warn('[storage] NEXT_PUBLIC_BASEFYIO_URL not set, returning path as-is')
     return path
   }
 
-  // Construct public URL
-  // Format: https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>/<path>
-  return `${supabaseUrl}/storage/v1/object/public/${bucket}/${cleanPath}`
+  return `${baseUrl}/storage/v1/object/public/${bucket}/${cleanPath}`
 }
 
 /**

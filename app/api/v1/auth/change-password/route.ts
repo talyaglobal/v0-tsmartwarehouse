@@ -3,11 +3,9 @@ import { createServerClient } from "@/lib/kolaybase/server"
 import { requireAuth } from "@/lib/auth/api-middleware"
 import { handleApiError } from "@/lib/utils/logger"
 import type { ApiResponse, ErrorResponse } from "@/types/api"
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication
     const authResult = await requireAuth(request)
     if (authResult instanceof NextResponse) {
       return authResult
@@ -17,7 +15,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { currentPassword, newPassword, confirmPassword } = body
 
-    // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
       const errorData: ErrorResponse = {
         success: false,
@@ -54,19 +51,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Verify current password by attempting to sign in with a separate client instance
-    const verifyClient = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-    
-    const { error: signInError } = await verifyClient.auth.signInWithPassword({
+    // Verify current password via basefyio signin endpoint
+    const supabase = createServerClient()
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: currentPassword,
     })
@@ -80,12 +67,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorData, { status: 401 })
     }
 
-    // Sign out from the verify client to clean up
-    await verifyClient.auth.signOut()
-
-    // Use Admin API to update password (since we already verified current password)
-    const supabaseAdmin = createServerClient()
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    // Update password via admin API
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
       user.id,
       { password: newPassword }
     )
@@ -114,4 +97,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(errorData, { status: errorResponse.statusCode })
   }
 }
-

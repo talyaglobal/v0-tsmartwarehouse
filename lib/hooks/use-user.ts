@@ -2,17 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/kolaybase/client"
-import type { User } from "@supabase/supabase-js"
-
 export function useUser() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const supabase = createClient()
 
     // Get initial user
-    supabase.auth.getUser().then(({ data: { user }, error }: { data: { user: User | null }, error: any }) => {
+    supabase.auth.getUser().then(({ data: { user }, error }: { data: { user: any }, error: any }) => {
       // Ignore AuthSessionMissingError for public pages
       if (error && error.message !== 'Auth session missing!' && error.name !== 'AuthSessionMissingError') {
         console.error("Error getting user:", error)

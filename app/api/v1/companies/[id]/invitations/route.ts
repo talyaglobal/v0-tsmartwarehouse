@@ -243,49 +243,21 @@ export async function POST(
       .eq('email', email.toLowerCase().trim())
       .maybeSingle()
     
-    // Check if user exists in Supabase Auth (even if not in profiles)
+    // Check if user exists in auth (even if not in profiles)
     let existingAuthUser: { id: string } | null = null
-    const { createClient } = await import('@supabase/supabase-js')
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    
-    if (!serviceRoleKey) {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: "Server configuration error",
-        statusCode: 500,
-      }
-      return NextResponse.json(errorData, { status: 500 })
-    }
+    const { createAdminClient: createAdmin } = await import('@/lib/kolaybase/server')
+    const supabaseAuthAdmin = createAdmin()
 
-    const supabaseAuthAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-
-    // Try to get user by email from Auth using listUsers with pagination
-    // Note: Supabase Admin API doesn't have a direct getUserByEmail method,
-    // so we need to list users and filter. For efficiency, we only fetch first page.
     try {
-      const { data: authUsers, error: listError } = await supabaseAuthAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000, // Max per page
-      })
+      const { data: authUsers, error: listError } = await supabaseAuthAdmin.auth.admin.listUsers()
       if (!listError && authUsers?.users) {
-        const authUser = authUsers.users.find(u => u.email?.toLowerCase() === email.toLowerCase().trim())
+        const authUser = authUsers.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase().trim())
         if (authUser) {
           existingAuthUser = { id: authUser.id }
         }
       }
     } catch (error) {
       console.error('Error checking auth users:', error)
-      // Continue, we'll handle this case below
-      // If listing fails, we'll try to create user and handle the error if user already exists
     }
 
     // Check if user is already a member (if profile exists and is active)

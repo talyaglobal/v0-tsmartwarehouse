@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     try {
       supabase = createAdminClient()
     } catch (adminError) {
-      console.error('Company search: createAdminClient failed (missing SUPABASE_SERVICE_ROLE_KEY?):', adminError)
+      console.error('Company search: createAdminClient failed (missing BASEFYIO_SERVICE_ROLE_KEY?):', adminError)
       return NextResponse.json({ companies: [], error: 'Search unavailable' })
     }
 

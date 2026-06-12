@@ -147,19 +147,10 @@ export async function PATCH(
 
       // Also update email in auth.users
       try {
-        const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-        const supabaseAdmin = createAdminClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-            },
-          }
-        )
-        
-        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(memberId, {
+        const { createAdminClient: createAdmin } = await import('@/lib/kolaybase/server')
+        const adminClient = createAdmin()
+
+        const { error: authError } = await adminClient.auth.admin.updateUserById(memberId, {
           email: email,
         })
 
@@ -186,19 +177,10 @@ export async function PATCH(
       }
 
       try {
-        const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-        const supabaseAdmin = createAdminClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-            },
-          }
-        )
-        
-        const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(memberId, {
+        const { createAdminClient: createAdmin2 } = await import('@/lib/kolaybase/server')
+        const adminClient2 = createAdmin2()
+
+        const { error: passwordError } = await adminClient2.auth.admin.updateUserById(memberId, {
           password: password,
         })
 

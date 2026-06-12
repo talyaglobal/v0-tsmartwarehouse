@@ -5,7 +5,7 @@ import { createClient } from "@/lib/kolaybase/client";
 // RealtimeChannel type aliased to any since we use KolayBase channel stubs
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type RealtimeChannel = any;
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+type RealtimePostgresChangesPayload<T> = { eventType: string; new: T; old: T };
 import type { Task, Notification } from "@/types";
 
 type RealtimeChannelStatus = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR";

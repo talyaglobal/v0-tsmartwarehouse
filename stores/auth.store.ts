@@ -5,14 +5,13 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { User } from '@supabase/supabase-js'
 import type { UserRole } from '@/types'
 
 interface AuthState {
-  user: User | null
+  user: any
   role: UserRole | null
   isLoading: boolean
-  setUser: (user: User | null) => void
+  setUser: (user: any) => void
   setRole: (role: UserRole | null) => void
   setLoading: (isLoading: boolean) => void
   clearAuth: () => void

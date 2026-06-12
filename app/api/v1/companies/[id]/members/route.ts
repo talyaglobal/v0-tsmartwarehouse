@@ -43,19 +43,9 @@ export async function GET(
       }
     }
 
-    // Use admin client to bypass RLS for company admin operations
-    const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-    
+    const { createAdminClient } = await import('@/lib/kolaybase/server')
+    const supabaseAdmin = createAdminClient()
+
     console.log(`[GET /api/v1/companies/${companyId}/members] Fetching members for company:`, companyId)
     console.log(`[GET /api/v1/companies/${companyId}/members] User role:`, user.role)
     console.log(`[GET /api/v1/companies/${companyId}/members] User ID:`, user.id)
@@ -190,18 +180,8 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    // Use admin client to bypass RLS
-    const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const { createAdminClient } = await import('@/lib/kolaybase/server')
+    const supabaseAdmin = createAdminClient()
 
     // Get current user's storage_interest to inherit it
     const { data: currentUserProfile } = await supabaseAdmin

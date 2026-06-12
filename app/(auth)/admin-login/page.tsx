@@ -53,7 +53,7 @@ export default function AdminLoginPage() {
         if (signInError.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please check your credentials and try again.')
         } else if (signInError.message.includes('not properly initialized')) {
-          setError('Supabase configuration error. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file and restart the server.')
+          setError('Configuration error. Please ensure NEXT_PUBLIC_BASEFYIO_ANON_KEY is set in your .env.local file and restart the server.')
         } else {
           setError(signInError.message)
         }

@@ -99,29 +99,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceRoleKey) {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: "Server configuration error",
-        statusCode: 500,
-      }
-      return NextResponse.json(errorData, { status: 500 })
-    }
+    const { createAdminClient } = await import('@/lib/kolaybase/server')
+    const adminClient = createAdminClient()
 
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-
-    const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(
       targetId,
       {
         email: email.toLowerCase().trim(),
@@ -147,7 +128,7 @@ export async function PATCH(request: NextRequest) {
     const responseData: ApiResponse = {
       success: true,
       data: {
-        email: updatedUser.user.email,
+        email: email.toLowerCase().trim(),
         profile: updatedProfile,
       },
       message: "Email updated successfully",

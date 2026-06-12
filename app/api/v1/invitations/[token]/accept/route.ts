@@ -33,31 +33,9 @@ export async function POST(
       return NextResponse.json(errorData, { status: 400 })
     }
 
-    const { createClient } = await import('@supabase/supabase-js')
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!serviceRoleKey) {
-      const errorData: ErrorResponse = {
-        success: false,
-        error: "Server configuration error",
-        statusCode: 500,
-      }
-      return NextResponse.json(errorData, { status: 500 })
-    }
-
-    // Use admin client for all operations to bypass RLS
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-
-    const supabaseAuthAdmin = supabaseAdmin // Same client for both auth and database operations
+    const { createAdminClient } = await import('@/lib/kolaybase/server')
+    const supabaseAdmin = createAdminClient()
+    const supabaseAuthAdmin = supabaseAdmin
 
     // Find profile with this invitation token (use admin client to bypass RLS)
     const { data: profile, error: profileError } = await supabaseAdmin
