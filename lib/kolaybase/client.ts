@@ -56,8 +56,8 @@ export class KolaybaseClient {
     return new KolaybaseRealtimeChannel();
   }
 
-  removeChannel(_channel: KolaybaseRealtimeChannel): Promise<void> {
-    return Promise.resolve();
+  removeChannel(channel: KolaybaseRealtimeChannel): Promise<void> {
+    return channel?.unsubscribe().then(() => undefined) ?? Promise.resolve();
   }
 
   from<T = any>(table: string): KolaybaseQueryBuilder<T> {
@@ -93,19 +93,107 @@ interface RealtimeFilter {
   filter?: string;
 }
 
+interface RealtimeListener {
+  table?: string;
+  event: string;
+  filter?: string;
+  callback: (payload: any) => void;
+}
+
+/**
+ * Realtime channel backed by the basefyio SSE stream
+ * (GET /api/realtime/v1/stream?apikey=...&channels=table:NAME).
+ * Tables must have realtime enabled in basefyio Settings → Realtime.
+ * Note: only REST/SDK/dashboard writes broadcast — raw SQL writes do not.
+ */
 export class KolaybaseRealtimeChannel {
-  on(_type: string, _filter: RealtimeFilter, _callback: (payload: any) => void) {
+  private listeners: RealtimeListener[] = [];
+  private eventSource: EventSource | null = null;
+  private statusCallback?: (status: any) => void;
+
+  on(_type: string, filter: RealtimeFilter, callback: (payload: any) => void) {
+    this.listeners.push({
+      table: filter?.table,
+      event: filter?.event || "*",
+      filter: filter?.filter,
+      callback,
+    });
     return this;
   }
 
-  subscribe(_callback?: (status: any) => void) {
-    _callback?.("SUBSCRIBED");
+  subscribe(callback?: (status: any) => void) {
+    this.statusCallback = callback;
+
+    if (typeof window === "undefined" || typeof EventSource === "undefined") {
+      callback?.("CLOSED");
+      return this;
+    }
+
+    const channels = [
+      ...new Set(
+        this.listeners.filter((l) => l.table).map((l) => `table:${l.table}`)
+      ),
+    ].join(",");
+
+    if (!channels) {
+      callback?.("SUBSCRIBED");
+      return this;
+    }
+
+    const url = `${API_URL}/realtime/v1/stream?apikey=${encodeURIComponent(ANON_KEY)}&channels=${encodeURIComponent(channels)}`;
+    this.eventSource = new EventSource(url);
+
+    this.eventSource.onopen = () => this.statusCallback?.("SUBSCRIBED");
+    // EventSource reconnects automatically; report transient errors
+    this.eventSource.onerror = () => this.statusCallback?.("CHANNEL_ERROR");
+    this.eventSource.onmessage = (ev) => {
+      let change: any;
+      try {
+        change = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
+      if (!change || !change.type) return; // keepalive pings etc.
+
+      const payload = {
+        eventType: change.type,
+        new: change.new ?? null,
+        old: change.old ?? null,
+        schema: "public",
+        table: change.entity,
+        commit_timestamp: change.commitTimestamp,
+      };
+
+      for (const listener of this.listeners) {
+        if (listener.table && change.entity !== listener.table) continue;
+        if (listener.event !== "*" && listener.event !== change.type) continue;
+        if (listener.filter && !matchesEqFilter(listener.filter, payload)) continue;
+        try {
+          listener.callback(payload);
+        } catch (err) {
+          console.error("Realtime listener error:", err);
+        }
+      }
+    };
+
     return this;
   }
 
   unsubscribe() {
+    this.eventSource?.close();
+    this.eventSource = null;
     return Promise.resolve("ok" as const);
   }
+}
+
+/** Supports the supabase-style "column=eq.value" realtime filter. */
+function matchesEqFilter(filter: string, payload: any): boolean {
+  const m = filter.match(/^([^=]+)=eq\.(.*)$/);
+  if (!m) return true;
+  const [, col, val] = m;
+  const row = payload.new ?? payload.old;
+  if (!row || !(col in row)) return true;
+  return String(row[col]) === val;
 }
 
 const _rawUrl = (

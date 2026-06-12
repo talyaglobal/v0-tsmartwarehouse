@@ -159,18 +159,19 @@ function parsePostgrestOr(raw: string): string {
   return splitTopLevel(raw).map(parseSingleCondition).join(" OR ");
 }
 
+function resolveApiKey(token: string): string {
+  // basefyio data endpoints only accept kb_ API keys; user JWTs are rejected.
+  return token && token.startsWith("kb_")
+    ? token
+    : typeof window === "undefined"
+      ? SERVICE_KEY || ANON_KEY
+      : ANON_KEY;
+}
+
 async function executeSql(sql: string, token: string): Promise<{ rows: any[]; error: any }> {
   const url = `${API_URL}/sql/execute`;
-  // The endpoint only accepts kb_ API keys; a user JWT (or any Authorization
-  // header carrying one) causes a 401. Filter out non-API-key tokens.
-  const apiKey =
-    token && token.startsWith("kb_")
-      ? token
-      : typeof window === "undefined"
-        ? SERVICE_KEY || ANON_KEY
-        : ANON_KEY;
   const headers: Record<string, string> = {
-    apikey: apiKey,
+    apikey: resolveApiKey(token),
     "Content-Type": "application/json",
   };
 
@@ -201,6 +202,8 @@ export class KolaybaseQueryBuilder<T = any> {
   private _filters: FilterEntry[] = [];
   private selectFields = "*";
   private orderFields: string[] = [];
+  private restOrderFields: string[] = [];
+  private restOrderUsable = true;
   private limitValue?: number;
   private offsetValue?: number;
   private countOption?: "exact" | "planned" | "estimated";
@@ -287,6 +290,8 @@ export class KolaybaseQueryBuilder<T = any> {
           ? " NULLS LAST"
           : "";
     this.orderFields.push(`${qi(field)} ${direction}${nulls}`);
+    if (options?.nullsFirst !== undefined) this.restOrderUsable = false;
+    this.restOrderFields.push(`${field}.${direction.toLowerCase()}`);
     return this;
   }
 
@@ -429,10 +434,77 @@ export class KolaybaseQueryBuilder<T = any> {
     return `SELECT * FROM ${table}`;
   }
 
+  /**
+   * Reads without embedded selects / OR / array filters can go through the
+   * documented REST table API (/rest/v1/:table). Writes stay on SQL —
+   * REST writes return 500 on the hosted platform.
+   */
+  private canUseRest(): boolean {
+    if (this.method !== "GET") return false;
+    if (this.selectFields.includes("(")) return false;
+    if (!this.restOrderUsable) return false;
+    return this._filters.every(
+      (f) => f.kind === "cmp" || f.kind === "is" || f.kind === "in"
+    );
+  }
+
+  private buildRestUrl(): string {
+    const params = new URLSearchParams();
+    params.append(
+      "select",
+      this.selectFields === "*"
+        ? "*"
+        : this.selectFields.split(",").map((c) => c.trim()).join(",")
+    );
+    for (const f of this._filters) {
+      if (f.kind === "cmp") {
+        params.append(f.col, `${f.op}.${f.val ?? ""}`);
+      } else if (f.kind === "is") {
+        params.append(f.col, `is.${f.val === null ? "null" : f.val ? "true" : "false"}`);
+      } else if (f.kind === "in") {
+        params.append(f.col, `in.(${f.vals.map((v) => String(v)).join(",")})`);
+      }
+    }
+    if (this.restOrderFields.length) params.append("order", this.restOrderFields.join(","));
+    if (this.limitValue) params.append("limit", String(this.limitValue));
+    if (this.offsetValue) params.append("offset", String(this.offsetValue));
+    return `${API_URL}/rest/v1/${encodeURIComponent(this.table)}?${params.toString()}`;
+  }
+
+  private async executeRest(
+    token: string
+  ): Promise<{ data: T[] | null; error: any; count?: number }> {
+    try {
+      const res = await fetch(this.buildRestUrl(), {
+        headers: { apikey: resolveApiKey(token) },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = text;
+        try { msg = JSON.parse(text).message || text; } catch {}
+        return { data: null, error: { message: msg, status: res.status } };
+      }
+      const json = await res.json();
+      const rows = json.data ?? (Array.isArray(json) ? json : []);
+      const count = typeof json.count === "number" ? json.count : undefined;
+      return { data: rows, error: null, count };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message || "REST query failed" } };
+    }
+  }
+
   async execute(): Promise<{ data: T | T[] | null; error: any; count?: number }> {
     const token = this._tokenOverride ?? getAuthToken();
-    const sql = this.buildSQL();
 
+    if (this.canUseRest()) {
+      const restResult = await this.executeRest(token);
+      if (!restResult.error) {
+        return restResult as any;
+      }
+      // Fall through to SQL on REST failure
+    }
+
+    const sql = this.buildSQL();
     const { rows, error } = await executeSql(sql, token);
 
     if (error) {
