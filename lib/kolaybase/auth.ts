@@ -486,6 +486,7 @@ export class KolaybaseAuth {
       localStorage.removeItem(USER_KEY);
       document.cookie = "kb_access_token=; path=/; max-age=0";
       document.cookie = "kb_refresh_token=; path=/; max-age=0";
+      document.cookie = "kb_user_role=; path=/; max-age=0";
     }
   }
 }

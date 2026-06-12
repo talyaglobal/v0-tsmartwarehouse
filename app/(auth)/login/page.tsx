@@ -197,43 +197,16 @@ export default function LoginPage() {
           redirectPath = '/dashboard'
         }
 
-        // Show success message
+        // Store role in cookie so proxy can read it without network calls
+        document.cookie = `kb_user_role=${role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+
         addNotification({
           type: 'success',
           message: 'Login successful! Redirecting...',
           duration: 2000,
         })
 
-        // Wait for auth state to be fully synchronized before redirecting
-        // This ensures cookies are set and middleware can see the session
-        const authStatePromise = new Promise<void>((resolve) => {
-          const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
-            if (event === 'SIGNED_IN' && session) {
-              subscription.unsubscribe()
-              resolve()
-            }
-          })
-          
-          // Fallback timeout in case auth state change doesn't fire
-          setTimeout(() => {
-            subscription.unsubscribe()
-            resolve()
-          }, 1000)
-        })
-
-        await authStatePromise
-
-        // Small additional delay to ensure cookies are fully set
-        await new Promise(resolve => setTimeout(resolve, 300))
-
-        // Use router.push for relative paths, window.location for full URLs
-        // This ensures proper session handling
-        if (redirectPath.startsWith('http://') || redirectPath.startsWith('https://')) {
-          window.location.href = redirectPath
-        } else {
-          router.push(redirectPath)
-          router.refresh()
-        }
+        window.location.href = redirectPath
       } else if (data.user && !data.session) {
         // User exists but no session - this shouldn't happen but handle it
         setError('Session could not be established. Please try again.')
