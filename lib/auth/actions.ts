@@ -177,6 +177,11 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.signUp({
       email: validation.data.email,
       password: validation.data.password,
+      options: {
+        data: {
+          name: validation.data.name || undefined,
+        },
+      },
     })
 
     if (signUpError) {

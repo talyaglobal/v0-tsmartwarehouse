@@ -11,6 +11,10 @@ const ANON_KEY =
   process.env.BASEFYIO_ANON_KEY ||
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
   "";
+const PROJECT_ID =
+  process.env.PROJECT_ID ||
+  process.env.BASEFYIO_PROJECT_ID ||
+  "";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +31,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         apikey: ANON_KEY,
+        "x-project-id": PROJECT_ID,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),

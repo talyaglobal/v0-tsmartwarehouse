@@ -23,6 +23,10 @@ const _rawUrl = (
   "https://api.basefyio.com"
 ).replace(/\/+$/, "");
 const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
+const PROJECT_ID =
+  process.env.PROJECT_ID ||
+  process.env.BASEFYIO_PROJECT_ID ||
+  "";
 export function createServerClient(): KolaybaseClient {
   if (!SERVICE_KEY && !ANON_KEY) {
     throw new Error(
@@ -108,6 +112,7 @@ class BasefyioServerAuth {
     const headers = (): Record<string, string> => ({
       apikey: svcKey,
       Authorization: `Bearer ${svcKey}`,
+      "x-project-id": PROJECT_ID,
       "Content-Type": "application/json",
     });
     const base = `${API_URL}/rest/v1/auth/admin/users`;
@@ -189,6 +194,7 @@ class BasefyioServerAuth {
         method: "POST",
         headers: {
           apikey: ANON_KEY,
+          "x-project-id": PROJECT_ID,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(credentials),
@@ -215,20 +221,44 @@ class BasefyioServerAuth {
     options?: any;
   }): Promise<{ data: any; error: any }> {
     try {
+      // basefyio signup requires x-project-id header and firstName/lastName fields
+      const meta = credentials.options?.data || {};
+      const fullName = String(meta.name || meta.full_name || "").trim();
+      const nameParts = fullName ? fullName.split(/\s+/) : [];
+      const firstName =
+        meta.firstName || nameParts[0] || credentials.email.split("@")[0];
+      const lastName =
+        meta.lastName || nameParts.slice(1).join(" ") || firstName;
+
       const res = await fetch(`${API_URL}/rest/v1/auth/signup`, {
         method: "POST",
         headers: {
           apikey: ANON_KEY,
+          "x-project-id": PROJECT_ID,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify({
+          email: credentials.email,
+          password: credentials.password,
+          firstName,
+          lastName,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         return { data: null, error: { message: err.message || "Signup failed" } };
       }
       const result = await res.json();
-      return { data: result, error: null };
+      const userId =
+        result.userId ||
+        (result.accessToken ? parseJwtPayload(result.accessToken)?.sub : null);
+      return {
+        data: {
+          ...result,
+          user: userId ? { id: userId, email: credentials.email } : null,
+        },
+        error: null,
+      };
     } catch (err: any) {
       return { data: null, error: { message: err.message } };
     }
