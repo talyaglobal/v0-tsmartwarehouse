@@ -26,8 +26,10 @@ const PROJECT_ID =
   "";
 
 function getAuthToken(): string {
+  // basefyio /sql/execute only accepts kb_ API keys (apikey header).
+  // User JWTs are rejected with 401, so never use them here.
   if (typeof window !== "undefined") {
-    return localStorage.getItem("kb_access_token") || ANON_KEY;
+    return ANON_KEY;
   }
   return SERVICE_KEY || ANON_KEY;
 }
@@ -159,14 +161,18 @@ function parsePostgrestOr(raw: string): string {
 
 async function executeSql(sql: string, token: string): Promise<{ rows: any[]; error: any }> {
   const url = `${API_URL}/sql/execute`;
+  // The endpoint only accepts kb_ API keys; a user JWT (or any Authorization
+  // header carrying one) causes a 401. Filter out non-API-key tokens.
+  const apiKey =
+    token && token.startsWith("kb_")
+      ? token
+      : typeof window === "undefined"
+        ? SERVICE_KEY || ANON_KEY
+        : ANON_KEY;
   const headers: Record<string, string> = {
-    apikey: ANON_KEY,
+    apikey: apiKey,
     "Content-Type": "application/json",
   };
-  if (token && token !== ANON_KEY) {
-    headers.apikey = token;
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   try {
     const res = await fetch(url, {
