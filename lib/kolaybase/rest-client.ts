@@ -13,6 +13,7 @@ const _rawUrl = (
 const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
 const ANON_KEY =
   process.env.NEXT_PUBLIC_BASEFYIO_ANON_KEY ||
+  process.env.BASEFYIO_ANON_KEY ||
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
   "";
 const SERVICE_KEY =
