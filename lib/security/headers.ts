@@ -20,7 +20,7 @@ const defaultCSP = [
   "style-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://fonts.googleapis.com", // Google Maps styles + fonts
   "img-src 'self' data: https: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.googleusercontent.com", // Google Maps images
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com",
+  "connect-src 'self' https://*.basefyio.com wss://*.basefyio.com https://*.supabase.co https://*.stripe.com wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com https://maps.gstatic.com https://va.vercel-scripts.com https://*.vercel-scripts.com",
   "frame-src 'self' https://js.stripe.com https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
   "object-src 'none'",
   "base-uri 'self'",
