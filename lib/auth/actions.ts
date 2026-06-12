@@ -19,7 +19,7 @@ const registerSchema = z.object({
   companyName: z.string().min(2, 'Company name must be at least 2 characters').optional(),
   role: z.enum(['warehouse_client', 'root', 'warehouse_staff', 'warehouse_supervisor', 'warehouse_admin']).optional(),
   storageType: z.string().optional(),
-  userType: z.enum(['owner', 'warehouse_client', 'warehouse_broker', 'warehouse_finder']).optional(),
+  userType: z.enum(['owner', 'warehouse_client', 'warehouse_broker', 'warehouse_finder', 'finder']).optional(),
   clientType: z.enum(['individual', 'corporate']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -160,10 +160,9 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     // Use admin API to create user directly (no email sent)
     const supabaseAdmin = createServerClient()
 
-    // Check if service role key is configured
-    const hasServiceRoleKey = !!process.env.KOLAYBASE_SERVICE_ROLE_KEY
+    const hasServiceRoleKey = !!(process.env.BASEFYIO_SERVICE_ROLE_KEY || process.env.KOLAYBASE_SERVICE_ROLE_KEY)
     if (!hasServiceRoleKey) {
-      console.error('KOLAYBASE_SERVICE_ROLE_KEY is not configured!')
+      console.error('BASEFYIO_SERVICE_ROLE_KEY is not configured!')
       return {
         error: {
           message: 'Server configuration error. Please contact support.',
@@ -196,7 +195,7 @@ export async function signUp(formData: FormData): Promise<{ error?: AuthError }>
     // Determine user role based on userType
     const isCustomer = validation.data.userType === 'warehouse_client'
     const isReseller = validation.data.userType === 'warehouse_broker'
-    const isFinder = validation.data.userType === 'warehouse_finder'
+    const isFinder = validation.data.userType === 'warehouse_finder' || validation.data.userType === 'finder'
     
     // Map userType to role
     let defaultRole = 'warehouse_admin' // Default

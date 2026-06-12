@@ -17,6 +17,12 @@ const ANON_KEY =
   process.env.BASEFYIO_ANON_KEY ||
   process.env.NEXT_PUBLIC_KOLAYBASE_ANON_KEY ||
   "";
+const _rawUrl = (
+  process.env.BASEFYIO_API_URL ||
+  process.env.NEXT_PUBLIC_BASEFYIO_URL ||
+  "https://api.basefyio.com"
+).replace(/\/+$/, "");
+const API_URL = _rawUrl.endsWith("/api") ? _rawUrl : `${_rawUrl}/api`;
 export function createServerClient(): KolaybaseClient {
   if (!SERVICE_KEY && !ANON_KEY) {
     throw new Error(
@@ -87,9 +93,171 @@ function parseJwtPayload(token: string): any {
 
 class BasefyioServerAuth {
   private token: string;
+  admin: {
+    getUserById(uid: string): Promise<{ data: any; error: any }>;
+    updateUserById(uid: string, attrs: any): Promise<{ data: any; error: any }>;
+    deleteUser(uid: string): Promise<{ data: any; error: any }>;
+    listUsers(options?: any): Promise<{ data: any; error: any }>;
+    createUser(attrs: any): Promise<{ data: any; error: any }>;
+    generateLink(params: any): Promise<{ data: any; error: any }>;
+  };
 
   constructor(token: string) {
     this.token = token;
+    const svcKey = SERVICE_KEY || token;
+    const headers = (): Record<string, string> => ({
+      apikey: svcKey,
+      Authorization: `Bearer ${svcKey}`,
+      "Content-Type": "application/json",
+    });
+    const base = `${API_URL}/rest/v1/auth/admin/users`;
+
+    this.admin = {
+      async getUserById(uid: string) {
+        try {
+          const res = await fetch(`${base}/${uid}`, { headers: headers() });
+          if (!res.ok) return { data: null, error: { message: "User not found" } };
+          return { data: { user: await res.json() }, error: null };
+        } catch (err: any) {
+          return { data: null, error: { message: err.message } };
+        }
+      },
+      async updateUserById(uid: string, attrs: any) {
+        try {
+          const res = await fetch(`${base}/${uid}`, {
+            method: "PUT",
+            headers: headers(),
+            body: JSON.stringify(attrs),
+          });
+          if (!res.ok) return { data: null, error: { message: "Update failed" } };
+          return { data: { user: attrs }, error: null };
+        } catch (err: any) {
+          return { data: null, error: { message: err.message } };
+        }
+      },
+      async deleteUser(uid: string) {
+        try {
+          const res = await fetch(`${base}/${uid}`, {
+            method: "DELETE",
+            headers: headers(),
+          });
+          if (!res.ok) return { data: null, error: { message: "Delete failed" } };
+          return { data: {}, error: null };
+        } catch (err: any) {
+          return { data: null, error: { message: err.message } };
+        }
+      },
+      async listUsers(_options?: any) {
+        try {
+          const res = await fetch(base, { headers: headers() });
+          if (!res.ok) return { data: null, error: { message: "Failed to list users" } };
+          const users = await res.json();
+          return { data: { users: Array.isArray(users) ? users : [] }, error: null };
+        } catch (err: any) {
+          return { data: null, error: { message: err.message } };
+        }
+      },
+      async createUser(attrs: any) {
+        try {
+          const res = await fetch(base, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(attrs),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { data: null, error: { message: err.message || "Create user failed", status: res.status } };
+          }
+          const user = await res.json();
+          return { data: { user }, error: null };
+        } catch (err: any) {
+          return { data: null, error: { message: err.message } };
+        }
+      },
+      async generateLink(_params: any) {
+        return { data: null, error: { message: "Not supported" } };
+      },
+    };
+  }
+
+  async signInWithPassword(credentials: {
+    email: string;
+    password: string;
+  }): Promise<{ data: any; error: any }> {
+    try {
+      const res = await fetch(`${API_URL}/rest/v1/auth/signin`, {
+        method: "POST",
+        headers: {
+          apikey: ANON_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { data: null, error: { message: err.message || "Invalid credentials", status: res.status } };
+      }
+      const result = await res.json();
+      const accessToken = result.accessToken || result.access_token;
+      const user = accessToken ? { id: parseJwtPayload(accessToken)?.sub } : null;
+      return {
+        data: { user, session: user ? { access_token: accessToken, user } : null },
+        error: null,
+      };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
+    }
+  }
+
+  async signUp(credentials: {
+    email: string;
+    password: string;
+    options?: any;
+  }): Promise<{ data: any; error: any }> {
+    try {
+      const res = await fetch(`${API_URL}/rest/v1/auth/signup`, {
+        method: "POST",
+        headers: {
+          apikey: ANON_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return { data: null, error: { message: err.message || "Signup failed" } };
+      }
+      const result = await res.json();
+      return { data: result, error: null };
+    } catch (err: any) {
+      return { data: null, error: { message: err.message } };
+    }
+  }
+
+  async signOut(): Promise<{ error: any }> {
+    return { error: null };
+  }
+
+  async resetPasswordForEmail(_email: string): Promise<{ data: any; error: any }> {
+    return { data: null, error: { message: "Use API endpoint for password reset" } };
+  }
+
+  async updateUser(attrs: any): Promise<{ data: any; error: any }> {
+    const claims = parseJwtPayload(this.token);
+    if (!claims?.sub) return { data: null, error: { message: "No user" } };
+    return this.admin.updateUserById(claims.sub, attrs);
+  }
+
+  async setSession(_tokens: any): Promise<{ data: any; error: any }> {
+    return { data: null, error: null };
+  }
+
+  onAuthStateChange(_callback: (event: string, session: any) => void) {
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  }
+
+  async signInWithOAuth(_options: any): Promise<{ data: any; error: any }> {
+    return { data: null, error: { message: "OAuth not supported server-side" } };
   }
 
   async getUser(): Promise<{ data: { user: any }; error: any }> {
